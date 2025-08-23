@@ -1,0 +1,21 @@
+basic resistor
+R1 in out 1k
+R2 in 0   1.1234T
+R3 in out -10
+R4 in out .5
+R5 in out 1.25
+R6 in out 2.5e3
+R7 in out 2.5E-3
+R8 in out -3e+6
+R9 in out 10K
+R10 in out 47Meg
+R11 in out 1m
+R12 in out 220u
+R13 in out 33n
+R14 in out 4.7p
+R15 in out 8f
+R16 in out 1a
+R17 in out 1.2e-3K
+R18 in out .123G
+R19 in out -0.99T
+.END

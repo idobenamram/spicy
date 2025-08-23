@@ -1,0 +1,251 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+[
+    Token {
+        kind: Ident,
+        start: 0,
+        end: 3,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 4,
+        end: 4,
+    },
+    Token {
+        kind: Ident,
+        start: 5,
+        end: 6,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 7,
+        end: 8,
+    },
+    Token {
+        kind: Ident,
+        start: 9,
+        end: 9,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 10,
+        end: 10,
+    },
+    Token {
+        kind: Ident,
+        start: 11,
+        end: 14,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 15,
+        end: 15,
+    },
+    Token {
+        kind: Ident,
+        start: 16,
+        end: 20,
+    },
+    Token {
+        kind: Newline,
+        start: 21,
+        end: 21,
+    },
+    Token {
+        kind: Asterisk,
+        start: 22,
+        end: 22,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 23,
+        end: 23,
+    },
+    Token {
+        kind: Ident,
+        start: 24,
+        end: 27,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 28,
+        end: 28,
+    },
+    Token {
+        kind: Ident,
+        start: 29,
+        end: 30,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 31,
+        end: 31,
+    },
+    Token {
+        kind: Ident,
+        start: 32,
+        end: 32,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 33,
+        end: 33,
+    },
+    Token {
+        kind: Ident,
+        start: 34,
+        end: 36,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 37,
+        end: 37,
+    },
+    Token {
+        kind: Ident,
+        start: 38,
+        end: 44,
+    },
+    Token {
+        kind: Newline,
+        start: 45,
+        end: 45,
+    },
+    Token {
+        kind: Ident,
+        start: 46,
+        end: 47,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 48,
+        end: 48,
+    },
+    Token {
+        kind: Ident,
+        start: 49,
+        end: 50,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 51,
+        end: 51,
+    },
+    Token {
+        kind: Ident,
+        start: 52,
+        end: 54,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 55,
+        end: 55,
+    },
+    Token {
+        kind: Plus,
+        start: 56,
+        end: 56,
+    },
+    Token {
+        kind: Newline,
+        start: 57,
+        end: 57,
+    },
+    Token {
+        kind: Number,
+        start: 58,
+        end: 58,
+    },
+    Token {
+        kind: Ident,
+        start: 59,
+        end: 59,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 60,
+        end: 60,
+    },
+    Token {
+        kind: Newline,
+        start: 61,
+        end: 61,
+    },
+    Token {
+        kind: Ident,
+        start: 62,
+        end: 63,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 64,
+        end: 64,
+    },
+    Token {
+        kind: Ident,
+        start: 65,
+        end: 66,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 67,
+        end: 67,
+    },
+    Token {
+        kind: Ident,
+        start: 68,
+        end: 70,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 71,
+        end: 71,
+    },
+    Token {
+        kind: Plus,
+        start: 72,
+        end: 72,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 73,
+        end: 74,
+    },
+    Token {
+        kind: Newline,
+        start: 75,
+        end: 75,
+    },
+    Token {
+        kind: Number,
+        start: 76,
+        end: 76,
+    },
+    Token {
+        kind: Ident,
+        start: 77,
+        end: 77,
+    },
+    Token {
+        kind: Newline,
+        start: 78,
+        end: 78,
+    },
+    Token {
+        kind: Dot,
+        start: 79,
+        end: 79,
+    },
+    Token {
+        kind: Ident,
+        start: 80,
+        end: 82,
+    },
+    Token {
+        kind: Newline,
+        start: 83,
+        end: 83,
+    },
+]

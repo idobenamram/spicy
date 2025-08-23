@@ -18,13 +18,18 @@ pub struct Deck {
 }
 
 #[derive(Debug)]
+pub struct Value {
+    value: f64,
+    exponent: Option<f64>,
+    suffix: Option<ValueSuffix>,
+}
+
+#[derive(Debug)]
 pub struct Element {
     kind: ElementType,
     name: String,
     nodes: Vec<Node>,
-    value: f64,
-    exponent: Option<f64>,
-    suffix: Option<ValueSuffix>,
+    value: Value,
     params: HashMap<String, String>,
     start: usize,
     end: usize,
@@ -84,6 +89,7 @@ impl Statement {
         }
         None
     }
+
 
     fn peek(&self) -> Option<&Token> {
         self.tokens.last()
@@ -225,7 +231,7 @@ impl<'s> Parser<'s> {
         comment
     }
 
-    fn parse_value(&mut self, mut statement: Statement) -> (f64, Option<f64>, Option<ValueSuffix>) {
+    fn parse_value(&mut self, statement: &mut Statement) -> Value {
         let mut number_str = String::new();
         let mut exponent: Option<f64> = None;
         let mut suffix: Option<ValueSuffix> = None;
@@ -317,7 +323,18 @@ impl<'s> Parser<'s> {
             .parse()
             .unwrap_or_else(|_| panic!("Invalid numeric literal: {}", number_str));
 
-        (value, exponent, suffix)
+        Value {
+            value,
+            exponent,
+            suffix,
+        }
+    }
+
+    fn parse_node(&mut self, statement: &mut Statement) -> Node {
+        let node = statement.next_non_whitespace().expect("Must be node");
+        assert!(matches!(node.kind, TokenKind::Ident | TokenKind::Number));
+        let node_string = self.input[node.start..=node.end].to_string();
+        Node { name: node_string }
     }
 
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
@@ -330,32 +347,83 @@ impl<'s> Parser<'s> {
         let start = statement.start;
         let end = statement.end;
 
-        let node1 = statement.next_non_whitespace().expect("Must be node1");
-        assert!(matches!(node1.kind, TokenKind::Ident | TokenKind::Number));
-        let node1_string = self.input[node1.start..=node1.end].to_string();
-        nodes.push(Node { name: node1_string });
+        nodes.push(self.parse_node(&mut statement));
+        nodes.push(self.parse_node(&mut statement));
 
-        let node2 = statement.next_non_whitespace().expect("Must be node2");
-        assert!(matches!(node2.kind, TokenKind::Ident | TokenKind::Number));
-        let node2_string = self.input[node2.start..=node2.end].to_string();
-        nodes.push(Node { name: node2_string });
-
-        let (value, exponent, suffix) = self.parse_value(statement);
+        let value = self.parse_value(&mut statement);
 
         Element {
             kind: ElementType::Resistor,
             name,
             nodes,
             value,
-            exponent,
-            suffix,
             params,
             start,
             end,
         }
     }
 
-    pub fn parse_element(&mut self, mut statement: Statement) -> Element {
+    // CXXXXXXX n+ n- <value> <mname> <m=val> <scale=val> <temp=val>
+    // + <dtemp=val> <tc1=val> <tc2=val> <ic=init_condition>
+    fn parse_capacitor(&mut self, name: String, mut statement: Statement) -> Element {
+        let mut nodes: Vec<Node> = vec![];
+        let params = HashMap::new();
+
+        let start = statement.start;
+        let end = statement.end;
+
+        nodes.push(self.parse_node(&mut statement));
+        nodes.push(self.parse_node(&mut statement));
+
+        let value = self.parse_value(&mut statement);
+
+        Element {
+            kind: ElementType::Capacitor,
+            name,
+            nodes,
+            value,
+            params,
+            start,
+            end,
+        }
+    }
+
+    // VXXXXXXX N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
+    // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
+    // IYYYYYYY N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
+    // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
+    fn parse_independent_source(&mut self, element_type: ElementType, name: String, mut statement: Statement) -> Element {
+        let mut nodes: Vec<Node> = vec![];
+        let params = HashMap::new();
+
+        let start = statement.start;
+        let end = statement.end;
+
+        nodes.push(self.parse_node(&mut statement));
+        nodes.push(self.parse_node(&mut statement));
+
+        let operation = statement.next_non_whitespace().expect("Must be operation");
+        assert_eq!(operation.kind, TokenKind::Ident);
+        let operation_string = self.input[operation.start..=operation.end].to_string();
+
+        let value = match operation_string.as_str() {
+            "DC" => self.parse_value(&mut statement),
+            "AC" => panic!("AC not supported yet"),
+            _ => panic!("Invalid operation: {}", operation_string),
+        };
+
+        Element {
+            kind: element_type,
+            name,
+            nodes,
+            value,
+            params,
+            start,
+            end,
+        }
+    }
+
+    fn parse_element(&mut self, mut statement: Statement) -> Element {
         let ident = statement.next().expect("Must be ident");
         assert_eq!(ident.kind, TokenKind::Ident);
 
@@ -367,6 +435,9 @@ impl<'s> Parser<'s> {
 
         match element_type {
             ElementType::Resistor => self.parse_resistor(name, statement),
+            ElementType::Capacitor => self.parse_capacitor(name, statement),
+            ElementType::VoltageSource => self.parse_independent_source(ElementType::VoltageSource, name, statement),
+            ElementType::CurrentSource => self.parse_independent_source(ElementType::CurrentSource, name, statement),
             _ => panic!("Invalid element type: {:?}", element_type),
         }
     }
@@ -376,7 +447,8 @@ impl<'s> Parser<'s> {
         todo!()
     }
 
-    pub fn parse_directive(&mut self, mut statement: Statement) -> Directive {
+
+    fn parse_directive(&mut self, mut statement: Statement) -> Directive {
         let dot = statement.next().expect("Must be dot");
         assert_eq!(dot.kind, TokenKind::Dot);
 
@@ -390,6 +462,13 @@ impl<'s> Parser<'s> {
                 &self.input[kind.start..=kind.end]
             ),
         };
+
+        match command {
+            // CommandType::Dc => self.parse_dc_command(statement),
+            CommandType::Op => {}
+            CommandType::End => {}
+            _ => panic!("Invalid command: {:?}", command),
+        }
 
         Directive {
             kind: command,
@@ -449,7 +528,7 @@ mod tests {
 
     #[rstest]
     fn test_statement_stream(
-        #[files("tests/test_inputs/with_line_continuation.spicy")] input: PathBuf,
+        #[files("tests/statement_inputs/*.spicy")] input: PathBuf,
     ) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
@@ -463,7 +542,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_parser(#[files("tests/test_inputs/basic_resistor.spicy")] input: PathBuf) {
+    fn test_parser(#[files("tests/parser_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let mut parser = Parser::new(&input_content);
         let deck = parser.parse();

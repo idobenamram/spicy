@@ -1,0 +1,206 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+[
+    Token {
+        kind: Ident,
+        start: 0,
+        end: 4,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 5,
+        end: 5,
+    },
+    Token {
+        kind: Ident,
+        start: 6,
+        end: 14,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 15,
+        end: 15,
+    },
+    Token {
+        kind: Ident,
+        start: 16,
+        end: 20,
+    },
+    Token {
+        kind: Newline,
+        start: 21,
+        end: 21,
+    },
+    Token {
+        kind: Ident,
+        start: 22,
+        end: 23,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 24,
+        end: 24,
+    },
+    Token {
+        kind: Ident,
+        start: 25,
+        end: 26,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 27,
+        end: 27,
+    },
+    Token {
+        kind: Ident,
+        start: 28,
+        end: 30,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 31,
+        end: 31,
+    },
+    Token {
+        kind: Number,
+        start: 32,
+        end: 33,
+    },
+    Token {
+        kind: Ident,
+        start: 34,
+        end: 34,
+    },
+    Token {
+        kind: Newline,
+        start: 35,
+        end: 35,
+    },
+    Token {
+        kind: Ident,
+        start: 36,
+        end: 37,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 38,
+        end: 38,
+    },
+    Token {
+        kind: Ident,
+        start: 39,
+        end: 41,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 42,
+        end: 42,
+    },
+    Token {
+        kind: Number,
+        start: 43,
+        end: 43,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 44,
+        end: 44,
+    },
+    Token {
+        kind: Number,
+        start: 45,
+        end: 45,
+    },
+    Token {
+        kind: Ident,
+        start: 46,
+        end: 46,
+    },
+    Token {
+        kind: Newline,
+        start: 47,
+        end: 47,
+    },
+    Token {
+        kind: Ident,
+        start: 48,
+        end: 49,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 50,
+        end: 50,
+    },
+    Token {
+        kind: Ident,
+        start: 51,
+        end: 53,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 54,
+        end: 54,
+    },
+    Token {
+        kind: Number,
+        start: 55,
+        end: 55,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 56,
+        end: 56,
+    },
+    Token {
+        kind: Number,
+        start: 57,
+        end: 57,
+    },
+    Token {
+        kind: Ident,
+        start: 58,
+        end: 58,
+    },
+    Token {
+        kind: Newline,
+        start: 59,
+        end: 59,
+    },
+    Token {
+        kind: Dot,
+        start: 60,
+        end: 60,
+    },
+    Token {
+        kind: Ident,
+        start: 61,
+        end: 62,
+    },
+    Token {
+        kind: Newline,
+        start: 63,
+        end: 63,
+    },
+    Token {
+        kind: Dot,
+        start: 64,
+        end: 64,
+    },
+    Token {
+        kind: Ident,
+        start: 65,
+        end: 67,
+    },
+    Token {
+        kind: Newline,
+        start: 68,
+        end: 68,
+    },
+    Token {
+        kind: Newline,
+        start: 69,
+        end: 69,
+    },
+]

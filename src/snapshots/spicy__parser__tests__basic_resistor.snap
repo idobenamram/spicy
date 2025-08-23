@@ -1,0 +1,391 @@
+---
+source: src/parser.rs
+expression: deck
+---
+Deck {
+    title: "basic resistor",
+    directives: [
+        Directive {
+            kind: END,
+            params: {},
+            start: 311,
+            end: 314,
+        },
+    ],
+    elements: [
+        Element {
+            kind: Resistor,
+            name: "1",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 1.0,
+            exponent: None,
+            suffix: Some(
+                Kilo,
+            ),
+            params: {},
+            start: 15,
+            end: 26,
+        },
+        Element {
+            kind: Resistor,
+            name: "2",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "0",
+                },
+            ],
+            value: 1.1234,
+            exponent: None,
+            suffix: Some(
+                Tera,
+            ),
+            params: {},
+            start: 28,
+            end: 44,
+        },
+        Element {
+            kind: Resistor,
+            name: "3",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: -10.0,
+            exponent: None,
+            suffix: None,
+            params: {},
+            start: 46,
+            end: 58,
+        },
+        Element {
+            kind: Resistor,
+            name: "4",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 0.5,
+            exponent: None,
+            suffix: None,
+            params: {},
+            start: 60,
+            end: 71,
+        },
+        Element {
+            kind: Resistor,
+            name: "5",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 1.25,
+            exponent: None,
+            suffix: None,
+            params: {},
+            start: 73,
+            end: 86,
+        },
+        Element {
+            kind: Resistor,
+            name: "6",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 2.5,
+            exponent: None,
+            suffix: None,
+            params: {},
+            start: 88,
+            end: 102,
+        },
+        Element {
+            kind: Resistor,
+            name: "7",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 2.5,
+            exponent: Some(
+                -3.0,
+            ),
+            suffix: None,
+            params: {},
+            start: 104,
+            end: 119,
+        },
+        Element {
+            kind: Resistor,
+            name: "8",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: -3.0,
+            exponent: Some(
+                6.0,
+            ),
+            suffix: None,
+            params: {},
+            start: 121,
+            end: 135,
+        },
+        Element {
+            kind: Resistor,
+            name: "9",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 10.0,
+            exponent: None,
+            suffix: Some(
+                Kilo,
+            ),
+            params: {},
+            start: 137,
+            end: 149,
+        },
+        Element {
+            kind: Resistor,
+            name: "10",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 47.0,
+            exponent: None,
+            suffix: Some(
+                Mega,
+            ),
+            params: {},
+            start: 151,
+            end: 166,
+        },
+        Element {
+            kind: Resistor,
+            name: "11",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 1.0,
+            exponent: None,
+            suffix: Some(
+                Milli,
+            ),
+            params: {},
+            start: 168,
+            end: 180,
+        },
+        Element {
+            kind: Resistor,
+            name: "12",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 220.0,
+            exponent: None,
+            suffix: Some(
+                Micro,
+            ),
+            params: {},
+            start: 182,
+            end: 196,
+        },
+        Element {
+            kind: Resistor,
+            name: "13",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 33.0,
+            exponent: None,
+            suffix: Some(
+                Nano,
+            ),
+            params: {},
+            start: 198,
+            end: 211,
+        },
+        Element {
+            kind: Resistor,
+            name: "14",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 4.7,
+            exponent: None,
+            suffix: Some(
+                Pico,
+            ),
+            params: {},
+            start: 213,
+            end: 227,
+        },
+        Element {
+            kind: Resistor,
+            name: "15",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 8.0,
+            exponent: None,
+            suffix: Some(
+                Femto,
+            ),
+            params: {},
+            start: 229,
+            end: 241,
+        },
+        Element {
+            kind: Resistor,
+            name: "16",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 1.0,
+            exponent: None,
+            suffix: Some(
+                Atto,
+            ),
+            params: {},
+            start: 243,
+            end: 255,
+        },
+        Element {
+            kind: Resistor,
+            name: "17",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 1.2,
+            exponent: Some(
+                -3.0,
+            ),
+            suffix: Some(
+                Kilo,
+            ),
+            params: {},
+            start: 257,
+            end: 274,
+        },
+        Element {
+            kind: Resistor,
+            name: "18",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: 0.123,
+            exponent: None,
+            suffix: Some(
+                Giga,
+            ),
+            params: {},
+            start: 276,
+            end: 291,
+        },
+        Element {
+            kind: Resistor,
+            name: "19",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: -0.99,
+            exponent: None,
+            suffix: Some(
+                Tera,
+            ),
+            params: {},
+            start: 293,
+            end: 309,
+        },
+    ],
+}

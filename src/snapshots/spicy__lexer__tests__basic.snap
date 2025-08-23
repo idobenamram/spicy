@@ -1,0 +1,131 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+[
+    Token {
+        kind: Ident,
+        start: 0,
+        end: 3,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 4,
+        end: 4,
+    },
+    Token {
+        kind: Ident,
+        start: 5,
+        end: 6,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 7,
+        end: 8,
+    },
+    Token {
+        kind: Ident,
+        start: 9,
+        end: 9,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 10,
+        end: 10,
+    },
+    Token {
+        kind: Ident,
+        start: 11,
+        end: 14,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 15,
+        end: 15,
+    },
+    Token {
+        kind: Ident,
+        start: 16,
+        end: 20,
+    },
+    Token {
+        kind: Newline,
+        start: 21,
+        end: 21,
+    },
+    Token {
+        kind: Asterisk,
+        start: 22,
+        end: 22,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 23,
+        end: 23,
+    },
+    Token {
+        kind: Ident,
+        start: 24,
+        end: 27,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 28,
+        end: 28,
+    },
+    Token {
+        kind: Ident,
+        start: 29,
+        end: 30,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 31,
+        end: 31,
+    },
+    Token {
+        kind: Ident,
+        start: 32,
+        end: 32,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 33,
+        end: 33,
+    },
+    Token {
+        kind: Ident,
+        start: 34,
+        end: 36,
+    },
+    Token {
+        kind: WhiteSpace,
+        start: 37,
+        end: 37,
+    },
+    Token {
+        kind: Ident,
+        start: 38,
+        end: 44,
+    },
+    Token {
+        kind: Newline,
+        start: 45,
+        end: 45,
+    },
+    Token {
+        kind: Dot,
+        start: 46,
+        end: 46,
+    },
+    Token {
+        kind: Ident,
+        start: 47,
+        end: 49,
+    },
+    Token {
+        kind: Newline,
+        start: 50,
+        end: 50,
+    },
+]

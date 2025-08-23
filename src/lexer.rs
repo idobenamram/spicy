@@ -58,6 +58,11 @@ impl<'s> Lexer<'s> {
         Token::new(TokenKind::WhiteSpace, start, self.s.cursor() - 1)
     }
 
+    fn newline(&mut self, start: usize) -> Token {
+        self.s.eat_while(|c: char| c == '\n');
+        Token::new(TokenKind::Newline, start, self.s.cursor() - 1)
+    }
+
     fn identifier(&mut self, first_char: char, start: usize) -> Token {
         // ensure first character is alphabetic, then consume remaining alphanumeric characters
         if !first_char.is_alphabetic() {
@@ -92,7 +97,7 @@ impl<'s> Lexer<'s> {
     pub fn next(&mut self) -> Token {
         let start = self.s.cursor();
         match self.s.eat() {
-            Some(c) if c == '\n' => Token::single(TokenKind::Newline, start),
+            Some(c) if c == '\n' => self.newline(start),
             Some(c) if c.is_whitespace() => self.whitespace(start),
             Some(c) => self.netlist(c, start),
             None => Token::end(start),
@@ -107,7 +112,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[rstest]
-    fn test_lexer(#[files("tests/test_inputs/*.spicy")] input: PathBuf) {
+    fn test_lexer(#[files("tests/lexer_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
         let mut lexer = Lexer::new(&input_content);

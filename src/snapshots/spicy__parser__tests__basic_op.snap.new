@@ -1,0 +1,90 @@
+---
+source: src/parser.rs
+assertion_line: 554
+expression: deck
+---
+Deck {
+    title: "basic operating point",
+    directives: [
+        Directive {
+            kind: Op,
+            params: {},
+            start: 63,
+            end: 65,
+        },
+        Directive {
+            kind: End,
+            params: {},
+            start: 67,
+            end: 70,
+        },
+    ],
+    elements: [
+        Element {
+            kind: Resistor,
+            name: "1",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: Value {
+                value: 10.0,
+                exponent: None,
+                suffix: Some(
+                    Kilo,
+                ),
+            },
+            params: {},
+            start: 22,
+            end: 34,
+        },
+        Element {
+            kind: CurrentSource,
+            name: "1",
+            nodes: [
+                Node {
+                    name: "out",
+                },
+                Node {
+                    name: "0",
+                },
+            ],
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Milli,
+                ),
+            },
+            params: {},
+            start: 36,
+            end: 49,
+        },
+        Element {
+            kind: Capacitor,
+            name: "1",
+            nodes: [
+                Node {
+                    name: "out",
+                },
+                Node {
+                    name: "0",
+                },
+            ],
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Micro,
+                ),
+            },
+            params: {},
+            start: 51,
+            end: 61,
+        },
+    ],
+}

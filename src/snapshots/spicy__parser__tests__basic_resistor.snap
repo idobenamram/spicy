@@ -6,7 +6,7 @@ Deck {
     title: "basic resistor",
     directives: [
         Directive {
-            kind: END,
+            kind: End,
             params: {},
             start: 311,
             end: 314,
@@ -24,11 +24,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 1.0,
-            exponent: None,
-            suffix: Some(
-                Kilo,
-            ),
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Kilo,
+                ),
+            },
             params: {},
             start: 15,
             end: 26,
@@ -44,11 +46,13 @@ Deck {
                     name: "0",
                 },
             ],
-            value: 1.1234,
-            exponent: None,
-            suffix: Some(
-                Tera,
-            ),
+            value: Value {
+                value: 1.1234,
+                exponent: None,
+                suffix: Some(
+                    Tera,
+                ),
+            },
             params: {},
             start: 28,
             end: 44,
@@ -64,9 +68,11 @@ Deck {
                     name: "out",
                 },
             ],
-            value: -10.0,
-            exponent: None,
-            suffix: None,
+            value: Value {
+                value: -10.0,
+                exponent: None,
+                suffix: None,
+            },
             params: {},
             start: 46,
             end: 58,
@@ -82,9 +88,11 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 0.5,
-            exponent: None,
-            suffix: None,
+            value: Value {
+                value: 0.5,
+                exponent: None,
+                suffix: None,
+            },
             params: {},
             start: 60,
             end: 71,
@@ -100,9 +108,11 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 1.25,
-            exponent: None,
-            suffix: None,
+            value: Value {
+                value: 1.25,
+                exponent: None,
+                suffix: None,
+            },
             params: {},
             start: 73,
             end: 86,
@@ -118,9 +128,11 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 2.5,
-            exponent: None,
-            suffix: None,
+            value: Value {
+                value: 2.5,
+                exponent: None,
+                suffix: None,
+            },
             params: {},
             start: 88,
             end: 102,
@@ -136,11 +148,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 2.5,
-            exponent: Some(
-                -3.0,
-            ),
-            suffix: None,
+            value: Value {
+                value: 2.5,
+                exponent: Some(
+                    -3.0,
+                ),
+                suffix: None,
+            },
             params: {},
             start: 104,
             end: 119,
@@ -156,11 +170,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: -3.0,
-            exponent: Some(
-                6.0,
-            ),
-            suffix: None,
+            value: Value {
+                value: -3.0,
+                exponent: Some(
+                    6.0,
+                ),
+                suffix: None,
+            },
             params: {},
             start: 121,
             end: 135,
@@ -176,11 +192,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 10.0,
-            exponent: None,
-            suffix: Some(
-                Kilo,
-            ),
+            value: Value {
+                value: 10.0,
+                exponent: None,
+                suffix: Some(
+                    Kilo,
+                ),
+            },
             params: {},
             start: 137,
             end: 149,
@@ -196,11 +214,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 47.0,
-            exponent: None,
-            suffix: Some(
-                Mega,
-            ),
+            value: Value {
+                value: 47.0,
+                exponent: None,
+                suffix: Some(
+                    Mega,
+                ),
+            },
             params: {},
             start: 151,
             end: 166,
@@ -216,11 +236,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 1.0,
-            exponent: None,
-            suffix: Some(
-                Milli,
-            ),
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Milli,
+                ),
+            },
             params: {},
             start: 168,
             end: 180,
@@ -236,11 +258,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 220.0,
-            exponent: None,
-            suffix: Some(
-                Micro,
-            ),
+            value: Value {
+                value: 220.0,
+                exponent: None,
+                suffix: Some(
+                    Micro,
+                ),
+            },
             params: {},
             start: 182,
             end: 196,
@@ -256,11 +280,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 33.0,
-            exponent: None,
-            suffix: Some(
-                Nano,
-            ),
+            value: Value {
+                value: 33.0,
+                exponent: None,
+                suffix: Some(
+                    Nano,
+                ),
+            },
             params: {},
             start: 198,
             end: 211,
@@ -276,11 +302,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 4.7,
-            exponent: None,
-            suffix: Some(
-                Pico,
-            ),
+            value: Value {
+                value: 4.7,
+                exponent: None,
+                suffix: Some(
+                    Pico,
+                ),
+            },
             params: {},
             start: 213,
             end: 227,
@@ -296,11 +324,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 8.0,
-            exponent: None,
-            suffix: Some(
-                Femto,
-            ),
+            value: Value {
+                value: 8.0,
+                exponent: None,
+                suffix: Some(
+                    Femto,
+                ),
+            },
             params: {},
             start: 229,
             end: 241,
@@ -316,11 +346,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 1.0,
-            exponent: None,
-            suffix: Some(
-                Atto,
-            ),
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Atto,
+                ),
+            },
             params: {},
             start: 243,
             end: 255,
@@ -336,13 +368,15 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 1.2,
-            exponent: Some(
-                -3.0,
-            ),
-            suffix: Some(
-                Kilo,
-            ),
+            value: Value {
+                value: 1.2,
+                exponent: Some(
+                    -3.0,
+                ),
+                suffix: Some(
+                    Kilo,
+                ),
+            },
             params: {},
             start: 257,
             end: 274,
@@ -358,11 +392,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: 0.123,
-            exponent: None,
-            suffix: Some(
-                Giga,
-            ),
+            value: Value {
+                value: 0.123,
+                exponent: None,
+                suffix: Some(
+                    Giga,
+                ),
+            },
             params: {},
             start: 276,
             end: 291,
@@ -378,11 +414,13 @@ Deck {
                     name: "out",
                 },
             ],
-            value: -0.99,
-            exponent: None,
-            suffix: Some(
-                Tera,
-            ),
+            value: Value {
+                value: -0.99,
+                exponent: None,
+                suffix: Some(
+                    Tera,
+                ),
+            },
             params: {},
             start: 293,
             end: 309,

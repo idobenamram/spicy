@@ -5,8 +5,8 @@
 pub enum CommandType {
     AC,
     DC,
-    OP,
-    END,
+    Op,
+    End,
 }
 
 impl CommandType {
@@ -14,8 +14,8 @@ impl CommandType {
         match s {
             "AC" => Some(CommandType::AC),
             "DC" => Some(CommandType::DC),
-            "OP" => Some(CommandType::OP),
-            "END" => Some(CommandType::END),
+            "OP" => Some(CommandType::Op),
+            "END" => Some(CommandType::End),
             _ => None,
         }
     }

@@ -1003,4 +1003,9 @@ expression: tokens
         start: 312,
         end: 314,
     },
+    Token {
+        kind: Newline,
+        start: 315,
+        end: 315,
+    },
 ]

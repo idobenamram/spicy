@@ -1,0 +1,6 @@
+basic operating point
+R1 in out 10k
+I1 out 0 DC 1m
+C1 out 0 1u
+.OP
+.END

@@ -5,16 +5,51 @@ use std::collections::HashMap;
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::netlist_types::{CommandType, ElementType, ValueSuffix};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
-    name: String,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct Nodes {
+    pub nodes: HashMap<String, u32>,
+}
+
+impl Nodes {
+    pub fn get(&self, name: &str) -> Option<u32> {
+        if name != "0" {
+            *self.nodes.get(name)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Deck {
     title: String,
-    directives: Vec<Directive>,
-    elements: Vec<Element>,
+    pub directives: Vec<Directive>,
+    pub elements: Vec<Element>,
+}
+
+
+impl Deck {
+    pub fn nodes(&self) -> HashMap<String, u32> {
+        let mut nodes = HashMap::new();
+        let mut node_index = 0;
+        for element in &self.elements {
+            for node in element.nodes.iter() {
+                if node.name != "0" {
+                    if !nodes.contains_key(&node.name) {
+                        nodes.insert(node.name.clone(), node_index);
+                        node_index += 1;
+                    }
+                }
+            }
+        }
+
+        nodes
+    }
 }
 
 #[derive(Debug)]
@@ -24,15 +59,29 @@ pub struct Value {
     suffix: Option<ValueSuffix>,
 }
 
+impl Value {
+    pub fn get_value(&self) -> f64 {
+        let mut value = self.value;
+        if let Some(exponent) = self.exponent {
+            value *= 10.0f64.powf(exponent);
+        }
+        if let Some(suffix) = self.suffix {
+            value *= suffix.scale();
+        }
+        value
+    }
+}
+
 #[derive(Debug)]
 pub struct Element {
-    kind: ElementType,
-    name: String,
-    nodes: Vec<Node>,
-    value: Value,
-    params: HashMap<String, String>,
-    start: usize,
-    end: usize,
+    pub kind: ElementType,
+    pub name: String,
+    // maybe we can make this type safe with a postive/negative node type
+    pub nodes: Vec<Node>,
+    pub value: Value,
+    pub params: HashMap<String, String>,
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Debug)]
@@ -69,11 +118,7 @@ impl Statement {
     fn new_reversed(tokens: Vec<Token>) -> Self {
         let start = tokens[tokens.len() - 1].start;
         let end = tokens[0].end;
-        Self {
-            start,
-            end,
-            tokens,
-        }
+        Self { start, end, tokens }
     }
 
     fn next(&mut self) -> Option<Token> {
@@ -89,7 +134,6 @@ impl Statement {
         }
         None
     }
-
 
     fn peek(&self) -> Option<&Token> {
         self.tokens.last()
@@ -392,7 +436,12 @@ impl<'s> Parser<'s> {
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
     // IYYYYYYY N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
-    fn parse_independent_source(&mut self, element_type: ElementType, name: String, mut statement: Statement) -> Element {
+    fn parse_independent_source(
+        &mut self,
+        element_type: ElementType,
+        name: String,
+        mut statement: Statement,
+    ) -> Element {
         let mut nodes: Vec<Node> = vec![];
         let params = HashMap::new();
 
@@ -436,8 +485,12 @@ impl<'s> Parser<'s> {
         match element_type {
             ElementType::Resistor => self.parse_resistor(name, statement),
             ElementType::Capacitor => self.parse_capacitor(name, statement),
-            ElementType::VoltageSource => self.parse_independent_source(ElementType::VoltageSource, name, statement),
-            ElementType::CurrentSource => self.parse_independent_source(ElementType::CurrentSource, name, statement),
+            ElementType::VoltageSource => {
+                self.parse_independent_source(ElementType::VoltageSource, name, statement)
+            }
+            ElementType::CurrentSource => {
+                self.parse_independent_source(ElementType::CurrentSource, name, statement)
+            }
             _ => panic!("Invalid element type: {:?}", element_type),
         }
     }
@@ -446,7 +499,6 @@ impl<'s> Parser<'s> {
     fn parse_dc_command(&mut self, statement: Statement) -> Directive {
         todo!()
     }
-
 
     fn parse_directive(&mut self, mut statement: Statement) -> Directive {
         let dot = statement.next().expect("Must be dot");
@@ -527,9 +579,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[rstest]
-    fn test_statement_stream(
-        #[files("tests/statement_inputs/*.spicy")] input: PathBuf,
-    ) {
+    fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
         let stream = StatementStream::new(&input_content);

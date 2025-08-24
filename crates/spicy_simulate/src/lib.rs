@@ -1,4 +1,8 @@
-use crate::parser::Deck;
+use spicy_parser::parser::{Deck, Element, Nodes};
+use spicy_parser::netlist_types::ElementType;
+use ndarray::{Array2, Array1};
+use ndarray_linalg::{FactorizeInto, Solve};
+
 
 fn stamp_resistor(G: &mut Array2<f64>, element: &Element, nodes: &Nodes) {
     let node1 = nodes.get(&element.nodes[0].name);
@@ -44,10 +48,11 @@ pub fn simulate(deck: Deck) {
         match element.kind {
             ElementType::Resistor => stamp_resistor(&mut G, &element, &nodes),
             ElementType::CurrentSource => stamp_current_source(&mut I, &element, &nodes),
+            _ => panic!("Unsupported element type: {:?}", element.kind),
         }
     }
 
-    let lu = G.lu();
+    let lu = G.factorize_into().expect("Failed to factorize matrix");
     let v = lu.solve(&I);
 
     for (i, v) in v.iter().enumerate() {

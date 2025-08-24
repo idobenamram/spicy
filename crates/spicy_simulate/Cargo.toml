@@ -1,0 +1,9 @@
+[package]
+name = "spicy_simulate"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ndarray = "0.16.1"
+ndarray-linalg = { version = "0.17", features = ["openblas-static"] }  # or netlib-*/intel-mkl-*
+spicy_parser = { path = "../spicy_parser" }

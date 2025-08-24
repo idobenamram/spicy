@@ -10,53 +10,19 @@ pub struct Node {
     pub name: String,
 }
 
-#[derive(Debug)]
-pub struct Nodes {
-    pub nodes: HashMap<String, usize>,
-}
 
-impl Nodes {
-    pub fn get(&self, name: &str) -> Option<usize> {
-        if name != "0" {
-            self.nodes.get(name).copied()
-        } else {
-            None
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.nodes.len()
-    }   
-}
 
 #[derive(Debug)]
 pub struct Deck {
-    title: String,
+    pub title: String,
     pub directives: Vec<Directive>,
     pub elements: Vec<Element>,
 }
 
 
-impl Deck {
-    pub fn nodes(&self) -> Nodes {
-        let mut nodes = HashMap::new();
-        let mut node_index = 0;
-        for element in &self.elements {
-            for node in element.nodes.iter() {
-                if node.name != "0" {
-                    if !nodes.contains_key(&node.name) {
-                        nodes.insert(node.name.clone(), node_index);
-                        node_index += 1;
-                    }
-                }
-            }
-        }
 
-        Nodes { nodes }
-    }
-}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Value {
     value: f64,
     exponent: Option<f64>,
@@ -88,12 +54,21 @@ pub struct Element {
     pub end: usize,
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Attr {
+    Value(Value),
+    String(String),
+}
+
+pub type Attributes = HashMap<String, Attr>;
+
 #[derive(Debug)]
 pub struct Directive {
-    kind: CommandType,
-    params: HashMap<String, String>,
-    start: usize,
-    end: usize,
+    pub kind: CommandType,
+    pub params: Attributes,
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Debug)]
@@ -244,10 +219,6 @@ impl StatementStream {
     fn next(&mut self) -> Option<Statement> {
         self.statements.pop()
     }
-
-    fn peek(&self) -> Option<&Statement> {
-        self.statements.last()
-    }
 }
 
 pub struct Parser<'s> {
@@ -275,6 +246,12 @@ impl<'s> Parser<'s> {
     fn parse_comment(&mut self, statement: Statement) -> String {
         let comment = self.input[statement.start..=statement.end].to_string();
         comment
+    }
+
+    fn parse_ident(&mut self, statement: &mut Statement) -> String {
+        let ident = statement.next_non_whitespace().expect("Must be ident");
+        assert_eq!(ident.kind, TokenKind::Ident);
+        self.input[ident.start..=ident.end].to_string()
     }
 
     fn parse_value(&mut self, statement: &mut Statement) -> Value {
@@ -453,14 +430,12 @@ impl<'s> Parser<'s> {
         nodes.push(self.parse_node(&mut statement));
         nodes.push(self.parse_node(&mut statement));
 
-        let operation = statement.next_non_whitespace().expect("Must be operation");
-        assert_eq!(operation.kind, TokenKind::Ident);
-        let operation_string = self.input[operation.start..=operation.end].to_string();
+        let operation = self.parse_ident(&mut statement);
 
-        let value = match operation_string.as_str() {
+        let value = match operation.as_str() {
             "DC" => self.parse_value(&mut statement),
             "AC" => panic!("AC not supported yet"),
-            _ => panic!("Invalid operation: {}", operation_string),
+            _ => panic!("Invalid operation: {}", operation),
         };
 
         Element {
@@ -498,11 +473,25 @@ impl<'s> Parser<'s> {
     }
 
     // .dc srcnam vstart vstop vincr [src2 start2 stop2 incr2]
-    fn parse_dc_command(&mut self, statement: Statement) -> Directive {
-        todo!()
+    fn parse_dc_command(&mut self, mut statement: Statement) -> Attributes {
+        
+        let srcnam = self.parse_ident(&mut statement);
+        let vstart = self.parse_value(&mut statement);
+        let vstop = self.parse_value(&mut statement);
+        let vincr = self.parse_value(&mut statement);
+
+        Attributes::from_iter(vec![
+            ("srcnam".to_string(), Attr::String(srcnam)),
+            ("vstart".to_string(), Attr::Value(vstart)),
+            ("vstop".to_string(), Attr::Value(vstop)),
+            ("vincr".to_string(), Attr::Value(vincr)),
+        ])
     }
 
     fn parse_directive(&mut self, mut statement: Statement) -> Directive {
+        let start = statement.start;
+        let end = statement.end;
+
         let dot = statement.next().expect("Must be dot");
         assert_eq!(dot.kind, TokenKind::Dot);
 
@@ -517,18 +506,18 @@ impl<'s> Parser<'s> {
             ),
         };
 
-        match command {
-            // CommandType::Dc => self.parse_dc_command(statement),
-            CommandType::Op => {}
-            CommandType::End => {}
+        let params = match command {
+            CommandType::DC => self.parse_dc_command(statement),
+            CommandType::Op => HashMap::new(),
+            CommandType::End => HashMap::new(),
             _ => panic!("Invalid command: {:?}", command),
-        }
+        };
 
         Directive {
             kind: command,
-            params: HashMap::new(),
-            start: statement.start,
-            end: statement.end,
+            params,
+            start,
+            end,
         }
     }
 
@@ -550,7 +539,7 @@ impl<'s> Parser<'s> {
                 }
                 // comment
                 TokenKind::Asterisk => {
-                    let comment = self.parse_comment(statement);
+                    let _ = self.parse_comment(statement);
                     // TODO: save comments?
                 }
                 TokenKind::Ident => {

@@ -1,7 +1,7 @@
 // https://ngspice.sourceforge.io/docs/ngspice-manual.pdf
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CommandType {
     AC,
     DC,
@@ -44,7 +44,7 @@ impl ElementType {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ValueSuffix {
     Tera,
     Giga,

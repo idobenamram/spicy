@@ -223,8 +223,7 @@ impl StatementStream {
 
         while token.kind != TokenKind::EOF {
             let mut statement = vec![];
-            // TODO: this might get stuck if we don't also add EOF here
-            while token.kind != TokenKind::Newline {
+            while token.kind != TokenKind::Newline && token.kind != TokenKind::EOF {
                 statement.push(token);
                 token = lexer.next();
             }

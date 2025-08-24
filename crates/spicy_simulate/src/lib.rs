@@ -52,11 +52,26 @@ pub fn simulate(deck: Deck) {
         }
     }
 
+    println!("G: {:?}", G);
     let lu = G.factorize_into().expect("Failed to factorize matrix");
-    let v = lu.solve(&I);
+    let v = lu
+        .solve(&I)
+        .expect("Failed to solve linear system");
 
-    for (i, v) in v.iter().enumerate() {
-        println!("Node {}: {}", i, v);
+    // Map indices back to node names for display
+    let mut index_to_name: Vec<String> = vec![String::new(); N];
+    for (name, idx) in &nodes.nodes {
+        if *idx < N {
+            index_to_name[*idx] = name.clone();
+        }
+    }
+
+    // Debug: print mapping from index to name
+    // println!("node index mapping: {:?}", index_to_name);
+
+    for (i, voltage) in v.iter().enumerate() {
+        let name = &index_to_name[i];
+        println!("{}: {:.6}", name, voltage);
     }
 
 }

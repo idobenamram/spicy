@@ -1,0 +1,10 @@
+[package]
+name = "spicy_cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+spicy_parser = { path = "../spicy_parser" }
+spicy_simulate = { path = "../spicy_simulate" }
+
+

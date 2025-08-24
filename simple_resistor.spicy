@@ -1,0 +1,6 @@
+simple current source with resistor network
+I1 in 0 DC 1m
+R1 in out 1k
+R2 out 0 2k
+.OP
+.END

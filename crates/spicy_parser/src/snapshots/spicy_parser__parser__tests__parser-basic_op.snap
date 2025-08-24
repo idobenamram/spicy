@@ -1,6 +1,5 @@
 ---
-source: src/parser.rs
-assertion_line: 554
+source: crates/spicy_parser/src/parser.rs
 expression: deck
 ---
 Deck {

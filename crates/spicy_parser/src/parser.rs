@@ -12,17 +12,21 @@ pub struct Node {
 
 #[derive(Debug)]
 pub struct Nodes {
-    pub nodes: HashMap<String, u32>,
+    pub nodes: HashMap<String, usize>,
 }
 
 impl Nodes {
-    pub fn get(&self, name: &str) -> Option<u32> {
+    pub fn get(&self, name: &str) -> Option<usize> {
         if name != "0" {
-            *self.nodes.get(name)
+            self.nodes.get(name).copied()
         } else {
             None
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }   
 }
 
 #[derive(Debug)]
@@ -34,7 +38,7 @@ pub struct Deck {
 
 
 impl Deck {
-    pub fn nodes(&self) -> HashMap<String, u32> {
+    pub fn nodes(&self) -> Nodes {
         let mut nodes = HashMap::new();
         let mut node_index = 0;
         for element in &self.elements {
@@ -48,7 +52,7 @@ impl Deck {
             }
         }
 
-        nodes
+        Nodes { nodes }
     }
 }
 
@@ -65,7 +69,7 @@ impl Value {
         if let Some(exponent) = self.exponent {
             value *= 10.0f64.powf(exponent);
         }
-        if let Some(suffix) = self.suffix {
+        if let Some(suffix) = &self.suffix {
             value *= suffix.scale();
         }
         value
@@ -230,7 +234,6 @@ impl StatementStream {
             statements.push(Statement::new(statement));
         }
 
-        println!("merge statements");
         // Merge statements with trailing '+' continuation
         let statements = Self::merge_statements(statements);
         // reverse statements to make it easier to pop
@@ -534,7 +537,6 @@ impl<'s> Parser<'s> {
         // first line should be a title
         let title = self.parse_title();
 
-        println!("title {:?}", title);
         let mut directives = vec![];
         let mut elements = vec![];
 
@@ -542,7 +544,6 @@ impl<'s> Parser<'s> {
             let first_token = statement
                 .peek()
                 .expect("Statement should have at least one token");
-            println!("statement {:?}", statement);
             match first_token.kind {
                 TokenKind::Dot => {
                     let directive = self.parse_directive(statement);
@@ -584,10 +585,10 @@ mod tests {
 
         let stream = StatementStream::new(&input_content);
 
-        let name = input
+        let name = format!("stream-{}",input
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| "unknown".to_string()));
         insta::assert_debug_snapshot!(name, stream);
     }
 
@@ -597,10 +598,10 @@ mod tests {
         let mut parser = Parser::new(&input_content);
         let deck = parser.parse();
 
-        let name = input
+        let name = format!("parser-{}",input
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| "unknown".to_string()));
         insta::assert_debug_snapshot!(name, deck);
     }
 }

@@ -1,5 +1,5 @@
 ---
-source: src/lexer.rs
+source: crates/spicy_parser/src/lexer.rs
 expression: tokens
 ---
 [

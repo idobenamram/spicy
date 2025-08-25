@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ndarray::{Array1, Array2};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::netlist_types::{CommandType, ElementType};
-use spicy_parser::parser::{Deck, Element};
+use spicy_parser::parser::{Deck, Directive, Element, Value};
 
 #[derive(Debug)]
 pub struct Nodes {
@@ -104,10 +104,81 @@ fn simulate_op(deck: &Deck) {
     }
 }
 
+fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
+    let nsteps = ((vstop - vstart) / vinc).floor() as usize;
+    (0..=nsteps).map(|i| vstart + i as f64 * vinc).collect()
+}
+
+fn simulate_dc(deck: &Deck, directive: &Directive) {
+    let srcnam = directive
+        .params
+        .get_string("srcnam")
+        .expect("srcnam is required");
+    let vstart = directive
+        .params
+        .get_value("vstart")
+        .expect("vstart is required");
+    let vstop = directive
+        .params
+        .get_value("vstop")
+        .expect("vstop is required");
+    let vincr = directive
+        .params
+        .get_value("vincr")
+        .expect("vincr is required");
+
+    let vstart = vstart.get_value();
+    let vstop = vstop.get_value();
+    let vincr = vincr.get_value();
+
+    let nodes = Nodes::new(&deck.elements);
+
+    let n = nodes.len();
+
+    // conductance matrix
+    let mut g = Array2::<f64>::zeros((n, n));
+    let mut i = Array1::<f64>::zeros(n);
+
+    let source_index = deck
+        .elements
+        .iter()
+        .position(|e| e.name() == *srcnam)
+        .expect("Source not found");
+    for element in &deck.elements {
+        match element.kind {
+            ElementType::Resistor => stamp_resistor(&mut g, &element, &nodes),
+            ElementType::CurrentSource => {
+                if element.name() != *srcnam {
+                    stamp_current_source(&mut i, &element, &nodes);
+                }
+            }
+            _ => panic!("Unsupported element type: {:?}", element.kind),
+        }
+    }
+
+    let lu = g.factorize_into().expect("Failed to factorize matrix");
+
+    let sweep_values = sweep(vstart, vstop, vincr);
+    for v in sweep_values {
+        let mut element = deck.elements[source_index].clone();
+        // TODO: this sucks
+        let value = Value::new(v, None, None);
+        element.value = value;
+        stamp_current_source(&mut i, &element, &nodes);
+        let v = lu.solve(&i).expect("Failed to solve linear system");
+
+        for (i, voltage) in v.iter().enumerate() {
+            let name = &nodes.node_names[i];
+            println!("{}: {:.6}", name, voltage);
+        }
+    }
+}
+
 pub fn simulate(deck: Deck) {
     for directive in &deck.directives {
         match directive.kind {
             CommandType::Op => simulate_op(&deck),
+            CommandType::DC => simulate_dc(&deck, &directive),
             CommandType::End => break,
             _ => panic!("Unsupported directive: {:?}", directive.kind),
         }

@@ -30,6 +30,10 @@ pub struct Value {
 }
 
 impl Value {
+    pub fn new(value: f64, exponent: Option<f64>, suffix: Option<ValueSuffix>) -> Self {
+        Self { value, exponent, suffix }
+    }
+
     pub fn get_value(&self) -> f64 {
         let mut value = self.value;
         if let Some(exponent) = self.exponent {
@@ -42,7 +46,7 @@ impl Value {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Element {
     pub kind: ElementType,
     pub name: String,
@@ -54,6 +58,11 @@ pub struct Element {
     pub end: usize,
 }
 
+impl Element {
+    pub fn name(&self) -> String {
+        format!("{}{}", self.kind.to_char(), self.name)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attr {
@@ -61,7 +70,32 @@ pub enum Attr {
     String(String),
 }
 
-pub type Attributes = HashMap<String, Attr>;
+#[derive(Debug, Clone, PartialEq)]
+pub struct Attributes(HashMap<String, Attr>);
+
+impl Attributes {
+    pub fn get_value(&self, key: &str) -> Option<&Value> {
+        if let Some(attr) = self.0.get(key) {;
+            if let Attr::Value(value) = attr {
+                return Some(value);
+            }
+        }
+        None
+    }
+
+    pub fn get_string(&self, key: &str) -> Option<&String> {
+        if let Some(attr) = self.0.get(key) {
+            if let Attr::String(value) = attr {
+                return Some(value);
+            }
+        }
+        None
+    }
+
+    pub fn from_iter(attrs: Vec<(String, Attr)>) -> Self {
+        Self(HashMap::from_iter(attrs))
+    }
+}
 
 #[derive(Debug)]
 pub struct Directive {
@@ -508,8 +542,8 @@ impl<'s> Parser<'s> {
 
         let params = match command {
             CommandType::DC => self.parse_dc_command(statement),
-            CommandType::Op => HashMap::new(),
-            CommandType::End => HashMap::new(),
+            CommandType::Op => Attributes::from_iter(vec![]),
+            CommandType::End => Attributes::from_iter(vec![]),
             _ => panic!("Invalid command: {:?}", command),
         };
 

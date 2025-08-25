@@ -21,7 +21,7 @@ impl CommandType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ElementType {
     Resistor,
     Capacitor,
@@ -39,6 +39,16 @@ impl ElementType {
             "V" => Some(ElementType::VoltageSource),
             "I" => Some(ElementType::CurrentSource),
             _ => None,
+        }
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            ElementType::Resistor => 'R',
+            ElementType::Capacitor => 'C',
+            ElementType::Inductor => 'L',
+            ElementType::VoltageSource => 'V',
+            ElementType::CurrentSource => 'I',
         }
     }
 }

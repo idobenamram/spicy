@@ -75,7 +75,7 @@ pub struct Attributes(HashMap<String, Attr>);
 
 impl Attributes {
     pub fn get_value(&self, key: &str) -> Option<&Value> {
-        if let Some(attr) = self.0.get(key) {;
+        if let Some(attr) = self.0.get(key) {
             if let Attr::Value(value) = attr {
                 return Some(value);
             }
@@ -444,6 +444,33 @@ impl<'s> Parser<'s> {
             end,
         }
     }
+    
+    // LYYYYYYY n+ n- <value> <mname> <nt=val> <m=val>
+    // + <scale=val> <temp=val> <dtemp=val> <tc1=val>
+    // + <tc2=val> <ic=init_condition>
+    fn parse_inductor(&mut self, name: String, mut statement: Statement) -> Element {
+        let mut nodes: Vec<Node> = vec![];
+        let params = HashMap::new();
+
+        let start = statement.start;
+        let end = statement.end;
+
+        nodes.push(self.parse_node(&mut statement));
+        nodes.push(self.parse_node(&mut statement));
+
+        let value = self.parse_value(&mut statement);
+
+        Element {
+            kind: ElementType::Inductor,
+            name,
+            nodes,
+            value,
+            params,
+            start,
+            end,
+        }
+        
+    }
 
     // VXXXXXXX N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
@@ -494,15 +521,16 @@ impl<'s> Parser<'s> {
         let name = name.to_string();
 
         match element_type {
+            // TODO: probably a smart way to parse these with a single function by specifiying the possible params
             ElementType::Resistor => self.parse_resistor(name, statement),
             ElementType::Capacitor => self.parse_capacitor(name, statement),
+            ElementType::Inductor => self.parse_inductor(name, statement),
             ElementType::VoltageSource => {
                 self.parse_independent_source(ElementType::VoltageSource, name, statement)
             }
             ElementType::CurrentSource => {
                 self.parse_independent_source(ElementType::CurrentSource, name, statement)
             }
-            _ => panic!("Invalid element type: {:?}", element_type),
         }
     }
 

@@ -7,7 +7,9 @@ Deck {
     directives: [
         Directive {
             kind: End,
-            params: {},
+            params: Attributes(
+                {},
+            ),
             start: 311,
             end: 314,
         },

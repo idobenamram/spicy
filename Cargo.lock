@@ -1009,8 +1009,10 @@ dependencies = [
 name = "spicy_simulate"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "ndarray",
  "ndarray-linalg",
+ "rstest",
  "spicy_parser",
 ]
 

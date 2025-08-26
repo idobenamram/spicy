@@ -1,0 +1,8 @@
+simple current source with resistor network
+I1 n001 0 DC 2m
+R1 n001 n002 1k
+L2 n002 0 1UH
+C1 n001 n002 1UF
+.OP
+.DC I1 1m 5m 1m
+.END

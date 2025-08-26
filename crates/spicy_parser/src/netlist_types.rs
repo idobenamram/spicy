@@ -75,12 +75,13 @@ impl ValueSuffix {
             s if s.starts_with("G") => Some(ValueSuffix::Giga),
             s if s.starts_with("Meg") => Some(ValueSuffix::Mega),
             s if s.starts_with("K") || s.starts_with("k") => Some(ValueSuffix::Kilo),
-            s if s.starts_with("m") => Some(ValueSuffix::Milli),
-            s if s.starts_with("u") => Some(ValueSuffix::Micro),
+            s if s.starts_with("m") || s.starts_with("M") => Some(ValueSuffix::Milli),
+            s if s.starts_with("u") || s.starts_with("U") => Some(ValueSuffix::Micro),
             s if s.starts_with("n") => Some(ValueSuffix::Nano),
             s if s.starts_with("p") => Some(ValueSuffix::Pico),
             s if s.starts_with("f") => Some(ValueSuffix::Femto),
             s if s.starts_with("a") => Some(ValueSuffix::Atto),
+            // TODO: should probalby panic?
             _ => None,
         }
     }

@@ -1,0 +1,5 @@
+---
+source: crates/spicy_simulate/src/lib.rs
+expression: output
+---
+[3.0, 2.0], shape=[2], strides=[1], layout=CFcf (0xf), const ndim=1

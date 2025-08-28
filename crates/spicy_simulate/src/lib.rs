@@ -134,7 +134,7 @@ fn stamp_voltage_source_incidence(
     let node1 = nodes.get_node_index(&element.nodes[0].name);
     let node2 = nodes.get_node_index(&element.nodes[1].name);
     let src_index = nodes
-        .get_voltage_source_index(&element.name)
+        .get_voltage_source_index(&element.name())
         .expect("should exist");
 
     // stamp in voltage incidence matrix (B)
@@ -156,7 +156,7 @@ fn stamp_voltage_source_incidence(
 
 fn stamp_voltage_source_value(s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
     let src_index = nodes
-        .get_voltage_source_index(&element.name)
+        .get_voltage_source_index(&element.name())
         .expect("should exist");
     let value = element.value.get_value();
     s[src_index] = value;
@@ -201,7 +201,6 @@ fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, element: &Element, n
 
 fn simulate_op(deck: &Deck) -> Array1<f64> {
     let nodes = Nodes::new(&deck.elements);
-    println!("nodes: {:?}", nodes);
 
     let n = nodes.node_len();
     let k = nodes.source_len();

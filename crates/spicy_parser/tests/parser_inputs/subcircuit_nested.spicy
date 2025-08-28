@@ -1,0 +1,10 @@
+nested subcircuits
+.SUBCKT OUTER a b c d
+R1 a b 1k
+.SUBCKT INNER x y z w
+R2 x y 2k
+.ENDS
+R3 c d 3k
+.ENDS
+.END
+

@@ -6,6 +6,8 @@ pub enum CommandType {
     AC,
     DC,
     Op,
+    Subcircuit,
+    Ends,
     End,
 }
 
@@ -15,7 +17,9 @@ impl CommandType {
             "AC" => Some(CommandType::AC),
             "DC" => Some(CommandType::DC),
             "OP" => Some(CommandType::Op),
+            "SUBCKT" => Some(CommandType::Subcircuit),
             "END" => Some(CommandType::End),
+            "ENDS" => Some(CommandType::Ends),
             _ => None,
         }
     }

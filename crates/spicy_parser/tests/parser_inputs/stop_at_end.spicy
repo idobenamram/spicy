@@ -1,0 +1,7 @@
+stop after end
+R1 in out 1k
+.OP
+.END
+R2 out 0 2k
+.OP
+

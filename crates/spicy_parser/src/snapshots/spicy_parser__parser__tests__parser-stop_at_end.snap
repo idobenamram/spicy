@@ -1,0 +1,42 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "stop after end",
+    subcircuits: [],
+    commands: [
+        Command {
+            kind: Op,
+            params: Attributes(
+                {},
+            ),
+            start: 28,
+            end: 30,
+        },
+    ],
+    elements: [
+        Element {
+            kind: Resistor,
+            name: "1",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+            ],
+            value: Value {
+                value: 1.0,
+                exponent: None,
+                suffix: Some(
+                    Kilo,
+                ),
+            },
+            params: {},
+            start: 15,
+            end: 26,
+        },
+    ],
+}

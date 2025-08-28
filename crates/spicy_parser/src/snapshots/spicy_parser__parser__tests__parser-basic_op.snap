@@ -4,22 +4,15 @@ expression: deck
 ---
 Deck {
     title: "basic operating point",
-    directives: [
-        Directive {
+    subcircuits: [],
+    commands: [
+        Command {
             kind: Op,
             params: Attributes(
                 {},
             ),
             start: 63,
             end: 65,
-        },
-        Directive {
-            kind: End,
-            params: Attributes(
-                {},
-            ),
-            start: 67,
-            end: 70,
         },
     ],
     elements: [

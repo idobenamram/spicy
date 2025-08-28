@@ -4,16 +4,8 @@ expression: deck
 ---
 Deck {
     title: "basic resistor",
-    directives: [
-        Directive {
-            kind: End,
-            params: Attributes(
-                {},
-            ),
-            start: 311,
-            end: 314,
-        },
-    ],
+    subcircuits: [],
+    commands: [],
     elements: [
         Element {
             kind: Resistor,

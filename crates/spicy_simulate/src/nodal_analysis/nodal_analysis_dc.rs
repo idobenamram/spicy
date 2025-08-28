@@ -1,33 +1,26 @@
+mod union_find;
+
 use std::collections::HashMap;
 
-use ndarray::{Array1, Array2, s};
+use ndarray::{Array1, Array2};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::netlist_types::{CommandType, ElementType};
 use spicy_parser::parser::{Deck, Directive, Element, Value};
+use union_find::UnionFind;
 
 #[derive(Debug)]
 pub struct Nodes {
     pub nodes: HashMap<String, usize>,
-    pub voltage_sources: HashMap<String, usize>,
+    pub uf: UnionFind,
 }
 
 impl Nodes {
     fn new(elements: &Vec<Element>) -> Self {
         let mut nodes = HashMap::new();
-        let mut voltage_sources = HashMap::new();
-        let mut src_index = 0;
-
         // assume already validated that ground exists
         nodes.insert("0".to_string(), 0);
         let mut node_index = 1;
         for element in elements {
-            match element.kind {
-                ElementType::Inductor | ElementType::VoltageSource => {
-                    voltage_sources.insert(element.name(), src_index);
-                    src_index += 1;
-                }
-                _ => {}
-            }
             for node in element.nodes.iter() {
                 if !nodes.contains_key(&node.name) {
                     nodes.insert(node.name.clone(), node_index);
@@ -35,67 +28,59 @@ impl Nodes {
                 }
             }
         }
+        let mut uf = UnionFind::new(nodes.len());
 
-        Self {
-            nodes,
-            voltage_sources,
+        for element in elements {
+            match element.kind {
+                ElementType::Inductor => {
+                    let node1 = nodes
+                        .get(&element.nodes[0].name)
+                        .expect("just went over nodes");
+                    let node2 = nodes
+                        .get(&element.nodes[1].name)
+                        .expect("just went over nodes");
+                    uf.union(*node1, *node2);
+                }
+                _ => {}
+            }
         }
+
+        Self { nodes, uf }
     }
 
     fn get_node_names(&self) -> Vec<String> {
         let mut names = vec![String::new(); self.nodes.len()];
         for (name, _) in &self.nodes {
-            if let Some(index) = self.get_node_index(name) {
+            if let Some(index) = self.get(name) {
                 names[index] = name.clone();
             }
         }
         names
     }
 
-    fn get_source_names(&self) -> Vec<String> {
-        let mut names = vec![String::new(); self.source_len()];
-        for (name, _) in &self.voltage_sources {
-            if let Some(index) = self.voltage_sources.get(name).copied() {
-                names[index] = name.clone();
-            }
-        }
-        names
-    }
-
-    fn get_node_index(&self, name: &str) -> Option<usize> {
+    fn get(&self, name: &str) -> Option<usize> {
         if name != "0" {
             let x = self.nodes.get(name).copied().expect("node not found");
-            if x != 0 { Some(x - 1) } else { None }
+            let index = self.uf.find_no_compress(x);
+            if index != 0 { Some(index - 1) } else { None }
         } else {
             None
         }
     }
 
-    fn get_voltage_source_index(&self, name: &str) -> Option<usize> {
-        if let Some(index) = self.voltage_sources.get(name).copied() {
-            Some(self.node_len() + index)
-        } else {
-            None
-        }
-    }
-
-    // TODO: save this?
-    fn node_len(&self) -> usize {
+    fn len(&self) -> usize {
         self.nodes
             .iter()
-            .map(|(_, x)| *x)
+            .map(|(_, x)| self.uf.find_no_compress(*x))
             .max()
             .expect("no nodes found")
-    }
-
-    fn source_len(&self) -> usize {
-        self.voltage_sources.len()
     }
 }
 
 fn stamp_resistor(g: &mut Array2<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
+    let node1 = nodes.get(&element.nodes[0].name);
+    let node2 = nodes.get(&element.nodes[1].name);
+    println!("stamp_resistor: {:?}, {:?}", node1, node2);
 
     let conductance = 1.0 / element.value.get_value();
 
@@ -114,8 +99,8 @@ fn stamp_resistor(g: &mut Array2<f64>, element: &Element, nodes: &Nodes) {
 }
 
 fn stamp_current_source(i: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
+    let node1 = nodes.get(&element.nodes[0].name);
+    let node2 = nodes.get(&element.nodes[1].name);
     let value = element.value.get_value();
 
     if let Some(node1) = node1 {
@@ -126,114 +111,37 @@ fn stamp_current_source(i: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
     }
 }
 
-fn stamp_voltage_source(
-    m: &mut Array2<f64>,
-    s: &mut Array1<f64>,
-    element: &Element,
-    nodes: &Nodes,
-) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
-    let src_index = nodes
-        .get_voltage_source_index(&element.name)
-        .expect("should exist");
-
-    let value = element.value.get_value();
-
-    // stamp in voltage incidence matrix (B)
-    if let Some(node1) = node1 {
-        m[[node1, src_index]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[node2, src_index]] = -1.0;
-    }
-
-    // stamp in voltage incidence matrix (B^T)
-    if let Some(node1) = node1 {
-        m[[src_index, node1]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[src_index, node2]] = -1.0;
-    }
-
-    // stamp in voltage source vector (E)
-    s[src_index] = value;
-}
-
-fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
-    let src_index = nodes
-        .get_voltage_source_index(&element.name())
-        .expect("should exist");
-
-    // stamp in voltage incidence matrix (B)
-    if let Some(node1) = node1 {
-        m[[node1, src_index]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[node2, src_index]] = -1.0;
-    }
-
-    // stamp in voltage incidence matrix (B^T)
-    if let Some(node1) = node1 {
-        m[[src_index, node1]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[src_index, node2]] = -1.0;
-    }
-
-    // stamp in voltage source vector (E)
-    s[src_index] = 0.0;
-}
-
 fn simulate_op(deck: &Deck) -> Array1<f64> {
     let nodes = Nodes::new(&deck.elements);
     println!("nodes: {:?}", nodes);
 
-    let n = nodes.node_len();
-    let k = nodes.source_len();
-    // Modified nodal analysis matrix
-    // [G, B]
-    // [B^T, 0]
-    // conductance matrix (n) + incidence of each voltage-defined element (k)
-    let mut m = Array2::<f64>::zeros((n + k, n + k));
-    // [I] current vector
-    // [E] source voltages
-    // current and voltage source vectors
-    let mut s = Array1::<f64>::zeros(n + k);
+    let n = nodes.len();
+    // conductance matrix
+    let mut g = Array2::<f64>::zeros((n, n));
+    // current vector
+    let mut i = Array1::<f64>::zeros(n);
 
     for element in &deck.elements {
         match element.kind {
-            ElementType::Resistor => stamp_resistor(&mut m, &element, &nodes),
+            ElementType::Resistor => stamp_resistor(&mut g, &element, &nodes),
             ElementType::Capacitor => {} // capcitors are just open circuits
-            ElementType::Inductor => stamp_inductor(&mut m, &mut s, &element, &nodes),
-            ElementType::CurrentSource => stamp_current_source(&mut s, &element, &nodes),
-            ElementType::VoltageSource => stamp_voltage_source(&mut m, &mut s, &element, &nodes),
+            ElementType::Inductor => {}  // inductors are just short circuits
+            ElementType::CurrentSource => stamp_current_source(&mut i, &element, &nodes),
             _ => panic!("Unsupported element type: {:?}", element.kind),
         }
     }
 
-    println!("m: {:?}", m);
-    println!("s: {:?}", s);
-    let lu = m.factorize_into().expect("Failed to factorize matrix");
-    // [V] node voltages
-    // [I] branch currents for voltage sources (also inductors)
-    let x = lu.solve(&s).expect("Failed to solve linear system");
+    println!("g: {:?}", g);
+    let lu = g.factorize_into().expect("Failed to factorize matrix");
+    let v = lu.solve(&i).expect("Failed to solve linear system");
 
     let node_names = nodes.get_node_names();
-    for (i, voltage) in x.slice(s![..n]).iter().enumerate() {
+    for (i, voltage) in v.iter().enumerate() {
         let name = &node_names[i];
-        println!("{}: {:.6}V", name, voltage);
+        println!("{}: {:.6}", name, voltage);
     }
 
-    let source_names = nodes.get_source_names();
-    for (i, current) in x.slice(s![n..]).iter().enumerate() {
-        let name = &source_names[i];
-        println!("{}: {:.6}A", name, current);
-    }
-
-    x
+    v
 }
 
 fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
@@ -265,11 +173,11 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
 
     let nodes = Nodes::new(&deck.elements);
 
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+    let n = nodes.len();
 
-    let mut m = Array2::<f64>::zeros((n + k, n + k));
-    let mut s_before = Array1::<f64>::zeros(n + k);
+    // conductance matrix
+    let mut g = Array2::<f64>::zeros((n, n));
+    let mut i_before = Array1::<f64>::zeros(n);
 
     let source_index = deck
         .elements
@@ -278,47 +186,38 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
         .expect("Source not found");
     for element in &deck.elements {
         match element.kind {
-            ElementType::Resistor => stamp_resistor(&mut m, &element, &nodes),
+            ElementType::Resistor => stamp_resistor(&mut g, &element, &nodes),
             ElementType::Capacitor => {} // capcitors are just open circuits
-            ElementType::Inductor => stamp_inductor(&mut m, &mut s_before, &element, &nodes),
-            ElementType::VoltageSource => {
-                stamp_voltage_source(&mut m, &mut s_before, &element, &nodes)
-            }
+            ElementType::Inductor => {}  // inductors are just short circuits
             ElementType::CurrentSource => {
                 if element.name() != *srcnam {
-                    stamp_current_source(&mut s_before, &element, &nodes);
+                    stamp_current_source(&mut i_before, &element, &nodes);
                 }
             }
             _ => panic!("Unsupported element type: {:?}", element.kind),
         }
     }
 
-    let lu = m.factorize_into().expect("Failed to factorize matrix");
+    let lu = g.factorize_into().expect("Failed to factorize matrix");
 
     let sweep_values = sweep(vstart, vstop, vincr);
-
+    
     let mut results = Vec::new();
     for v in sweep_values {
-        let mut s = s_before.clone();
+        let mut i = i_before.clone();
         let mut element = deck.elements[source_index].clone();
         // TODO: this sucks
         let value = Value::new(v, None, None);
         element.value = value;
-        stamp_current_source(&mut s, &element, &nodes);
-        let x = lu.solve(&s).expect("Failed to solve linear system");
+        stamp_current_source(&mut i, &element, &nodes);
+        let v = lu.solve(&i).expect("Failed to solve linear system");
 
         let node_names = nodes.get_node_names();
-        for (index, voltage) in x.slice(s![..n]).iter().enumerate() {
+        for (index, voltage) in v.iter().enumerate() {
             let name = &node_names[index];
             println!("{}: {:.6}V", name, voltage);
         }
-
-        let source_names = nodes.get_source_names();
-        for (i, current) in x.slice(s![n..]).iter().enumerate() {
-            let name = &source_names[i];
-            println!("{}: {:.6}A", name, current);
-        }
-        results.push(x);
+        results.push(v);
     }
 
     results
@@ -378,9 +277,9 @@ mod tests {
 
         let nodes = Nodes::new(&elements);
 
-        assert_eq!(nodes.get_node_index("0"), None);
-        assert_eq!(nodes.get_node_index("n1"), Some(0));
-        assert_eq!(nodes.get_node_index("n2"), Some(1));
+        assert_eq!(nodes.get("0"), None);
+        assert_eq!(nodes.get("n1"), Some(0));
+        assert_eq!(nodes.get("n2"), Some(1));
     }
 
     #[test]
@@ -392,9 +291,9 @@ mod tests {
 
         let nodes = Nodes::new(&elements);
 
-        assert_eq!(nodes.get_node_index("0"), None);
-        assert_eq!(nodes.get_node_index("n1"), Some(0));
-        assert_eq!(nodes.get_node_index("n2"), Some(1));
+        assert_eq!(nodes.get("0"), None);
+        assert_eq!(nodes.get("n1"), Some(0));
+        assert_eq!(nodes.get("n2"), Some(1));
     }
 
     #[test]
@@ -407,11 +306,11 @@ mod tests {
 
         let nodes = Nodes::new(&elements);
 
-        let n1_idx = nodes.get_node_index("n1");
-        let n2_idx = nodes.get_node_index("n2");
+        let n1_idx = nodes.get("n1");
+        let n2_idx = nodes.get("n2");
         assert_eq!(n1_idx, n2_idx);
         assert!(n1_idx.is_some());
-        assert_eq!(nodes.get_node_index("0"), None);
+        assert_eq!(nodes.get("0"), None);
     }
 
     #[test]
@@ -424,16 +323,16 @@ mod tests {
 
         let nodes = Nodes::new(&elements);
 
-        let n1_idx = nodes.get_node_index("n1");
-        let n2_idx = nodes.get_node_index("n2");
-        let n3_idx = nodes.get_node_index("n3");
-        let n4_idx = nodes.get_node_index("n4");
+        let n1_idx = nodes.get("n1");
+        let n2_idx = nodes.get("n2");
+        let n3_idx = nodes.get("n3");
+        let n4_idx = nodes.get("n4");
 
         assert_eq!(n1_idx, n2_idx);
         assert_eq!(n2_idx, n3_idx);
         assert_eq!(n3_idx, n4_idx);
         assert!(n1_idx.is_some());
-        assert_eq!(nodes.get_node_index("0"), None);
+        assert_eq!(nodes.get("0"), None);
     }
 
     #[rstest]

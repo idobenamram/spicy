@@ -126,9 +126,8 @@ fn stamp_current_source(i: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
     }
 }
 
-fn stamp_voltage_source(
+fn stamp_voltage_source_incidence(
     m: &mut Array2<f64>,
-    s: &mut Array1<f64>,
     element: &Element,
     nodes: &Nodes,
 ) {
@@ -137,8 +136,6 @@ fn stamp_voltage_source(
     let src_index = nodes
         .get_voltage_source_index(&element.name)
         .expect("should exist");
-
-    let value = element.value.get_value();
 
     // stamp in voltage incidence matrix (B)
     if let Some(node1) = node1 {
@@ -155,9 +152,24 @@ fn stamp_voltage_source(
     if let Some(node2) = node2 {
         m[[src_index, node2]] = -1.0;
     }
+}
 
-    // stamp in voltage source vector (E)
+fn stamp_voltage_source_value(s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
+    let src_index = nodes
+        .get_voltage_source_index(&element.name)
+        .expect("should exist");
+    let value = element.value.get_value();
     s[src_index] = value;
+}
+
+fn stamp_voltage_source(
+    m: &mut Array2<f64>,
+    s: &mut Array1<f64>,
+    element: &Element,
+    nodes: &Nodes,
+) {
+    stamp_voltage_source_incidence(m, element, nodes);
+    stamp_voltage_source_value(s, element, nodes);
 }
 
 fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
@@ -282,7 +294,7 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
             ElementType::Capacitor => {} // capcitors are just open circuits
             ElementType::Inductor => stamp_inductor(&mut m, &mut s_before, &element, &nodes),
             ElementType::VoltageSource => {
-                stamp_voltage_source(&mut m, &mut s_before, &element, &nodes)
+                stamp_voltage_source_incidence(&mut m, &element, &nodes);
             }
             ElementType::CurrentSource => {
                 if element.name() != *srcnam {
@@ -304,7 +316,15 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
         // TODO: this sucks
         let value = Value::new(v, None, None);
         element.value = value;
-        stamp_current_source(&mut s, &element, &nodes);
+        match element.kind {
+            ElementType::VoltageSource => {
+                stamp_voltage_source_value(&mut s, &element, &nodes);
+            }
+            ElementType::CurrentSource => {
+                stamp_current_source(&mut s, &element, &nodes);
+            }
+            _ => {}
+        }
         let x = lu.solve(&s).expect("Failed to solve linear system");
 
         let node_names = nodes.get_node_names();

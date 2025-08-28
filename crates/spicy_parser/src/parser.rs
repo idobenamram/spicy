@@ -10,12 +10,18 @@ pub struct Node {
     pub name: String,
 }
 
-
+#[derive(Debug)]
+pub struct Subcircuit {
+    pub name: String,
+    pub nodes: Vec<Node>,
+    pub elements: Vec<Element>,
+}
 
 #[derive(Debug)]
 pub struct Deck {
     pub title: String,
-    pub directives: Vec<Directive>,
+    pub subcircuits: Vec<Subcircuit>,
+    pub commands: Vec<Command>,
     pub elements: Vec<Element>,
 }
 
@@ -97,8 +103,8 @@ impl Attributes {
     }
 }
 
-#[derive(Debug)]
-pub struct Directive {
+#[derive(Debug, Clone)]
+pub struct Command {
     pub kind: CommandType,
     pub params: Attributes,
     pub start: usize,
@@ -150,6 +156,15 @@ impl Statement {
 
     fn peek(&self) -> Option<&Token> {
         self.tokens.last()
+    }
+
+    fn peek_non_whitespace(&self) -> Option<&Token> {
+        for token in self.tokens.iter().rev() {
+            if token.kind != TokenKind::WhiteSpace {
+                return Some(token);
+            }
+        }
+        None
     }
 }
 
@@ -550,10 +565,23 @@ impl<'s> Parser<'s> {
         ])
     }
 
-    fn parse_directive(&mut self, mut statement: Statement) -> Directive {
-        let start = statement.start;
-        let end = statement.end;
+    fn parse_subcircuit_command(&mut self, mut statement: Statement) -> Subcircuit {
+        let name = self.parse_ident(&mut statement);
+        let first_node = self.parse_node(&mut statement);
+        let mut nodes = vec![first_node];
+        while let Some(_) = statement.peek_non_whitespace() {
+            // TODO: this needs to change when we support params
+            nodes.push(self.parse_node(&mut statement));
+        }
 
+        Subcircuit {
+            name,
+            nodes,
+            elements: vec![]
+        }
+    }
+
+    fn parse_command_type(&mut self, statement: &mut Statement) -> CommandType {
         let dot = statement.next().expect("Must be dot");
         assert_eq!(dot.kind, TokenKind::Dot);
 
@@ -568,14 +596,21 @@ impl<'s> Parser<'s> {
             ),
         };
 
+        command
+    }
+
+    fn parse_command_attrs(&mut self, statement: Statement, command: CommandType) -> Command {
+
+        let start = statement.start;
+        let end = statement.end;
+
         let params = match command {
             CommandType::DC => self.parse_dc_command(statement),
             CommandType::Op => Attributes::from_iter(vec![]),
-            CommandType::End => Attributes::from_iter(vec![]),
             _ => panic!("Invalid command: {:?}", command),
         };
 
-        Directive {
+        Command {
             kind: command,
             params,
             start,
@@ -587,17 +622,36 @@ impl<'s> Parser<'s> {
         // first line should be a title
         let title = self.parse_title();
 
-        let mut directives = vec![];
+        let mut commands = vec![];
         let mut elements = vec![];
+        let mut subcircuits = vec![];
 
-        while let Some(statement) = self.stream.next() {
+        let mut current_subcircuits: Vec<Subcircuit> = vec![];
+
+        while let Some(mut statement) = self.stream.next() {
             let first_token = statement
                 .peek()
                 .expect("Statement should have at least one token");
             match first_token.kind {
                 TokenKind::Dot => {
-                    let directive = self.parse_directive(statement);
-                    directives.push(directive);
+                    let command = self.parse_command_type(&mut statement);
+                    match command {
+                        CommandType::Subcircuit => {
+                            let subcircuit = self.parse_subcircuit_command(statement);
+                            current_subcircuits.push(subcircuit);
+                        }
+                        CommandType::Ends => {
+                            let subcircuit = current_subcircuits.pop().expect("Subcircuit not started");
+                            subcircuits.push(subcircuit);
+                        }
+                        CommandType::End => {
+                            // once we see an end command we stop
+                            break;
+                        }
+                        _ => {
+                            commands.push(self.parse_command_attrs(statement, command));
+                        }
+                    }
                 }
                 // comment
                 TokenKind::Asterisk => {
@@ -606,17 +660,22 @@ impl<'s> Parser<'s> {
                 }
                 TokenKind::Ident => {
                     let element = self.parse_element(statement);
-                    elements.push(element);
+                    if let Some(subcircuit) = current_subcircuits.last_mut() {
+                        subcircuit.elements.push(element);
+                    } else {
+                        elements.push(element);
+                    }
                 }
                 _ => {
-                    panic!("Expected directive or element, got {:?}", first_token.kind);
+                    panic!("Expected command or element, got {:?}", first_token.kind);
                 }
             }
         }
 
         Deck {
             title,
-            directives,
+            subcircuits,
+            commands,
             elements,
         }
     }

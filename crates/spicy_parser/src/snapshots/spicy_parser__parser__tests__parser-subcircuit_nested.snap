@@ -1,0 +1,115 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "nested subcircuits",
+    subcircuits: [
+        Subcircuit {
+            name: "INNER",
+            nodes: [
+                Node {
+                    name: "x",
+                },
+                Node {
+                    name: "y",
+                },
+                Node {
+                    name: "z",
+                },
+                Node {
+                    name: "w",
+                },
+            ],
+            elements: [
+                Element {
+                    kind: Resistor,
+                    name: "2",
+                    nodes: [
+                        Node {
+                            name: "x",
+                        },
+                        Node {
+                            name: "y",
+                        },
+                    ],
+                    value: Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                    params: {},
+                    start: 73,
+                    end: 81,
+                },
+            ],
+        },
+        Subcircuit {
+            name: "OUTER",
+            nodes: [
+                Node {
+                    name: "a",
+                },
+                Node {
+                    name: "b",
+                },
+                Node {
+                    name: "c",
+                },
+                Node {
+                    name: "d",
+                },
+            ],
+            elements: [
+                Element {
+                    kind: Resistor,
+                    name: "1",
+                    nodes: [
+                        Node {
+                            name: "a",
+                        },
+                        Node {
+                            name: "b",
+                        },
+                    ],
+                    value: Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                    params: {},
+                    start: 41,
+                    end: 49,
+                },
+                Element {
+                    kind: Resistor,
+                    name: "3",
+                    nodes: [
+                        Node {
+                            name: "c",
+                        },
+                        Node {
+                            name: "d",
+                        },
+                    ],
+                    value: Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                    params: {},
+                    start: 89,
+                    end: 97,
+                },
+            ],
+        },
+    ],
+    commands: [],
+    elements: [],
+}

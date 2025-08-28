@@ -1,0 +1,6 @@
+basic subcircuit
+.SUBCKT INV in out vdd gnd
+R1 in out 1k
+.ENDS
+.END
+

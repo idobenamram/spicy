@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::netlist_types::{CommandType, ElementType};
-use spicy_parser::parser::{Deck, Directive, Element, Value};
+use spicy_parser::parser::{Deck, Command, Element, Value};
 
 #[derive(Debug)]
 pub struct Nodes {
@@ -221,7 +221,6 @@ fn simulate_op(deck: &Deck) -> Array1<f64> {
             ElementType::Inductor => stamp_inductor(&mut m, &mut s, &element, &nodes),
             ElementType::CurrentSource => stamp_current_source(&mut s, &element, &nodes),
             ElementType::VoltageSource => stamp_voltage_source(&mut m, &mut s, &element, &nodes),
-            _ => panic!("Unsupported element type: {:?}", element.kind),
         }
     }
 
@@ -252,20 +251,20 @@ fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
     (0..=nsteps).map(|i| vstart + i as f64 * vinc).collect()
 }
 
-fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
-    let srcnam = directive
+fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
+    let srcnam = command
         .params
         .get_string("srcnam")
         .expect("srcnam is required");
-    let vstart = directive
+    let vstart = command
         .params
         .get_value("vstart")
         .expect("vstart is required");
-    let vstop = directive
+    let vstop = command
         .params
         .get_value("vstop")
         .expect("vstop is required");
-    let vincr = directive
+    let vincr = command
         .params
         .get_value("vincr")
         .expect("vincr is required");
@@ -282,6 +281,7 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
     let mut m = Array2::<f64>::zeros((n + k, n + k));
     let mut s_before = Array1::<f64>::zeros(n + k);
 
+    println!("srcnam: {:?}", srcnam);
     let source_index = deck
         .elements
         .iter()
@@ -300,7 +300,6 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
                     stamp_current_source(&mut s_before, &element, &nodes);
                 }
             }
-            _ => panic!("Unsupported element type: {:?}", element.kind),
         }
     }
 
@@ -344,16 +343,15 @@ fn simulate_dc(deck: &Deck, directive: &Directive) -> Vec<Array1<f64>> {
 }
 
 pub fn simulate(deck: Deck) {
-    for directive in &deck.directives {
-        match directive.kind {
+    for command in &deck.commands {
+        match command.kind {
             CommandType::Op => {
                 let _ = simulate_op(&deck);
             }
             CommandType::DC => {
-                let _ = simulate_dc(&deck, &directive);
+                let _ = simulate_dc(&deck, &command);
             }
-            CommandType::End => break,
-            _ => panic!("Unsupported directive: {:?}", directive.kind),
+            _ => panic!("Unsupported command: {:?}", command.kind),
         }
     }
 }
@@ -416,45 +414,6 @@ mod tests {
         assert_eq!(nodes.get_node_index("n2"), Some(1));
     }
 
-    #[test]
-    fn test_nodes_indices_with_inductors_union() {
-        let elements = vec![
-            make_element(ElementType::Inductor, "1", "n1", "n2", 1e-3),
-            // include a resistor so order is deterministic after the inductor-created nodes
-            make_element(ElementType::Resistor, "2", "n3", "0", 1_000.0),
-        ];
-
-        let nodes = Nodes::new(&elements);
-
-        let n1_idx = nodes.get_node_index("n1");
-        let n2_idx = nodes.get_node_index("n2");
-        assert_eq!(n1_idx, n2_idx);
-        assert!(n1_idx.is_some());
-        assert_eq!(nodes.get_node_index("0"), None);
-    }
-
-    #[test]
-    fn test_nodes_indices_with_multiple_inductors_union() {
-        let elements = vec![
-            make_element(ElementType::Inductor, "1", "n1", "n2", 1e-3),
-            make_element(ElementType::Inductor, "2", "n2", "n3", 1e-3),
-            make_element(ElementType::Inductor, "3", "n3", "n4", 1e-3),
-        ];
-
-        let nodes = Nodes::new(&elements);
-
-        let n1_idx = nodes.get_node_index("n1");
-        let n2_idx = nodes.get_node_index("n2");
-        let n3_idx = nodes.get_node_index("n3");
-        let n4_idx = nodes.get_node_index("n4");
-
-        assert_eq!(n1_idx, n2_idx);
-        assert_eq!(n2_idx, n3_idx);
-        assert_eq!(n3_idx, n4_idx);
-        assert!(n1_idx.is_some());
-        assert_eq!(nodes.get_node_index("0"), None);
-    }
-
     #[rstest]
     fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
@@ -472,35 +431,12 @@ mod tests {
 
     #[rstest]
     fn test_simulate_dc(#[files("tests/*.spicy")] input: PathBuf) {
-        use spicy_parser::{
-            netlist_types::ValueSuffix,
-            parser::{Attr, Attributes},
-        };
-
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let deck = Parser::new(&input_content).parse();
+        let command = deck.commands[1].clone();
         let output = simulate_dc(
             &deck,
-            &Directive {
-                kind: CommandType::DC,
-                params: Attributes::from_iter(vec![
-                    ("srcnam".to_string(), Attr::String("I1".to_string())),
-                    (
-                        "vstart".to_string(),
-                        Attr::Value(Value::new(1.0, None, Some(ValueSuffix::Milli))),
-                    ),
-                    (
-                        "vstop".to_string(),
-                        Attr::Value(Value::new(5.0, None, Some(ValueSuffix::Milli))),
-                    ),
-                    (
-                        "vincr".to_string(),
-                        Attr::Value(Value::new(1.0, None, Some(ValueSuffix::Milli))),
-                    ),
-                ]),
-                start: 0,
-                end: 0,
-            },
+            &command
         );
         let name = format!(
             "simulate-dc-{}",

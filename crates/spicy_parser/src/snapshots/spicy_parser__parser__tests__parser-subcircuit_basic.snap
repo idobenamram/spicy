@@ -1,0 +1,52 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "basic subcircuit",
+    subcircuits: [
+        Subcircuit {
+            name: "INV",
+            nodes: [
+                Node {
+                    name: "in",
+                },
+                Node {
+                    name: "out",
+                },
+                Node {
+                    name: "vdd",
+                },
+                Node {
+                    name: "gnd",
+                },
+            ],
+            elements: [
+                Element {
+                    kind: Resistor,
+                    name: "1",
+                    nodes: [
+                        Node {
+                            name: "in",
+                        },
+                        Node {
+                            name: "out",
+                        },
+                    ],
+                    value: Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                    params: {},
+                    start: 44,
+                    end: 55,
+                },
+            ],
+        },
+    ],
+    commands: [],
+    elements: [],
+}

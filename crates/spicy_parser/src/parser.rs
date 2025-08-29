@@ -4,6 +4,7 @@ use std::collections::HashMap;
 /// based on matklad's pratt parser blog https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::netlist_types::{CommandType, ElementType, ValueSuffix};
+use crate::attributes::{Attributes, Attr};
 
 #[derive(Debug, Clone)]
 pub struct Node {
@@ -20,13 +21,11 @@ pub struct Subcircuit {
 #[derive(Debug)]
 pub struct Deck {
     pub title: String,
+    pub params: HashMap<String, Value>,
     pub subcircuits: Vec<Subcircuit>,
     pub commands: Vec<Command>,
     pub elements: Vec<Element>,
 }
-
-
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -53,13 +52,31 @@ impl Value {
 }
 
 #[derive(Debug, Clone)]
+pub enum ValueOrParam {
+    Value(Value),
+    Param(String),
+}
+
+impl ValueOrParam {
+    pub fn get_value(&self) -> f64 {
+        match self {
+            ValueOrParam::Value(value) => value.get_value(),
+            ValueOrParam::Param(param) => {
+                panic!("Param is not a value: {}", param)
+            }
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
 pub struct Element {
     pub kind: ElementType,
     pub name: String,
     // maybe we can make this type safe with a postive/negative node type
     pub nodes: Vec<Node>,
-    pub value: Value,
-    pub params: HashMap<String, String>,
+    pub value: ValueOrParam,
+    pub params: Attributes,
     pub start: usize,
     pub end: usize,
 }
@@ -70,38 +87,6 @@ impl Element {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Attr {
-    Value(Value),
-    String(String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Attributes(HashMap<String, Attr>);
-
-impl Attributes {
-    pub fn get_value(&self, key: &str) -> Option<&Value> {
-        if let Some(attr) = self.0.get(key) {
-            if let Attr::Value(value) = attr {
-                return Some(value);
-            }
-        }
-        None
-    }
-
-    pub fn get_string(&self, key: &str) -> Option<&String> {
-        if let Some(attr) = self.0.get(key) {
-            if let Attr::String(value) = attr {
-                return Some(value);
-            }
-        }
-        None
-    }
-
-    pub fn from_iter(attrs: Vec<(String, Attr)>) -> Self {
-        Self(HashMap::from_iter(attrs))
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Command {
@@ -174,36 +159,6 @@ struct StatementStream {
 }
 
 impl StatementStream {
-    // fn new(input: &str) -> Self {
-    //     let mut lexer = Lexer::new(input);
-    //     let mut statements = vec![];
-    //     let mut token = lexer.next();
-
-    //     let mut last_non_whitespace_token = None;
-    //     let mut statement = vec![];
-    //     while token.kind != TokenKind::EOF {
-    //         while token.kind != TokenKind::Newline {
-    //             statement.push(token);
-    //             if token.kind != TokenKind::WhiteSpace {
-    //                 last_non_whitespace_token = Some(token);
-    //             }
-    //             token = lexer.next();
-    //         }
-
-    //         // skip newlines
-    //         token = lexer.next();
-    //         if let Some(last_non_whitespace_token) = last_non_whitespace_token {
-    //             if last_non_whitespace_token.kind != TokenKind::Plus {
-    //                 statements.push(Statement::new(&statement));
-    //                 statement.clear();
-    //             }
-    //         }
-    //     }
-
-    //     // reverse statements to make it easier to pop
-    //     statements.reverse();
-    //     Self { statements }
-    // }
 
     fn merge_statements(statements: Vec<Statement>) -> Vec<Statement> {
         let mut merged: Vec<Statement> = Vec::new();
@@ -301,6 +256,14 @@ impl<'s> Parser<'s> {
         let ident = statement.next_non_whitespace().expect("Must be ident");
         assert_eq!(ident.kind, TokenKind::Ident);
         self.input[ident.start..=ident.end].to_string()
+    }
+
+    fn parse_equal_expr(&mut self, statement: &mut Statement) -> (String, Value) {
+        let ident = self.parse_ident(statement);
+        let equal = statement.next().expect("Must be equal");
+        assert_eq!(equal.kind, TokenKind::Equal);
+        let value = self.parse_value(statement);
+        (ident, value)
     }
 
     fn parse_value(&mut self, statement: &mut Statement) -> Value {
@@ -402,6 +365,18 @@ impl<'s> Parser<'s> {
         }
     }
 
+    fn parse_value_or_param(&mut self, statement: &mut Statement) -> ValueOrParam {
+        let token = statement.peek_non_whitespace().expect("Must be value or param");
+        if token.kind == TokenKind::LeftBracket {
+            let _ = statement.next().expect("Must be left bracket");
+            let param_name = self.parse_ident(statement);
+            let right_bracket = statement.next().expect("Must be right bracket");
+            assert_eq!(right_bracket.kind, TokenKind::RightBracket);
+            return ValueOrParam::Param(param_name);
+        }
+        ValueOrParam::Value(self.parse_value(statement))
+    }
+
     fn parse_node(&mut self, statement: &mut Statement) -> Node {
         let node = statement.next_non_whitespace().expect("Must be node");
         assert!(matches!(node.kind, TokenKind::Ident | TokenKind::Number));
@@ -409,12 +384,51 @@ impl<'s> Parser<'s> {
         Node { name: node_string }
     }
 
+    fn parse_element_params(&mut self, params_order: Vec<&str>, mut statement: &mut Statement) -> Attributes {
+        let mut named_mode = false;
+        let mut current_param = 0;
+        let mut params = Attributes::new();
+
+        while let Some(token) = statement.next() {
+            if token.kind != TokenKind::WhiteSpace {
+                println!("warning: unexpected token: {:?}", token);
+                break;
+            }
+            let next_token = statement.next().expect("should have a token");
+            match next_token.kind {
+                TokenKind::Ident => {
+                    named_mode = true;
+                    let ident = self.parse_ident(&mut statement);
+                    let equal_sign = statement.next().expect("Must be equal");
+                    assert_eq!(equal_sign.kind, TokenKind::Equal);
+                    let value = self.parse_value_or_param(&mut statement);
+                    let old_value = params.insert(ident.clone(), value.into());
+                    if old_value.is_some() {
+                        panic!("duplicate param: {}", ident);
+                    }
+                }
+                _ => {
+                    if named_mode {
+                        panic!("when in named mode can no longer work with positional")
+                    }
+                    let value = self.parse_value_or_param(&mut statement);
+                    let old_value = params.insert(params_order[current_param].to_string(), value.into());
+                    if old_value.is_some() {
+                        panic!("duplicate param: {}", params_order[current_param]);
+                    }   
+                    current_param += 1;
+                }
+            }
+        }
+
+        params
+    }
+
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
     // + <scale=val> <temp=val> <dtemp=val> <tc1=val> <tc2=val>
     // + <noisy=0|1>
     fn parse_resistor(&mut self, name: String, mut statement: Statement) -> Element {
         let mut nodes: Vec<Node> = vec![];
-        let params = HashMap::new();
 
         let start = statement.start;
         let end = statement.end;
@@ -422,7 +436,11 @@ impl<'s> Parser<'s> {
         nodes.push(self.parse_node(&mut statement));
         nodes.push(self.parse_node(&mut statement));
 
-        let value = self.parse_value(&mut statement);
+        let value = self.parse_value_or_param(&mut statement);
+
+        // TODO: i kinda want to support type safety on the params (like noisy is always a bool)
+        let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
+        let params = self.parse_element_params(params_order, &mut statement);
 
         Element {
             kind: ElementType::Resistor,
@@ -439,7 +457,6 @@ impl<'s> Parser<'s> {
     // + <dtemp=val> <tc1=val> <tc2=val> <ic=init_condition>
     fn parse_capacitor(&mut self, name: String, mut statement: Statement) -> Element {
         let mut nodes: Vec<Node> = vec![];
-        let params = HashMap::new();
 
         let start = statement.start;
         let end = statement.end;
@@ -447,7 +464,11 @@ impl<'s> Parser<'s> {
         nodes.push(self.parse_node(&mut statement));
         nodes.push(self.parse_node(&mut statement));
 
-        let value = self.parse_value(&mut statement);
+        // support models
+        let value = self.parse_value_or_param(&mut statement);
+
+        let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
+        let params = self.parse_element_params(params_order, &mut statement);
 
         Element {
             kind: ElementType::Capacitor,
@@ -465,7 +486,6 @@ impl<'s> Parser<'s> {
     // + <tc2=val> <ic=init_condition>
     fn parse_inductor(&mut self, name: String, mut statement: Statement) -> Element {
         let mut nodes: Vec<Node> = vec![];
-        let params = HashMap::new();
 
         let start = statement.start;
         let end = statement.end;
@@ -473,7 +493,10 @@ impl<'s> Parser<'s> {
         nodes.push(self.parse_node(&mut statement));
         nodes.push(self.parse_node(&mut statement));
 
-        let value = self.parse_value(&mut statement);
+        let value = self.parse_value_or_param(&mut statement);
+
+        let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
+        let params = self.parse_element_params(params_order, &mut statement);
 
         Element {
             kind: ElementType::Inductor,
@@ -498,7 +521,7 @@ impl<'s> Parser<'s> {
         mut statement: Statement,
     ) -> Element {
         let mut nodes: Vec<Node> = vec![];
-        let params = HashMap::new();
+        let mut params = Attributes::new();
 
         let start = statement.start;
         let end = statement.end;
@@ -509,7 +532,7 @@ impl<'s> Parser<'s> {
         let operation = self.parse_ident(&mut statement);
 
         let value = match operation.as_str() {
-            "DC" => self.parse_value(&mut statement),
+            "DC" => self.parse_value_or_param(&mut statement),
             "AC" => panic!("AC not supported yet"),
             _ => panic!("Invalid operation: {}", operation),
         };
@@ -536,7 +559,6 @@ impl<'s> Parser<'s> {
         let name = name.to_string();
 
         match element_type {
-            // TODO: probably a smart way to parse these with a single function by specifiying the possible params
             ElementType::Resistor => self.parse_resistor(name, statement),
             ElementType::Capacitor => self.parse_capacitor(name, statement),
             ElementType::Inductor => self.parse_inductor(name, statement),
@@ -546,6 +568,7 @@ impl<'s> Parser<'s> {
             ElementType::CurrentSource => {
                 self.parse_independent_source(ElementType::CurrentSource, name, statement)
             }
+            ElementType::Subcircuit => todo!(),
         }
     }
 
@@ -563,6 +586,21 @@ impl<'s> Parser<'s> {
             ("vstop".to_string(), Attr::Value(vstop)),
             ("vincr".to_string(), Attr::Value(vincr)),
         ])
+    }
+
+    fn parse_param_command(&mut self, mut statement: Statement) -> HashMap<String, Value> {
+        let mut params = HashMap::new();
+
+        while let Some(token) = statement.next() {
+            if token.kind != TokenKind::WhiteSpace {
+                println!("warning: unexpected token: {:?}", token);
+                break;
+            }
+            let (ident, value) = self.parse_equal_expr(&mut statement);
+            params.insert(ident, value);
+        }
+
+        params
     }
 
     fn parse_subcircuit_command(&mut self, mut statement: Statement) -> Subcircuit {
@@ -625,6 +663,7 @@ impl<'s> Parser<'s> {
         let mut commands = vec![];
         let mut elements = vec![];
         let mut subcircuits = vec![];
+        let mut params: HashMap<String, Value> = HashMap::new();
 
         let mut current_subcircuits: Vec<Subcircuit> = vec![];
 
@@ -643,6 +682,10 @@ impl<'s> Parser<'s> {
                         CommandType::Ends => {
                             let subcircuit = current_subcircuits.pop().expect("Subcircuit not started");
                             subcircuits.push(subcircuit);
+                        }
+                        CommandType::Param => {
+                            let new_params = self.parse_param_command(statement);
+                            params.extend(new_params);
                         }
                         CommandType::End => {
                             // once we see an end command we stop
@@ -674,6 +717,7 @@ impl<'s> Parser<'s> {
 
         Deck {
             title,
+            params,
             subcircuits,
             commands,
             elements,

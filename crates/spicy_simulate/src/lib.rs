@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::netlist_types::{CommandType, ElementType};
-use spicy_parser::parser::{Deck, Command, Element, Value};
+use spicy_parser::parser::{Deck, Command, Element, Value, ValueOrParam};
 
 #[derive(Debug)]
 pub struct Nodes {
@@ -221,6 +221,7 @@ fn simulate_op(deck: &Deck) -> Array1<f64> {
             ElementType::Inductor => stamp_inductor(&mut m, &mut s, &element, &nodes),
             ElementType::CurrentSource => stamp_current_source(&mut s, &element, &nodes),
             ElementType::VoltageSource => stamp_voltage_source(&mut m, &mut s, &element, &nodes),
+            ElementType::Subcircuit => {}
         }
     }
 
@@ -292,6 +293,7 @@ fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
             ElementType::Resistor => stamp_resistor(&mut m, &element, &nodes),
             ElementType::Capacitor => {} // capcitors are just open circuits
             ElementType::Inductor => stamp_inductor(&mut m, &mut s_before, &element, &nodes),
+            ElementType::Subcircuit => {}
             ElementType::VoltageSource => {
                 stamp_voltage_source_incidence(&mut m, &element, &nodes);
             }
@@ -312,7 +314,7 @@ fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
         let mut s = s_before.clone();
         let mut element = deck.elements[source_index].clone();
         // TODO: this sucks
-        let value = Value::new(v, None, None);
+        let value = ValueOrParam::Value(Value::new(v, None, None));
         element.value = value;
         match element.kind {
             ElementType::VoltageSource => {
@@ -361,8 +363,8 @@ mod tests {
     use super::*;
     use rstest::rstest;
     use spicy_parser::parser::Node;
-    use std::collections::HashMap;
 
+    use spicy_parser::attributes::Attributes;
     use spicy_parser::parser::Parser;
 
     use std::path::PathBuf;
@@ -379,8 +381,8 @@ mod tests {
                     name: n2.to_string(),
                 },
             ],
-            value: Value::new(value, None, None),
-            params: HashMap::new(),
+            value: ValueOrParam::Value(Value::new(value, None, None)),
+            params: Attributes::new(),
             start: 0,
             end: 0,
         }

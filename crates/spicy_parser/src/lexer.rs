@@ -1,45 +1,71 @@
 use unscanny::Scanner;
 
+use crate::expr::PlaceholderId;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Ident,
     Number,
     Equal,
     Dot,
+    Placeholder,
     Asterisk,
     WhiteSpace,
     Newline,
     LeftBracket,
     RightBracket,
+    LeftParen, 
+    RightParen,
+    Comma,
     Plus,
     Minus,
     EOF,
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl Span {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
-    pub(crate) start: usize,
-    pub(crate) end: usize,
+    pub(crate) id: Option<PlaceholderId>,
+    pub(crate) span: Span,
 }
 
 impl Token {
     pub fn new(kind: TokenKind, start: usize, end: usize) -> Self {
-        Self { kind, start, end }
+        Self { kind, id: None, span: Span::new(start, end) }
     }
     pub fn single(kind: TokenKind, pos: usize) -> Self {
         Self {
             kind,
-            start: pos,
-            end: pos,
+            id: None,
+            span: Span::new(pos, pos),
         }
     }
 
     pub fn end(pos: usize) -> Self {
         Self {
             kind: TokenKind::EOF,
-            start: pos,
-            end: pos,
+            id: None,
+            span: Span::new(pos, pos),
+        }
+    }
+
+    pub fn placeholder(id: PlaceholderId, span: Span) -> Self {
+        Self {
+            kind: TokenKind::Placeholder,
+            id: Some(id),
+            span,
         }
     }
 }
@@ -94,6 +120,9 @@ impl<'s> Lexer<'s> {
             '.' => Token::single(TokenKind::Dot, start),
             '{' => Token::single(TokenKind::LeftBracket, start),
             '}' => Token::single(TokenKind::RightBracket, start),
+            '(' => Token::single(TokenKind::LeftParen, start),
+            ')' => Token::single(TokenKind::RightParen, start),
+            ',' => Token::single(TokenKind::Comma, start),
             _ => panic!("Unexpected character: {}", c),
         }
     }
@@ -107,6 +136,10 @@ impl<'s> Lexer<'s> {
             None => Token::end(start),
         }
     }
+}
+
+pub fn token_text<'a>(src: &'a str, t: &Token) -> &'a str {
+    &src[t.span.start..=t.span.end]
 }
 
 #[cfg(test)]

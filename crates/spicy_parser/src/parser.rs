@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 /// A parser for basic latex expressions.
 /// based on matklad's pratt parser blog https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-use crate::lexer::{Lexer, Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 use crate::netlist_types::{CommandType, ElementType, ValueSuffix};
 use crate::attributes::{Attributes, Attr};
+use crate::statement_phase::{Statement, StatementStream};
+use crate::expr::Value;
 
 #[derive(Debug, Clone)]
 pub struct Node {
@@ -27,29 +29,7 @@ pub struct Deck {
     pub elements: Vec<Element>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Value {
-    value: f64,
-    exponent: Option<f64>,
-    suffix: Option<ValueSuffix>,
-}
 
-impl Value {
-    pub fn new(value: f64, exponent: Option<f64>, suffix: Option<ValueSuffix>) -> Self {
-        Self { value, exponent, suffix }
-    }
-
-    pub fn get_value(&self) -> f64 {
-        let mut value = self.value;
-        if let Some(exponent) = self.exponent {
-            value *= 10.0f64.powf(exponent);
-        }
-        if let Some(suffix) = &self.suffix {
-            value *= suffix.scale();
-        }
-        value
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum ValueOrParam {
@@ -96,134 +76,6 @@ pub struct Command {
     pub end: usize,
 }
 
-#[derive(Debug)]
-struct Statement {
-    tokens: Vec<Token>,
-    start: usize,
-    end: usize,
-}
-
-impl Statement {
-    fn new(tokens: Vec<Token>) -> Self {
-        if tokens.is_empty() {
-            panic!("Statement must have at least one token");
-        }
-
-        let start = tokens[0].start;
-        let end = tokens[tokens.len() - 1].end;
-
-        Self {
-            start,
-            end,
-            tokens: tokens.into_iter().rev().collect(),
-        }
-    }
-
-    fn new_reversed(tokens: Vec<Token>) -> Self {
-        let start = tokens[tokens.len() - 1].start;
-        let end = tokens[0].end;
-        Self { start, end, tokens }
-    }
-
-    fn next(&mut self) -> Option<Token> {
-        self.tokens.pop()
-    }
-
-    fn next_non_whitespace(&mut self) -> Option<Token> {
-        while let Some(token) = self.tokens.pop() {
-            if token.kind == TokenKind::WhiteSpace {
-                continue;
-            }
-            return Some(token);
-        }
-        None
-    }
-
-    fn peek(&self) -> Option<&Token> {
-        self.tokens.last()
-    }
-
-    fn peek_non_whitespace(&self) -> Option<&Token> {
-        for token in self.tokens.iter().rev() {
-            if token.kind != TokenKind::WhiteSpace {
-                return Some(token);
-            }
-        }
-        None
-    }
-}
-
-#[derive(Debug)]
-struct StatementStream {
-    statements: Vec<Statement>,
-}
-
-impl StatementStream {
-
-    fn merge_statements(statements: Vec<Statement>) -> Vec<Statement> {
-        let mut merged: Vec<Statement> = Vec::new();
-        let mut iter = statements.into_iter();
-        while let Some(stmt) = iter.next() {
-            // Start with the current statement's tokens
-            let mut tokens = stmt.tokens;
-
-            loop {
-                // Trim trailing whitespace
-                while matches!(tokens.last(), Some(t) if t.kind == TokenKind::WhiteSpace) {
-                    tokens.pop();
-                }
-
-                // If last non-whitespace token is a Plus, remove it and merge next
-                let should_merge = matches!(tokens.last(), Some(t) if t.kind == TokenKind::Plus);
-                if !should_merge {
-                    break;
-                }
-                // Remove the trailing Plus token
-                tokens.pop();
-
-                // Fetch the next statement to merge into current
-                if let Some(next_stmt) = iter.next() {
-                    // Append next statement tokens
-                    tokens.extend(next_stmt.tokens);
-                } else {
-                    break;
-                }
-            }
-
-            merged.push(Statement::new_reversed(tokens));
-        }
-        merged
-    }
-
-    fn new(input: &str) -> Self {
-        let mut lexer = Lexer::new(input);
-        let mut statements = vec![];
-        let mut token = lexer.next();
-
-        while token.kind != TokenKind::EOF {
-            let mut statement = vec![];
-            while token.kind != TokenKind::Newline && token.kind != TokenKind::EOF {
-                statement.push(token);
-                token = lexer.next();
-            }
-
-            // skip newlines
-            token = lexer.next();
-            statements.push(Statement::new(statement));
-        }
-
-        // Merge statements with trailing '+' continuation
-        let statements = Self::merge_statements(statements);
-        // reverse statements to make it easier to pop
-        let mut statements = statements;
-        statements.reverse();
-        Self { statements }
-    }
-
-    fn next(&mut self) -> Option<Statement> {
-        self.statements.pop()
-    }
-}
 
 pub struct Parser<'s> {
     input: &'s str,
@@ -731,19 +583,6 @@ mod tests {
 
     use super::*;
     use std::path::PathBuf;
-
-    #[rstest]
-    fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
-        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-
-        let stream = StatementStream::new(&input_content);
-
-        let name = format!("stream-{}",input
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "unknown".to_string()));
-        insta::assert_debug_snapshot!(name, stream);
-    }
 
     #[rstest]
     fn test_parser(#[files("tests/parser_inputs/*.spicy")] input: PathBuf) {

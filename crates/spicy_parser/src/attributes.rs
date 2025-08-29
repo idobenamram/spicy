@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::parser::{Value, ValueOrParam};
+use crate::expr::Value;
 
 
 
@@ -43,14 +43,5 @@ impl Attributes {
 
     pub fn from_iter(attrs: Vec<(String, Attr)>) -> Self {
         Self(HashMap::from_iter(attrs))
-    }
-}
-
-impl From<ValueOrParam> for Attr {
-    fn from(value_or_param: ValueOrParam) -> Self {
-        match value_or_param {
-            ValueOrParam::Value(v) => Attr::Value(v),
-            ValueOrParam::Param(s) => Attr::Param(s),
-        }
     }
 }

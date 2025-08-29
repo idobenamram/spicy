@@ -1,5 +1,5 @@
 ---
-source: crates/spicy_parser/src/parser.rs
+source: crates/spicy_parser/src/statement_phase.rs
 expression: stream
 ---
 StatementStream {
@@ -7,66 +7,25 @@ StatementStream {
         Statement {
             tokens: [
                 Token {
-                    kind: Ident,
-                    start: 80,
-                    end: 82,
-                },
-                Token {
                     kind: Dot,
-                    start: 79,
-                    end: 79,
-                },
-            ],
-            start: 79,
-            end: 82,
-        },
-        Statement {
-            tokens: [
-                Token {
-                    kind: Ident,
                     start: 77,
                     end: 77,
                 },
                 Token {
-                    kind: Number,
-                    start: 76,
-                    end: 76,
+                    kind: Ident,
+                    start: 78,
+                    end: 80,
                 },
             ],
-            start: 76,
-            end: 77,
+            start: 77,
+            end: 80,
         },
         Statement {
             tokens: [
                 Token {
-                    kind: WhiteSpace,
-                    start: 73,
-                    end: 74,
-                },
-                Token {
-                    kind: Plus,
-                    start: 72,
-                    end: 72,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 71,
-                    end: 71,
-                },
-                Token {
                     kind: Ident,
-                    start: 68,
-                    end: 70,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 67,
-                    end: 67,
-                },
-                Token {
-                    kind: Ident,
-                    start: 65,
-                    end: 66,
+                    start: 62,
+                    end: 63,
                 },
                 Token {
                     kind: WhiteSpace,
@@ -75,60 +34,44 @@ StatementStream {
                 },
                 Token {
                     kind: Ident,
-                    start: 62,
-                    end: 63,
+                    start: 65,
+                    end: 66,
                 },
-            ],
-            start: 62,
-            end: 74,
-        },
-        Statement {
-            tokens: [
                 Token {
                     kind: WhiteSpace,
-                    start: 60,
-                    end: 60,
+                    start: 67,
+                    end: 67,
                 },
                 Token {
                     kind: Ident,
-                    start: 59,
-                    end: 59,
+                    start: 68,
+                    end: 70,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 73,
+                    end: 73,
                 },
                 Token {
                     kind: Number,
-                    start: 58,
-                    end: 58,
+                    start: 74,
+                    end: 74,
+                },
+                Token {
+                    kind: Ident,
+                    start: 75,
+                    end: 75,
                 },
             ],
-            start: 58,
-            end: 60,
+            start: 62,
+            end: 75,
         },
         Statement {
             tokens: [
                 Token {
-                    kind: Plus,
-                    start: 56,
-                    end: 56,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 55,
-                    end: 55,
-                },
-                Token {
                     kind: Ident,
-                    start: 52,
-                    end: 54,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 51,
-                    end: 51,
-                },
-                Token {
-                    kind: Ident,
-                    start: 49,
-                    end: 50,
+                    start: 46,
+                    end: 47,
                 },
                 Token {
                     kind: WhiteSpace,
@@ -137,54 +80,54 @@ StatementStream {
                 },
                 Token {
                     kind: Ident,
-                    start: 46,
-                    end: 47,
+                    start: 49,
+                    end: 50,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 51,
+                    end: 51,
+                },
+                Token {
+                    kind: Ident,
+                    start: 52,
+                    end: 54,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 57,
+                    end: 57,
+                },
+                Token {
+                    kind: Number,
+                    start: 58,
+                    end: 58,
+                },
+                Token {
+                    kind: Ident,
+                    start: 59,
+                    end: 59,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 60,
+                    end: 60,
                 },
             ],
             start: 46,
-            end: 56,
+            end: 60,
         },
         Statement {
             tokens: [
                 Token {
-                    kind: Ident,
-                    start: 38,
-                    end: 44,
+                    kind: Asterisk,
+                    start: 22,
+                    end: 22,
                 },
                 Token {
                     kind: WhiteSpace,
-                    start: 37,
-                    end: 37,
-                },
-                Token {
-                    kind: Ident,
-                    start: 34,
-                    end: 36,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 33,
-                    end: 33,
-                },
-                Token {
-                    kind: Ident,
-                    start: 32,
-                    end: 32,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 31,
-                    end: 31,
-                },
-                Token {
-                    kind: Ident,
-                    start: 29,
-                    end: 30,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 28,
-                    end: 28,
+                    start: 23,
+                    end: 23,
                 },
                 Token {
                     kind: Ident,
@@ -193,13 +136,43 @@ StatementStream {
                 },
                 Token {
                     kind: WhiteSpace,
-                    start: 23,
-                    end: 23,
+                    start: 28,
+                    end: 28,
                 },
                 Token {
-                    kind: Asterisk,
-                    start: 22,
-                    end: 22,
+                    kind: Ident,
+                    start: 29,
+                    end: 30,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 31,
+                    end: 31,
+                },
+                Token {
+                    kind: Ident,
+                    start: 32,
+                    end: 32,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 33,
+                    end: 33,
+                },
+                Token {
+                    kind: Ident,
+                    start: 34,
+                    end: 36,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 37,
+                    end: 37,
+                },
+                Token {
+                    kind: Ident,
+                    start: 38,
+                    end: 44,
                 },
             ],
             start: 22,
@@ -209,38 +182,8 @@ StatementStream {
             tokens: [
                 Token {
                     kind: Ident,
-                    start: 16,
-                    end: 20,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 15,
-                    end: 15,
-                },
-                Token {
-                    kind: Ident,
-                    start: 11,
-                    end: 14,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 10,
-                    end: 10,
-                },
-                Token {
-                    kind: Ident,
-                    start: 9,
-                    end: 9,
-                },
-                Token {
-                    kind: WhiteSpace,
-                    start: 7,
-                    end: 8,
-                },
-                Token {
-                    kind: Ident,
-                    start: 5,
-                    end: 6,
+                    start: 0,
+                    end: 3,
                 },
                 Token {
                     kind: WhiteSpace,
@@ -249,8 +192,38 @@ StatementStream {
                 },
                 Token {
                     kind: Ident,
-                    start: 0,
-                    end: 3,
+                    start: 5,
+                    end: 6,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 7,
+                    end: 8,
+                },
+                Token {
+                    kind: Ident,
+                    start: 9,
+                    end: 9,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 10,
+                    end: 10,
+                },
+                Token {
+                    kind: Ident,
+                    start: 11,
+                    end: 14,
+                },
+                Token {
+                    kind: WhiteSpace,
+                    start: 15,
+                    end: 15,
+                },
+                Token {
+                    kind: Ident,
+                    start: 16,
+                    end: 20,
                 },
             ],
             start: 0,

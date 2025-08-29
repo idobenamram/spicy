@@ -8,6 +8,7 @@ pub enum CommandType {
     Op,
     Subcircuit,
     Ends,
+    Param,
     End,
 }
 
@@ -18,8 +19,9 @@ impl CommandType {
             "DC" => Some(CommandType::DC),
             "OP" => Some(CommandType::Op),
             "SUBCKT" => Some(CommandType::Subcircuit),
-            "END" => Some(CommandType::End),
             "ENDS" => Some(CommandType::Ends),
+            "PARAM" => Some(CommandType::Param),
+            "END" => Some(CommandType::End),
             _ => None,
         }
     }
@@ -32,6 +34,7 @@ pub enum ElementType {
     Inductor,
     VoltageSource,
     CurrentSource,
+    Subcircuit,
 }
 
 impl ElementType {
@@ -42,6 +45,7 @@ impl ElementType {
             "L" => Some(ElementType::Inductor),
             "V" => Some(ElementType::VoltageSource),
             "I" => Some(ElementType::CurrentSource),
+            "X" => Some(ElementType::Subcircuit),
             _ => None,
         }
     }
@@ -53,6 +57,7 @@ impl ElementType {
             ElementType::Inductor => 'L',
             ElementType::VoltageSource => 'V',
             ElementType::CurrentSource => 'I',
+            ElementType::Subcircuit => 'X',
         }
     }
 }

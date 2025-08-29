@@ -9,6 +9,8 @@ pub enum TokenKind {
     Asterisk,
     WhiteSpace,
     Newline,
+    LeftBracket,
+    RightBracket,
     Plus,
     Minus,
     EOF,
@@ -90,6 +92,8 @@ impl<'s> Lexer<'s> {
             '+' => Token::single(TokenKind::Plus, start),
             '=' => Token::single(TokenKind::Equal, start),
             '.' => Token::single(TokenKind::Dot, start),
+            '{' => Token::single(TokenKind::LeftBracket, start),
+            '}' => Token::single(TokenKind::RightBracket, start),
             _ => panic!("Unexpected character: {}", c),
         }
     }

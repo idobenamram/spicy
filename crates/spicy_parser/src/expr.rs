@@ -174,7 +174,7 @@ impl Scope {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ScopeArena {
     nodes: Vec<Scope>,
 }

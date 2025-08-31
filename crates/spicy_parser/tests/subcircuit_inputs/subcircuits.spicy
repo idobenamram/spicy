@@ -1,0 +1,12 @@
+Some subcircuits
+* this is a bad comment
+.PARAM a=1k check={a} just=10k nice={10k + check}
+R1 in out {check} ac={just}
+R2 in out {nice}
+.SUBCKT sub1 1 a alright default=1k default2=6k
+.PARAM local=5k
+R3 1 a 5k
+R4 alright a 10k
+.ends sub1
+X1 in out 0 sub1  default=3k
+.end

@@ -1,0 +1,113 @@
+---
+source: crates/spicy_parser/src/expression_phase.rs
+expression: output
+---
+PlaceholderMap {
+    next: 4,
+    map: {
+        PlaceholderId(
+            2,
+        ): Expr {
+            span: Span {
+                start: 85,
+                end: 103,
+            },
+            type: Binary {
+                op: Plus,
+                left: Expr {
+                    span: Span {
+                        start: 85,
+                        end: 88,
+                    },
+                    type: Ident(
+                        "nice",
+                    ),
+                },
+                right: Expr {
+                    span: Span {
+                        start: 92,
+                        end: 103,
+                    },
+                    type: Binary {
+                        op: Asterisk,
+                        left: Expr {
+                            span: Span {
+                                start: 92,
+                                end: 96,
+                            },
+                            type: Ident(
+                                "check",
+                            ),
+                        },
+                        right: Expr {
+                            span: Span {
+                                start: 100,
+                                end: 103,
+                            },
+                            type: Ident(
+                                "just",
+                            ),
+                        },
+                    },
+                },
+            },
+        },
+        PlaceholderId(
+            1,
+        ): Expr {
+            span: Span {
+                start: 68,
+                end: 71,
+            },
+            type: Ident(
+                "just",
+            ),
+        },
+        PlaceholderId(
+            0,
+        ): Expr {
+            span: Span {
+                start: 57,
+                end: 61,
+            },
+            type: Ident(
+                "check",
+            ),
+        },
+        PlaceholderId(
+            3,
+        ): Expr {
+            span: Span {
+                start: 117,
+                end: 124,
+            },
+            type: Binary {
+                op: Plus,
+                left: Expr {
+                    span: Span {
+                        start: 117,
+                        end: 120,
+                    },
+                    type: Ident(
+                        "nice",
+                    ),
+                },
+                right: Expr {
+                    span: Span {
+                        start: 124,
+                        end: 124,
+                    },
+                    type: Value(
+                        Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: Some(
+                                Kilo,
+                            ),
+                        },
+                    ),
+                },
+            },
+        },
+    },
+}

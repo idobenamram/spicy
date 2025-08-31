@@ -12,14 +12,21 @@ pub enum TokenKind {
     Asterisk,
     WhiteSpace,
     Newline,
-    LeftBracket,
-    RightBracket,
+    LeftBrace,
+    RightBrace,
     LeftParen, 
     RightParen,
     Comma,
     Plus,
     Minus,
+    Slash,
     EOF,
+}
+
+impl TokenKind {
+    pub fn ident_or_numeric(&self) -> bool {
+        matches!(self, TokenKind::Ident | TokenKind::Number)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -31,6 +38,13 @@ pub struct Span {
 impl Span {
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
+    }
+
+    pub fn expand(&self) -> Self {
+        Self {
+            start: self.start - 1,
+            end: self.end + 1
+        }
     }
 }
 
@@ -117,9 +131,10 @@ impl<'s> Lexer<'s> {
             '-' => Token::single(TokenKind::Minus, start),
             '+' => Token::single(TokenKind::Plus, start),
             '=' => Token::single(TokenKind::Equal, start),
+            '/' => Token::single(TokenKind::Slash, start),
             '.' => Token::single(TokenKind::Dot, start),
-            '{' => Token::single(TokenKind::LeftBracket, start),
-            '}' => Token::single(TokenKind::RightBracket, start),
+            '{' => Token::single(TokenKind::LeftBrace, start),
+            '}' => Token::single(TokenKind::RightBrace, start),
             '(' => Token::single(TokenKind::LeftParen, start),
             ')' => Token::single(TokenKind::RightParen, start),
             ',' => Token::single(TokenKind::Comma, start),

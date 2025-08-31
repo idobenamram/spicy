@@ -1,6 +1,6 @@
 This is  a nice title
 * this is a bad comment
-.PARAM check=2k nice=5 just=0
 R1 in out {check} ac={just}
-R2 in out {nice}
+R2 in out {nice + check * just}
+R3 in out {nice + 1k}
 .end

@@ -1,75 +1,9 @@
 ---
-source: crates/spicy_parser/src/param_phase.rs
-expression: output
+source: crates/spicy_parser/src/statement_phase.rs
+expression: stream
 ---
-ParamPhase {
-    env: ParamEnv {
-        parent: None,
-        map: {
-            "nice": Value(
-                Value {
-                    value: 5.0,
-                    exponent: None,
-                    suffix: None,
-                },
-            ),
-            "just": Value(
-                Value {
-                    value: 0.0,
-                    exponent: None,
-                    suffix: None,
-                },
-            ),
-            "check": Value(
-                Value {
-                    value: 2.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
-            ),
-        },
-    },
-    placeholders: PlaceholderMap {
-        next: 3,
-        map: {
-            PlaceholderId(
-                0,
-            ): (
-                Ident(
-                    "check",
-                ),
-                Span {
-                    start: 86,
-                    end: 92,
-                },
-            ),
-            PlaceholderId(
-                1,
-            ): (
-                Ident(
-                    "just",
-                ),
-                Span {
-                    start: 97,
-                    end: 102,
-                },
-            ),
-            PlaceholderId(
-                2,
-            ): (
-                Ident(
-                    "nice",
-                ),
-                Span {
-                    start: 114,
-                    end: 119,
-                },
-            ),
-        },
-    },
-    stmts: [
+Statements {
+    statements: [
         Statement {
             tokens: [
                 Token {
@@ -252,102 +186,78 @@ ParamPhase {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 76,
-                        end: 77,
+                        start: 46,
+                        end: 47,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 78,
-                        end: 78,
+                        start: 48,
+                        end: 48,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 79,
-                        end: 80,
+                        start: 49,
+                        end: 50,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 81,
-                        end: 81,
+                        start: 51,
+                        end: 51,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 82,
-                        end: 84,
+                        start: 52,
+                        end: 54,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 85,
-                        end: 85,
+                        start: 57,
+                        end: 57,
                     },
                 },
                 Token {
-                    kind: Placeholder,
-                    id: Some(
-                        PlaceholderId(
-                            0,
-                        ),
-                    ),
-                    span: Span {
-                        start: 86,
-                        end: 92,
-                    },
-                },
-                Token {
-                    kind: WhiteSpace,
+                    kind: Number,
                     id: None,
                     span: Span {
-                        start: 93,
-                        end: 93,
+                        start: 58,
+                        end: 58,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 94,
-                        end: 95,
+                        start: 59,
+                        end: 59,
                     },
                 },
                 Token {
-                    kind: Equal,
+                    kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 96,
-                        end: 96,
-                    },
-                },
-                Token {
-                    kind: Placeholder,
-                    id: Some(
-                        PlaceholderId(
-                            1,
-                        ),
-                    ),
-                    span: Span {
-                        start: 97,
-                        end: 102,
+                        start: 60,
+                        end: 60,
                     },
                 },
             ],
             span: Span {
-                start: 76,
-                end: 102,
+                start: 46,
+                end: 60,
             },
         },
         Statement {
@@ -356,66 +266,70 @@ ParamPhase {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 104,
-                        end: 105,
+                        start: 62,
+                        end: 63,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 106,
-                        end: 106,
+                        start: 64,
+                        end: 64,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 107,
-                        end: 108,
+                        start: 65,
+                        end: 66,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 109,
-                        end: 109,
+                        start: 67,
+                        end: 67,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 110,
-                        end: 112,
+                        start: 68,
+                        end: 70,
                     },
                 },
                 Token {
                     kind: WhiteSpace,
                     id: None,
                     span: Span {
-                        start: 113,
-                        end: 113,
+                        start: 73,
+                        end: 73,
                     },
                 },
                 Token {
-                    kind: Placeholder,
-                    id: Some(
-                        PlaceholderId(
-                            2,
-                        ),
-                    ),
+                    kind: Number,
+                    id: None,
                     span: Span {
-                        start: 114,
-                        end: 119,
+                        start: 74,
+                        end: 74,
+                    },
+                },
+                Token {
+                    kind: Ident,
+                    id: None,
+                    span: Span {
+                        start: 75,
+                        end: 75,
                     },
                 },
             ],
             span: Span {
-                start: 104,
-                end: 119,
+                start: 62,
+                end: 75,
             },
         },
         Statement {
@@ -424,22 +338,22 @@ ParamPhase {
                     kind: Dot,
                     id: None,
                     span: Span {
-                        start: 121,
-                        end: 121,
+                        start: 77,
+                        end: 77,
                     },
                 },
                 Token {
                     kind: Ident,
                     id: None,
                     span: Span {
-                        start: 122,
-                        end: 124,
+                        start: 78,
+                        end: 80,
                     },
                 },
             ],
             span: Span {
-                start: 121,
-                end: 124,
+                start: 77,
+                end: 80,
             },
         },
     ],

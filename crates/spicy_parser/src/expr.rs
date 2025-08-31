@@ -1,4 +1,10 @@
-use crate::{lexer::Span, netlist_types::ValueSuffix};
+use crate::{
+    lexer::{token_text, Span, Token, TokenKind},
+    netlist_types::ValueSuffix,
+    parser_utils::{parse_value, Node},
+    statement_phase::StmtCursor,
+};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -9,7 +15,11 @@ pub struct Value {
 
 impl Value {
     pub fn new(value: f64, exponent: Option<f64>, suffix: Option<ValueSuffix>) -> Self {
-        Self { value, exponent, suffix }
+        Self {
+            value,
+            exponent,
+            suffix,
+        }
     }
 
     pub fn get_value(&self) -> f64 {
@@ -25,13 +35,77 @@ impl Value {
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum ExprType {
     Const(f64),
     Value(Value),
+    Placeholder(PlaceholderId),
     Ident(String),
-    // Unary { op: char, e: Box<Expr> },       // +, -
-    // Binary { op: char, l: Box<Expr>, r: Box<Expr> }, // + - * /
+    Unary { op: TokenKind, operand: Box<Expr> },       // +, -
+    Binary { op: TokenKind, left: Box<Expr>, right: Box<Expr> }, // + - * /
     // Add Call { fun, args } if you want sin(), etc.
+}
+
+#[derive(Debug, Clone)]
+pub struct Expr {
+    pub span: Span,
+    pub r#type: ExprType,
+}
+
+impl Expr {
+    fn identifier(name: String, span: Span) -> Expr {
+        Expr {
+            span,
+            r#type: ExprType::Ident(name),
+        }
+    }
+
+    fn float(value: f64, span: Span) -> Expr {
+        Expr {
+            span,
+            r#type: ExprType::Const(value),
+        }
+    }
+
+    pub fn value(value: Value, span: Span) -> Expr {
+        Expr {
+            span,
+            r#type: ExprType::Value(value),
+        }
+    }
+
+    pub fn placeholder(id: PlaceholderId, span: Span) -> Expr {
+        Expr {
+            span,
+            r#type: ExprType::Placeholder(id),
+        }
+    }
+
+    fn unary(op: Token, operand: Expr) -> Expr {
+        Expr {
+            span: Span::new(op.span.start, op.span.end),
+            r#type: ExprType::Unary {
+                op: op.kind,
+                operand: Box::new(operand),
+            },
+        }
+    }
+
+    fn binary(op: TokenKind, lhs: Expr, rhs: Expr) -> Expr {
+        Expr {
+            span: Span::new(lhs.span.start, rhs.span.end),
+            r#type: ExprType::Binary {
+                op,
+                left: Box::new(lhs),
+                right: Box::new(rhs),
+            },
+        }
+    }
+    pub fn expand(self) -> Expr {
+        Expr {
+            span: self.span.expand(),
+            r#type: self.r#type.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,32 +114,220 @@ pub struct PlaceholderId(pub u64);
 #[derive(Debug, Default)]
 pub struct PlaceholderMap {
     next: u64,
-    pub map: std::collections::HashMap<PlaceholderId, (Expr, Span)>,
+    pub map: HashMap<PlaceholderId, Expr>,
 }
 
 impl PlaceholderMap {
-    pub fn fresh(&mut self, expr: Expr, span: Span) -> PlaceholderId {
+    pub fn fresh(&mut self, expr: Expr) -> PlaceholderId {
         let id = PlaceholderId(self.next);
         self.next += 1;
-        self.map.insert(id, (expr, span));
+        self.map.insert(id, expr);
         id
     }
 }
 
-#[derive(Debug)]
-pub struct ParamEnv<'a> {
-    pub parent: Option<&'a ParamEnv<'a>>,
-    pub map: std::collections::HashMap<String, Expr>, // store Expr; evaluation is later
+#[derive(Debug, Clone, Default)]
+pub struct Params(HashMap<String, Expr>);
+
+impl Params {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn get_param(&self, k: &str) -> Option<&Expr> {
+        self.0.get(k)
+    }
+    pub fn set_param(&mut self, k: String, v: Expr) {
+        self.0.insert(k, v);
+    }
+    pub fn merge(&mut self, other: Params) {
+        self.0.extend(other.0);
+    }
 }
 
-impl<'a> ParamEnv<'a> {
-    pub fn new_root() -> Self {
-        Self { parent: None, map: Default::default() }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScopeId(usize);
+
+#[derive(Debug, Clone)]
+pub struct Scope {
+    pub parent: Option<ScopeId>,
+    pub instance_name: Option<String>,
+    pub param_map: Params, // store Expr; evaluation is later
+    pub node_mapping: HashMap<Node, Node>,
+}
+
+impl Scope {
+    pub fn new(
+        instance_name: Option<String>,
+        param_map: Params,
+        node_mapping: HashMap<Node, Node>,
+    ) -> Self {
+        Self {
+            parent: None,
+            instance_name,
+            param_map,
+            node_mapping,
+        }
     }
-    pub fn child(&'a self) -> ParamEnv<'a> {
-        ParamEnv { parent: Some(self), map: Default::default() }
+
+    pub fn set_parent(&mut self, parent: ScopeId) {
+        self.parent = Some(parent);
     }
-    pub fn get(&self, k: &str) -> Option<&Expr> {
-        self.map.get(k).or_else(|| self.parent.and_then(|p| p.get(k)))
+}
+
+#[derive(Default)]
+pub struct ScopeArena {
+    nodes: Vec<Scope>,
+}
+
+impl ScopeArena {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn new_root(&mut self) -> (&mut Scope, ScopeId) {
+        let id = ScopeId(self.nodes.len());
+        self.nodes.push(Scope {
+            parent: None,
+            instance_name: None,
+            param_map: Default::default(),
+            node_mapping: Default::default(),
+        });
+        (self.get_mut(id).expect("just pushed"), id)
+    }
+
+    pub fn new_child(&mut self, parent: ScopeId, mut env: Scope) -> ScopeId {
+        let id = ScopeId(self.nodes.len());
+        env.set_parent(parent);
+        self.nodes.push(env);
+        id
+    }
+
+    pub fn get(&self, id: ScopeId) -> Option<&Scope> {
+        self.nodes.get(id.0)
+    }
+
+    pub fn get_mut(&mut self, id: ScopeId) -> Option<&mut Scope> {
+        self.nodes.get_mut(id.0)
+    }
+
+    /// Get by key, walking up parents until found (rootward)
+    pub fn get_param_in_scope(&self, id: ScopeId, key: &str) -> Option<&Expr> {
+        let mut cur = Some(id);
+        while let Some(eid) = cur {
+            let scope = self.nodes.get(eid.0)?;
+            if let Some(v) = scope.param_map.0.get(key) {
+                return Some(v);
+            }
+            cur = scope.parent;
+        }
+        None
+    }
+}
+
+// mini partt parser
+
+fn prefix_binding_power(op: &Token) -> ((), u8) {
+    match op.kind {
+        TokenKind::Minus => ((), 7),
+        _ => panic!("bad prefix operator: {:?}", op),
+    }
+}
+
+fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
+    match op {
+        TokenKind::Plus | TokenKind::Minus => Some((3, 4)),
+        // multiplication and division
+        TokenKind::Asterisk | TokenKind::Slash => Some((5, 6)),
+        _ => None,
+    }
+}
+
+pub struct ExpressionParser<'s> {
+    input: &'s str,
+    expression_cursor: StmtCursor<'s>,
+}
+
+impl<'s> ExpressionParser<'s> {
+    pub fn new(input: &'s str, tokens: &'s [Token]) -> Self {
+        ExpressionParser {
+            input,
+            expression_cursor: StmtCursor::new(tokens),
+        }
+    }
+
+    pub fn parse(&mut self) -> Expr {
+        println!("------parsing");
+        self.parse_expr(0)
+    }
+
+    fn parse_expr(&mut self, min_bp: u8) -> Expr {
+        let checkpoint = self.expression_cursor.checkpoint();
+        let token = self
+            .expression_cursor
+            .next_non_whitespace();
+
+        let mut lhs = match token {
+            Some(t) if t.kind == TokenKind::Ident => {
+                let name = token_text(self.input, t).to_string();
+                Expr::identifier(name, t.span)
+            }
+            Some(t) if t.kind == TokenKind::Number => {
+                // kinda weird but, rewind to before we parsed the number then give it to parse_value
+                self.expression_cursor.rewind(checkpoint);
+                let value = parse_value(&mut self.expression_cursor, self.input);
+                Expr::value(value, t.span)
+            }
+            Some(t) if t.kind == TokenKind::LeftParen => {
+                let lhs = self.parse_expr(0);
+                let next_token = self.expression_cursor.next().expect("Expected token");
+                assert_eq!(next_token.kind, TokenKind::RightParen);
+                // expand to include the parentheses
+                lhs.expand()
+            }
+            Some(t) if t.kind == TokenKind::Minus => {
+                let ((), r_bp) = prefix_binding_power(&t);
+                let rhs = self.parse_expr(r_bp);
+                Expr::unary(*t, rhs)
+            }
+            Some(t) => panic!("bad token: {:?}", t),
+            None => panic!("no token"),
+        };
+
+        loop {
+            let op = match self.expression_cursor.peek_non_whitespace() {
+                Some(t) if matches!(t.kind, TokenKind::Asterisk | TokenKind::Plus | TokenKind::Minus | TokenKind::Slash) => t,
+                Some(t) if t.kind.ident_or_numeric() => t,
+                Some(t) => panic!("bad token: {:?}", t),
+                None => break,
+            };
+
+            // in the case of no operator, we should assume multiplication
+            if op.kind == TokenKind::LeftParen || op.kind.ident_or_numeric() {
+                let (l_bp, r_bp) = infix_binding_power(&TokenKind::Asterisk)
+                    .expect("multiplication is an infix operator");
+                if l_bp < min_bp {
+                    break;
+                }
+
+                let rhs = self.parse_expr(r_bp);
+                lhs = Expr::binary(TokenKind::Asterisk, lhs, rhs);
+                continue;
+            }
+
+            if let Some((l_bp, r_bp)) = infix_binding_power(&op.kind) {
+                if l_bp < min_bp {
+                    break;
+                }
+                self.expression_cursor.next_non_whitespace().expect("already peeked");
+
+                let rhs = self.parse_expr(r_bp);
+                lhs = Expr::binary(op.kind, lhs, rhs);
+                continue;
+            }
+
+            break;
+        }
+
+        lhs
     }
 }

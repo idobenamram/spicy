@@ -1,9 +1,9 @@
 use crate::{
-    lexer::{Lexer, Span, Token, TokenKind, token_text},
-    netlist_types::CommandType,
+    lexer::{token_text, Lexer, Span, Token, TokenKind},
+    netlist_types::{CommandType, ElementType},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Statement {
     pub tokens: Vec<Token>,
     pub span: Span,
@@ -25,50 +25,51 @@ impl Statement {
     }
 
     pub fn into_cursor(&self) -> StmtCursor<'_> {
-        StmtCursor {
-            toks: &self.tokens,
-            i: 0,
-        }
+        StmtCursor::new(&self.tokens)
     }
 
     pub fn replace_tokens(&mut self, start: usize, end: usize, tokens: Vec<Token>) {
         self.tokens.splice(start..=end, tokens);
     }
-
-    // pub fn next(&mut self) -> Option<Token> {
-    //     self.tokens.
-    // }
-
-    // pub fn next_non_whitespace(&mut self) -> Option<Token> {
-    //     while let Some(token) = self.tokens.remove(0) {
-    //         if token.kind == TokenKind::WhiteSpace {
-    //             continue;
-    //         }
-    //         return Some(token);
-    //     }
-    //     None
-    // }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct StmtCursor<'a> {
     toks: &'a [Token],
     i: usize,
 }
 
 impl<'a> StmtCursor<'a> {
+
+    pub fn new(tokens: &'a [Token]) -> Self {
+        Self { toks: tokens, i: 0 }
+    }
+
+    #[inline]
     pub fn done(&self) -> bool { self.i >= self.toks.len() }
+
     #[inline]
     pub fn pos(&self) -> usize {
         self.i
     }
+
     #[inline]
     pub fn checkpoint(&self) -> usize {
-        self.i
+        self.pos()
     }
+
     #[inline]
     pub fn rewind(&mut self, mark: usize) {
         self.i = mark;
+    }
+
+    pub fn skip_ws(&mut self) {
+        while let Some(t) = self.toks.get(self.i) {
+            if t.kind != TokenKind::WhiteSpace {
+                break;
+            }
+            self.i += 1;
+        }
     }
 
     #[inline]
@@ -76,7 +77,7 @@ impl<'a> StmtCursor<'a> {
         self.toks.get(self.i)
     }
     /// Peek skipping whitespace
-    pub fn peek_non_ws(&self) -> Option<&'a Token> {
+    pub fn peek_non_whitespace(&self) -> Option<&'a Token> {
         let mut j = self.i;
         while let Some(t) = self.toks.get(j) {
             if t.kind != TokenKind::WhiteSpace {
@@ -93,15 +94,6 @@ impl<'a> StmtCursor<'a> {
             self.i += 1;
         }
         t
-    }
-    /// Advance past whitespace only
-    pub fn skip_ws(&mut self) {
-        while let Some(t) = self.toks.get(self.i) {
-            if t.kind != TokenKind::WhiteSpace {
-                break;
-            }
-            self.i += 1;
-        }
     }
 
     pub fn next_non_whitespace(&mut self) -> Option<&'a Token> {
@@ -137,21 +129,36 @@ impl<'a> StmtCursor<'a> {
         self.rewind(checkpoint);
         false
     }
+
+    pub fn consume_if_element(&mut self, input: &'a str, device: ElementType) -> Option<&'a str> {
+        let checkpoint = self.checkpoint();
+        self.skip_ws();
+        if let Some(t) = self.consume(TokenKind::Ident) {
+            let ident_string = token_text(input, t);
+            let (first, name) = ident_string.split_at(1);
+            let found_device = ElementType::from_str(first) == Some(device);
+            if found_device {
+                return Some(name);
+            }
+        }
+        self.rewind(checkpoint);
+        None
+    }
 }
 
 #[derive(Debug)]
-pub struct StatementStream {
-    statements: Vec<Statement>,
+pub struct Statements {
+    pub(crate) statements: Vec<Statement>,
 }
 
-impl StatementStream {
+impl Statements {
     fn merge_statements(statements: Vec<Statement>) -> Vec<Statement> {
         let mut merged: Vec<Statement> = Vec::new();
 
         for stmt in statements.into_iter() {
             // Find first non-whitespace token index
             let cursor = stmt.into_cursor();
-            let starts_with_plus = match cursor.peek_non_ws() {
+            let starts_with_plus = match cursor.peek_non_whitespace() {
                 Some(t) => t.kind == TokenKind::Plus,
                 None => false,
             };
@@ -192,16 +199,11 @@ impl StatementStream {
         }
 
         // Merge statements with trailing '+' continuation
-        let mut statements = Self::merge_statements(statements);
-        statements.reverse();
-
+        let statements = Self::merge_statements(statements);
         Self { statements }
     }
-
-    pub fn next(&mut self) -> Option<Statement> {
-        self.statements.pop()
-    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -214,10 +216,10 @@ mod tests {
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let stream = StatementStream::new(&input_content);
+        let stream = Statements::new(&input_content);
 
         let name = format!(
-            "stream-{}",
+            "statements-{}",
             input
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())

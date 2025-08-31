@@ -1,0 +1,1232 @@
+---
+source: crates/spicy_parser/src/subcircuit_phase.rs
+expression: expanded_stream
+---
+Deck {
+    scope_arena: ScopeArena {
+        nodes: [
+            Scope {
+                parent: None,
+                instance_name: None,
+                param_map: Params(
+                    {
+                        "Rg": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 500.0,
+                                    exponent: None,
+                                    suffix: None,
+                                },
+                            ),
+                        },
+                        "C": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 5.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Nano,
+                                    ),
+                                },
+                            ),
+                        },
+                    },
+                ),
+                node_mapping: {},
+            },
+            Scope {
+                parent: Some(
+                    ScopeId(
+                        0,
+                    ),
+                ),
+                instance_name: Some(
+                    "1",
+                ),
+                param_map: Params(
+                    {
+                        "C": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 10.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Nano,
+                                    ),
+                                },
+                            ),
+                        },
+                        "R": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 2.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Kilo,
+                                    ),
+                                },
+                            ),
+                        },
+                    },
+                ),
+                node_mapping: {
+                    Node {
+                        name: "out",
+                    }: Node {
+                        name: "n2",
+                    },
+                    Node {
+                        name: "in",
+                    }: Node {
+                        name: "n1",
+                    },
+                },
+            },
+            Scope {
+                parent: Some(
+                    ScopeId(
+                        0,
+                    ),
+                ),
+                instance_name: Some(
+                    "2",
+                ),
+                param_map: Params(
+                    {
+                        "C": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 10.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Nano,
+                                    ),
+                                },
+                            ),
+                        },
+                        "R": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 2.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Kilo,
+                                    ),
+                                },
+                            ),
+                        },
+                    },
+                ),
+                node_mapping: {
+                    Node {
+                        name: "out",
+                    }: Node {
+                        name: "b",
+                    },
+                    Node {
+                        name: "in",
+                    }: Node {
+                        name: "a",
+                    },
+                },
+            },
+            Scope {
+                parent: Some(
+                    ScopeId(
+                        0,
+                    ),
+                ),
+                instance_name: Some(
+                    "3",
+                ),
+                param_map: Params(
+                    {
+                        "C": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 22.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Nano,
+                                    ),
+                                },
+                            ),
+                        },
+                        "R": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 2.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Kilo,
+                                    ),
+                                },
+                            ),
+                        },
+                    },
+                ),
+                node_mapping: {
+                    Node {
+                        name: "out",
+                    }: Node {
+                        name: "y",
+                    },
+                    Node {
+                        name: "in",
+                    }: Node {
+                        name: "x",
+                    },
+                },
+            },
+        ],
+    },
+    global_params: ScopeId(
+        0,
+    ),
+    subckt_table: SubcktTable {
+        map: {
+            "LP": SubcktDecl {
+                name: "LP",
+                nodes: [
+                    Node {
+                        name: "in",
+                    },
+                    Node {
+                        name: "out",
+                    },
+                ],
+                default_params: Params(
+                    {
+                        "C": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 10.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Nano,
+                                    ),
+                                },
+                            ),
+                        },
+                        "R": Expr {
+                            span: Span {
+                                start: 120,
+                                end: 123,
+                            },
+                            type: Placeholder(
+                                PlaceholderId(
+                                    0,
+                                ),
+                            ),
+                        },
+                    },
+                ),
+                local_params: Params(
+                    {
+                        "R": Expr {
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                            type: Value(
+                                Value {
+                                    value: 2.0,
+                                    exponent: None,
+                                    suffix: Some(
+                                        Kilo,
+                                    ),
+                                },
+                            ),
+                        },
+                    },
+                ),
+                body: [
+                    Statement {
+                        tokens: [
+                            Token {
+                                kind: Ident,
+                                id: None,
+                                span: Span {
+                                    start: 144,
+                                    end: 145,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 146,
+                                    end: 146,
+                                },
+                            },
+                            Token {
+                                kind: Ident,
+                                id: None,
+                                span: Span {
+                                    start: 147,
+                                    end: 148,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 149,
+                                    end: 149,
+                                },
+                            },
+                            Token {
+                                kind: Ident,
+                                id: None,
+                                span: Span {
+                                    start: 150,
+                                    end: 152,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 153,
+                                    end: 153,
+                                },
+                            },
+                            Token {
+                                kind: Placeholder,
+                                id: Some(
+                                    PlaceholderId(
+                                        1,
+                                    ),
+                                ),
+                                span: Span {
+                                    start: 154,
+                                    end: 156,
+                                },
+                            },
+                        ],
+                        span: Span {
+                            start: 144,
+                            end: 156,
+                        },
+                    },
+                    Statement {
+                        tokens: [
+                            Token {
+                                kind: Ident,
+                                id: None,
+                                span: Span {
+                                    start: 158,
+                                    end: 159,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 160,
+                                    end: 160,
+                                },
+                            },
+                            Token {
+                                kind: Ident,
+                                id: None,
+                                span: Span {
+                                    start: 161,
+                                    end: 163,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 164,
+                                    end: 164,
+                                },
+                            },
+                            Token {
+                                kind: Number,
+                                id: None,
+                                span: Span {
+                                    start: 165,
+                                    end: 165,
+                                },
+                            },
+                            Token {
+                                kind: WhiteSpace,
+                                id: None,
+                                span: Span {
+                                    start: 166,
+                                    end: 167,
+                                },
+                            },
+                            Token {
+                                kind: Placeholder,
+                                id: Some(
+                                    PlaceholderId(
+                                        2,
+                                    ),
+                                ),
+                                span: Span {
+                                    start: 168,
+                                    end: 170,
+                                },
+                            },
+                        ],
+                        span: Span {
+                            start: 158,
+                            end: 170,
+                        },
+                    },
+                ],
+            },
+        },
+    },
+    statements: [
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 0,
+                            end: 3,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 4,
+                            end: 4,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 5,
+                            end: 15,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 0,
+                    end: 15,
+                },
+            },
+            scope: ScopeId(
+                0,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Asterisk,
+                        id: None,
+                        span: Span {
+                            start: 17,
+                            end: 17,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 18,
+                            end: 18,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 19,
+                            end: 19,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 20,
+                            end: 20,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 21,
+                            end: 21,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 22,
+                            end: 22,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 23,
+                            end: 28,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 29,
+                            end: 29,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 30,
+                            end: 35,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 36,
+                            end: 36,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 37,
+                            end: 37,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 38,
+                            end: 38,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 39,
+                            end: 39,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 17,
+                    end: 39,
+                },
+            },
+            scope: ScopeId(
+                0,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Asterisk,
+                        id: None,
+                        span: Span {
+                            start: 68,
+                            end: 68,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 69,
+                            end: 69,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 70,
+                            end: 70,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 71,
+                            end: 71,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 72,
+                            end: 72,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 73,
+                            end: 73,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 74,
+                            end: 83,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 84,
+                            end: 84,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 85,
+                            end: 94,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 95,
+                            end: 95,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 96,
+                            end: 96,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 97,
+                            end: 97,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 98,
+                            end: 98,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 68,
+                    end: 98,
+                },
+            },
+            scope: ScopeId(
+                0,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Asterisk,
+                        id: None,
+                        span: Span {
+                            start: 182,
+                            end: 182,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 183,
+                            end: 183,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 184,
+                            end: 184,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 185,
+                            end: 185,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 186,
+                            end: 186,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 187,
+                            end: 187,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 188,
+                            end: 196,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 197,
+                            end: 197,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 198,
+                            end: 198,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 199,
+                            end: 199,
+                        },
+                    },
+                    Token {
+                        kind: Minus,
+                        id: None,
+                        span: Span {
+                            start: 200,
+                            end: 200,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 182,
+                    end: 200,
+                },
+            },
+            scope: ScopeId(
+                0,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 144,
+                            end: 145,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 146,
+                            end: 146,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 147,
+                            end: 148,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 149,
+                            end: 149,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 150,
+                            end: 152,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 153,
+                            end: 153,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                1,
+                            ),
+                        ),
+                        span: Span {
+                            start: 154,
+                            end: 156,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 144,
+                    end: 156,
+                },
+            },
+            scope: ScopeId(
+                1,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 158,
+                            end: 159,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 160,
+                            end: 160,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 161,
+                            end: 163,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 164,
+                            end: 164,
+                        },
+                    },
+                    Token {
+                        kind: Number,
+                        id: None,
+                        span: Span {
+                            start: 165,
+                            end: 165,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 166,
+                            end: 167,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                2,
+                            ),
+                        ),
+                        span: Span {
+                            start: 168,
+                            end: 170,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 158,
+                    end: 170,
+                },
+            },
+            scope: ScopeId(
+                1,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 144,
+                            end: 145,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 146,
+                            end: 146,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 147,
+                            end: 148,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 149,
+                            end: 149,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 150,
+                            end: 152,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 153,
+                            end: 153,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                1,
+                            ),
+                        ),
+                        span: Span {
+                            start: 154,
+                            end: 156,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 144,
+                    end: 156,
+                },
+            },
+            scope: ScopeId(
+                2,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 158,
+                            end: 159,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 160,
+                            end: 160,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 161,
+                            end: 163,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 164,
+                            end: 164,
+                        },
+                    },
+                    Token {
+                        kind: Number,
+                        id: None,
+                        span: Span {
+                            start: 165,
+                            end: 165,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 166,
+                            end: 167,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                2,
+                            ),
+                        ),
+                        span: Span {
+                            start: 168,
+                            end: 170,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 158,
+                    end: 170,
+                },
+            },
+            scope: ScopeId(
+                2,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 144,
+                            end: 145,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 146,
+                            end: 146,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 147,
+                            end: 148,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 149,
+                            end: 149,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 150,
+                            end: 152,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 153,
+                            end: 153,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                1,
+                            ),
+                        ),
+                        span: Span {
+                            start: 154,
+                            end: 156,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 144,
+                    end: 156,
+                },
+            },
+            scope: ScopeId(
+                3,
+            ),
+        },
+        ScopedStmt {
+            stmt: Statement {
+                tokens: [
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 158,
+                            end: 159,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 160,
+                            end: 160,
+                        },
+                    },
+                    Token {
+                        kind: Ident,
+                        id: None,
+                        span: Span {
+                            start: 161,
+                            end: 163,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 164,
+                            end: 164,
+                        },
+                    },
+                    Token {
+                        kind: Number,
+                        id: None,
+                        span: Span {
+                            start: 165,
+                            end: 165,
+                        },
+                    },
+                    Token {
+                        kind: WhiteSpace,
+                        id: None,
+                        span: Span {
+                            start: 166,
+                            end: 167,
+                        },
+                    },
+                    Token {
+                        kind: Placeholder,
+                        id: Some(
+                            PlaceholderId(
+                                2,
+                            ),
+                        ),
+                        span: Span {
+                            start: 168,
+                            end: 170,
+                        },
+                    },
+                ],
+                span: Span {
+                    start: 158,
+                    end: 170,
+                },
+            },
+            scope: ScopeId(
+                3,
+            ),
+        },
+    ],
+}

@@ -15,13 +15,13 @@ pub enum CommandType {
 impl CommandType {
     pub fn from_str(s: &str) -> Option<CommandType> {
         match s {
-            "AC" => Some(CommandType::AC),
-            "DC" => Some(CommandType::DC),
-            "OP" => Some(CommandType::Op),
-            "SUBCKT" => Some(CommandType::Subcircuit),
-            "ENDS" => Some(CommandType::Ends),
-            "PARAM" => Some(CommandType::Param),
-            "END" => Some(CommandType::End),
+            "AC" | "ac" => Some(CommandType::AC),
+            "DC" | "dc" => Some(CommandType::DC),
+            "OP" | "op" => Some(CommandType::Op),
+            "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
+            "ENDS" | "ends" => Some(CommandType::Ends),
+            "PARAM" | "param" => Some(CommandType::Param),
+            "END" | "end" => Some(CommandType::End),
             _ => None,
         }
     }

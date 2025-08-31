@@ -25,7 +25,7 @@ pub struct SubcktDecl {
     pub body: Vec<Statement>, // statements between .subckt and .ends (already placeholderized)
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SubcktTable {
     pub map: HashMap<String, SubcktDecl>,
 }
@@ -55,13 +55,14 @@ pub fn collect_subckts(stmts: Statements, input: &str) -> UnexpandedDeck {
             let mut body = Vec::new();
             // TODO: this doesn't support nested subcircuits
             while let Some(next) = it.next() {
-
-                if cursor.consume_if_command(input, CommandType::Param) {
-                    parse_dot_param(&mut cursor, input, &mut subckt.local_params);
+                let mut inner_cursor = next.into_cursor();
+                if inner_cursor.consume_if_command(input, CommandType::Param) {
+                    println!("parsing param in subcircuit");
+                    parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params);
                     continue;
                 }
                 // collect body until .ends
-                if cursor.consume_if_command(input, CommandType::Ends) {
+                if inner_cursor.consume_if_command(input, CommandType::Ends) {
                     // TODO: the .ends command also has the subcircuit name, add assert here
                     break;
                 }
@@ -164,11 +165,19 @@ fn parse_x_element(
     (nodes, subcircuit_name, param_overrides)
 }
 
+#[derive(Debug, Clone)]
+pub struct Deck {
+    pub scope_arena: ScopeArena,
+    pub global_params: ScopeId,
+    pub subckt_table: SubcktTable,
+    pub statements: Vec<ScopedStmt>,
+}
+
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
 pub fn expand_subckts<'a>(
     mut unexpanded_deck: UnexpandedDeck,
     src: &'a str,
-) -> Vec<ScopedStmt> {
+) -> Deck {
     let mut out = Vec::new();
 
     let root_scope_id = unexpanded_deck.global_params;
@@ -194,8 +203,10 @@ pub fn expand_subckts<'a>(
             }
 
             let mut instance_params = subckt_def.default_params.clone();
-            // will override any default params and node mappings
+            // will override any default params 
             instance_params.merge(param_overrides);
+            // will override any instance params
+            instance_params.merge(subckt_def.local_params.clone());
             // pin map
             let mut node_mapping = HashMap::new();
             for (f, a) in subckt_def.nodes
@@ -222,7 +233,12 @@ pub fn expand_subckts<'a>(
             scope: root_scope_id,
         });
     }
-    out
+    Deck {
+        scope_arena: unexpanded_deck.scope_arena,
+        global_params: unexpanded_deck.global_params,
+        subckt_table: unexpanded_deck.subckt_table,
+        statements: out,
+    }
 }
 
 #[cfg(test)]

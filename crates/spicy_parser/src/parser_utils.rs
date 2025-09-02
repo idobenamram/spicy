@@ -1,13 +1,9 @@
-use crate::netlist_types::{ValueSuffix};
-use crate::expr::{Expr, Params, Scope};
-use crate::lexer::{token_text, Span, TokenKind};
 use crate::expr::Value;
-use crate::statement_phase::{StmtCursor};
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Node {
-    pub name: String,
-}
+use crate::expr::{Expr, Params};
+use crate::lexer::{Span, TokenKind, token_text};
+use crate::netlist_types::Node;
+use crate::netlist_types::ValueSuffix;
+use crate::statement_phase::StmtCursor;
 
 pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Node {
     let node = cursor.next_non_whitespace().expect("Must be node");
@@ -112,6 +108,17 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
         value,
         exponent,
         suffix,
+    }
+}
+
+pub(crate) fn parse_bool(cursor: &mut StmtCursor, src: &str) -> bool {
+    let bool = cursor.next_non_whitespace().expect("Must be bool");
+    assert_eq!(bool.kind, TokenKind::Number);
+    let bool_text = token_text(src, bool);
+    match bool_text {
+        "0" => false,
+        "1" => true,
+        _ => panic!("expected '0' or '1'"),
     }
 }
 

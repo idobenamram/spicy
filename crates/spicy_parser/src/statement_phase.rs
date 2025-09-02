@@ -1,6 +1,6 @@
 use crate::{
-    lexer::{token_text, Lexer, Span, Token, TokenKind},
-    netlist_types::{CommandType, ElementType},
+    lexer::{Lexer, Span, Token, TokenKind, token_text},
+    netlist_types::{CommandType, DeviceType},
 };
 
 #[derive(Debug, Clone)]
@@ -40,13 +40,14 @@ pub struct StmtCursor<'a> {
 }
 
 impl<'a> StmtCursor<'a> {
-
     pub fn new(tokens: &'a [Token]) -> Self {
         Self { toks: tokens, i: 0 }
     }
 
     #[inline]
-    pub fn done(&self) -> bool { self.i >= self.toks.len() }
+    pub fn done(&self) -> bool {
+        self.i >= self.toks.len()
+    }
 
     #[inline]
     pub fn pos(&self) -> usize {
@@ -130,19 +131,50 @@ impl<'a> StmtCursor<'a> {
         false
     }
 
-    pub fn consume_if_element(&mut self, input: &'a str, device: ElementType) -> Option<&'a str> {
+    pub fn consume_if_device(&mut self, input: &'a str, device: DeviceType) -> Option<&'a str> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if let Some(t) = self.consume(TokenKind::Ident) {
             let ident_string = token_text(input, t);
             let (first, name) = ident_string.split_at(1);
-            let found_device = ElementType::from_str(first) == Some(device);
+            let found_device = DeviceType::from_str(first) == Some(device);
             if found_device {
                 return Some(name);
             }
         }
         self.rewind(checkpoint);
         None
+    }
+
+    pub fn contains(&self, kind: TokenKind) -> bool {
+        self.toks.iter().any(|t| t.kind == kind)
+    }
+
+    pub fn split_on_whitespace(&self) -> Vec<StmtCursor<'a>> {
+        let mut result = Vec::new();
+        let mut start = self.i;
+
+        for (offset, tok) in self.toks[self.i..].iter().enumerate() {
+            let idx = self.i + offset;
+            if matches!(tok.kind, TokenKind::WhiteSpace) {
+                if start < idx {
+                    result.push(StmtCursor {
+                        toks: &self.toks[start..idx],
+                        i: 0,
+                    });
+                }
+                start = idx + 1;
+            }
+        }
+
+        if start < self.toks.len() {
+            result.push(StmtCursor {
+                toks: &self.toks[start..],
+                i: 0,
+            });
+        }
+
+        result
     }
 }
 
@@ -203,7 +235,6 @@ impl Statements {
         Self { statements }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

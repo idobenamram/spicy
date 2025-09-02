@@ -1,7 +1,8 @@
 use crate::{
     lexer::{token_text, Span, Token, TokenKind},
     netlist_types::ValueSuffix,
-    parser_utils::{parse_value, Node},
+    parser_utils::{parse_value},
+    netlist_types::Node,
     statement_phase::StmtCursor,
 };
 use std::collections::HashMap;
@@ -34,9 +35,40 @@ impl Value {
     }
 }
 
+// Arithmetic operations for Value using fully-scaled numeric values.
+// Results are returned normalized without exponent or suffix.
+use std::ops::{Add, Sub, Mul, Div};
+
+impl Add for Value {
+    type Output = Value;
+    fn add(self, rhs: Value) -> Self::Output {
+        Value::new(self.get_value() + rhs.get_value(), None, None)
+    }
+}
+
+impl Sub for Value {
+    type Output = Value;
+    fn sub(self, rhs: Value) -> Self::Output {
+        Value::new(self.get_value() - rhs.get_value(), None, None)
+    }
+}
+
+impl Mul for Value {
+    type Output = Value;
+    fn mul(self, rhs: Value) -> Self::Output {
+        Value::new(self.get_value() * rhs.get_value(), None, None)
+    }
+}
+
+impl Div for Value {
+    type Output = Value;
+    fn div(self, rhs: Value) -> Self::Output {
+        Value::new(self.get_value() / rhs.get_value(), None, None)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ExprType {
-    Const(f64),
     Value(Value),
     Placeholder(PlaceholderId),
     Ident(String),
@@ -62,7 +94,7 @@ impl Expr {
     fn float(value: f64, span: Span) -> Expr {
         Expr {
             span,
-            r#type: ExprType::Const(value),
+            r#type: ExprType::Value(Value::new(value, None, None)),
         }
     }
 
@@ -106,6 +138,45 @@ impl Expr {
             r#type: self.r#type.clone(),
         }
     }
+
+    pub fn evaluate(self, scope: &Scope) -> Value {
+        match self.r#type {
+            ExprType::Value(value) => value,
+            ExprType::Placeholder(id) => panic!("Placeholder not evaluatable: {:?}", id),
+            ExprType::Ident(name) => scope.param_map.get_param(&name).cloned().expect("param not found").evaluate(scope),
+            ExprType::Unary { op, operand } => {match op {
+                TokenKind::Minus => {
+                    let value = operand.evaluate(scope);
+                    Value::new(-value.get_value(), None, None)
+                }
+                _ => panic!("Unary operator not evaluatable: {:?}", op),
+            }},
+            ExprType::Binary { op, left, right } => {match op {
+                TokenKind::Plus => {
+                    let left_value = left.evaluate(scope);
+                    let right_value = right.evaluate(scope);
+                    left_value + right_value
+                }
+                TokenKind::Minus => {
+                    let left_value = left.evaluate(scope);
+                    let right_value = right.evaluate(scope);
+                    left_value - right_value
+                }
+                TokenKind::Asterisk => {
+                    let left_value = left.evaluate(scope);
+                    let right_value = right.evaluate(scope);
+                    left_value * right_value
+                }
+                TokenKind::Slash => {
+                    let left_value = left.evaluate(scope);
+                    let right_value = right.evaluate(scope);
+                    left_value / right_value
+                }
+                _ => panic!("Binary operator not evaluatable: {:?}", op),
+            }},
+        }
+
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -123,6 +194,10 @@ impl PlaceholderMap {
         self.next += 1;
         self.map.insert(id, expr);
         id
+    }
+
+    pub fn get(&self, id: PlaceholderId) -> Option<&Expr> {
+        self.map.get(&id)
     }
 }
 
@@ -169,8 +244,15 @@ impl Scope {
         }
     }
 
-    pub fn set_parent(&mut self, parent: ScopeId) {
+    pub(crate) fn set_parent(&mut self, parent: ScopeId) {
         self.parent = Some(parent);
+    }
+
+    pub(crate) fn get_device_name(&self, name: &str) -> String {
+        if let Some(instance_name) = &self.instance_name {
+            return format!("{}_{}", instance_name, name);
+        }
+        name.to_string()
     }
 }
 

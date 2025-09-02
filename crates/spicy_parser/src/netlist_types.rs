@@ -1,5 +1,11 @@
 // https://ngspice.sourceforge.io/docs/ngspice-manual.pdf
 
+use crate::{expr::Value, lexer::Span};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Node {
+    pub name: String,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommandType {
@@ -27,8 +33,28 @@ impl CommandType {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct OpCommand {
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct DcCommand {
+    pub span: Span,
+    pub srcnam: String,
+    pub vstart: Value,
+    pub vstop: Value,
+    pub vincr: Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum Command {
+    Op(OpCommand),
+    Dc(DcCommand),
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum ElementType {
+pub enum DeviceType {
     Resistor,
     Capacitor,
     Inductor,
@@ -37,31 +63,265 @@ pub enum ElementType {
     Subcircuit,
 }
 
-impl ElementType {
-    pub fn from_str(s: &str) -> Option<ElementType> {
+impl DeviceType {
+    pub fn from_str(s: &str) -> Option<DeviceType> {
         match s.to_uppercase().to_string().as_str() {
-            "R" => Some(ElementType::Resistor),
-            "C" => Some(ElementType::Capacitor),
-            "L" => Some(ElementType::Inductor),
-            "V" => Some(ElementType::VoltageSource),
-            "I" => Some(ElementType::CurrentSource),
-            "X" => Some(ElementType::Subcircuit),
+            "R" => Some(DeviceType::Resistor),
+            "C" => Some(DeviceType::Capacitor),
+            "L" => Some(DeviceType::Inductor),
+            "V" => Some(DeviceType::VoltageSource),
+            "I" => Some(DeviceType::CurrentSource),
+            "X" => Some(DeviceType::Subcircuit),
             _ => None,
         }
     }
 
     pub fn to_char(&self) -> char {
         match self {
-            ElementType::Resistor => 'R',
-            ElementType::Capacitor => 'C',
-            ElementType::Inductor => 'L',
-            ElementType::VoltageSource => 'V',
-            ElementType::CurrentSource => 'I',
-            ElementType::Subcircuit => 'X',
+            DeviceType::Resistor => 'R',
+            DeviceType::Capacitor => 'C',
+            DeviceType::Inductor => 'L',
+            DeviceType::VoltageSource => 'V',
+            DeviceType::CurrentSource => 'I',
+            DeviceType::Subcircuit => 'X',
         }
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Resistor {
+    pub name: String,
+    pub span: Span,
+    pub positive: Node,
+    pub negative: Node,
+    pub resistance: Value,
+    pub ac: Option<Value>,
+    pub m: Option<Value>,
+    pub scale: Option<Value>,
+    pub temp: Option<Value>,
+    pub dtemp: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
+    pub noisy: Option<bool>,
+}
+
+impl Resistor {
+    pub fn new(
+        name: String,
+        span: Span,
+        positive: Node,
+        negative: Node,
+        resistance: Value,
+    ) -> Self {
+        Self {
+            name,
+            span,
+            positive,
+            negative,
+            resistance,
+            ac: None,
+            m: None,
+            scale: None,
+            temp: None,
+            dtemp: None,
+            tc1: None,
+            tc2: None,
+            noisy: None,
+        }
+    }
+
+    pub fn set_ac(&mut self, value: Value) {
+        self.ac = Some(value);
+    }
+    pub fn set_m(&mut self, value: Value) {
+        self.m = Some(value);
+    }
+
+    pub fn set_scale(&mut self, value: Value) {
+        self.scale = Some(value);
+    }
+    pub fn set_temp(&mut self, value: Value) {
+        self.temp = Some(value);
+    }
+
+    pub fn set_dtemp(&mut self, value: Value) {
+        self.dtemp = Some(value);
+    }
+    pub fn set_tc1(&mut self, value: Value) {
+        self.tc1 = Some(value);
+    }
+
+    pub fn set_tc2(&mut self, value: Value) {
+        self.tc2 = Some(value);
+    }
+    pub fn set_noisy(&mut self, value: bool) {
+        self.noisy = Some(value);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Capacitor {
+    pub name: String,
+    pub span: Span,
+    pub positive: Node,
+    pub negative: Node,
+    pub capacitance: Value,
+    pub mname: Option<String>,
+    pub m: Option<Value>,
+    pub scale: Option<Value>,
+    pub temp: Option<Value>,
+    pub dtemp: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
+    pub ic: Option<Value>,
+}
+
+impl Capacitor {
+    pub fn new(
+        name: String,
+        span: Span,
+        positive: Node,
+        negative: Node,
+        capacitance: Value,
+    ) -> Self {
+        Self {
+            name,
+            span,
+            positive,
+            negative,
+            capacitance,
+            mname: None,
+            m: None,
+            scale: None,
+            temp: None,
+            dtemp: None,
+            tc1: None,
+            tc2: None,
+            ic: None,
+        }
+    }
+
+    pub fn set_m(&mut self, value: Value) {
+        self.m = Some(value);
+    }
+
+    pub fn set_scale(&mut self, value: Value) {
+        self.scale = Some(value);
+    }
+    pub fn set_temp(&mut self, value: Value) {
+        self.temp = Some(value);
+    }
+
+    pub fn set_dtemp(&mut self, value: Value) {
+        self.dtemp = Some(value);
+    }
+    pub fn set_tc1(&mut self, value: Value) {
+        self.tc1 = Some(value);
+    }
+
+    pub fn set_tc2(&mut self, value: Value) {
+        self.tc2 = Some(value);
+    }
+    pub fn set_ic(&mut self, value: Value) {
+        self.ic = Some(value);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Inductor {
+    pub name: String,
+    pub span: Span,
+    pub positive: Node,
+    pub negative: Node,
+    pub inductance: Value,
+    pub nt: Option<Value>,
+    pub m: Option<Value>,
+    pub scale: Option<Value>,
+    pub temp: Option<Value>,
+    pub dtemp: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
+    pub ic: Option<Value>,
+}
+
+
+impl Inductor {
+    pub fn new(
+        name: String,
+        span: Span,
+        positive: Node,
+        negative: Node,
+        inductance: Value,
+    ) -> Self {
+        Self {
+            name,
+            span,
+            positive,
+            negative,
+            inductance,
+            nt: None,
+            m: None,
+            scale: None,
+            temp: None,
+            dtemp: None,
+            tc1: None,
+            tc2: None,
+            ic: None,
+        }
+    }
+
+    pub fn set_nt(&mut self, value: Value) {
+        self.nt = Some(value);
+    }
+
+    pub fn set_m(&mut self, value: Value) {
+        self.m = Some(value);
+    }
+
+    pub fn set_scale(&mut self, value: Value) {
+        self.scale = Some(value);
+    }
+    pub fn set_temp(&mut self, value: Value) {
+        self.temp = Some(value);
+    }
+
+    pub fn set_dtemp(&mut self, value: Value) {
+        self.dtemp = Some(value);
+    }
+    pub fn set_tc1(&mut self, value: Value) {
+        self.tc1 = Some(value);
+    }
+
+    pub fn set_tc2(&mut self, value: Value) {
+        self.tc2 = Some(value);
+    }
+    pub fn set_ic(&mut self, value: Value) {
+        self.ic = Some(value);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IndependentSourceMode {
+    DC { value: Value },
+    // TODO: support AC
+}
+
+#[derive(Debug, Clone)]
+pub struct IndependentSource {
+    pub name: String,
+    pub positive: Node,
+    pub negative: Node,
+    pub mode: IndependentSourceMode,
+}
+
+#[derive(Debug, Clone)]
+pub enum Device {
+    Resistor(Resistor),
+    Capacitor(Capacitor),
+    Inductor(Inductor),
+    VoltageSource(IndependentSource),
+    CurrentSource(IndependentSource),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSuffix {

@@ -1,365 +1,309 @@
+use crate::expr::{PlaceholderMap, Scope, Value};
+use crate::expression_phase::substitute_expressions;
+use crate::lexer::{Span, Token, TokenKind, token_text};
+use crate::netlist_types::{
+    Capacitor, Command, CommandType, DcCommand, Device, DeviceType, IndependentSource,
+    IndependentSourceMode, Inductor, OpCommand, Resistor,
+};
+use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_value};
+use crate::statement_phase::{Statement, Statements, StmtCursor};
+use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt, collect_subckts, expand_subckts};
 use std::collections::HashMap;
-
-/// A parser for basic latex expressions.
-/// based on matklad's pratt parser blog https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-use crate::lexer::{Token, TokenKind};
-use crate::netlist_types::{CommandType, ElementType, ValueSuffix};
-use crate::attributes::{Attributes, Attr};
-use crate::statement_phase::{Statement, StatementStream};
-use crate::expr::Value;
-
-#[derive(Debug, Clone)]
-pub struct Node {
-    pub name: String,
-}
-
-#[derive(Debug)]
-pub struct Subcircuit {
-    pub name: String,
-    pub nodes: Vec<Node>,
-    pub elements: Vec<Element>,
-}
+use std::collections::binary_heap::Iter;
 
 #[derive(Debug)]
 pub struct Deck {
     pub title: String,
-    pub params: HashMap<String, Value>,
-    pub subcircuits: Vec<Subcircuit>,
     pub commands: Vec<Command>,
-    pub elements: Vec<Element>,
+    pub devices: Vec<Device>,
 }
 
-
-
-#[derive(Debug, Clone)]
-pub enum ValueOrParam {
-    Value(Value),
-    Param(String),
+pub struct ParamParser<'s> {
+    input: &'s str,
+    params_order: Vec<&'s str>,
+    param_cursors: Vec<StmtCursor<'s>>,
+    current_param: usize,
+    named_mode: bool,
 }
 
-impl ValueOrParam {
-    pub fn get_value(&self) -> f64 {
-        match self {
-            ValueOrParam::Value(value) => value.get_value(),
-            ValueOrParam::Param(param) => {
-                panic!("Param is not a value: {}", param)
-            }
+impl<'s> ParamParser<'s> {
+    pub fn new(input: &'s str, params_order: Vec<&'s str>, cursor: StmtCursor<'s>) -> Self {
+        ParamParser {
+            input,
+            params_order,
+            param_cursors: cursor.split_on_whitespace(),
+            named_mode: false,
+            current_param: 0,
         }
     }
 }
 
+impl<'s> Iterator for ParamParser<'s> {
+    type Item = (&'s str, StmtCursor<'s>);
 
-#[derive(Debug, Clone)]
-pub struct Element {
-    pub kind: ElementType,
-    pub name: String,
-    // maybe we can make this type safe with a postive/negative node type
-    pub nodes: Vec<Node>,
-    pub value: ValueOrParam,
-    pub params: Attributes,
-    pub start: usize,
-    pub end: usize,
-}
-
-impl Element {
-    pub fn name(&self) -> String {
-        format!("{}{}", self.kind.to_char(), self.name)
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_param >= self.param_cursors.len() {
+            None
+        } else {
+            let mut cursor = self.param_cursors[self.current_param].clone();
+            let item = if !self.named_mode {
+                if cursor.contains(TokenKind::Equal) {
+                    self.named_mode = true;
+                    let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
+                    let ident_str = token_text(self.input, ident);
+                    assert_eq!(ident_str, self.params_order[self.current_param]);
+                    let _equal_sign = cursor.expect(TokenKind::Equal).expect("Must be equal");
+                    Some((ident_str, cursor))
+                } else {
+                    Some((self.params_order[self.current_param], cursor))
+                }
+            } else {
+                let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
+                let ident_str = token_text(self.input, ident);
+                assert_eq!(ident_str, self.params_order[self.current_param]);
+                let _equal_sign = cursor.expect(TokenKind::Equal).expect("Must be equal");
+                Some((ident_str, cursor))
+            };
+            self.current_param += 1;
+            item
+        }
     }
 }
 
-
-#[derive(Debug, Clone)]
-pub struct Command {
-    pub kind: CommandType,
-    pub params: Attributes,
-    pub start: usize,
-    pub end: usize,
-}
-
-
 pub struct Parser<'s> {
+    expanded_deck: ExpandedDeck,
+    placeholder_map: PlaceholderMap,
     input: &'s str,
-    stream: StatementStream,
 }
 
 impl<'s> Parser<'s> {
-    pub fn new(input: &'s str) -> Self {
+    pub fn new(
+        expanded_deck: ExpandedDeck,
+        placeholder_map: PlaceholderMap,
+        input: &'s str,
+    ) -> Self {
         Parser {
+            expanded_deck,
+            placeholder_map,
             input,
-            stream: StatementStream::new(input),
         }
     }
 
-    fn parse_title(&mut self) -> String {
-        let statement = self.stream.next();
-        if statement.is_none() {
-            panic!("Expected title, got EOF");
-        }
-        let statement = statement.unwrap();
-        self.input[statement.start..=statement.end].to_string()
+    fn parse_title(&self, statement: &ScopedStmt) -> String {
+        self.input[statement.stmt.span.start..=statement.stmt.span.end].to_string()
     }
 
-    fn parse_comment(&mut self, statement: Statement) -> String {
-        let comment = self.input[statement.start..=statement.end].to_string();
+    fn parse_comment(&self, statement: &ScopedStmt) -> String {
+        let comment = self.input[statement.stmt.span.start..=statement.stmt.span.end].to_string();
         comment
     }
 
-    fn parse_ident(&mut self, statement: &mut Statement) -> String {
-        let ident = statement.next_non_whitespace().expect("Must be ident");
-        assert_eq!(ident.kind, TokenKind::Ident);
-        self.input[ident.start..=ident.end].to_string()
+    fn parse_value(&self, cursor: &mut StmtCursor, scope: &Scope) -> Value {
+        if let Some(token) = cursor.consume(TokenKind::Placeholder) {
+            let id = token.id.expect("must have a placeholder id");
+            // TOOD: maybe we can change the expresion to only evalute once
+            let expr = self
+                .placeholder_map
+                .get(id)
+                .cloned()
+                .expect("id must be in map");
+            expr.evaluate(scope);
+        }
+        parse_value(cursor, self.input)
     }
 
-    fn parse_equal_expr(&mut self, statement: &mut Statement) -> (String, Value) {
-        let ident = self.parse_ident(statement);
-        let equal = statement.next().expect("Must be equal");
-        assert_eq!(equal.kind, TokenKind::Equal);
-        let value = self.parse_value(statement);
-        (ident, value)
-    }
-
-    fn parse_value(&mut self, statement: &mut Statement) -> Value {
-        let mut number_str = String::new();
-        let mut exponent: Option<f64> = None;
-        let mut suffix: Option<ValueSuffix> = None;
-
-        // Optional leading minus
-        let mut t = statement
-            .next_non_whitespace()
-            .expect("Must start with a value");
-        if matches!(t.kind, TokenKind::Minus) {
-            number_str.push('-');
-            t = statement
-                .next_non_whitespace()
-                .expect("Expected digits or '.' after '-'");
+    fn parse_bool(&self, cursor: &mut StmtCursor, scope: &Scope) -> bool {
+        if let Some(token) = cursor.consume(TokenKind::Placeholder) {
+            let id = token.id.expect("must have a placeholder id");
+            // TOOD: maybe we can change the expresion to only evalute once
+            let expr = self
+                .placeholder_map
+                .get(id)
+                .cloned()
+                .expect("id must be in map");
+            expr.evaluate(scope);
         }
-
-        // Integer digits or leading '.' with fraction
-        match t.kind {
-            TokenKind::Number => {
-                number_str.push_str(&self.input[t.start..=t.end]);
-                // Optional fractional part if next immediate token is a dot
-                if let Some(peek) = statement.peek() {
-                    if matches!(peek.kind, TokenKind::Dot) {
-                        let _dot = statement.next().unwrap();
-                        number_str.push('.');
-                        let frac = statement
-                            .next_non_whitespace()
-                            .expect("Expected digits after '.'");
-                        assert!(
-                            matches!(frac.kind, TokenKind::Number),
-                            "Expected digits after '.'"
-                        );
-                        number_str.push_str(&self.input[frac.start..=frac.end]);
-                    }
-                }
-            }
-            TokenKind::Dot => {
-                number_str.push('.');
-                let frac = statement
-                    .next_non_whitespace()
-                    .expect("Expected digits after '.'");
-                assert!(
-                    matches!(frac.kind, TokenKind::Number),
-                    "Expected digits after '.'"
-                );
-                number_str.push_str(&self.input[frac.start..=frac.end]);
-            }
-            _ => panic!("Invalid start of numeric value"),
-        }
-
-        // Optional exponent: e|E [+-]? digits (no whitespace inside the literal)
-        if let Some(peek) = statement.peek() {
-            if matches!(peek.kind, TokenKind::Ident) {
-                let ident_text = &self.input[peek.start..=peek.end];
-                if ident_text == "e" || ident_text == "E" {
-                    let _e = statement.next().unwrap();
-                    let mut exp_str = String::new();
-                    // optional sign
-                    if let Some(sign_peek) = statement.peek() {
-                        match sign_peek.kind {
-                            TokenKind::Plus => {
-                                let _ = statement.next().unwrap();
-                                exp_str.push('+');
-                            }
-                            TokenKind::Minus => {
-                                let _ = statement.next().unwrap();
-                                exp_str.push('-');
-                            }
-                            _ => {}
-                        }
-                    }
-                    let exp_digits = statement.next().expect("Expected digits after exponent");
-                    assert!(matches!(exp_digits.kind, TokenKind::Number));
-                    exp_str.push_str(&self.input[exp_digits.start..=exp_digits.end]);
-                    exponent = Some(exp_str.parse::<f64>().expect("Invalid exponent digits"));
-                }
-            }
-        }
-
-        // Optional suffix as trailing identifier without whitespace
-        if let Some(peek) = statement.peek() {
-            if matches!(peek.kind, TokenKind::Ident) {
-                let ident = statement.next().unwrap();
-                let ident_text = &self.input[ident.start..=ident.end];
-                suffix = ValueSuffix::from_str(ident_text);
-            }
-        }
-
-        let value: f64 = number_str
-            .parse()
-            .unwrap_or_else(|_| panic!("Invalid numeric literal: {}", number_str));
-
-        Value {
-            value,
-            exponent,
-            suffix,
-        }
-    }
-
-    fn parse_value_or_param(&mut self, statement: &mut Statement) -> ValueOrParam {
-        let token = statement.peek_non_whitespace().expect("Must be value or param");
-        if token.kind == TokenKind::LeftBracket {
-            let _ = statement.next().expect("Must be left bracket");
-            let param_name = self.parse_ident(statement);
-            let right_bracket = statement.next().expect("Must be right bracket");
-            assert_eq!(right_bracket.kind, TokenKind::RightBracket);
-            return ValueOrParam::Param(param_name);
-        }
-        ValueOrParam::Value(self.parse_value(statement))
-    }
-
-    fn parse_node(&mut self, statement: &mut Statement) -> Node {
-        let node = statement.next_non_whitespace().expect("Must be node");
-        assert!(matches!(node.kind, TokenKind::Ident | TokenKind::Number));
-        let node_string = self.input[node.start..=node.end].to_string();
-        Node { name: node_string }
-    }
-
-    fn parse_element_params(&mut self, params_order: Vec<&str>, mut statement: &mut Statement) -> Attributes {
-        let mut named_mode = false;
-        let mut current_param = 0;
-        let mut params = Attributes::new();
-
-        while let Some(token) = statement.next() {
-            if token.kind != TokenKind::WhiteSpace {
-                println!("warning: unexpected token: {:?}", token);
-                break;
-            }
-            let next_token = statement.next().expect("should have a token");
-            match next_token.kind {
-                TokenKind::Ident => {
-                    named_mode = true;
-                    let ident = self.parse_ident(&mut statement);
-                    let equal_sign = statement.next().expect("Must be equal");
-                    assert_eq!(equal_sign.kind, TokenKind::Equal);
-                    let value = self.parse_value_or_param(&mut statement);
-                    let old_value = params.insert(ident.clone(), value.into());
-                    if old_value.is_some() {
-                        panic!("duplicate param: {}", ident);
-                    }
-                }
-                _ => {
-                    if named_mode {
-                        panic!("when in named mode can no longer work with positional")
-                    }
-                    let value = self.parse_value_or_param(&mut statement);
-                    let old_value = params.insert(params_order[current_param].to_string(), value.into());
-                    if old_value.is_some() {
-                        panic!("duplicate param: {}", params_order[current_param]);
-                    }   
-                    current_param += 1;
-                }
-            }
-        }
-
-        params
+        parse_bool(cursor, self.input)
     }
 
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
     // + <scale=val> <temp=val> <dtemp=val> <tc1=val> <tc2=val>
     // + <noisy=0|1>
-    fn parse_resistor(&mut self, name: String, mut statement: Statement) -> Element {
-        let mut nodes: Vec<Node> = vec![];
+    fn parse_resistor(&mut self, name: String, statement: &ScopedStmt) -> Resistor {
+        let mut cursor = statement.stmt.into_cursor();
 
-        let start = statement.start;
-        let end = statement.end;
+        let positive = parse_node(&mut cursor, self.input);
+        let negative = parse_node(&mut cursor, self.input);
 
-        nodes.push(self.parse_node(&mut statement));
-        nodes.push(self.parse_node(&mut statement));
-
-        let value = self.parse_value_or_param(&mut statement);
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .expect("scope must be in arena");
+        let resistance = self.parse_value(&mut cursor, scope);
+        let mut resistor = Resistor::new(name, statement.stmt.span, positive, negative, resistance);
 
         // TODO: i kinda want to support type safety on the params (like noisy is always a bool)
         let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
-        let params = self.parse_element_params(params_order, &mut statement);
-
-        Element {
-            kind: ElementType::Resistor,
-            name,
-            nodes,
-            value,
-            params,
-            start,
-            end,
+        let params = ParamParser::new(self.input, params_order, cursor);
+        for (ident, mut cursor) in params {
+            match ident {
+                "ac" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_ac(value);
+                }
+                "m" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_m(value);
+                }
+                "scale" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_scale(value);
+                }
+                "temp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_temp(value);
+                }
+                "dtemp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_dtemp(value);
+                }
+                "tc1" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_tc1(value);
+                }
+                "tc2" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    resistor.set_tc2(value);
+                }
+                "noisy" => {
+                    let value = self.parse_bool(&mut cursor, scope);
+                    resistor.set_noisy(value);
+                }
+                _ => panic!("Invalid resistor param: {}", ident),
+            }
         }
+        resistor
     }
 
     // CXXXXXXX n+ n- <value> <mname> <m=val> <scale=val> <temp=val>
     // + <dtemp=val> <tc1=val> <tc2=val> <ic=init_condition>
-    fn parse_capacitor(&mut self, name: String, mut statement: Statement) -> Element {
-        let mut nodes: Vec<Node> = vec![];
+    fn parse_capacitor(&mut self, name: String, statement: &ScopedStmt) -> Capacitor {
+        let mut cursor = statement.stmt.into_cursor();
 
-        let start = statement.start;
-        let end = statement.end;
+        let positive = parse_node(&mut cursor, self.input);
+        let negative = parse_node(&mut cursor, self.input);
 
-        nodes.push(self.parse_node(&mut statement));
-        nodes.push(self.parse_node(&mut statement));
-
-        // support models
-        let value = self.parse_value_or_param(&mut statement);
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .expect("scope must be in arena");
+        // TODO: support models
+        let capacitance = self.parse_value(&mut cursor, scope);
+        let mut capacitor =
+            Capacitor::new(name, statement.stmt.span, positive, negative, capacitance);
 
         let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
-        let params = self.parse_element_params(params_order, &mut statement);
+        let params = ParamParser::new(self.input, params_order, cursor);
 
-        Element {
-            kind: ElementType::Capacitor,
-            name,
-            nodes,
-            value,
-            params,
-            start,
-            end,
+        for (ident, mut cursor) in params {
+            match ident {
+                "m" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_m(value);
+                }
+                "scale" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_scale(value);
+                }
+                "temp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_temp(value);
+                }
+                "dtemp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_dtemp(value);
+                }
+                "tc1" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_tc1(value);
+                }
+                "tc2" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_tc2(value);
+                }
+                "ic" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    capacitor.set_ic(value);
+                }
+                _ => panic!("Invalid capacitor param: {}", ident),
+            }
         }
+
+        capacitor
     }
-    
+
     // LYYYYYYY n+ n- <value> <mname> <nt=val> <m=val>
     // + <scale=val> <temp=val> <dtemp=val> <tc1=val>
     // + <tc2=val> <ic=init_condition>
-    fn parse_inductor(&mut self, name: String, mut statement: Statement) -> Element {
-        let mut nodes: Vec<Node> = vec![];
+    fn parse_inductor(&mut self, name: String, statement: &ScopedStmt) -> Inductor {
+        let mut cursor = statement.stmt.into_cursor();
 
-        let start = statement.start;
-        let end = statement.end;
+        let positive = parse_node(&mut cursor, self.input);
+        let negative = parse_node(&mut cursor, self.input);
 
-        nodes.push(self.parse_node(&mut statement));
-        nodes.push(self.parse_node(&mut statement));
+        let inductance = parse_value(&mut cursor, self.input);
 
-        let value = self.parse_value_or_param(&mut statement);
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .expect("scope must be in arena");
+        let mut inductor = Inductor::new(name, statement.stmt.span, positive, negative, inductance);
 
         let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
-        let params = self.parse_element_params(params_order, &mut statement);
+        let params = ParamParser::new(self.input, params_order, cursor);
 
-        Element {
-            kind: ElementType::Inductor,
-            name,
-            nodes,
-            value,
-            params,
-            start,
-            end,
+        for (ident, mut cursor) in params {
+            match ident {
+                "nt" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_nt(value);
+                }
+                "m" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_m(value);
+                }
+                "scale" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_scale(value);
+                }
+                "temp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_temp(value);
+                }
+                "dtemp" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_dtemp(value);
+                }
+                "tc1" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_tc1(value);
+                }
+                "tc2" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_tc2(value);
+                }
+                "ic" => {
+                    let value = self.parse_value(&mut cursor, scope);
+                    inductor.set_ic(value);
+                }
+                _ => panic!("Invalid inductor param: {}", ident),
+            }
         }
-        
+
+        inductor
     }
 
     // VXXXXXXX N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
@@ -368,198 +312,148 @@ impl<'s> Parser<'s> {
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
     fn parse_independent_source(
         &mut self,
-        element_type: ElementType,
         name: String,
-        mut statement: Statement,
-    ) -> Element {
-        let mut nodes: Vec<Node> = vec![];
-        let mut params = Attributes::new();
+        statement: &ScopedStmt,
+    ) -> IndependentSource {
+        let mut cursor = statement.stmt.into_cursor();
 
-        let start = statement.start;
-        let end = statement.end;
+        let positive = parse_node(&mut cursor, self.input);
+        let negative = parse_node(&mut cursor, self.input);
 
-        nodes.push(self.parse_node(&mut statement));
-        nodes.push(self.parse_node(&mut statement));
+        let operation = parse_ident(&mut cursor, self.input);
 
-        let operation = self.parse_ident(&mut statement);
-
-        let value = match operation.as_str() {
-            "DC" => self.parse_value_or_param(&mut statement),
+        let mode = match operation.as_str() {
+            "DC" => IndependentSourceMode::DC {
+                value: parse_value(&mut cursor, self.input),
+            },
             "AC" => panic!("AC not supported yet"),
             _ => panic!("Invalid operation: {}", operation),
         };
 
-        Element {
-            kind: element_type,
+        IndependentSource {
             name,
-            nodes,
-            value,
-            params,
-            start,
-            end,
+            positive,
+            negative,
+            mode,
         }
     }
 
-    fn parse_element(&mut self, mut statement: Statement) -> Element {
-        let ident = statement.next().expect("Must be ident");
-        assert_eq!(ident.kind, TokenKind::Ident);
+    fn parse_device(&mut self, statement: &ScopedStmt) -> Device {
+        let mut cursor = statement.stmt.into_cursor();
+        let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
 
-        let ident_string = self.input[ident.start..=ident.end].to_string();
+        let ident_string = token_text(self.input, ident).to_string();
         let (first, name) = ident_string.split_at(1);
 
-        let element_type = ElementType::from_str(first).expect("Must be element type");
-        let name = name.to_string();
+        let element_type = DeviceType::from_str(first).expect("Must be element type");
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .expect("scope must be in arena");
+        let name = scope.get_device_name(&name);
 
         match element_type {
-            ElementType::Resistor => self.parse_resistor(name, statement),
-            ElementType::Capacitor => self.parse_capacitor(name, statement),
-            ElementType::Inductor => self.parse_inductor(name, statement),
-            ElementType::VoltageSource => {
-                self.parse_independent_source(ElementType::VoltageSource, name, statement)
+            DeviceType::Resistor => Device::Resistor(self.parse_resistor(name, &statement)),
+            DeviceType::Capacitor => Device::Capacitor(self.parse_capacitor(name, &statement)),
+            DeviceType::Inductor => Device::Inductor(self.parse_inductor(name, &statement)),
+            DeviceType::VoltageSource => {
+                Device::VoltageSource(self.parse_independent_source(name, statement))
             }
-            ElementType::CurrentSource => {
-                self.parse_independent_source(ElementType::CurrentSource, name, statement)
+            DeviceType::CurrentSource => {
+                Device::CurrentSource(self.parse_independent_source(name, statement))
             }
-            ElementType::Subcircuit => todo!(),
+            _ => panic!("Invalid device type: {:?}", element_type),
         }
     }
 
     // .dc srcnam vstart vstop vincr [src2 start2 stop2 incr2]
-    fn parse_dc_command(&mut self, mut statement: Statement) -> Attributes {
-        
-        let srcnam = self.parse_ident(&mut statement);
-        let vstart = self.parse_value(&mut statement);
-        let vstop = self.parse_value(&mut statement);
-        let vincr = self.parse_value(&mut statement);
+    fn parse_dc_command(&mut self, cursor: &mut StmtCursor, statement_span: Span) -> DcCommand {
+        let srcnam = parse_ident(cursor, self.input);
+        let vstart = parse_value(cursor, self.input);
+        let vstop = parse_value(cursor, self.input);
+        let vincr = parse_value(cursor, self.input);
 
-        Attributes::from_iter(vec![
-            ("srcnam".to_string(), Attr::String(srcnam)),
-            ("vstart".to_string(), Attr::Value(vstart)),
-            ("vstop".to_string(), Attr::Value(vstop)),
-            ("vincr".to_string(), Attr::Value(vincr)),
-        ])
-    }
-
-    fn parse_param_command(&mut self, mut statement: Statement) -> HashMap<String, Value> {
-        let mut params = HashMap::new();
-
-        while let Some(token) = statement.next() {
-            if token.kind != TokenKind::WhiteSpace {
-                println!("warning: unexpected token: {:?}", token);
-                break;
-            }
-            let (ident, value) = self.parse_equal_expr(&mut statement);
-            params.insert(ident, value);
-        }
-
-        params
-    }
-
-    fn parse_subcircuit_command(&mut self, mut statement: Statement) -> Subcircuit {
-        let name = self.parse_ident(&mut statement);
-        let first_node = self.parse_node(&mut statement);
-        let mut nodes = vec![first_node];
-        while let Some(_) = statement.peek_non_whitespace() {
-            // TODO: this needs to change when we support params
-            nodes.push(self.parse_node(&mut statement));
-        }
-
-        Subcircuit {
-            name,
-            nodes,
-            elements: vec![]
+        DcCommand {
+            span: statement_span,
+            srcnam,
+            vstart,
+            vstop,
+            vincr,
         }
     }
 
-    fn parse_command_type(&mut self, statement: &mut Statement) -> CommandType {
-        let dot = statement.next().expect("Must be dot");
-        assert_eq!(dot.kind, TokenKind::Dot);
+    fn parse_command_type(&mut self, cursor: &mut StmtCursor) -> CommandType {
+        let dot = cursor.expect(TokenKind::Dot).expect("must be dot");
+        let kind = cursor.expect(TokenKind::Ident).expect("Must be ident");
 
-        let kind = statement.next().expect("Must be element type");
-        assert_eq!(kind.kind, TokenKind::Ident);
-
-        let command = match CommandType::from_str(&self.input[kind.start..=kind.end]) {
+        let kind_string = token_text(self.input, kind);
+        let command = match CommandType::from_str(&kind_string) {
             Some(command) => command,
-            None => panic!(
-                "Invalid element type: {}",
-                &self.input[kind.start..=kind.end]
-            ),
+            None => panic!("Invalid element type: {}", kind_string),
         };
 
         command
     }
 
-    fn parse_command_attrs(&mut self, statement: Statement, command: CommandType) -> Command {
-
-        let start = statement.start;
-        let end = statement.end;
-
-        let params = match command {
-            CommandType::DC => self.parse_dc_command(statement),
-            CommandType::Op => Attributes::from_iter(vec![]),
-            _ => panic!("Invalid command: {:?}", command),
+    fn parse_command_attrs(
+        &mut self,
+        cursor: &mut StmtCursor,
+        statement_span: Span,
+        command_type: CommandType,
+    ) -> Command {
+        let command = match command_type {
+            CommandType::DC => Command::Dc(self.parse_dc_command(cursor, statement_span)),
+            CommandType::Op => Command::Op(OpCommand {
+                span: statement_span,
+            }),
+            _ => panic!("Invalid command: {:?}", command_type),
         };
 
-        Command {
-            kind: command,
-            params,
-            start,
-            end,
-        }
+        command
     }
 
     pub fn parse(&mut self) -> Deck {
+        // TODO: clone is sadge
+        let mut statements_iter = self.expanded_deck.statements.clone().into_iter();
         // first line should be a title
-        let title = self.parse_title();
+        let title = self.parse_title(&statements_iter.next().expect("Expected title"));
 
         let mut commands = vec![];
-        let mut elements = vec![];
-        let mut subcircuits = vec![];
-        let mut params: HashMap<String, Value> = HashMap::new();
+        let mut devices = vec![];
 
-        let mut current_subcircuits: Vec<Subcircuit> = vec![];
+        while let Some(statement) = statements_iter.next() {
+            let mut cursor = statement.stmt.into_cursor();
 
-        while let Some(mut statement) = self.stream.next() {
-            let first_token = statement
+            let first_token = cursor
                 .peek()
                 .expect("Statement should have at least one token");
+
             match first_token.kind {
                 TokenKind::Dot => {
-                    let command = self.parse_command_type(&mut statement);
+                    let command = self.parse_command_type(&mut cursor);
                     match command {
-                        CommandType::Subcircuit => {
-                            let subcircuit = self.parse_subcircuit_command(statement);
-                            current_subcircuits.push(subcircuit);
-                        }
-                        CommandType::Ends => {
-                            let subcircuit = current_subcircuits.pop().expect("Subcircuit not started");
-                            subcircuits.push(subcircuit);
-                        }
-                        CommandType::Param => {
-                            let new_params = self.parse_param_command(statement);
-                            params.extend(new_params);
-                        }
                         CommandType::End => {
                             // once we see an end command we stop
                             break;
                         }
                         _ => {
-                            commands.push(self.parse_command_attrs(statement, command));
+                            commands.push(self.parse_command_attrs(
+                                &mut cursor,
+                                statement.stmt.span,
+                                command,
+                            ));
                         }
                     }
                 }
                 // comment
                 TokenKind::Asterisk => {
-                    let _ = self.parse_comment(statement);
+                    let _ = self.parse_comment(&statement);
                     // TODO: save comments?
                 }
                 TokenKind::Ident => {
-                    let element = self.parse_element(statement);
-                    if let Some(subcircuit) = current_subcircuits.last_mut() {
-                        subcircuit.elements.push(element);
-                    } else {
-                        elements.push(element);
-                    }
+                    let device = self.parse_device(&statement);
+                    devices.push(device);
                 }
                 _ => {
                     panic!("Expected command or element, got {:?}", first_token.kind);
@@ -569,12 +463,20 @@ impl<'s> Parser<'s> {
 
         Deck {
             title,
-            params,
-            subcircuits,
             commands,
-            elements,
+            devices,
         }
     }
+}
+
+fn parse(input: &str) -> Deck {
+    let mut stream = Statements::new(input);
+    let placeholders_map = substitute_expressions(&mut stream, &input);
+    let unexpanded_deck = collect_subckts(stream, &input);
+    let expanded_deck = expand_subckts(unexpanded_deck, &input);
+    let mut parser = Parser::new(expanded_deck, placeholders_map, input);
+    let deck = parser.parse();
+    deck
 }
 
 #[cfg(test)]
@@ -587,13 +489,15 @@ mod tests {
     #[rstest]
     fn test_parser(#[files("tests/parser_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut parser = Parser::new(&input_content);
-        let deck = parser.parse();
+        let deck = parse(&input_content);
 
-        let name = format!("parser-{}",input
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "unknown".to_string()));
+        let name = format!(
+            "parser-{}",
+            input
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
         insta::assert_debug_snapshot!(name, deck);
     }
 }

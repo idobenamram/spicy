@@ -2,8 +2,12 @@ use std::collections::HashMap;
 
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
-use spicy_parser::netlist_types::{CommandType, ElementType};
-use spicy_parser::parser::{Deck, Command, Element, Value, ValueOrParam};
+use spicy_parser::netlist_types::{Command, Device};
+use spicy_parser::netlist_types::{
+    DcCommand, IndependentSource, IndependentSourceMode, Inductor, Resistor,
+};
+use spicy_parser::parser::Deck;
+use spicy_parser::Value;
 
 #[derive(Debug)]
 pub struct Nodes {
@@ -12,7 +16,7 @@ pub struct Nodes {
 }
 
 impl Nodes {
-    fn new(elements: &Vec<Element>) -> Self {
+    fn new(devices: &Vec<Device>) -> Self {
         let mut nodes = HashMap::new();
         let mut voltage_sources = HashMap::new();
         let mut src_index = 0;
@@ -20,15 +24,15 @@ impl Nodes {
         // assume already validated that ground exists
         nodes.insert("0".to_string(), 0);
         let mut node_index = 1;
-        for element in elements {
-            match element.kind {
-                ElementType::Inductor | ElementType::VoltageSource => {
-                    voltage_sources.insert(element.name(), src_index);
+        for device in devices {
+            match device {
+                Device::Inductor(_) | Device::VoltageSource(_) => {
+                    voltage_sources.insert(device.name().to_string(), src_index);
                     src_index += 1;
                 }
                 _ => {}
             }
-            for node in element.nodes.iter() {
+            for node in device.nodes() {
                 if !nodes.contains_key(&node.name) {
                     nodes.insert(node.name.clone(), node_index);
                     node_index += 1;
@@ -93,11 +97,11 @@ impl Nodes {
     }
 }
 
-fn stamp_resistor(g: &mut Array2<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
+fn stamp_resistor(g: &mut Array2<f64>, resistor: &Resistor, nodes: &Nodes) {
+    let node1 = nodes.get_node_index(&resistor.positive.name);
+    let node2 = nodes.get_node_index(&resistor.negative.name);
 
-    let conductance = 1.0 / element.value.get_value();
+    let conductance = 1.0 / resistor.resistance.get_value();
 
     if let Some(node1) = node1 {
         g[[node1, node1]] += conductance;
@@ -113,10 +117,12 @@ fn stamp_resistor(g: &mut Array2<f64>, element: &Element, nodes: &Nodes) {
     }
 }
 
-fn stamp_current_source(i: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
-    let value = element.value.get_value();
+fn stamp_current_source(i: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
+    let node1 = nodes.get_node_index(&device.positive.name);
+    let node2 = nodes.get_node_index(&device.negative.name);
+    let value = match &device.mode {
+        IndependentSourceMode::DC { value } => value.get_value(),
+    };
 
     if let Some(node1) = node1 {
         i[node1] += value;
@@ -126,15 +132,11 @@ fn stamp_current_source(i: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
     }
 }
 
-fn stamp_voltage_source_incidence(
-    m: &mut Array2<f64>,
-    element: &Element,
-    nodes: &Nodes,
-) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
+fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
+    let node1 = nodes.get_node_index(&device.positive.name);
+    let node2 = nodes.get_node_index(&device.negative.name);
     let src_index = nodes
-        .get_voltage_source_index(&element.name())
+        .get_voltage_source_index(&device.name)
         .expect("should exist");
 
     // stamp in voltage incidence matrix (B)
@@ -154,29 +156,32 @@ fn stamp_voltage_source_incidence(
     }
 }
 
-fn stamp_voltage_source_value(s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
+fn stamp_voltage_source_value(s: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
     let src_index = nodes
-        .get_voltage_source_index(&element.name())
+        .get_voltage_source_index(&device.name)
         .expect("should exist");
-    let value = element.value.get_value();
+
+    let value = match &device.mode {
+        IndependentSourceMode::DC { value } => value.get_value(),
+    };
     s[src_index] = value;
 }
 
 fn stamp_voltage_source(
     m: &mut Array2<f64>,
     s: &mut Array1<f64>,
-    element: &Element,
+    device: &IndependentSource,
     nodes: &Nodes,
 ) {
-    stamp_voltage_source_incidence(m, element, nodes);
-    stamp_voltage_source_value(s, element, nodes);
+    stamp_voltage_source_incidence(m, device, nodes);
+    stamp_voltage_source_value(s, device, nodes);
 }
 
-fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, element: &Element, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&element.nodes[0].name);
-    let node2 = nodes.get_node_index(&element.nodes[1].name);
+fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, device: &Inductor, nodes: &Nodes) {
+    let node1 = nodes.get_node_index(&device.positive.name);
+    let node2 = nodes.get_node_index(&device.negative.name);
     let src_index = nodes
-        .get_voltage_source_index(&element.name())
+        .get_voltage_source_index(&device.name)
         .expect("should exist");
 
     // stamp in voltage incidence matrix (B)
@@ -200,7 +205,7 @@ fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, element: &Element, n
 }
 
 fn simulate_op(deck: &Deck) -> Array1<f64> {
-    let nodes = Nodes::new(&deck.elements);
+    let nodes = Nodes::new(&deck.devices);
 
     let n = nodes.node_len();
     let k = nodes.source_len();
@@ -214,14 +219,13 @@ fn simulate_op(deck: &Deck) -> Array1<f64> {
     // current and voltage source vectors
     let mut s = Array1::<f64>::zeros(n + k);
 
-    for element in &deck.elements {
-        match element.kind {
-            ElementType::Resistor => stamp_resistor(&mut m, &element, &nodes),
-            ElementType::Capacitor => {} // capcitors are just open circuits
-            ElementType::Inductor => stamp_inductor(&mut m, &mut s, &element, &nodes),
-            ElementType::CurrentSource => stamp_current_source(&mut s, &element, &nodes),
-            ElementType::VoltageSource => stamp_voltage_source(&mut m, &mut s, &element, &nodes),
-            ElementType::Subcircuit => {}
+    for device in &deck.devices {
+        match device {
+            Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
+            Device::Capacitor(_) => {} // capcitors are just open circuits
+            Device::Inductor(device) => stamp_inductor(&mut m, &mut s, &device, &nodes),
+            Device::CurrentSource(device) => stamp_current_source(&mut s, &device, &nodes),
+            Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, &device, &nodes),
         }
     }
 
@@ -252,29 +256,13 @@ fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
     (0..=nsteps).map(|i| vstart + i as f64 * vinc).collect()
 }
 
-fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
-    let srcnam = command
-        .params
-        .get_string("srcnam")
-        .expect("srcnam is required");
-    let vstart = command
-        .params
-        .get_value("vstart")
-        .expect("vstart is required");
-    let vstop = command
-        .params
-        .get_value("vstop")
-        .expect("vstop is required");
-    let vincr = command
-        .params
-        .get_value("vincr")
-        .expect("vincr is required");
+fn simulate_dc(deck: &Deck, command: &DcCommand) -> Vec<Array1<f64>> {
+    let srcnam = &command.srcnam;
+    let vstart = command.vstart.get_value();
+    let vstop = command.vstop.get_value();
+    let vincr = command.vincr.get_value();
 
-    let vstart = vstart.get_value();
-    let vstop = vstop.get_value();
-    let vincr = vincr.get_value();
-
-    let nodes = Nodes::new(&deck.elements);
+    let nodes = Nodes::new(&deck.devices);
 
     let n = nodes.node_len();
     let k = nodes.source_len();
@@ -284,22 +272,21 @@ fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
 
     println!("srcnam: {:?}", srcnam);
     let source_index = deck
-        .elements
+        .devices
         .iter()
-        .position(|e| e.name() == *srcnam)
+        .position(|d| d.name() == srcnam)
         .expect("Source not found");
-    for element in &deck.elements {
-        match element.kind {
-            ElementType::Resistor => stamp_resistor(&mut m, &element, &nodes),
-            ElementType::Capacitor => {} // capcitors are just open circuits
-            ElementType::Inductor => stamp_inductor(&mut m, &mut s_before, &element, &nodes),
-            ElementType::Subcircuit => {}
-            ElementType::VoltageSource => {
-                stamp_voltage_source_incidence(&mut m, &element, &nodes);
+    for device in &deck.devices {
+        match device {
+            Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
+            Device::Capacitor(_) => {} // capcitors are just open circuits
+            Device::Inductor(device) => stamp_inductor(&mut m, &mut s_before, &device, &nodes),
+            Device::VoltageSource(device) => {
+                stamp_voltage_source_incidence(&mut m, &device, &nodes);
             }
-            ElementType::CurrentSource => {
-                if element.name() != *srcnam {
-                    stamp_current_source(&mut s_before, &element, &nodes);
+            Device::CurrentSource(device) => {
+                if device.name != *srcnam {
+                    stamp_current_source(&mut s_before, &device, &nodes);
                 }
             }
         }
@@ -312,16 +299,17 @@ fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
     let mut results = Vec::new();
     for v in sweep_values {
         let mut s = s_before.clone();
-        let mut element = deck.elements[source_index].clone();
+        let device = deck.devices[source_index].clone();
         // TODO: this sucks
-        let value = ValueOrParam::Value(Value::new(v, None, None));
-        element.value = value;
-        match element.kind {
-            ElementType::VoltageSource => {
-                stamp_voltage_source_value(&mut s, &element, &nodes);
+        let value = Value::new(v, None, None);
+        match device {
+            Device::VoltageSource(mut device) => {
+                device.mode = IndependentSourceMode::DC { value };
+                stamp_voltage_source_value(&mut s, &device, &nodes);
             }
-            ElementType::CurrentSource => {
-                stamp_current_source(&mut s, &element, &nodes);
+            Device::CurrentSource(mut device) => {
+                device.mode = IndependentSourceMode::DC { value };
+                stamp_current_source(&mut s, &device, &nodes);
             }
             _ => {}
         }
@@ -346,14 +334,14 @@ fn simulate_dc(deck: &Deck, command: &Command) -> Vec<Array1<f64>> {
 
 pub fn simulate(deck: Deck) {
     for command in &deck.commands {
-        match command.kind {
-            CommandType::Op => {
+        match command {
+            Command::Op(_) => {
                 let _ = simulate_op(&deck);
             }
-            CommandType::DC => {
-                let _ = simulate_dc(&deck, &command);
+            Command::Dc(command_params) => {
+                let _ = simulate_dc(&deck, &command_params);
             }
-            _ => panic!("Unsupported command: {:?}", command.kind),
+            _ => panic!("Unsupported command: {:?}", command),
         }
     }
 }
@@ -362,40 +350,51 @@ pub fn simulate(deck: Deck) {
 mod tests {
     use super::*;
     use rstest::rstest;
-    use spicy_parser::parser::Node;
+    use spicy_parser::netlist_types::Capacitor;
+    use spicy_parser::netlist_types::Node;
 
-    use spicy_parser::attributes::Attributes;
+        use spicy_parser::parser::parse;
     use spicy_parser::parser::Parser;
+    use spicy_parser::Span;
 
     use std::path::PathBuf;
 
-    fn make_element(kind: ElementType, name: &str, n1: &str, n2: &str, value: f64) -> Element {
-        Element {
-            kind,
-            name: name.to_string(),
-            nodes: vec![
-                Node {
-                    name: n1.to_string(),
-                },
-                Node {
-                    name: n2.to_string(),
-                },
-            ],
-            value: ValueOrParam::Value(Value::new(value, None, None)),
-            params: Attributes::new(),
-            start: 0,
-            end: 0,
-        }
+    fn make_resistor(name: &str, n1: &str, n2: &str, value: f64) -> Resistor {
+        Resistor::new(
+            name.to_string(),
+            Span::new(0, 0),
+            Node {
+                name: n1.to_string(),
+            },
+            Node {
+                name: n2.to_string(),
+            },
+            Value::new(value, None, None),
+        )
     }
+    fn make_capacitor(name: &str, n1: &str, n2: &str, value: f64) -> Capacitor {
+        Capacitor::new(
+            name.to_string(),
+            Span::new(0, 0),
+            Node {
+                name: n1.to_string(),
+            },
+            Node {
+                name: n2.to_string(),
+            },
+            Value::new(value, None, None),
+        )
+    }
+
 
     #[test]
     fn test_nodes_indices_with_resistors() {
-        let elements = vec![
-            make_element(ElementType::Resistor, "1", "n1", "0", 1_000.0),
-            make_element(ElementType::Resistor, "2", "n2", "n1", 2_000.0),
+        let devices = vec![
+            Device::Resistor(make_resistor("1", "n1", "0", 1_000.0)),
+            Device::Resistor(make_resistor("2", "n2", "n1", 2_000.0)),
         ];
 
-        let nodes = Nodes::new(&elements);
+        let nodes = Nodes::new(&devices);
 
         assert_eq!(nodes.get_node_index("0"), None);
         assert_eq!(nodes.get_node_index("n1"), Some(0));
@@ -404,12 +403,12 @@ mod tests {
 
     #[test]
     fn test_nodes_indices_with_capacitors() {
-        let elements = vec![
-            make_element(ElementType::Capacitor, "1", "n1", "0", 1e-6),
-            make_element(ElementType::Capacitor, "2", "n2", "n1", 2e-6),
+        let devices = vec![
+            Device::Capacitor(make_capacitor("1", "n1", "0", 1e-6)),
+            Device::Capacitor(make_capacitor("2", "n2", "n1", 2e-6)),
         ];
 
-        let nodes = Nodes::new(&elements);
+        let nodes = Nodes::new(&devices);
 
         assert_eq!(nodes.get_node_index("0"), None);
         assert_eq!(nodes.get_node_index("n1"), Some(0));
@@ -418,8 +417,9 @@ mod tests {
 
     #[rstest]
     fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
+
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = Parser::new(&input_content).parse();
+        let deck = parse(&input_content);
         let output = simulate_op(&deck);
         let name = format!(
             "simulate-op-{}",
@@ -434,12 +434,15 @@ mod tests {
     #[rstest]
     fn test_simulate_dc(#[files("tests/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = Parser::new(&input_content).parse();
+        let deck = parse(&input_content);
         let command = deck.commands[1].clone();
-        let output = simulate_dc(
-            &deck,
-            &command
-        );
+        let output = match command {
+            Command::Dc(command) => {
+                simulate_dc(&deck, &command);
+            }
+            _ => panic!("Unsupported command: {:?}", command),
+        };
+
         let name = format!(
             "simulate-dc-{}",
             input

@@ -2,14 +2,11 @@ use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expression_phase::substitute_expressions;
 use crate::lexer::{Span, Token, TokenKind, token_text};
 use crate::netlist_types::{
-    Capacitor, Command, CommandType, DcCommand, Device, DeviceType, IndependentSource,
-    IndependentSourceMode, Inductor, OpCommand, Resistor,
+    Capacitor, Command, CommandType, DcCommand, Device, DeviceType, IndependentSource, IndependentSourceMode, Inductor, Node, OpCommand, Resistor
 };
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_value};
 use crate::statement_phase::{Statement, Statements, StmtCursor};
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt, collect_subckts, expand_subckts};
-use std::collections::HashMap;
-use std::collections::binary_heap::Iter;
 
 #[derive(Debug)]
 pub struct Deck {
@@ -112,6 +109,15 @@ impl<'s> Parser<'s> {
         parse_value(cursor, self.input)
     }
 
+    fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Node {
+        let node = parse_node(cursor, self.input);
+        if let Some(node) = scope.node_mapping.get(&node) {
+            node.clone()
+        } else {
+            node
+        }
+    }
+
     fn parse_bool(&self, cursor: &mut StmtCursor, scope: &Scope) -> bool {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
@@ -132,14 +138,15 @@ impl<'s> Parser<'s> {
     fn parse_resistor(&mut self, name: String, statement: &ScopedStmt) -> Resistor {
         let mut cursor = statement.stmt.into_cursor();
 
-        let positive = parse_node(&mut cursor, self.input);
-        let negative = parse_node(&mut cursor, self.input);
-
         let scope = self
             .expanded_deck
             .scope_arena
             .get(statement.scope)
             .expect("scope must be in arena");
+
+        let positive = self.parse_node(&mut cursor, scope);
+        let negative = self.parse_node(&mut cursor, scope);
+
         let resistance = self.parse_value(&mut cursor, scope);
         let mut resistor = Resistor::new(name, statement.stmt.span, positive, negative, resistance);
 
@@ -191,14 +198,14 @@ impl<'s> Parser<'s> {
     fn parse_capacitor(&mut self, name: String, statement: &ScopedStmt) -> Capacitor {
         let mut cursor = statement.stmt.into_cursor();
 
-        let positive = parse_node(&mut cursor, self.input);
-        let negative = parse_node(&mut cursor, self.input);
-
         let scope = self
             .expanded_deck
             .scope_arena
             .get(statement.scope)
             .expect("scope must be in arena");
+        let positive = self.parse_node(&mut cursor, scope);
+        let negative = self.parse_node(&mut cursor, scope);
+
         // TODO: support models
         let capacitance = self.parse_value(&mut cursor, scope);
         let mut capacitor =
@@ -250,16 +257,16 @@ impl<'s> Parser<'s> {
     fn parse_inductor(&mut self, name: String, statement: &ScopedStmt) -> Inductor {
         let mut cursor = statement.stmt.into_cursor();
 
-        let positive = parse_node(&mut cursor, self.input);
-        let negative = parse_node(&mut cursor, self.input);
-
-        let inductance = parse_value(&mut cursor, self.input);
-
         let scope = self
             .expanded_deck
             .scope_arena
             .get(statement.scope)
             .expect("scope must be in arena");
+        let positive = self.parse_node(&mut cursor, scope);
+        let negative = self.parse_node(&mut cursor, scope);
+
+        let inductance = self.parse_value(&mut cursor, scope);
+
         let mut inductor = Inductor::new(name, statement.stmt.span, positive, negative, inductance);
 
         let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
@@ -317,14 +324,19 @@ impl<'s> Parser<'s> {
     ) -> IndependentSource {
         let mut cursor = statement.stmt.into_cursor();
 
-        let positive = parse_node(&mut cursor, self.input);
-        let negative = parse_node(&mut cursor, self.input);
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .expect("scope must be in arena");
+        let positive = self.parse_node(&mut cursor, scope);
+        let negative = self.parse_node(&mut cursor, scope);
 
         let operation = parse_ident(&mut cursor, self.input);
 
         let mode = match operation.as_str() {
             "DC" => IndependentSourceMode::DC {
-                value: parse_value(&mut cursor, self.input),
+                value: self.parse_value(&mut cursor, scope),
             },
             "AC" => panic!("AC not supported yet"),
             _ => panic!("Invalid operation: {}", operation),
@@ -343,7 +355,7 @@ impl<'s> Parser<'s> {
         let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
 
         let ident_string = token_text(self.input, ident).to_string();
-        let (first, name) = ident_string.split_at(1);
+        let (first, _) = ident_string.split_at(1);
 
         let element_type = DeviceType::from_str(first).expect("Must be element type");
         let scope = self
@@ -351,7 +363,7 @@ impl<'s> Parser<'s> {
             .scope_arena
             .get(statement.scope)
             .expect("scope must be in arena");
-        let name = scope.get_device_name(&name);
+        let name = scope.get_device_name(&ident_string);
 
         match element_type {
             DeviceType::Resistor => Device::Resistor(self.parse_resistor(name, &statement)),
@@ -384,7 +396,7 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_command_type(&mut self, cursor: &mut StmtCursor) -> CommandType {
-        let dot = cursor.expect(TokenKind::Dot).expect("must be dot");
+        cursor.expect(TokenKind::Dot).expect("must be dot");
         let kind = cursor.expect(TokenKind::Ident).expect("Must be ident");
 
         let kind_string = token_text(self.input, kind);
@@ -469,7 +481,7 @@ impl<'s> Parser<'s> {
     }
 }
 
-fn parse(input: &str) -> Deck {
+pub fn parse(input: &str) -> Deck {
     let mut stream = Statements::new(input);
     let placeholders_map = substitute_expressions(&mut stream, &input);
     let unexpanded_deck = collect_subckts(stream, &input);

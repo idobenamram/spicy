@@ -323,6 +323,29 @@ pub enum Device {
     CurrentSource(IndependentSource),
 }
 
+impl Device {
+
+    pub fn name(&self) -> &str {
+        match self {
+            Device::Resistor(r) => &r.name,
+            Device::Capacitor(c) => &c.name,
+            Device::Inductor(l) => &l.name,
+            Device::VoltageSource(v) => &v.name,
+            Device::CurrentSource(i) => &i.name,
+        }
+    }
+    pub fn nodes(&self) -> Vec<&Node> {
+        match self {
+            Device::Resistor(r) => vec![&r.positive, &r.negative],
+            Device::Capacitor(c) => vec![&c.positive, &c.negative],
+            Device::Inductor(l) => vec![&l.positive, &l.negative],
+            Device::VoltageSource(v) => vec![&v.positive, &v.negative],
+            Device::CurrentSource(i) => vec![&i.positive, &i.negative],
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueSuffix {
     Tera,

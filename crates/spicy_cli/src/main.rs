@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use spicy_parser::parser::Parser;
+use spicy_parser::parser::parse;
 use spicy_simulate::simulate;
 
 fn main() {
@@ -16,8 +16,7 @@ fn main() {
     });
 
     println!("input: {}", input);
-    let mut parser = Parser::new(&input);
-    let deck = parser.parse();
+    let deck = parse(&input);
     simulate(deck);
 }
 

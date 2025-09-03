@@ -1,14 +1,19 @@
 use std::collections::HashMap;
 
-use crate::expr::{Params, Scope, ScopeId};
+use serde::Serialize;
+
 use crate::expr::ScopeArena;
-use crate::netlist_types::{CommandType, DeviceType};
-use crate::parser_utils::{parse_dot_param, parse_equal_expr, parse_ident, parse_node, parse_value_or_placeholder};
+use crate::expr::{Params, Scope, ScopeId};
 use crate::netlist_types::Node;
-use crate::statement_phase::{Statements, StmtCursor};
-use crate::{
-    lexer::TokenKind, statement_phase::Statement,
+use crate::netlist_types::{CommandType, DeviceType};
+use crate::parser_utils::{
+    parse_dot_param, parse_equal_expr, parse_ident, parse_node, parse_value_or_placeholder,
 };
+use crate::statement_phase::{Statements, StmtCursor};
+use crate::{lexer::TokenKind, statement_phase::Statement};
+
+#[cfg(test)]
+use crate::test_utils::serialize_sorted_map;
 
 pub struct UnexpandedDeck {
     pub scope_arena: ScopeArena,
@@ -17,7 +22,7 @@ pub struct UnexpandedDeck {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SubcktDecl {
     pub name: String,
     pub nodes: Vec<Node>,
@@ -26,13 +31,13 @@ pub struct SubcktDecl {
     pub body: Vec<Statement>, // statements between .subckt and .ends (already placeholderized)
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct SubcktTable {
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
     pub map: HashMap<String, SubcktDecl>,
 }
 
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ScopedStmt {
     pub stmt: Statement,
     pub scope: ScopeId,
@@ -118,10 +123,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> SubcktDecl {
     }
 }
 
-fn parse_x_device(
-    cursor: &mut StmtCursor,
-    src: &str,
-) -> (Vec<Node>, String, Params) {
+fn parse_x_device(cursor: &mut StmtCursor, src: &str) -> (Vec<Node>, String, Params) {
     // Phase 1: parse only nodes (last one is the subcircuit name)
     let first_node = parse_node(cursor, src);
 
@@ -166,7 +168,7 @@ fn parse_x_device(
     (nodes, subcircuit_name, param_overrides)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExpandedDeck {
     pub scope_arena: ScopeArena,
     pub global_params: ScopeId,
@@ -175,10 +177,7 @@ pub struct ExpandedDeck {
 }
 
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
-pub fn expand_subckts<'a>(
-    mut unexpanded_deck: UnexpandedDeck,
-    src: &'a str,
-) -> ExpandedDeck {
+pub fn expand_subckts<'a>(mut unexpanded_deck: UnexpandedDeck, src: &'a str) -> ExpandedDeck {
     let mut out = Vec::new();
 
     let root_scope_id = unexpanded_deck.global_params;
@@ -204,22 +203,20 @@ pub fn expand_subckts<'a>(
             }
 
             let mut instance_params = subckt_def.default_params.clone();
-            // will override any default params 
+            // will override any default params
             instance_params.merge(param_overrides);
             // will override any instance params
             instance_params.merge(subckt_def.local_params.clone());
             // pin map
             let mut node_mapping = HashMap::new();
-            for (f, a) in subckt_def.nodes
-                .iter()
-                .cloned()
-                .zip(nodes.into_iter())
-            {
+            for (f, a) in subckt_def.nodes.iter().cloned().zip(nodes.into_iter()) {
                 node_mapping.insert(f, a);
             }
 
             let child_scope = Scope::new(Some(instance_name), instance_params, node_mapping);
-            let child_scope_id = unexpanded_deck.scope_arena.new_child(root_scope_id, child_scope);
+            let child_scope_id = unexpanded_deck
+                .scope_arena
+                .new_child(root_scope_id, child_scope);
 
             for stmt in subckt_def.body.iter() {
                 out.push(ScopedStmt {
@@ -247,17 +244,16 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use std::path::PathBuf;
     use crate::expression_phase::substitute_expressions;
+    use std::path::PathBuf;
 
     #[rstest]
     fn test_subcircuit_phase(#[files("tests/subcircuit_inputs/*.spicy")] input: PathBuf) {
-
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let mut statements = Statements::new(&input_content);
         let _placeholders_map = substitute_expressions(&mut statements, &input_content);
-        let stream = collect_subckts(statements, &input_content);
-        let expanded_stream = expand_subckts(stream, &input_content);
+        let unexpanded_deck = collect_subckts(statements, &input_content);
+        let expanded_deck = expand_subckts(unexpanded_deck, &input_content);
 
         let name = format!(
             "subcircuit-{}",
@@ -266,6 +262,8 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, expanded_stream);
+
+        let json = serde_json::to_string_pretty(&expanded_deck).expect("serialize output to json");
+        insta::assert_snapshot!(name, json);
     }
 }

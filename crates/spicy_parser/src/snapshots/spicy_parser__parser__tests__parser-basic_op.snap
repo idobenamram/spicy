@@ -4,83 +4,96 @@ expression: deck
 ---
 Deck {
     title: "basic operating point",
-    subcircuits: [],
     commands: [
-        Command {
-            kind: Op,
-            params: Attributes(
-                {},
-            ),
-            start: 63,
-            end: 65,
-        },
+        Op(
+            OpCommand {
+                span: Span {
+                    start: 63,
+                    end: 65,
+                },
+            },
+        ),
     ],
-    elements: [
-        Element {
-            kind: Resistor,
-            name: "1",
-            nodes: [
-                Node {
+    devices: [
+        Resistor(
+            Resistor {
+                name: "R1",
+                span: Span {
+                    start: 22,
+                    end: 34,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 10.0,
-                exponent: None,
-                suffix: Some(
-                    Kilo,
-                ),
+                resistance: Value {
+                    value: 10.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 22,
-            end: 34,
-        },
-        Element {
-            kind: CurrentSource,
-            name: "1",
-            nodes: [
-                Node {
+        ),
+        CurrentSource(
+            IndependentSource {
+                name: "I1",
+                positive: Node {
                     name: "out",
                 },
-                Node {
+                negative: Node {
                     name: "0",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Milli,
-                ),
+                mode: DC {
+                    value: Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Milli,
+                        ),
+                    },
+                },
             },
-            params: {},
-            start: 36,
-            end: 49,
-        },
-        Element {
-            kind: Capacitor,
-            name: "1",
-            nodes: [
-                Node {
+        ),
+        Capacitor(
+            Capacitor {
+                name: "C1",
+                span: Span {
+                    start: 51,
+                    end: 61,
+                },
+                positive: Node {
                     name: "out",
                 },
-                Node {
+                negative: Node {
                     name: "0",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Micro,
-                ),
+                capacitance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                mname: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                ic: None,
             },
-            params: {},
-            start: 51,
-            end: 61,
-        },
+        ),
     ],
 }

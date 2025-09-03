@@ -24,7 +24,7 @@ pub struct ParamParser<'s> {
 }
 
 impl<'s> ParamParser<'s> {
-    pub fn new(input: &'s str, params_order: Vec<&'s str>, cursor: StmtCursor<'s>) -> Self {
+    pub fn new(input: &'s str, params_order: Vec<&'s str>, cursor: &StmtCursor<'s>) -> Self {
         ParamParser {
             input,
             params_order,
@@ -135,21 +135,12 @@ impl<'s> Parser<'s> {
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
     // + <scale=val> <temp=val> <dtemp=val> <tc1=val> <tc2=val>
     // + <noisy=0|1>
-    fn parse_resistor(&mut self, name: String, statement: &ScopedStmt) -> Resistor {
-        let mut cursor = statement.stmt.into_cursor();
+    fn parse_resistor(&self, name: String, cursor: &mut StmtCursor, scope: &Scope) -> Resistor {
+        let positive = self.parse_node(cursor, scope);
+        let negative = self.parse_node(cursor, scope);
 
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .expect("scope must be in arena");
-
-        let positive = self.parse_node(&mut cursor, scope);
-        let negative = self.parse_node(&mut cursor, scope);
-
-        let resistance = self.parse_value(&mut cursor, scope);
-        let mut resistor = Resistor::new(name, statement.stmt.span, positive, negative, resistance);
-
+        let resistance = self.parse_value(cursor, scope);
+        let mut resistor = Resistor::new(name, cursor.span, positive, negative, resistance);
         // TODO: i kinda want to support type safety on the params (like noisy is always a bool)
         let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
         let params = ParamParser::new(self.input, params_order, cursor);
@@ -195,21 +186,14 @@ impl<'s> Parser<'s> {
 
     // CXXXXXXX n+ n- <value> <mname> <m=val> <scale=val> <temp=val>
     // + <dtemp=val> <tc1=val> <tc2=val> <ic=init_condition>
-    fn parse_capacitor(&mut self, name: String, statement: &ScopedStmt) -> Capacitor {
-        let mut cursor = statement.stmt.into_cursor();
-
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .expect("scope must be in arena");
-        let positive = self.parse_node(&mut cursor, scope);
-        let negative = self.parse_node(&mut cursor, scope);
+    fn parse_capacitor(&self, name: String, cursor: &mut StmtCursor, scope: &Scope) -> Capacitor {
+        let positive = self.parse_node(cursor, scope);
+        let negative = self.parse_node(cursor, scope);
 
         // TODO: support models
-        let capacitance = self.parse_value(&mut cursor, scope);
+        let capacitance = self.parse_value(cursor, scope);
         let mut capacitor =
-            Capacitor::new(name, statement.stmt.span, positive, negative, capacitance);
+            Capacitor::new(name, cursor.span, positive, negative, capacitance);
 
         let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
         let params = ParamParser::new(self.input, params_order, cursor);
@@ -254,20 +238,13 @@ impl<'s> Parser<'s> {
     // LYYYYYYY n+ n- <value> <mname> <nt=val> <m=val>
     // + <scale=val> <temp=val> <dtemp=val> <tc1=val>
     // + <tc2=val> <ic=init_condition>
-    fn parse_inductor(&mut self, name: String, statement: &ScopedStmt) -> Inductor {
-        let mut cursor = statement.stmt.into_cursor();
+    fn parse_inductor(&self, name: String, cursor: &mut StmtCursor, scope: &Scope) -> Inductor {
+        let positive = self.parse_node(cursor, scope);
+        let negative = self.parse_node(cursor, scope);
 
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .expect("scope must be in arena");
-        let positive = self.parse_node(&mut cursor, scope);
-        let negative = self.parse_node(&mut cursor, scope);
+        let inductance = self.parse_value(cursor, scope);
 
-        let inductance = self.parse_value(&mut cursor, scope);
-
-        let mut inductor = Inductor::new(name, statement.stmt.span, positive, negative, inductance);
+        let mut inductor = Inductor::new(name, cursor.span, positive, negative, inductance);
 
         let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
         let params = ParamParser::new(self.input, params_order, cursor);
@@ -318,25 +295,19 @@ impl<'s> Parser<'s> {
     // IYYYYYYY N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
     fn parse_independent_source(
-        &mut self,
+        &self,
         name: String,
-        statement: &ScopedStmt,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
     ) -> IndependentSource {
-        let mut cursor = statement.stmt.into_cursor();
+        let positive = self.parse_node(cursor, scope);
+        let negative = self.parse_node(cursor, scope);
 
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .expect("scope must be in arena");
-        let positive = self.parse_node(&mut cursor, scope);
-        let negative = self.parse_node(&mut cursor, scope);
-
-        let operation = parse_ident(&mut cursor, self.input);
+        let operation = parse_ident(cursor, self.input);
 
         let mode = match operation.as_str() {
             "DC" => IndependentSourceMode::DC {
-                value: self.parse_value(&mut cursor, scope),
+                value: self.parse_value(cursor, scope),
             },
             "AC" => panic!("AC not supported yet"),
             _ => panic!("Invalid operation: {}", operation),
@@ -350,7 +321,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_device(&mut self, statement: &ScopedStmt) -> Device {
+    fn parse_device(&self, statement: &ScopedStmt) -> Device {
         let mut cursor = statement.stmt.into_cursor();
         let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
 
@@ -366,14 +337,14 @@ impl<'s> Parser<'s> {
         let name = scope.get_device_name(&ident_string);
 
         match element_type {
-            DeviceType::Resistor => Device::Resistor(self.parse_resistor(name, &statement)),
-            DeviceType::Capacitor => Device::Capacitor(self.parse_capacitor(name, &statement)),
-            DeviceType::Inductor => Device::Inductor(self.parse_inductor(name, &statement)),
+            DeviceType::Resistor => Device::Resistor(self.parse_resistor(name, &mut cursor, scope)),
+            DeviceType::Capacitor => Device::Capacitor(self.parse_capacitor(name, &mut cursor, scope)),
+            DeviceType::Inductor => Device::Inductor(self.parse_inductor(name, &mut cursor, scope)),
             DeviceType::VoltageSource => {
-                Device::VoltageSource(self.parse_independent_source(name, statement))
+                Device::VoltageSource(self.parse_independent_source(name, &mut cursor, scope))
             }
             DeviceType::CurrentSource => {
-                Device::CurrentSource(self.parse_independent_source(name, statement))
+                Device::CurrentSource(self.parse_independent_source(name, &mut cursor, scope))
             }
             _ => panic!("Invalid device type: {:?}", element_type),
         }

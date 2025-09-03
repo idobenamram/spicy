@@ -6,8 +6,12 @@ use crate::{
     statement_phase::StmtCursor,
 };
 use std::collections::HashMap;
+use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq)]
+#[cfg(test)]
+use crate::test_utils::serialize_sorted_map;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Value {
     pub value: f64,
     pub exponent: Option<f64>,
@@ -67,7 +71,7 @@ impl Div for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ExprType {
     Value(Value),
     Placeholder(PlaceholderId),
@@ -77,7 +81,7 @@ pub enum ExprType {
     // Add Call { fun, args } if you want sin(), etc.
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Expr {
     pub span: Span,
     pub r#type: ExprType,
@@ -179,13 +183,14 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
 pub struct PlaceholderId(pub u64);
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct PlaceholderMap {
-    next: u64,
-    pub map: HashMap<PlaceholderId, Expr>,
+    pub(crate) next: u64,
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
+    pub(crate) map: HashMap<PlaceholderId, Expr>,
 }
 
 impl PlaceholderMap {
@@ -201,8 +206,11 @@ impl PlaceholderMap {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct Params(HashMap<String, Expr>);
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Params(
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
+    HashMap<String, Expr>
+);
 
 impl Params {
     pub fn new() -> Self {
@@ -219,14 +227,15 @@ impl Params {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct ScopeId(usize);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Scope {
     pub parent: Option<ScopeId>,
     pub instance_name: Option<String>,
     pub param_map: Params, // store Expr; evaluation is later
+    #[cfg_attr(test, serde(serialize_with = "crate::test_utils::serialize_node_map"))]
     pub node_mapping: HashMap<Node, Node>,
 }
 
@@ -256,7 +265,7 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct ScopeArena {
     nodes: Vec<Scope>,
 }
@@ -331,14 +340,14 @@ pub struct ExpressionParser<'s> {
 
 impl<'s> ExpressionParser<'s> {
     pub fn new(input: &'s str, tokens: &'s [Token]) -> Self {
+        let span = Span::new(tokens[0].span.start, tokens[tokens.len() - 1].span.end);
         ExpressionParser {
             input,
-            expression_cursor: StmtCursor::new(tokens),
+            expression_cursor: StmtCursor::new(tokens, span),
         }
     }
 
     pub fn parse(&mut self) -> Expr {
-        println!("------parsing");
         self.parse_expr(0)
     }
 

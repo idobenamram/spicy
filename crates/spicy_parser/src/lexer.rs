@@ -1,8 +1,9 @@
 use unscanny::Scanner;
+use serde::Serialize;
 
 use crate::expr::PlaceholderId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
     Ident,
     Number,
@@ -29,7 +30,7 @@ impl TokenKind {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
@@ -48,7 +49,7 @@ impl Span {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
     pub(crate) id: Option<PlaceholderId>,

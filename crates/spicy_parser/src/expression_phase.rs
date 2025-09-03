@@ -59,9 +59,10 @@ fn brace_to_placeholders(statement: &mut Statement, src: &str, pm: &mut Placehol
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
+    use serde_json;
 
     use super::*;
-    use std::path::PathBuf;
+    use std::{path::PathBuf};
 
     #[rstest]
     fn test_expression_phase(#[files("tests/expression_inputs/*.spicy")] input: PathBuf) {
@@ -70,6 +71,7 @@ mod tests {
 
         let output = substitute_expressions(&mut statements, &input_content);
 
+
         let name = format!(
             "expression-{}",
             input
@@ -77,6 +79,7 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, output);
+        let json = serde_json::to_string_pretty(&output).expect("serialize output to json");
+        insta::assert_snapshot!(name, json);
     }
 }

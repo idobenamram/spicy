@@ -1,8 +1,10 @@
 // https://ngspice.sourceforge.io/docs/ngspice-manual.pdf
 
+use serde::Serialize;
+
 use crate::{expr::Value, lexer::Span};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
 pub struct Node {
     pub name: String,
 }
@@ -346,7 +348,7 @@ impl Device {
 }
 
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ValueSuffix {
     Tera,
     Giga,

@@ -1,113 +1,109 @@
 ---
 source: crates/spicy_parser/src/expression_phase.rs
-expression: output
+expression: json
 ---
-PlaceholderMap {
-    next: 4,
-    map: {
-        PlaceholderId(
-            2,
-        ): Expr {
-            span: Span {
-                start: 85,
-                end: 103,
-            },
-            type: Binary {
-                op: Plus,
-                left: Expr {
-                    span: Span {
-                        start: 85,
-                        end: 88,
-                    },
-                    type: Ident(
-                        "nice",
-                    ),
-                },
-                right: Expr {
-                    span: Span {
-                        start: 92,
-                        end: 103,
-                    },
-                    type: Binary {
-                        op: Asterisk,
-                        left: Expr {
-                            span: Span {
-                                start: 92,
-                                end: 96,
-                            },
-                            type: Ident(
-                                "check",
-                            ),
-                        },
-                        right: Expr {
-                            span: Span {
-                                start: 100,
-                                end: 103,
-                            },
-                            type: Ident(
-                                "just",
-                            ),
-                        },
-                    },
-                },
-            },
-        },
-        PlaceholderId(
-            1,
-        ): Expr {
-            span: Span {
-                start: 68,
-                end: 71,
-            },
-            type: Ident(
-                "just",
-            ),
-        },
-        PlaceholderId(
-            0,
-        ): Expr {
-            span: Span {
-                start: 57,
-                end: 61,
-            },
-            type: Ident(
-                "check",
-            ),
-        },
-        PlaceholderId(
-            3,
-        ): Expr {
-            span: Span {
-                start: 117,
-                end: 124,
-            },
-            type: Binary {
-                op: Plus,
-                left: Expr {
-                    span: Span {
-                        start: 117,
-                        end: 120,
-                    },
-                    type: Ident(
-                        "nice",
-                    ),
-                },
-                right: Expr {
-                    span: Span {
-                        start: 124,
-                        end: 124,
-                    },
-                    type: Value(
-                        Value {
-                            value: 1.0,
-                            exponent: None,
-                            suffix: Some(
-                                Kilo,
-                            ),
-                        },
-                    ),
-                },
-            },
-        },
+{
+  "next": 4,
+  "map": {
+    "0": {
+      "span": {
+        "start": 57,
+        "end": 61
+      },
+      "type": {
+        "Ident": "check"
+      }
     },
+    "1": {
+      "span": {
+        "start": 68,
+        "end": 71
+      },
+      "type": {
+        "Ident": "just"
+      }
+    },
+    "2": {
+      "span": {
+        "start": 85,
+        "end": 103
+      },
+      "type": {
+        "Binary": {
+          "op": "Plus",
+          "left": {
+            "span": {
+              "start": 85,
+              "end": 88
+            },
+            "type": {
+              "Ident": "nice"
+            }
+          },
+          "right": {
+            "span": {
+              "start": 92,
+              "end": 103
+            },
+            "type": {
+              "Binary": {
+                "op": "Asterisk",
+                "left": {
+                  "span": {
+                    "start": 92,
+                    "end": 96
+                  },
+                  "type": {
+                    "Ident": "check"
+                  }
+                },
+                "right": {
+                  "span": {
+                    "start": 100,
+                    "end": 103
+                  },
+                  "type": {
+                    "Ident": "just"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "3": {
+      "span": {
+        "start": 117,
+        "end": 124
+      },
+      "type": {
+        "Binary": {
+          "op": "Plus",
+          "left": {
+            "span": {
+              "start": 117,
+              "end": 120
+            },
+            "type": {
+              "Ident": "nice"
+            }
+          },
+          "right": {
+            "span": {
+              "start": 124,
+              "end": 124
+            },
+            "type": {
+              "Value": {
+                "value": 1.0,
+                "exponent": null,
+                "suffix": "Kilo"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

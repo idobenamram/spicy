@@ -1,1232 +1,1116 @@
 ---
 source: crates/spicy_parser/src/subcircuit_phase.rs
-expression: expanded_stream
+expression: json
 ---
-Deck {
-    scope_arena: ScopeArena {
-        nodes: [
-            Scope {
-                parent: None,
-                instance_name: None,
-                param_map: Params(
-                    {
-                        "Rg": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 500.0,
-                                    exponent: None,
-                                    suffix: None,
-                                },
-                            ),
-                        },
-                        "C": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 5.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Nano,
-                                    ),
-                                },
-                            ),
-                        },
-                    },
-                ),
-                node_mapping: {},
+{
+  "scope_arena": {
+    "nodes": [
+      {
+        "parent": null,
+        "instance_name": null,
+        "param_map": {
+          "C": {
+            "span": {
+              "start": 0,
+              "end": 0
             },
-            Scope {
-                parent: Some(
-                    ScopeId(
-                        0,
-                    ),
-                ),
-                instance_name: Some(
-                    "1",
-                ),
-                param_map: Params(
-                    {
-                        "C": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 10.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Nano,
-                                    ),
-                                },
-                            ),
-                        },
-                        "R": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 2.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Kilo,
-                                    ),
-                                },
-                            ),
-                        },
-                    },
-                ),
-                node_mapping: {
-                    Node {
-                        name: "out",
-                    }: Node {
-                        name: "n2",
-                    },
-                    Node {
-                        name: "in",
-                    }: Node {
-                        name: "n1",
-                    },
-                },
+            "type": {
+              "Value": {
+                "value": 5.0,
+                "exponent": null,
+                "suffix": "Nano"
+              }
+            }
+          },
+          "Rg": {
+            "span": {
+              "start": 0,
+              "end": 0
             },
-            Scope {
-                parent: Some(
-                    ScopeId(
-                        0,
-                    ),
-                ),
-                instance_name: Some(
-                    "2",
-                ),
-                param_map: Params(
-                    {
-                        "C": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 10.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Nano,
-                                    ),
-                                },
-                            ),
-                        },
-                        "R": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 2.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Kilo,
-                                    ),
-                                },
-                            ),
-                        },
-                    },
-                ),
-                node_mapping: {
-                    Node {
-                        name: "out",
-                    }: Node {
-                        name: "b",
-                    },
-                    Node {
-                        name: "in",
-                    }: Node {
-                        name: "a",
-                    },
-                },
+            "type": {
+              "Value": {
+                "value": 500.0,
+                "exponent": null,
+                "suffix": null
+              }
+            }
+          }
+        },
+        "node_mapping": {}
+      },
+      {
+        "parent": 0,
+        "instance_name": "1",
+        "param_map": {
+          "C": {
+            "span": {
+              "start": 0,
+              "end": 0
             },
-            Scope {
-                parent: Some(
-                    ScopeId(
-                        0,
-                    ),
-                ),
-                instance_name: Some(
-                    "3",
-                ),
-                param_map: Params(
-                    {
-                        "C": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 22.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Nano,
-                                    ),
-                                },
-                            ),
-                        },
-                        "R": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 2.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Kilo,
-                                    ),
-                                },
-                            ),
-                        },
-                    },
-                ),
-                node_mapping: {
-                    Node {
-                        name: "out",
-                    }: Node {
-                        name: "y",
-                    },
-                    Node {
-                        name: "in",
-                    }: Node {
-                        name: "x",
-                    },
-                },
+            "type": {
+              "Value": {
+                "value": 10.0,
+                "exponent": null,
+                "suffix": "Nano"
+              }
+            }
+          },
+          "R": {
+            "span": {
+              "start": 0,
+              "end": 0
             },
+            "type": {
+              "Value": {
+                "value": 2.0,
+                "exponent": null,
+                "suffix": "Kilo"
+              }
+            }
+          }
+        },
+        "node_mapping": {
+          "in": {
+            "name": "n1"
+          },
+          "out": {
+            "name": "n2"
+          }
+        }
+      },
+      {
+        "parent": 0,
+        "instance_name": "2",
+        "param_map": {
+          "C": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 10.0,
+                "exponent": null,
+                "suffix": "Nano"
+              }
+            }
+          },
+          "R": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 2.0,
+                "exponent": null,
+                "suffix": "Kilo"
+              }
+            }
+          }
+        },
+        "node_mapping": {
+          "in": {
+            "name": "a"
+          },
+          "out": {
+            "name": "b"
+          }
+        }
+      },
+      {
+        "parent": 0,
+        "instance_name": "3",
+        "param_map": {
+          "C": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 22.0,
+                "exponent": null,
+                "suffix": "Nano"
+              }
+            }
+          },
+          "R": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 2.0,
+                "exponent": null,
+                "suffix": "Kilo"
+              }
+            }
+          }
+        },
+        "node_mapping": {
+          "in": {
+            "name": "x"
+          },
+          "out": {
+            "name": "y"
+          }
+        }
+      }
+    ]
+  },
+  "global_params": 0,
+  "subckt_table": {
+    "map": {
+      "LP": {
+        "name": "LP",
+        "nodes": [
+          {
+            "name": "in"
+          },
+          {
+            "name": "out"
+          }
         ],
+        "default_params": {
+          "C": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 10.0,
+                "exponent": null,
+                "suffix": "Nano"
+              }
+            }
+          },
+          "R": {
+            "span": {
+              "start": 120,
+              "end": 123
+            },
+            "type": {
+              "Placeholder": 0
+            }
+          }
+        },
+        "local_params": {
+          "R": {
+            "span": {
+              "start": 0,
+              "end": 0
+            },
+            "type": {
+              "Value": {
+                "value": 2.0,
+                "exponent": null,
+                "suffix": "Kilo"
+              }
+            }
+          }
+        },
+        "body": [
+          {
+            "tokens": [
+              {
+                "kind": "Ident",
+                "id": null,
+                "span": {
+                  "start": 144,
+                  "end": 145
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 146,
+                  "end": 146
+                }
+              },
+              {
+                "kind": "Ident",
+                "id": null,
+                "span": {
+                  "start": 147,
+                  "end": 148
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 149,
+                  "end": 149
+                }
+              },
+              {
+                "kind": "Ident",
+                "id": null,
+                "span": {
+                  "start": 150,
+                  "end": 152
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 153,
+                  "end": 153
+                }
+              },
+              {
+                "kind": "Placeholder",
+                "id": 1,
+                "span": {
+                  "start": 154,
+                  "end": 156
+                }
+              }
+            ],
+            "span": {
+              "start": 144,
+              "end": 156
+            }
+          },
+          {
+            "tokens": [
+              {
+                "kind": "Ident",
+                "id": null,
+                "span": {
+                  "start": 158,
+                  "end": 159
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 160,
+                  "end": 160
+                }
+              },
+              {
+                "kind": "Ident",
+                "id": null,
+                "span": {
+                  "start": 161,
+                  "end": 163
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 164,
+                  "end": 164
+                }
+              },
+              {
+                "kind": "Number",
+                "id": null,
+                "span": {
+                  "start": 165,
+                  "end": 165
+                }
+              },
+              {
+                "kind": "WhiteSpace",
+                "id": null,
+                "span": {
+                  "start": 166,
+                  "end": 167
+                }
+              },
+              {
+                "kind": "Placeholder",
+                "id": 2,
+                "span": {
+                  "start": 168,
+                  "end": 170
+                }
+              }
+            ],
+            "span": {
+              "start": 158,
+              "end": 170
+            }
+          }
+        ]
+      }
+    }
+  },
+  "statements": [
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 0,
+              "end": 3
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 4,
+              "end": 4
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 5,
+              "end": 15
+            }
+          }
+        ],
+        "span": {
+          "start": 0,
+          "end": 15
+        }
+      },
+      "scope": 0
     },
-    global_params: ScopeId(
-        0,
-    ),
-    subckt_table: SubcktTable {
-        map: {
-            "LP": SubcktDecl {
-                name: "LP",
-                nodes: [
-                    Node {
-                        name: "in",
-                    },
-                    Node {
-                        name: "out",
-                    },
-                ],
-                default_params: Params(
-                    {
-                        "C": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 10.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Nano,
-                                    ),
-                                },
-                            ),
-                        },
-                        "R": Expr {
-                            span: Span {
-                                start: 120,
-                                end: 123,
-                            },
-                            type: Placeholder(
-                                PlaceholderId(
-                                    0,
-                                ),
-                            ),
-                        },
-                    },
-                ),
-                local_params: Params(
-                    {
-                        "R": Expr {
-                            span: Span {
-                                start: 0,
-                                end: 0,
-                            },
-                            type: Value(
-                                Value {
-                                    value: 2.0,
-                                    exponent: None,
-                                    suffix: Some(
-                                        Kilo,
-                                    ),
-                                },
-                            ),
-                        },
-                    },
-                ),
-                body: [
-                    Statement {
-                        tokens: [
-                            Token {
-                                kind: Ident,
-                                id: None,
-                                span: Span {
-                                    start: 144,
-                                    end: 145,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 146,
-                                    end: 146,
-                                },
-                            },
-                            Token {
-                                kind: Ident,
-                                id: None,
-                                span: Span {
-                                    start: 147,
-                                    end: 148,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 149,
-                                    end: 149,
-                                },
-                            },
-                            Token {
-                                kind: Ident,
-                                id: None,
-                                span: Span {
-                                    start: 150,
-                                    end: 152,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 153,
-                                    end: 153,
-                                },
-                            },
-                            Token {
-                                kind: Placeholder,
-                                id: Some(
-                                    PlaceholderId(
-                                        1,
-                                    ),
-                                ),
-                                span: Span {
-                                    start: 154,
-                                    end: 156,
-                                },
-                            },
-                        ],
-                        span: Span {
-                            start: 144,
-                            end: 156,
-                        },
-                    },
-                    Statement {
-                        tokens: [
-                            Token {
-                                kind: Ident,
-                                id: None,
-                                span: Span {
-                                    start: 158,
-                                    end: 159,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 160,
-                                    end: 160,
-                                },
-                            },
-                            Token {
-                                kind: Ident,
-                                id: None,
-                                span: Span {
-                                    start: 161,
-                                    end: 163,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 164,
-                                    end: 164,
-                                },
-                            },
-                            Token {
-                                kind: Number,
-                                id: None,
-                                span: Span {
-                                    start: 165,
-                                    end: 165,
-                                },
-                            },
-                            Token {
-                                kind: WhiteSpace,
-                                id: None,
-                                span: Span {
-                                    start: 166,
-                                    end: 167,
-                                },
-                            },
-                            Token {
-                                kind: Placeholder,
-                                id: Some(
-                                    PlaceholderId(
-                                        2,
-                                    ),
-                                ),
-                                span: Span {
-                                    start: 168,
-                                    end: 170,
-                                },
-                            },
-                        ],
-                        span: Span {
-                            start: 158,
-                            end: 170,
-                        },
-                    },
-                ],
-            },
-        },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Asterisk",
+            "id": null,
+            "span": {
+              "start": 17,
+              "end": 17
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 18,
+              "end": 18
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 19,
+              "end": 19
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 20,
+              "end": 20
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 21,
+              "end": 21
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 22,
+              "end": 22
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 23,
+              "end": 28
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 29,
+              "end": 29
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 30,
+              "end": 35
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 36,
+              "end": 36
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 37,
+              "end": 37
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 38,
+              "end": 38
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 39,
+              "end": 39
+            }
+          }
+        ],
+        "span": {
+          "start": 17,
+          "end": 39
+        }
+      },
+      "scope": 0
     },
-    statements: [
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 0,
-                            end: 3,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 4,
-                            end: 4,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 5,
-                            end: 15,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 0,
-                    end: 15,
-                },
-            },
-            scope: ScopeId(
-                0,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Asterisk,
-                        id: None,
-                        span: Span {
-                            start: 17,
-                            end: 17,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 18,
-                            end: 18,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 19,
-                            end: 19,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 20,
-                            end: 20,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 21,
-                            end: 21,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 22,
-                            end: 22,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 23,
-                            end: 28,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 29,
-                            end: 29,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 30,
-                            end: 35,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 36,
-                            end: 36,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 37,
-                            end: 37,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 38,
-                            end: 38,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 39,
-                            end: 39,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 17,
-                    end: 39,
-                },
-            },
-            scope: ScopeId(
-                0,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Asterisk,
-                        id: None,
-                        span: Span {
-                            start: 68,
-                            end: 68,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 69,
-                            end: 69,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 70,
-                            end: 70,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 71,
-                            end: 71,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 72,
-                            end: 72,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 73,
-                            end: 73,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 74,
-                            end: 83,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 84,
-                            end: 84,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 85,
-                            end: 94,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 95,
-                            end: 95,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 96,
-                            end: 96,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 97,
-                            end: 97,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 98,
-                            end: 98,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 68,
-                    end: 98,
-                },
-            },
-            scope: ScopeId(
-                0,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Asterisk,
-                        id: None,
-                        span: Span {
-                            start: 182,
-                            end: 182,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 183,
-                            end: 183,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 184,
-                            end: 184,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 185,
-                            end: 185,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 186,
-                            end: 186,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 187,
-                            end: 187,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 188,
-                            end: 196,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 197,
-                            end: 197,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 198,
-                            end: 198,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 199,
-                            end: 199,
-                        },
-                    },
-                    Token {
-                        kind: Minus,
-                        id: None,
-                        span: Span {
-                            start: 200,
-                            end: 200,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 182,
-                    end: 200,
-                },
-            },
-            scope: ScopeId(
-                0,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 144,
-                            end: 145,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 146,
-                            end: 146,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 147,
-                            end: 148,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 149,
-                            end: 149,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 150,
-                            end: 152,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 153,
-                            end: 153,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                1,
-                            ),
-                        ),
-                        span: Span {
-                            start: 154,
-                            end: 156,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 144,
-                    end: 156,
-                },
-            },
-            scope: ScopeId(
-                1,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 158,
-                            end: 159,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 160,
-                            end: 160,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 161,
-                            end: 163,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 164,
-                            end: 164,
-                        },
-                    },
-                    Token {
-                        kind: Number,
-                        id: None,
-                        span: Span {
-                            start: 165,
-                            end: 165,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 166,
-                            end: 167,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                2,
-                            ),
-                        ),
-                        span: Span {
-                            start: 168,
-                            end: 170,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 158,
-                    end: 170,
-                },
-            },
-            scope: ScopeId(
-                1,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 144,
-                            end: 145,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 146,
-                            end: 146,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 147,
-                            end: 148,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 149,
-                            end: 149,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 150,
-                            end: 152,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 153,
-                            end: 153,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                1,
-                            ),
-                        ),
-                        span: Span {
-                            start: 154,
-                            end: 156,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 144,
-                    end: 156,
-                },
-            },
-            scope: ScopeId(
-                2,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 158,
-                            end: 159,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 160,
-                            end: 160,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 161,
-                            end: 163,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 164,
-                            end: 164,
-                        },
-                    },
-                    Token {
-                        kind: Number,
-                        id: None,
-                        span: Span {
-                            start: 165,
-                            end: 165,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 166,
-                            end: 167,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                2,
-                            ),
-                        ),
-                        span: Span {
-                            start: 168,
-                            end: 170,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 158,
-                    end: 170,
-                },
-            },
-            scope: ScopeId(
-                2,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 144,
-                            end: 145,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 146,
-                            end: 146,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 147,
-                            end: 148,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 149,
-                            end: 149,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 150,
-                            end: 152,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 153,
-                            end: 153,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                1,
-                            ),
-                        ),
-                        span: Span {
-                            start: 154,
-                            end: 156,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 144,
-                    end: 156,
-                },
-            },
-            scope: ScopeId(
-                3,
-            ),
-        },
-        ScopedStmt {
-            stmt: Statement {
-                tokens: [
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 158,
-                            end: 159,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 160,
-                            end: 160,
-                        },
-                    },
-                    Token {
-                        kind: Ident,
-                        id: None,
-                        span: Span {
-                            start: 161,
-                            end: 163,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 164,
-                            end: 164,
-                        },
-                    },
-                    Token {
-                        kind: Number,
-                        id: None,
-                        span: Span {
-                            start: 165,
-                            end: 165,
-                        },
-                    },
-                    Token {
-                        kind: WhiteSpace,
-                        id: None,
-                        span: Span {
-                            start: 166,
-                            end: 167,
-                        },
-                    },
-                    Token {
-                        kind: Placeholder,
-                        id: Some(
-                            PlaceholderId(
-                                2,
-                            ),
-                        ),
-                        span: Span {
-                            start: 168,
-                            end: 170,
-                        },
-                    },
-                ],
-                span: Span {
-                    start: 158,
-                    end: 170,
-                },
-            },
-            scope: ScopeId(
-                3,
-            ),
-        },
-    ],
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Asterisk",
+            "id": null,
+            "span": {
+              "start": 68,
+              "end": 68
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 69,
+              "end": 69
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 70,
+              "end": 70
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 71,
+              "end": 71
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 72,
+              "end": 72
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 73,
+              "end": 73
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 74,
+              "end": 83
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 84,
+              "end": 84
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 85,
+              "end": 94
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 95,
+              "end": 95
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 96,
+              "end": 96
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 97,
+              "end": 97
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 98,
+              "end": 98
+            }
+          }
+        ],
+        "span": {
+          "start": 68,
+          "end": 98
+        }
+      },
+      "scope": 0
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Asterisk",
+            "id": null,
+            "span": {
+              "start": 182,
+              "end": 182
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 183,
+              "end": 183
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 184,
+              "end": 184
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 185,
+              "end": 185
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 186,
+              "end": 186
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 187,
+              "end": 187
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 188,
+              "end": 196
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 197,
+              "end": 197
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 198,
+              "end": 198
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 199,
+              "end": 199
+            }
+          },
+          {
+            "kind": "Minus",
+            "id": null,
+            "span": {
+              "start": 200,
+              "end": 200
+            }
+          }
+        ],
+        "span": {
+          "start": 182,
+          "end": 200
+        }
+      },
+      "scope": 0
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 144,
+              "end": 145
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 146,
+              "end": 146
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 147,
+              "end": 148
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 149,
+              "end": 149
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 150,
+              "end": 152
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 153,
+              "end": 153
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 1,
+            "span": {
+              "start": 154,
+              "end": 156
+            }
+          }
+        ],
+        "span": {
+          "start": 144,
+          "end": 156
+        }
+      },
+      "scope": 1
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 158,
+              "end": 159
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 160,
+              "end": 160
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 161,
+              "end": 163
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 164,
+              "end": 164
+            }
+          },
+          {
+            "kind": "Number",
+            "id": null,
+            "span": {
+              "start": 165,
+              "end": 165
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 166,
+              "end": 167
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 2,
+            "span": {
+              "start": 168,
+              "end": 170
+            }
+          }
+        ],
+        "span": {
+          "start": 158,
+          "end": 170
+        }
+      },
+      "scope": 1
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 144,
+              "end": 145
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 146,
+              "end": 146
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 147,
+              "end": 148
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 149,
+              "end": 149
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 150,
+              "end": 152
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 153,
+              "end": 153
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 1,
+            "span": {
+              "start": 154,
+              "end": 156
+            }
+          }
+        ],
+        "span": {
+          "start": 144,
+          "end": 156
+        }
+      },
+      "scope": 2
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 158,
+              "end": 159
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 160,
+              "end": 160
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 161,
+              "end": 163
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 164,
+              "end": 164
+            }
+          },
+          {
+            "kind": "Number",
+            "id": null,
+            "span": {
+              "start": 165,
+              "end": 165
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 166,
+              "end": 167
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 2,
+            "span": {
+              "start": 168,
+              "end": 170
+            }
+          }
+        ],
+        "span": {
+          "start": 158,
+          "end": 170
+        }
+      },
+      "scope": 2
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 144,
+              "end": 145
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 146,
+              "end": 146
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 147,
+              "end": 148
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 149,
+              "end": 149
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 150,
+              "end": 152
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 153,
+              "end": 153
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 1,
+            "span": {
+              "start": 154,
+              "end": 156
+            }
+          }
+        ],
+        "span": {
+          "start": 144,
+          "end": 156
+        }
+      },
+      "scope": 3
+    },
+    {
+      "stmt": {
+        "tokens": [
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 158,
+              "end": 159
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 160,
+              "end": 160
+            }
+          },
+          {
+            "kind": "Ident",
+            "id": null,
+            "span": {
+              "start": 161,
+              "end": 163
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 164,
+              "end": 164
+            }
+          },
+          {
+            "kind": "Number",
+            "id": null,
+            "span": {
+              "start": 165,
+              "end": 165
+            }
+          },
+          {
+            "kind": "WhiteSpace",
+            "id": null,
+            "span": {
+              "start": 166,
+              "end": 167
+            }
+          },
+          {
+            "kind": "Placeholder",
+            "id": 2,
+            "span": {
+              "start": 168,
+              "end": 170
+            }
+          }
+        ],
+        "span": {
+          "start": 158,
+          "end": 170
+        }
+      },
+      "scope": 3
+    }
+  ]
 }

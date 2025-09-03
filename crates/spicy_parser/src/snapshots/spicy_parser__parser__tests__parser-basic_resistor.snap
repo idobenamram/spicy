@@ -4,420 +4,571 @@ expression: deck
 ---
 Deck {
     title: "basic resistor",
-    subcircuits: [],
     commands: [],
-    elements: [
-        Element {
-            kind: Resistor,
-            name: "1",
-            nodes: [
-                Node {
+    devices: [
+        Resistor(
+            Resistor {
+                name: "R1",
+                span: Span {
+                    start: 15,
+                    end: 26,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Kilo,
-                ),
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 15,
-            end: 26,
-        },
-        Element {
-            kind: Resistor,
-            name: "2",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R2",
+                span: Span {
+                    start: 28,
+                    end: 44,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "0",
                 },
-            ],
-            value: Value {
-                value: 1.1234,
-                exponent: None,
-                suffix: Some(
-                    Tera,
-                ),
+                resistance: Value {
+                    value: 1.1234,
+                    exponent: None,
+                    suffix: Some(
+                        Tera,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 28,
-            end: 44,
-        },
-        Element {
-            kind: Resistor,
-            name: "3",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R3",
+                span: Span {
+                    start: 46,
+                    end: 58,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: -10.0,
-                exponent: None,
-                suffix: None,
+                resistance: Value {
+                    value: -10.0,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 46,
-            end: 58,
-        },
-        Element {
-            kind: Resistor,
-            name: "4",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R4",
+                span: Span {
+                    start: 60,
+                    end: 71,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 0.5,
-                exponent: None,
-                suffix: None,
+                resistance: Value {
+                    value: 0.5,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 60,
-            end: 71,
-        },
-        Element {
-            kind: Resistor,
-            name: "5",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R5",
+                span: Span {
+                    start: 73,
+                    end: 86,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.25,
-                exponent: None,
-                suffix: None,
+                resistance: Value {
+                    value: 1.25,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 73,
-            end: 86,
-        },
-        Element {
-            kind: Resistor,
-            name: "6",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R6",
+                span: Span {
+                    start: 88,
+                    end: 102,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 2.5,
-                exponent: None,
-                suffix: None,
+                resistance: Value {
+                    value: 2.5,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 88,
-            end: 102,
-        },
-        Element {
-            kind: Resistor,
-            name: "7",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R7",
+                span: Span {
+                    start: 104,
+                    end: 119,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 2.5,
-                exponent: Some(
-                    -3.0,
-                ),
-                suffix: None,
+                resistance: Value {
+                    value: 2.5,
+                    exponent: Some(
+                        -3.0,
+                    ),
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 104,
-            end: 119,
-        },
-        Element {
-            kind: Resistor,
-            name: "8",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R8",
+                span: Span {
+                    start: 121,
+                    end: 135,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: -3.0,
-                exponent: Some(
-                    6.0,
-                ),
-                suffix: None,
+                resistance: Value {
+                    value: -3.0,
+                    exponent: Some(
+                        6.0,
+                    ),
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 121,
-            end: 135,
-        },
-        Element {
-            kind: Resistor,
-            name: "9",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R9",
+                span: Span {
+                    start: 137,
+                    end: 149,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 10.0,
-                exponent: None,
-                suffix: Some(
-                    Kilo,
-                ),
+                resistance: Value {
+                    value: 10.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 137,
-            end: 149,
-        },
-        Element {
-            kind: Resistor,
-            name: "10",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R10",
+                span: Span {
+                    start: 151,
+                    end: 166,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 47.0,
-                exponent: None,
-                suffix: Some(
-                    Mega,
-                ),
+                resistance: Value {
+                    value: 47.0,
+                    exponent: None,
+                    suffix: Some(
+                        Mega,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 151,
-            end: 166,
-        },
-        Element {
-            kind: Resistor,
-            name: "11",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R11",
+                span: Span {
+                    start: 168,
+                    end: 180,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Milli,
-                ),
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Milli,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 168,
-            end: 180,
-        },
-        Element {
-            kind: Resistor,
-            name: "12",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R12",
+                span: Span {
+                    start: 182,
+                    end: 196,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 220.0,
-                exponent: None,
-                suffix: Some(
-                    Micro,
-                ),
+                resistance: Value {
+                    value: 220.0,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 182,
-            end: 196,
-        },
-        Element {
-            kind: Resistor,
-            name: "13",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R13",
+                span: Span {
+                    start: 198,
+                    end: 211,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 33.0,
-                exponent: None,
-                suffix: Some(
-                    Nano,
-                ),
+                resistance: Value {
+                    value: 33.0,
+                    exponent: None,
+                    suffix: Some(
+                        Nano,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 198,
-            end: 211,
-        },
-        Element {
-            kind: Resistor,
-            name: "14",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R14",
+                span: Span {
+                    start: 213,
+                    end: 227,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 4.7,
-                exponent: None,
-                suffix: Some(
-                    Pico,
-                ),
+                resistance: Value {
+                    value: 4.7,
+                    exponent: None,
+                    suffix: Some(
+                        Pico,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 213,
-            end: 227,
-        },
-        Element {
-            kind: Resistor,
-            name: "15",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R15",
+                span: Span {
+                    start: 229,
+                    end: 241,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 8.0,
-                exponent: None,
-                suffix: Some(
-                    Femto,
-                ),
+                resistance: Value {
+                    value: 8.0,
+                    exponent: None,
+                    suffix: Some(
+                        Femto,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 229,
-            end: 241,
-        },
-        Element {
-            kind: Resistor,
-            name: "16",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R16",
+                span: Span {
+                    start: 243,
+                    end: 255,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Atto,
-                ),
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Atto,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 243,
-            end: 255,
-        },
-        Element {
-            kind: Resistor,
-            name: "17",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R17",
+                span: Span {
+                    start: 257,
+                    end: 274,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.2,
-                exponent: Some(
-                    -3.0,
-                ),
-                suffix: Some(
-                    Kilo,
-                ),
+                resistance: Value {
+                    value: 1.2,
+                    exponent: Some(
+                        -3.0,
+                    ),
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 257,
-            end: 274,
-        },
-        Element {
-            kind: Resistor,
-            name: "18",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R18",
+                span: Span {
+                    start: 276,
+                    end: 291,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 0.123,
-                exponent: None,
-                suffix: Some(
-                    Giga,
-                ),
+                resistance: Value {
+                    value: 0.123,
+                    exponent: None,
+                    suffix: Some(
+                        Giga,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 276,
-            end: 291,
-        },
-        Element {
-            kind: Resistor,
-            name: "19",
-            nodes: [
-                Node {
+        ),
+        Resistor(
+            Resistor {
+                name: "R19",
+                span: Span {
+                    start: 293,
+                    end: 309,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: -0.99,
-                exponent: None,
-                suffix: Some(
-                    Tera,
-                ),
+                resistance: Value {
+                    value: -0.99,
+                    exponent: None,
+                    suffix: Some(
+                        Tera,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 293,
-            end: 309,
-        },
+        ),
     ],
 }

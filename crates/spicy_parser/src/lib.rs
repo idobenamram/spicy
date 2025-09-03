@@ -8,3 +8,6 @@ pub mod parser;
 pub mod netlist_types;
 pub use lexer::Span;
 pub use expr::Value;
+
+#[cfg(test)]
+mod test_utils;

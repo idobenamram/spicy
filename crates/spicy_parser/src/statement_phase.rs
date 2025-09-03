@@ -2,8 +2,9 @@ use crate::{
     lexer::{Lexer, Span, Token, TokenKind, token_text},
     netlist_types::{CommandType, DeviceType},
 };
+use serde::Serialize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Statement {
     pub tokens: Vec<Token>,
     pub span: Span,
@@ -25,7 +26,7 @@ impl Statement {
     }
 
     pub fn into_cursor(&self) -> StmtCursor<'_> {
-        StmtCursor::new(&self.tokens)
+        StmtCursor::new(&self.tokens, self.span)
     }
 
     pub fn replace_tokens(&mut self, start: usize, end: usize, tokens: Vec<Token>) {
@@ -35,13 +36,14 @@ impl Statement {
 
 #[derive(Debug, Clone)]
 pub struct StmtCursor<'a> {
-    toks: &'a [Token],
-    i: usize,
+    pub span: Span,
+    pub toks: &'a [Token],
+    pub i: usize,
 }
 
 impl<'a> StmtCursor<'a> {
-    pub fn new(tokens: &'a [Token]) -> Self {
-        Self { toks: tokens, i: 0 }
+    pub fn new(tokens: &'a [Token], span: Span) -> Self {
+        Self { toks: tokens, i: 0, span }
     }
 
     #[inline]
@@ -160,6 +162,7 @@ impl<'a> StmtCursor<'a> {
                 if start < idx {
                     result.push(StmtCursor {
                         toks: &self.toks[start..idx],
+                        span: Span::new(start, idx),
                         i: 0,
                     });
                 }
@@ -170,6 +173,7 @@ impl<'a> StmtCursor<'a> {
         if start < self.toks.len() {
             result.push(StmtCursor {
                 toks: &self.toks[start..],
+                span: Span::new(start, self.toks.len() - start),
                 i: 0,
             });
         }

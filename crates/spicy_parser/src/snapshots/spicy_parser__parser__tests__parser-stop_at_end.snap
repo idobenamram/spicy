@@ -4,39 +4,46 @@ expression: deck
 ---
 Deck {
     title: "stop after end",
-    subcircuits: [],
     commands: [
-        Command {
-            kind: Op,
-            params: Attributes(
-                {},
-            ),
-            start: 28,
-            end: 30,
-        },
+        Op(
+            OpCommand {
+                span: Span {
+                    start: 28,
+                    end: 30,
+                },
+            },
+        ),
     ],
-    elements: [
-        Element {
-            kind: Resistor,
-            name: "1",
-            nodes: [
-                Node {
+    devices: [
+        Resistor(
+            Resistor {
+                name: "R1",
+                span: Span {
+                    start: 15,
+                    end: 26,
+                },
+                positive: Node {
                     name: "in",
                 },
-                Node {
+                negative: Node {
                     name: "out",
                 },
-            ],
-            value: Value {
-                value: 1.0,
-                exponent: None,
-                suffix: Some(
-                    Kilo,
-                ),
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
             },
-            params: {},
-            start: 15,
-            end: 26,
-        },
+        ),
     ],
 }

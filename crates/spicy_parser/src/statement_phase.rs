@@ -3,70 +3,71 @@ use crate::{
     netlist_types::{CommandType, DeviceType},
 };
 use serde::Serialize;
+use crate::error::{ParserError, SpicyError};
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Statement {
-    pub tokens: Vec<Token>,
+pub(crate) struct Statement {
+    pub(crate) tokens: Vec<Token>,
     pub span: Span,
 }
 
 impl Statement {
-    fn new(tokens: Vec<Token>) -> Self {
+    fn new(tokens: Vec<Token>) -> Result<Self, ParserError> {
         if tokens.is_empty() {
-            panic!("Statement must have at least one token");
+            return Err(ParserError::EmptyStatement { span: Span::new(0, 0) });
         }
 
         let start = tokens[0].span.start;
         let end = tokens[tokens.len() - 1].span.end;
 
-        Self {
+        Ok(Self {
             span: Span::new(start, end),
             tokens,
-        }
+        })
     }
 
-    pub fn into_cursor(&self) -> StmtCursor<'_> {
+    pub(crate) fn into_cursor(&self) -> StmtCursor<'_> {
         StmtCursor::new(&self.tokens, self.span)
     }
 
-    pub fn replace_tokens(&mut self, start: usize, end: usize, tokens: Vec<Token>) {
+    pub(crate) fn replace_tokens(&mut self, start: usize, end: usize, tokens: Vec<Token>) {
         self.tokens.splice(start..=end, tokens);
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct StmtCursor<'a> {
+pub(crate) struct StmtCursor<'a> {
     pub span: Span,
     pub toks: &'a [Token],
     pub i: usize,
 }
 
 impl<'a> StmtCursor<'a> {
-    pub fn new(tokens: &'a [Token], span: Span) -> Self {
+    pub(crate) fn new(tokens: &'a [Token], span: Span) -> Self {
         Self { toks: tokens, i: 0, span }
     }
 
     #[inline]
-    pub fn done(&self) -> bool {
+    pub(crate) fn done(&self) -> bool {
         self.i >= self.toks.len()
     }
 
     #[inline]
-    pub fn pos(&self) -> usize {
+    pub(crate) fn pos(&self) -> usize {
         self.i
     }
 
     #[inline]
-    pub fn checkpoint(&self) -> usize {
+    pub(crate) fn checkpoint(&self) -> usize {
         self.pos()
     }
 
     #[inline]
-    pub fn rewind(&mut self, mark: usize) {
+    pub(crate) fn rewind(&mut self, mark: usize) {
         self.i = mark;
     }
 
-    pub fn skip_ws(&mut self) {
+    pub(crate) fn skip_ws(&mut self) {
         while let Some(t) = self.toks.get(self.i) {
             if t.kind != TokenKind::WhiteSpace {
                 break;
@@ -76,11 +77,12 @@ impl<'a> StmtCursor<'a> {
     }
 
     #[inline]
-    pub fn peek(&self) -> Option<&'a Token> {
+    pub(crate) fn peek(&self) -> Option<&'a Token> {
         self.toks.get(self.i)
     }
+
     /// Peek skipping whitespace
-    pub fn peek_non_whitespace(&self) -> Option<&'a Token> {
+    pub(crate) fn peek_non_whitespace(&self) -> Option<&'a Token> {
         let mut j = self.i;
         while let Some(t) = self.toks.get(j) {
             if t.kind != TokenKind::WhiteSpace {
@@ -91,7 +93,11 @@ impl<'a> StmtCursor<'a> {
         None
     }
 
-    pub fn next(&mut self) -> Option<&'a Token> {
+    pub(crate) fn peek_span(&self) -> Option<Span> {
+        Some(self.peek()?.span)
+    }
+
+    pub(crate) fn next(&mut self) -> Option<&'a Token> {
         let t = self.toks.get(self.i);
         if t.is_some() {
             self.i += 1;
@@ -99,26 +105,39 @@ impl<'a> StmtCursor<'a> {
         t
     }
 
-    pub fn next_non_whitespace(&mut self) -> Option<&'a Token> {
+    pub(crate) fn next_non_whitespace(&mut self) -> Option<&'a Token> {
         self.skip_ws();
         self.next()
     }
     /// Consume a specific kind (skips ws first)
-    pub fn consume(&mut self, kind: TokenKind) -> Option<&'a Token> {
+    pub(crate) fn consume(&mut self, kind: TokenKind) -> Option<&'a Token> {
         if self.peek()?.kind == kind {
             return self.next();
         }
         None
     }
     /// Expect a specific kind (nice for errors)
-    pub fn expect(&mut self, kind: TokenKind) -> Result<&'a Token, &'static str> {
-        self.peek()
-            .filter(|t| t.kind == kind)
-            .map(|_| self.next().unwrap())
-            .ok_or("unexpected token")
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<&'a Token, SpicyError> {
+        if let Some(tok) = self.peek() {
+            if tok.kind == kind {
+                return Ok(self.next().unwrap());
+            }
+            return Err(ParserError::UnexpectedToken {
+                expected: format!("{:?}", kind),
+                found: tok.kind,
+                span: tok.span,
+            }
+            .into());
+        }
+        Err(ParserError::MissingToken { message: "token", span: self.peek_span().unwrap_or(Span::new(0, 0)) }.into())
     }
 
-    pub fn consume_if_command(&mut self, input: &str, command: CommandType) -> bool {
+    pub(crate) fn expect_non_whitespace(&mut self, kind: TokenKind) -> Result<&'a Token, SpicyError> {
+        self.skip_ws();
+        self.expect(kind)
+    }
+
+    pub(crate) fn consume_if_command(&mut self, input: &str, command: CommandType) -> bool {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if let Some(_) = self.consume(TokenKind::Dot) {
@@ -133,13 +152,14 @@ impl<'a> StmtCursor<'a> {
         false
     }
 
-    pub fn consume_if_device(&mut self, input: &'a str, device: DeviceType) -> Option<&'a str> {
+    pub(crate) fn consume_if_device(&mut self, input: &'a str, device: DeviceType) -> Option<&'a str> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if let Some(t) = self.consume(TokenKind::Ident) {
             let ident_string = token_text(input, t);
             let (first, name) = ident_string.split_at(1);
-            let found_device = DeviceType::from_str(first) == Some(device);
+            // TODO: not sure this is correct
+            let found_device = DeviceType::from_str(first).ok() == Some(device);
             if found_device {
                 return Some(name);
             }
@@ -148,11 +168,11 @@ impl<'a> StmtCursor<'a> {
         None
     }
 
-    pub fn contains(&self, kind: TokenKind) -> bool {
+    pub(crate) fn contains(&self, kind: TokenKind) -> bool {
         self.toks.iter().any(|t| t.kind == kind)
     }
 
-    pub fn split_on_whitespace(&self) -> Vec<StmtCursor<'a>> {
+    pub(crate) fn split_on_whitespace(&self) -> Vec<StmtCursor<'a>> {
         let mut result = Vec::new();
         let mut start = self.i;
 
@@ -183,12 +203,12 @@ impl<'a> StmtCursor<'a> {
 }
 
 #[derive(Debug)]
-pub struct Statements {
+pub(crate) struct Statements {
     pub(crate) statements: Vec<Statement>,
 }
 
 impl Statements {
-    fn merge_statements(statements: Vec<Statement>) -> Vec<Statement> {
+    fn merge_statements(statements: Vec<Statement>) -> Result<Vec<Statement>, ParserError> {
         let mut merged: Vec<Statement> = Vec::new();
 
         for stmt in statements.into_iter() {
@@ -207,36 +227,36 @@ impl Statements {
                     prev.tokens.extend_from_slice(&stmt.tokens[start_idx..]);
                     prev.span.end = stmt.span.end;
                 } else {
-                    panic!("No previous statement to merge with");
+                    return Err(ParserError::ContinuationWithoutPrevious { span: stmt.span });
                 }
             } else {
                 merged.push(stmt);
             }
         }
 
-        merged
+        Ok(merged)
     }
 
-    pub fn new(input: &str) -> Self {
+    pub(crate) fn new(input: &str) -> Result<Self, SpicyError> {
         let mut lexer = Lexer::new(input);
         let mut statements = vec![];
-        let mut token = lexer.next();
+        let mut token = lexer.next()?;
 
         while token.kind != TokenKind::EOF {
             let mut statement = vec![];
             while token.kind != TokenKind::Newline && token.kind != TokenKind::EOF {
                 statement.push(token);
-                token = lexer.next();
+                token = lexer.next()?;
             }
 
             // skip newlines
-            token = lexer.next();
-            statements.push(Statement::new(statement));
+            token = lexer.next()?;
+            statements.push(Statement::new(statement)?);
         }
 
         // Merge statements with trailing '+' continuation
-        let statements = Self::merge_statements(statements);
-        Self { statements }
+        let statements = Self::merge_statements(statements)?;
+        Ok(Self { statements })
     }
 }
 

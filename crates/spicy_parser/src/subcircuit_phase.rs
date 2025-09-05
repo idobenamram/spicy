@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::Span;
+use crate::error::{SpicyError, SubcircuitError};
 use crate::expr::ScopeArena;
 use crate::expr::{Params, Scope, ScopeId};
 use crate::netlist_types::Node;
@@ -15,7 +17,7 @@ use crate::{lexer::TokenKind, statement_phase::Statement};
 #[cfg(test)]
 use crate::test_utils::serialize_sorted_map;
 
-pub struct UnexpandedDeck {
+pub(crate) struct UnexpandedDeck {
     pub scope_arena: ScopeArena,
     pub global_params: ScopeId,
     pub subckt_table: SubcktTable,
@@ -23,7 +25,7 @@ pub struct UnexpandedDeck {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct SubcktDecl {
+pub(crate) struct SubcktDecl {
     pub name: String,
     pub nodes: Vec<Node>,
     pub default_params: Params,
@@ -32,18 +34,18 @@ pub struct SubcktDecl {
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct SubcktTable {
+pub(crate) struct SubcktTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
     pub map: HashMap<String, SubcktDecl>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ScopedStmt {
+pub(crate) struct ScopedStmt {
     pub stmt: Statement,
     pub scope: ScopeId,
 }
 
-pub fn collect_subckts(stmts: Statements, input: &str) -> UnexpandedDeck {
+pub(crate) fn collect_subckts(stmts: Statements, input: &str) -> Result<UnexpandedDeck, SpicyError> {
     let mut out = Vec::new();
     let mut table = SubcktTable::default();
     let mut scope_arena = ScopeArena::new();
@@ -53,18 +55,17 @@ pub fn collect_subckts(stmts: Statements, input: &str) -> UnexpandedDeck {
     while let Some(s) = it.next() {
         let mut cursor = s.into_cursor();
         if cursor.consume_if_command(input, CommandType::Param) {
-            parse_dot_param(&mut cursor, input, &mut root_env.param_map);
+            parse_dot_param(&mut cursor, input, &mut root_env.param_map)?;
             continue;
         }
         if cursor.consume_if_command(input, CommandType::Subcircuit) {
-            let mut subckt = parse_subckt_command(&mut cursor, input);
+            let mut subckt = parse_subckt_command(&mut cursor, input)?;
             let mut body = Vec::new();
             // TODO: this doesn't support nested subcircuits
             while let Some(next) = it.next() {
                 let mut inner_cursor = next.into_cursor();
                 if inner_cursor.consume_if_command(input, CommandType::Param) {
-                    println!("parsing param in subcircuit");
-                    parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params);
+                    parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params)?;
                     continue;
                 }
                 // collect body until .ends
@@ -81,19 +82,19 @@ pub fn collect_subckts(stmts: Statements, input: &str) -> UnexpandedDeck {
         }
         out.push(s);
     }
-    UnexpandedDeck {
+    Ok(UnexpandedDeck {
         scope_arena,
         global_params: root_env_id,
         subckt_table: table,
         statements: out,
-    }
+    })
 }
 
 // SUBCKT subnam N1 <N2 N3 ...>
-fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> SubcktDecl {
-    let name = parse_ident(cursor, src);
+fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl, SpicyError> {
+    let name = parse_ident(cursor, src)?;
 
-    let first_node = parse_node(cursor, src);
+    let first_node = parse_node(cursor, src)?;
 
     let mut nodes = vec![first_node];
     let mut default_params = Params::new();
@@ -103,10 +104,10 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> SubcktDecl {
         let Some(_) = cursor.peek() else {
             break;
         };
-        let node = parse_node(cursor, src);
+        let node = parse_node(cursor, src)?;
         if let Some(_) = cursor.consume(TokenKind::Equal) {
             let param_name = node.name;
-            let value = parse_value_or_placeholder(cursor, src);
+            let value = parse_value_or_placeholder(cursor, src)?;
             default_params.set_param(param_name, value);
         } else {
             // TODO: technically we can't parse nodes after we saw parameters
@@ -114,18 +115,21 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> SubcktDecl {
         }
     }
 
-    SubcktDecl {
+    Ok(SubcktDecl {
         name,
         nodes,
         default_params,
         local_params: Params::new(),
         body: vec![],
-    }
+    })
 }
 
-fn parse_x_device(cursor: &mut StmtCursor, src: &str) -> (Vec<Node>, String, Params) {
+fn parse_x_device(
+    cursor: &mut StmtCursor,
+    src: &str,
+) -> Result<(Vec<Node>, String, Params), SpicyError> {
     // Phase 1: parse only nodes (last one is the subcircuit name)
-    let first_node = parse_node(cursor, src);
+    let first_node = parse_node(cursor, src)?;
 
     let mut nodes = vec![first_node];
 
@@ -144,14 +148,25 @@ fn parse_x_device(cursor: &mut StmtCursor, src: &str) -> (Vec<Node>, String, Par
             break;
         }
 
-        let node = parse_node(cursor, src);
+        let node = parse_node(cursor, src)?;
         nodes.push(node);
     }
 
     // The last parsed node is the subcircuit name
-    let subcircuit_name = nodes.pop().expect("Subcircuit name is required").name;
+    let subcircuit_name = nodes
+        .pop()
+        .ok_or_else(|| SubcircuitError::MissingSubcircuitName {
+            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+        })?
+        .name;
 
-    assert!(!nodes.is_empty(), "must have at least one node");
+    if nodes.is_empty() {
+        return Err(SubcircuitError::NoNodes {
+            name: subcircuit_name,
+            span: cursor.span,
+        }
+        .into());
+    }
 
     // Phase 2: parse only parameters (IDENT '=' value)
     let mut param_overrides = Params::new();
@@ -161,15 +176,15 @@ fn parse_x_device(cursor: &mut StmtCursor, src: &str) -> (Vec<Node>, String, Par
             break;
         }
 
-        let (param_name, value) = parse_equal_expr(cursor, src);
+        let (param_name, value) = parse_equal_expr(cursor, src)?;
         param_overrides.set_param(param_name, value);
     }
 
-    (nodes, subcircuit_name, param_overrides)
+    Ok((nodes, subcircuit_name, param_overrides))
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ExpandedDeck {
+pub(crate) struct ExpandedDeck {
     pub scope_arena: ScopeArena,
     pub global_params: ScopeId,
     pub subckt_table: SubcktTable,
@@ -177,7 +192,10 @@ pub struct ExpandedDeck {
 }
 
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
-pub fn expand_subckts<'a>(mut unexpanded_deck: UnexpandedDeck, src: &'a str) -> ExpandedDeck {
+pub(crate) fn expand_subckts<'a>(
+    mut unexpanded_deck: UnexpandedDeck,
+    src: &'a str,
+) -> Result<ExpandedDeck, SpicyError> {
     let mut out = Vec::new();
 
     let root_scope_id = unexpanded_deck.global_params;
@@ -186,20 +204,23 @@ pub fn expand_subckts<'a>(mut unexpanded_deck: UnexpandedDeck, src: &'a str) -> 
 
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
             let instance_name = instance_name.to_string();
-            let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src);
+            let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src)?;
 
             let Some(subckt_def) = unexpanded_deck.subckt_table.map.get(&instance_subckt) else {
-                panic!("subcircuit not found: {}", instance_subckt);
+                return Err(SubcircuitError::NotFound {
+                    name: instance_subckt,
+                }
+                .into());
             };
 
             // arity check
             if nodes.len() != subckt_def.nodes.len() {
-                panic!(
-                    "subcircuit {} has {} nodes, expected {}",
-                    instance_subckt,
-                    nodes.len(),
-                    subckt_def.nodes.len()
-                );
+                return Err(SubcircuitError::ArityMismatch {
+                    name: instance_subckt,
+                    found: nodes.len(),
+                    expected: subckt_def.nodes.len(),
+                }
+                .into());
             }
 
             let mut instance_params = subckt_def.default_params.clone();
@@ -231,12 +252,12 @@ pub fn expand_subckts<'a>(mut unexpanded_deck: UnexpandedDeck, src: &'a str) -> 
             scope: root_scope_id,
         });
     }
-    ExpandedDeck {
+    Ok(ExpandedDeck {
         scope_arena: unexpanded_deck.scope_arena,
         global_params: unexpanded_deck.global_params,
         subckt_table: unexpanded_deck.subckt_table,
         statements: out,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -250,10 +271,11 @@ mod tests {
     #[rstest]
     fn test_subcircuit_phase(#[files("tests/subcircuit_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut statements = Statements::new(&input_content);
+        let mut statements = Statements::new(&input_content).expect("statements");
         let _placeholders_map = substitute_expressions(&mut statements, &input_content);
-        let unexpanded_deck = collect_subckts(statements, &input_content);
-        let expanded_deck = expand_subckts(unexpanded_deck, &input_content);
+        let unexpanded_deck = collect_subckts(statements, &input_content).expect("collect subckts");
+        let expanded_deck =
+            expand_subckts(unexpanded_deck, &input_content).expect("expand subckts");
 
         let name = format!(
             "subcircuit-{}",

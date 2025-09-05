@@ -1,0 +1,162 @@
+use thiserror::Error;
+
+use crate::Span;
+
+#[derive(Debug, Error)]
+pub enum SpicyError {
+    #[error(transparent)]
+    Lexer(#[from] LexerError),
+    #[error(transparent)]
+    Parser(#[from] ParserError),
+    #[error(transparent)]
+    Expression(#[from] ExpressionError),
+    #[error(transparent)]
+    Subcircuit(#[from] SubcircuitError),
+}
+
+impl SpicyError {
+    pub fn error_span(&self) -> Option<Span> {
+        match self {
+            SpicyError::Lexer(le) => match le {
+                LexerError::UnexpectedCharacter { span, .. } => Some(*span),
+                LexerError::InvalidIdentifierStart { span } => Some(*span),
+            },
+            SpicyError::Parser(pe) => match pe {
+                ParserError::EmptyStatement { span }
+                | ParserError::ContinuationWithoutPrevious { span }
+                | ParserError::UnexpectedToken { span, .. }
+                | ParserError::InvalidStartNumeric { span }
+                | ParserError::ExpectedDigitsAfterDot { span }
+                | ParserError::InvalidExponentDigits { span, .. }
+                | ParserError::InvalidNumericLiteral { span, .. }
+                | ParserError::ExpectedBoolZeroOrOne { span }
+                | ParserError::ExpectedIdent { span }
+                | ParserError::MissingPlaceholderId { span }
+                | ParserError::MissingScope { span }
+                | ParserError::MissingTitle { span }
+                | ParserError::UnexpectedCommandType { span, .. }
+                | ParserError::InvalidCommandType { span, .. }
+                | ParserError::InvalidOperation { span, .. }
+                | ParserError::InvalidParam { span, .. } => Some(*span),
+                ParserError::MissingToken { .. } | ParserError::InvalidDeviceType { .. } => None,
+            },
+            SpicyError::Expression(ee) => match ee {
+                ExpressionError::UnexpectedToken { span, .. }
+                | ExpressionError::BadPrefixOperator { span, .. } => Some(*span),
+                ExpressionError::MissingToken { .. } => None,
+            },
+            SpicyError::Subcircuit(se) => match se {
+                SubcircuitError::MissingSubcircuitName { span }
+                | SubcircuitError::NoNodes { span, .. } => Some(*span),
+                SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum LexerError {
+    #[error("unexpected character '{ch}' at span {span:?}")]
+    UnexpectedCharacter { ch: char, span: Span },
+
+    #[error("identifier must start with an alphabetic character at span {span:?}")]
+    InvalidIdentifierStart { span: Span },
+}
+
+#[derive(Debug, Error)]
+pub enum ParserError {
+    #[error("empty statement at span {span:?}")]
+    EmptyStatement { span: Span },
+
+    #[error("line continuation '+' without a previous statement at span {span:?}")]
+    ContinuationWithoutPrevious { span: Span },
+
+    #[error("unexpected token {found:?} at span {span:?} (expected {expected})")]
+    UnexpectedToken {
+        expected: String,
+        found: crate::lexer::TokenKind,
+        span: Span,
+    },
+
+    #[error("missing token: {message}")]
+    MissingToken { message: &'static str, span: Span },
+
+    #[error("invalid start of numeric value at span {span:?}")]
+    InvalidStartNumeric { span: Span },
+
+    #[error("expected digits after '.' at span {span:?}")]
+    ExpectedDigitsAfterDot { span: Span },
+
+    #[error("invalid exponent digits '{lexeme}' at span {span:?}")]
+    InvalidExponentDigits { span: Span, lexeme: String },
+
+    #[error("invalid numeric literal '{lexeme}' at span {span:?}")]
+    InvalidNumericLiteral { span: Span, lexeme: String },
+
+    #[error("expected boolean '0' or '1' at span {span:?}")]
+    ExpectedBoolZeroOrOne { span: Span },
+
+    #[error("expected identifier at span {span:?}")]
+    ExpectedIdent { span: Span },
+
+    #[error("missing placeholder id at span {span:?}")]
+    MissingPlaceholderId { span: Span },
+
+    #[error("invalid param: {param} at span {span:?}")]
+    InvalidParam { param: String, span: Span },
+
+    #[error("invalid operation: {operation} at span {span:?}")]
+    InvalidOperation { operation: String, span: Span },
+
+    #[error("invalid command type: {s} at span {span:?}")]
+    InvalidCommandType { s: String, span: Span },
+
+    #[error("unexpected command type: {s} at span {span:?}")]
+    UnexpectedCommandType { s: String, span: Span },
+
+    #[error("invalid device type: {s}")]
+    InvalidDeviceType { s: String },
+
+    #[error("missing scope at span {span:?}")]
+    MissingScope { span: Span },
+
+    #[error("missing title at span {span:?}")]
+    MissingTitle { span: Span },
+}
+
+#[derive(Debug, Error)]
+pub enum ExpressionError {
+    #[error("unexpected token {found:?} at span {span:?}")]
+    UnexpectedToken {
+        found: crate::lexer::TokenKind,
+        span: Span,
+    },
+
+    #[error("missing token: {message}")]
+    MissingToken { message: &'static str },
+
+    #[error("bad prefix operator {op:?} at span {span:?}")]
+    BadPrefixOperator {
+        op: crate::lexer::TokenKind,
+        span: Span,
+    },
+}
+
+#[derive(Debug, Error)]
+pub enum SubcircuitError {
+    #[error("missing subcircuit name at span {span:?}")]
+    MissingSubcircuitName { span: Span },
+
+    #[error("subcircuit not found: {name}")]
+    NotFound { name: String },
+
+    #[error("subcircuit {name} has {found} nodes, expected {expected}")]
+    ArityMismatch {
+        name: String,
+        found: usize,
+        expected: usize,
+    },
+
+    #[error("subcircuit {name} has no nodes")]
+    NoNodes { name: String, span: Span },
+}

@@ -1018,10 +1018,12 @@ dependencies = [
 name = "spicy_parser"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "insta",
  "rstest",
  "serde",
  "serde_json",
+ "thiserror",
  "unscanny",
 ]
 

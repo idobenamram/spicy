@@ -5,6 +5,7 @@ use crate::{
     netlist_types::Node,
     statement_phase::StmtCursor,
 };
+use crate::error::{ExpressionError, SpicyError};
 use std::collections::HashMap;
 use serde::Serialize;
 
@@ -333,13 +334,13 @@ fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
     }
 }
 
-pub struct ExpressionParser<'s> {
+pub(crate) struct ExpressionParser<'s> {
     input: &'s str,
     expression_cursor: StmtCursor<'s>,
 }
 
 impl<'s> ExpressionParser<'s> {
-    pub fn new(input: &'s str, tokens: &'s [Token]) -> Self {
+    pub(crate) fn new(input: &'s str, tokens: &'s [Token]) -> Self {
         let span = Span::new(tokens[0].span.start, tokens[tokens.len() - 1].span.end);
         ExpressionParser {
             input,
@@ -347,11 +348,11 @@ impl<'s> ExpressionParser<'s> {
         }
     }
 
-    pub fn parse(&mut self) -> Expr {
-        self.parse_expr(0)
+    pub(crate) fn parse(&mut self) -> Result<Expr, SpicyError> {
+        Ok(self.parse_expr(0)?)
     }
 
-    fn parse_expr(&mut self, min_bp: u8) -> Expr {
+    fn parse_expr(&mut self, min_bp: u8) -> Result<Expr, SpicyError> {
         let checkpoint = self.expression_cursor.checkpoint();
         let token = self
             .expression_cursor
@@ -365,30 +366,29 @@ impl<'s> ExpressionParser<'s> {
             Some(t) if t.kind == TokenKind::Number => {
                 // kinda weird but, rewind to before we parsed the number then give it to parse_value
                 self.expression_cursor.rewind(checkpoint);
-                let value = parse_value(&mut self.expression_cursor, self.input);
+                let value = parse_value(&mut self.expression_cursor, self.input)?;
                 Expr::value(value, t.span)
             }
             Some(t) if t.kind == TokenKind::LeftParen => {
-                let lhs = self.parse_expr(0);
-                let next_token = self.expression_cursor.next().expect("Expected token");
-                assert_eq!(next_token.kind, TokenKind::RightParen);
+                let lhs = self.parse_expr(0)?;
+                self.expression_cursor.expect(TokenKind::RightParen)?;
                 // expand to include the parentheses
                 lhs.expand()
             }
             Some(t) if t.kind == TokenKind::Minus => {
                 let ((), r_bp) = prefix_binding_power(&t);
-                let rhs = self.parse_expr(r_bp);
+                let rhs = self.parse_expr(r_bp)?;
                 Expr::unary(*t, rhs)
             }
-            Some(t) => panic!("bad token: {:?}", t),
-            None => panic!("no token"),
+            Some(t) => return Err(ExpressionError::UnexpectedToken { found: t.kind, span: t.span }.into()),
+            None => return Err(ExpressionError::MissingToken { message: "no token" }.into()),
         };
 
         loop {
             let op = match self.expression_cursor.peek_non_whitespace() {
                 Some(t) if matches!(t.kind, TokenKind::Asterisk | TokenKind::Plus | TokenKind::Minus | TokenKind::Slash) => t,
                 Some(t) if t.kind.ident_or_numeric() => t,
-                Some(t) => panic!("bad token: {:?}", t),
+                Some(t) => return Err(ExpressionError::UnexpectedToken { found: t.kind, span: t.span }.into()),
                 None => break,
             };
 
@@ -400,7 +400,7 @@ impl<'s> ExpressionParser<'s> {
                     break;
                 }
 
-                let rhs = self.parse_expr(r_bp);
+                let rhs = self.parse_expr(r_bp)?;
                 lhs = Expr::binary(TokenKind::Asterisk, lhs, rhs);
                 continue;
             }
@@ -411,7 +411,7 @@ impl<'s> ExpressionParser<'s> {
                 }
                 self.expression_cursor.next_non_whitespace().expect("already peeked");
 
-                let rhs = self.parse_expr(r_bp);
+                let rhs = self.parse_expr(r_bp)?;
                 lhs = Expr::binary(op.kind, lhs, rhs);
                 continue;
             }
@@ -419,6 +419,6 @@ impl<'s> ExpressionParser<'s> {
             break;
         }
 
-        lhs
+        Ok(lhs)
     }
 }

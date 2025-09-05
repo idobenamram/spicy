@@ -1,5 +1,6 @@
 use unscanny::Scanner;
 use serde::Serialize;
+use crate::error::LexerError;
 
 use crate::expr::PlaceholderId;
 
@@ -106,15 +107,15 @@ impl<'s> Lexer<'s> {
         Token::new(TokenKind::Newline, start, self.s.cursor() - 1)
     }
 
-    fn identifier(&mut self, first_char: char, start: usize) -> Token {
+    fn identifier(&mut self, first_char: char, start: usize) -> Result<Token, LexerError> {
         // ensure first character is alphabetic, then consume remaining alphanumeric characters
         if !first_char.is_alphabetic() {
-            panic!("Identifier must start with an alphabetic character");
+            return Err(LexerError::InvalidIdentifierStart { span: Span::new(start, start) });
         }
         self.s.eat_while(|c: char| c.is_alphanumeric());
         let identifier_end = self.s.cursor() - 1;
 
-        Token::new(TokenKind::Ident, start, identifier_end)
+        Ok(Token::new(TokenKind::Ident, start, identifier_end))
     }
 
     fn number(&mut self, start: usize) -> Token {
@@ -124,33 +125,35 @@ impl<'s> Lexer<'s> {
         Token::new(TokenKind::Number, start, number_end)
     }
 
-    fn netlist(&mut self, c: char, start: usize) -> Token {
-        match c {
+    fn netlist(&mut self, c: char, start: usize) -> Result<Token, LexerError> {
+        let tok = match c {
             c if c.is_alphabetic() => self.identifier(c, start),
-            c if c.is_ascii_digit() => self.number(start),
-            '*' => Token::single(TokenKind::Asterisk, start),
-            '-' => Token::single(TokenKind::Minus, start),
-            '+' => Token::single(TokenKind::Plus, start),
-            '=' => Token::single(TokenKind::Equal, start),
-            '/' => Token::single(TokenKind::Slash, start),
-            '.' => Token::single(TokenKind::Dot, start),
-            '{' => Token::single(TokenKind::LeftBrace, start),
-            '}' => Token::single(TokenKind::RightBrace, start),
-            '(' => Token::single(TokenKind::LeftParen, start),
-            ')' => Token::single(TokenKind::RightParen, start),
-            ',' => Token::single(TokenKind::Comma, start),
-            _ => panic!("Unexpected character: {}", c),
-        }
+            c if c.is_ascii_digit() => Ok(self.number(start)),
+            '*' => Ok(Token::single(TokenKind::Asterisk, start)),
+            '-' => Ok(Token::single(TokenKind::Minus, start)),
+            '+' => Ok(Token::single(TokenKind::Plus, start)),
+            '=' => Ok(Token::single(TokenKind::Equal, start)),
+            '/' => Ok(Token::single(TokenKind::Slash, start)),
+            '.' => Ok(Token::single(TokenKind::Dot, start)),
+            '{' => Ok(Token::single(TokenKind::LeftBrace, start)),
+            '}' => Ok(Token::single(TokenKind::RightBrace, start)),
+            '(' => Ok(Token::single(TokenKind::LeftParen, start)),
+            ')' => Ok(Token::single(TokenKind::RightParen, start)),
+            ',' => Ok(Token::single(TokenKind::Comma, start)),
+            _ => return Err(LexerError::UnexpectedCharacter { ch: c, span: Span::new(start, start) }),
+        };
+        tok
     }
 
-    pub fn next(&mut self) -> Token {
+    pub fn next(&mut self) -> Result<Token, LexerError> {
         let start = self.s.cursor();
-        match self.s.eat() {
-            Some(c) if c == '\n' => self.newline(start),
-            Some(c) if c.is_whitespace() => self.whitespace(start),
+        let t = match self.s.eat() {
+            Some(c) if c == '\n' => Ok(self.newline(start)),
+            Some(c) if c.is_whitespace() => Ok(self.whitespace(start)),
             Some(c) => self.netlist(c, start),
-            None => Token::end(start),
-        }
+            None => Ok(Token::end(start)),
+        };
+        t
     }
 }
 
@@ -170,10 +173,10 @@ mod tests {
 
         let mut lexer = Lexer::new(&input_content);
         let mut tokens = vec![];
-        let mut token = lexer.next();
-        while token.kind != TokenKind::EOF {
+        loop {
+            let token = lexer.next().expect("lexing should succeed in tests");
+            if token.kind == TokenKind::EOF { break; }
             tokens.push(token);
-            token = lexer.next();
         }
 
         let name = input

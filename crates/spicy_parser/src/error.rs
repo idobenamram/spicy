@@ -38,7 +38,8 @@ impl SpicyError {
                 | ParserError::InvalidCommandType { span, .. }
                 | ParserError::InvalidOperation { span, .. }
                 | ParserError::InvalidParam { span, .. }
-                | ParserError::UnmatchedBrace { span } => Some(*span),
+                | ParserError::UnmatchedBrace { span }
+                | ParserError::EmptyExpressionInsideBraces { span } => Some(*span),
                 ParserError::MissingToken { .. } | ParserError::InvalidDeviceType { .. } => None,
             },
             SpicyError::Expression(ee) => match ee {
@@ -126,6 +127,9 @@ pub enum ParserError {
 
     #[error("unmatched '{{' at span {span:?}")]
     UnmatchedBrace { span: Span },
+
+    #[error("empty expression inside braces at span {span:?}")]
+    EmptyExpressionInsideBraces { span: Span },
 }
 
 #[derive(Debug, Error)]

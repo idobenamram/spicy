@@ -1,13 +1,13 @@
+use crate::error::{ExpressionError, SpicyError};
 use crate::{
-    lexer::{token_text, Span, Token, TokenKind},
-    netlist_types::ValueSuffix,
-    parser_utils::{parse_value},
+    lexer::{Span, Token, TokenKind, token_text},
     netlist_types::Node,
+    netlist_types::ValueSuffix,
+    parser_utils::parse_value,
     statement_phase::StmtCursor,
 };
-use crate::error::{ExpressionError, SpicyError};
-use std::collections::HashMap;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[cfg(test)]
 use crate::test_utils::serialize_sorted_map;
@@ -42,7 +42,7 @@ impl Value {
 
 // Arithmetic operations for Value using fully-scaled numeric values.
 // Results are returned normalized without exponent or suffix.
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Div, Mul, Sub};
 
 impl Add for Value {
     type Output = Value;
@@ -77,9 +77,16 @@ pub enum ExprType {
     Value(Value),
     Placeholder(PlaceholderId),
     Ident(String),
-    Unary { op: TokenKind, operand: Box<Expr> },       // +, -
-    Binary { op: TokenKind, left: Box<Expr>, right: Box<Expr> }, // + - * /
-    // Add Call { fun, args } if you want sin(), etc.
+    Unary {
+        op: TokenKind,
+        operand: Box<Expr>,
+    }, // +, -
+    Binary {
+        op: TokenKind,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    }, // + - * /
+       // Add Call { fun, args } if you want sin(), etc.
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -148,15 +155,20 @@ impl Expr {
         match self.r#type {
             ExprType::Value(value) => value,
             ExprType::Placeholder(id) => panic!("Placeholder not evaluatable: {:?}", id),
-            ExprType::Ident(name) => scope.param_map.get_param(&name).cloned().expect("param not found").evaluate(scope),
-            ExprType::Unary { op, operand } => {match op {
+            ExprType::Ident(name) => scope
+                .param_map
+                .get_param(&name)
+                .cloned()
+                .expect("param not found")
+                .evaluate(scope),
+            ExprType::Unary { op, operand } => match op {
                 TokenKind::Minus => {
                     let value = operand.evaluate(scope);
                     Value::new(-value.get_value(), None, None)
                 }
                 _ => panic!("Unary operator not evaluatable: {:?}", op),
-            }},
-            ExprType::Binary { op, left, right } => {match op {
+            },
+            ExprType::Binary { op, left, right } => match op {
                 TokenKind::Plus => {
                     let left_value = left.evaluate(scope);
                     let right_value = right.evaluate(scope);
@@ -178,9 +190,8 @@ impl Expr {
                     left_value / right_value
                 }
                 _ => panic!("Binary operator not evaluatable: {:?}", op),
-            }},
+            },
         }
-
     }
 }
 
@@ -209,8 +220,7 @@ impl PlaceholderMap {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Params(
-    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    HashMap<String, Expr>
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))] HashMap<String, Expr>,
 );
 
 impl Params {
@@ -354,9 +364,7 @@ impl<'s> ExpressionParser<'s> {
 
     fn parse_expr(&mut self, min_bp: u8) -> Result<Expr, SpicyError> {
         let checkpoint = self.expression_cursor.checkpoint();
-        let token = self
-            .expression_cursor
-            .next_non_whitespace();
+        let token = self.expression_cursor.next_non_whitespace();
 
         let mut lhs = match token {
             Some(t) if t.kind == TokenKind::Ident => {
@@ -380,15 +388,39 @@ impl<'s> ExpressionParser<'s> {
                 let rhs = self.parse_expr(r_bp)?;
                 Expr::unary(*t, rhs)
             }
-            Some(t) => return Err(ExpressionError::UnexpectedToken { found: t.kind, span: t.span }.into()),
-            None => return Err(ExpressionError::MissingToken { message: "no token" }.into()),
+            Some(t) => {
+                return Err(ExpressionError::UnexpectedToken {
+                    found: t.kind,
+                    span: t.span,
+                }
+                .into());
+            }
+            None => {
+                return Err(ExpressionError::MissingToken {
+                    message: "no token",
+                }
+                .into());
+            }
         };
 
         loop {
             let op = match self.expression_cursor.peek_non_whitespace() {
-                Some(t) if matches!(t.kind, TokenKind::Asterisk | TokenKind::Plus | TokenKind::Minus | TokenKind::Slash) => t,
+                Some(t)
+                    if matches!(
+                        t.kind,
+                        TokenKind::Asterisk | TokenKind::Plus | TokenKind::Minus | TokenKind::Slash
+                    ) =>
+                {
+                    t
+                }
                 Some(t) if t.kind.ident_or_numeric() => t,
-                Some(t) => return Err(ExpressionError::UnexpectedToken { found: t.kind, span: t.span }.into()),
+                Some(t) => {
+                    return Err(ExpressionError::UnexpectedToken {
+                        found: t.kind,
+                        span: t.span,
+                    }
+                    .into());
+                }
                 None => break,
             };
 
@@ -409,7 +441,9 @@ impl<'s> ExpressionParser<'s> {
                 if l_bp < min_bp {
                     break;
                 }
-                self.expression_cursor.next_non_whitespace().expect("already peeked");
+                self.expression_cursor
+                    .next_non_whitespace()
+                    .expect("already peeked");
 
                 let rhs = self.parse_expr(r_bp)?;
                 lhs = Expr::binary(op.kind, lhs, rhs);

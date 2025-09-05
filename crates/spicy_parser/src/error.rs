@@ -37,7 +37,8 @@ impl SpicyError {
                 | ParserError::UnexpectedCommandType { span, .. }
                 | ParserError::InvalidCommandType { span, .. }
                 | ParserError::InvalidOperation { span, .. }
-                | ParserError::InvalidParam { span, .. } => Some(*span),
+                | ParserError::InvalidParam { span, .. }
+                | ParserError::UnmatchedBrace { span } => Some(*span),
                 ParserError::MissingToken { .. } | ParserError::InvalidDeviceType { .. } => None,
             },
             SpicyError::Expression(ee) => match ee {
@@ -122,6 +123,9 @@ pub enum ParserError {
 
     #[error("missing title at span {span:?}")]
     MissingTitle { span: Span },
+
+    #[error("unmatched '{{' at span {span:?}")]
+    UnmatchedBrace { span: Span },
 }
 
 #[derive(Debug, Error)]

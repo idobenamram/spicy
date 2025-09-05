@@ -485,7 +485,7 @@ impl<'s> Parser<'s> {
                 &statements_iter
                     .next()
                     .ok_or_else(|| ParserError::MissingTitle {
-                        span: statements_iter.next().unwrap().stmt.span,
+                        span: Span::new(0, 0),
                     })?,
             );
 

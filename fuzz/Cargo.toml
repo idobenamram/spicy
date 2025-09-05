@@ -1,0 +1,20 @@
+[package]
+name = "spicy_parser-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+spicy_parser = {path = "../crates/spicy_parser"}
+
+
+[[bin]]
+name = "fuzz_spicy_parser"
+path = "fuzz_targets/spicy_parser.rs"
+test = false
+doc = false
+bench = false

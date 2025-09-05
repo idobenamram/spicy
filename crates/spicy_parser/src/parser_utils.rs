@@ -1,3 +1,4 @@
+use crate::error::{ParserError, SpicyError};
 use crate::expr::Value;
 use crate::expr::{Expr, Params};
 use crate::lexer::{Span, TokenKind, token_text};
@@ -5,27 +6,42 @@ use crate::netlist_types::Node;
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;
 
-pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Node {
-    let node = cursor.next_non_whitespace().expect("Must be node");
-    assert!(matches!(node.kind, TokenKind::Ident | TokenKind::Number));
+pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<Node, SpicyError> {
+    let node = cursor
+        .next_non_whitespace()
+        .ok_or_else(|| ParserError::MissingToken {
+            message: "node",
+            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+        })?;
+
+    if !matches!(node.kind, TokenKind::Ident | TokenKind::Number) {
+        return Err(ParserError::UnexpectedToken {
+            expected: "identifier or number".to_string(),
+            found: node.kind,
+            span: node.span,
+        }
+        .into());
+    }
     let node_string = token_text(src, node).to_string();
-    Node { name: node_string }
+    Ok(Node { name: node_string })
 }
 
-pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
+pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, SpicyError> {
     let mut number_str = String::new();
     let mut exponent: Option<f64> = None;
     let mut suffix: Option<ValueSuffix> = None;
 
     // Optional leading minus
-    let mut t = cursor
-        .next_non_whitespace()
-        .expect("Must start with a value");
+    let mut t = cursor.expect_non_whitespace(TokenKind::Number)?;
+
     if matches!(t.kind, TokenKind::Minus) {
         number_str.push('-');
         t = cursor
             .next_non_whitespace()
-            .expect("Expected digits or '.' after '-'");
+            .ok_or_else(|| ParserError::MissingToken {
+                message: "Expected digits or '.' after '-'",
+                span: t.span,
+            })?;
     }
 
     // Integer digits or leading '.' with fraction
@@ -35,15 +51,20 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
             // Optional fractional part if next immediate token is a dot
             if let Some(peek) = cursor.peek() {
                 if matches!(peek.kind, TokenKind::Dot) {
-                    let _dot = cursor.next().unwrap();
+                    cursor.next().expect("just check for dot");
                     number_str.push('.');
-                    let frac = cursor
-                        .next_non_whitespace()
-                        .expect("Expected digits after '.'");
-                    assert!(
-                        matches!(frac.kind, TokenKind::Number),
-                        "Expected digits after '.'"
-                    );
+
+                    let frac =
+                        cursor
+                            .next_non_whitespace()
+                            .ok_or_else(|| ParserError::MissingToken {
+                                message: "Expected token after '.'",
+                                span: peek.span,
+                            })?;
+
+                    if !matches!(frac.kind, TokenKind::Number) {
+                        return Err(ParserError::ExpectedDigitsAfterDot { span: peek.span }.into());
+                    }
                     number_str.push_str(token_text(src, frac));
                 }
             }
@@ -52,11 +73,13 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
             number_str.push('.');
             let frac = cursor
                 .next_non_whitespace()
-                .expect("Expected digits after '.'");
-            assert!(
-                matches!(frac.kind, TokenKind::Number),
-                "Expected digits after '.'"
-            );
+                .ok_or_else(|| ParserError::MissingToken {
+                    message: "Expected digits after '.'",
+                    span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                })?;
+            if !matches!(frac.kind, TokenKind::Number) {
+                return Err(ParserError::ExpectedDigitsAfterDot { span: frac.span }.into());
+            }
             number_str.push_str(token_text(src, frac));
         }
         _ => panic!("Invalid start of numeric value"),
@@ -67,26 +90,47 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
         if matches!(peek.kind, TokenKind::Ident) {
             let ident_text = token_text(src, peek);
             if ident_text == "e" || ident_text == "E" {
-                let _e = cursor.next().unwrap();
+                cursor.next().ok_or(ParserError::MissingToken {
+                    message: "Expected digits after exponent",
+                    span: peek.span,
+                })?;
+
                 let mut exp_str = String::new();
                 // optional sign
                 if let Some(sign_peek) = cursor.peek() {
                     match sign_peek.kind {
                         TokenKind::Plus => {
-                            let _ = cursor.next().unwrap();
+                            let _ = cursor.next().expect("just peeked");
                             exp_str.push('+');
                         }
                         TokenKind::Minus => {
-                            let _ = cursor.next().unwrap();
+                            let _ = cursor.next().expect("just peeked");
                             exp_str.push('-');
                         }
                         _ => {}
                     }
                 }
-                let exp_digits = cursor.next().expect("Expected digits after exponent");
-                assert!(matches!(exp_digits.kind, TokenKind::Number));
-                exp_str.push_str(token_text(src, exp_digits));
-                exponent = Some(exp_str.parse::<f64>().expect("Invalid exponent digits"));
+                let exp_digits = cursor.next().ok_or(ParserError::MissingToken {
+                    message: "Expected digits after exponent",
+                    span: peek.span,
+                })?;
+
+                let exp_digits_str = token_text(src, exp_digits).to_string();
+                if !matches!(exp_digits.kind, TokenKind::Number) {
+                    return Err(ParserError::InvalidExponentDigits {
+                        span: exp_digits.span,
+                        lexeme: exp_digits_str,
+                    }
+                    .into());
+                }
+                exp_str.push_str(&exp_digits_str);
+
+                exponent = Some(exp_str.parse::<f64>().map_err(|_| {
+                    ParserError::InvalidExponentDigits {
+                        span: exp_digits.span,
+                        lexeme: exp_digits_str,
+                    }
+                })?);
             }
         }
     }
@@ -94,7 +138,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
     // Optional suffix as trailing identifier without whitespace
     if let Some(peek) = cursor.peek() {
         if matches!(peek.kind, TokenKind::Ident) {
-            let ident = cursor.next().unwrap();
+            let ident = cursor.next().expect("just peeked");
             let ident_text = token_text(src, ident);
             suffix = ValueSuffix::from_str(ident_text);
         }
@@ -102,57 +146,68 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Value {
 
     let value: f64 = number_str
         .parse()
-        .unwrap_or_else(|_| panic!("Invalid numeric literal: {}", number_str));
+        .map_err(|_| ParserError::InvalidNumericLiteral {
+            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            lexeme: number_str,
+        })?;
 
-    Value {
+    Ok(Value {
         value,
         exponent,
         suffix,
-    }
+    })
 }
 
-pub(crate) fn parse_bool(cursor: &mut StmtCursor, src: &str) -> bool {
-    let bool = cursor.next_non_whitespace().expect("Must be bool");
-    assert_eq!(bool.kind, TokenKind::Number);
+pub(crate) fn parse_bool(cursor: &mut StmtCursor, src: &str) -> Result<bool, SpicyError> {
+    let bool = cursor.expect_non_whitespace(TokenKind::Number)?;
     let bool_text = token_text(src, bool);
     match bool_text {
-        "0" => false,
-        "1" => true,
-        _ => panic!("expected '0' or '1'"),
+        "0" => Ok(false),
+        "1" => Ok(true),
+        _ => Err(ParserError::ExpectedBoolZeroOrOne { span: bool.span }.into()),
     }
 }
 
-pub(crate) fn parse_ident(cursor: &mut StmtCursor, src: &str) -> String {
-    let ident = cursor.next_non_whitespace().expect("Must be ident");
-    assert_eq!(ident.kind, TokenKind::Ident);
-    token_text(src, ident).to_string()
+pub(crate) fn parse_ident(cursor: &mut StmtCursor, src: &str) -> Result<String, SpicyError> {
+    let ident = cursor.expect_non_whitespace(TokenKind::Ident)?;
+    Ok(token_text(src, ident).to_string())
 }
 
-pub(crate) fn parse_value_or_placeholder(cursor: &mut StmtCursor, src: &str) -> Expr {
+pub(crate) fn parse_value_or_placeholder(
+    cursor: &mut StmtCursor,
+    src: &str,
+) -> Result<Expr, SpicyError> {
     if let Some(placeholder) = cursor.consume(TokenKind::Placeholder) {
-        return Expr::placeholder(placeholder.id.unwrap(), placeholder.span);
+        return Ok(Expr::placeholder(placeholder.id.unwrap(), placeholder.span));
     }
     // TODO: get the correct span
-    Expr::value(parse_value(cursor, src), Span::new(0, 0))
+    Ok(Expr::value(parse_value(cursor, src)?, Span::new(0, 0)))
 }
 
-pub(crate) fn parse_equal_expr(cursor: &mut StmtCursor, src: &str) -> (String, Expr) {
-    let ident = parse_ident(cursor, src);
-    let equal = cursor.next().expect("Must be equal");
-    assert_eq!(equal.kind, TokenKind::Equal);
-    let value = parse_value_or_placeholder(cursor, src);
-    (ident, value)
+pub(crate) fn parse_equal_expr(
+    cursor: &mut StmtCursor,
+    src: &str,
+) -> Result<(String, Expr), SpicyError> {
+    let ident = parse_ident(cursor, src)?;
+    cursor.expect(TokenKind::Equal)?;
+    let value = parse_value_or_placeholder(cursor, src)?;
+    Ok((ident, value))
 }
 
 // .param <ident>=<value> <ident>=<value> ...
-pub(crate) fn parse_dot_param(cursor: &mut StmtCursor, src: &str, env: &mut Params) {
+pub(crate) fn parse_dot_param(
+    cursor: &mut StmtCursor,
+    src: &str,
+    env: &mut Params,
+) -> Result<(), SpicyError> {
     while let Some(token) = cursor.next() {
         if token.kind != TokenKind::WhiteSpace {
             println!("warning: unexpected token: {:?}", token);
             break;
         }
-        let (ident, value) = parse_equal_expr(cursor, src);
+        let (ident, value) = parse_equal_expr(cursor, src)?;
         env.set_param(ident, value);
     }
     assert!(cursor.done(), "Expected end of statement");
+    Ok(())
 }

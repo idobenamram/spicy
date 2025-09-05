@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::{expr::Value, lexer::Span};
+use crate::{error::{ParserError, SpicyError}, expr::Value, lexer::Span};
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
 pub struct Node {
@@ -32,6 +32,19 @@ impl CommandType {
             "END" | "end" => Some(CommandType::End),
             _ => None,
         }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            CommandType::AC => "AC",
+            CommandType::DC => "DC",
+            CommandType::Op => "OP",
+            CommandType::Subcircuit => "SUBCKT",
+            CommandType::Ends => "ENDS",
+            CommandType::Param => "PARAM",
+            CommandType::End => "END",
+        }
+        .to_string()
     }
 }
 
@@ -66,15 +79,15 @@ pub enum DeviceType {
 }
 
 impl DeviceType {
-    pub fn from_str(s: &str) -> Option<DeviceType> {
+    pub fn from_str(s: &str) -> Result<DeviceType, SpicyError> {
         match s.to_uppercase().to_string().as_str() {
-            "R" => Some(DeviceType::Resistor),
-            "C" => Some(DeviceType::Capacitor),
-            "L" => Some(DeviceType::Inductor),
-            "V" => Some(DeviceType::VoltageSource),
-            "I" => Some(DeviceType::CurrentSource),
-            "X" => Some(DeviceType::Subcircuit),
-            _ => None,
+            "R" => Ok(DeviceType::Resistor),
+            "C" => Ok(DeviceType::Capacitor),
+            "L" => Ok(DeviceType::Inductor),
+            "V" => Ok(DeviceType::VoltageSource),
+            "I" => Ok(DeviceType::CurrentSource),
+            "X" => Ok(DeviceType::Subcircuit),
+            _ => return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into()),
         }
     }
 

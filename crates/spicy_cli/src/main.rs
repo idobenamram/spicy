@@ -3,6 +3,8 @@ use std::fs;
 
 use spicy_parser::parser::parse;
 use spicy_simulate::simulate;
+use spicy_parser::error::{SpicyError, LexerError, ParserError, ExpressionError, SubcircuitError};
+use spicy_parser::Span;
 
 fn main() {
     let path = env::args().nth(1).unwrap_or_else(|| {
@@ -15,9 +17,43 @@ fn main() {
         std::process::exit(1);
     });
 
-    println!("input: {}", input);
-    let deck = parse(&input);
-    simulate(deck);
+    match parse(&input) {
+        Ok(deck) => simulate(deck),
+        Err(e) => {
+            eprintln!("Parse error: {}", e);
+            if let Some(span) = e.error_span() {
+                eprintln!("");
+                render_error_snippet(&input, span);
+            }
+            std::process::exit(2);
+        }
+    }
+}
+
+
+fn render_error_snippet(src: &str, span: Span) {
+    let len = src.len();
+    if len == 0 { return; }
+    let start = span.start.min(len.saturating_sub(1));
+    let end = span.end.min(len.saturating_sub(1));
+    if start > end { return; }
+
+    // find line bounds
+    let line_start = src[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_end = src[end + 1..].find('\n').map(|i| end + 1 + i).unwrap_or(len);
+    let line = &src[line_start..line_end];
+
+    // compute columns by char count
+    let prefix = &src[line_start..start];
+    let highlight = &src[start..=end];
+    let col = prefix.chars().count();
+    let width = highlight.chars().count().max(1);
+
+    // optionally include line number
+    let line_no = src[..line_start].chars().filter(|&c| c == '\n').count() + 1;
+    eprintln!("{:>4} | {}", line_no, line);
+    let underline = "~".repeat(width);
+    eprintln!("     | {:space$}\x1b[31m{}\x1b[0m", "", underline, space = col);
 }
 
 

@@ -341,7 +341,6 @@ pub fn simulate(deck: Deck) {
             Command::Dc(command_params) => {
                 let _ = simulate_dc(&deck, &command_params);
             }
-            _ => panic!("Unsupported command: {:?}", command),
         }
     }
 }
@@ -354,7 +353,6 @@ mod tests {
     use spicy_parser::netlist_types::Node;
 
         use spicy_parser::parser::parse;
-    use spicy_parser::parser::Parser;
     use spicy_parser::Span;
 
     use std::path::PathBuf;
@@ -419,7 +417,7 @@ mod tests {
     fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
 
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = parse(&input_content);
+        let deck = parse(&input_content).expect("parse");
         let output = simulate_op(&deck);
         let name = format!(
             "simulate-op-{}",
@@ -434,7 +432,7 @@ mod tests {
     #[rstest]
     fn test_simulate_dc(#[files("tests/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = parse(&input_content);
+        let deck = parse(&input_content).expect("parse");
         let command = deck.commands[1].clone();
         let output = match command {
             Command::Dc(command) => {

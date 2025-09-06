@@ -53,7 +53,7 @@ fn brace_to_placeholders(
                     .all(|t| t.kind == TokenKind::WhiteSpace)
             {
                 // we found a {} with nothing inside
-                return Err(ParserError::EmptyStatement {
+                return Err(ParserError::EmptyExpressionInsideBraces {
                     span: Span::new(tok.span.start, right_brace.span.end),
                 })?;
             }
@@ -116,7 +116,7 @@ mod tests {
         };
         assert!(matches!(
             err,
-            ParserError::EmptyStatement {
+            ParserError::EmptyExpressionInsideBraces {
                 // make sure we include the entire `{ }` in the span
                 span: Span { start: 13, end: 15 }
             }

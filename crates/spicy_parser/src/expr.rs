@@ -151,45 +151,51 @@ impl Expr {
         }
     }
 
-    pub fn evaluate(self, scope: &Scope) -> Value {
+    pub fn evaluate(self, scope: &Scope) -> Result<Value, SpicyError> {
+        println!("evaluating expr with type: {:?}", self.r#type);
         match self.r#type {
-            ExprType::Value(value) => value,
-            ExprType::Placeholder(id) => panic!("Placeholder not evaluatable: {:?}", id),
-            ExprType::Ident(name) => scope
-                .param_map
-                .get_param(&name)
-                .cloned()
-                .expect("param not found")
-                .evaluate(scope),
+            ExprType::Value(value) => Ok(value),
+            // TODO: support layered expressions with no loops
+            ExprType::Placeholder(id) => Err(ExpressionError::UnevaluatablePlaceholder {
+                id,
+                span: self.span,
+            }
+            .into()),
+            ExprType::Ident(name) => {
+                let Some(expr) = scope.param_map.get_param(&name).cloned() else {
+                    return Err(ExpressionError::UnknownIdentifier { name, span: self.span }.into());
+                };
+                expr.evaluate(scope)
+            }
             ExprType::Unary { op, operand } => match op {
                 TokenKind::Minus => {
-                    let value = operand.evaluate(scope);
-                    Value::new(-value.get_value(), None, None)
+                    let value = operand.evaluate(scope)?;
+                    Ok(Value::new(-value.get_value(), None, None))
                 }
-                _ => panic!("Unary operator not evaluatable: {:?}", op),
+                _ => Err(ExpressionError::UnsupportedUnaryOperator { op, span: self.span }.into()),
             },
             ExprType::Binary { op, left, right } => match op {
                 TokenKind::Plus => {
-                    let left_value = left.evaluate(scope);
-                    let right_value = right.evaluate(scope);
-                    left_value + right_value
+                    let left_value = left.evaluate(scope)?;
+                    let right_value = right.evaluate(scope)?;
+                    Ok(left_value + right_value)
                 }
                 TokenKind::Minus => {
-                    let left_value = left.evaluate(scope);
-                    let right_value = right.evaluate(scope);
-                    left_value - right_value
+                    let left_value = left.evaluate(scope)?;
+                    let right_value = right.evaluate(scope)?;
+                    Ok(left_value - right_value)
                 }
                 TokenKind::Asterisk => {
-                    let left_value = left.evaluate(scope);
-                    let right_value = right.evaluate(scope);
-                    left_value * right_value
+                    let left_value = left.evaluate(scope)?;
+                    let right_value = right.evaluate(scope)?;
+                    Ok(left_value * right_value)
                 }
                 TokenKind::Slash => {
-                    let left_value = left.evaluate(scope);
-                    let right_value = right.evaluate(scope);
-                    left_value / right_value
+                    let left_value = left.evaluate(scope)?;
+                    let right_value = right.evaluate(scope)?;
+                    Ok(left_value / right_value)
                 }
-                _ => panic!("Binary operator not evaluatable: {:?}", op),
+                _ => Err(ExpressionError::UnsupportedBinaryOperator { op, span: self.span }.into()),
             },
         }
     }

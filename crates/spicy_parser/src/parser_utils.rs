@@ -31,9 +31,12 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     let mut exponent: Option<f64> = None;
     let mut suffix: Option<ValueSuffix> = None;
 
-    // Optional leading minus
-    let mut t = cursor.expect_non_whitespace(TokenKind::Number)?;
+    let mut t = cursor.next_non_whitespace().ok_or_else(|| ParserError::MissingToken {
+        message: "Expected number or minus",
+        span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+    })?;
 
+    // Optional leading minus
     if matches!(t.kind, TokenKind::Minus) {
         number_str.push('-');
         t = cursor

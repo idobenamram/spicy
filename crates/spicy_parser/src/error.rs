@@ -44,7 +44,11 @@ impl SpicyError {
             },
             SpicyError::Expression(ee) => match ee {
                 ExpressionError::UnexpectedToken { span, .. }
-                | ExpressionError::BadPrefixOperator { span, .. } => Some(*span),
+                | ExpressionError::BadPrefixOperator { span, .. }
+                | ExpressionError::UnevaluatablePlaceholder { span, .. }
+                | ExpressionError::UnknownIdentifier { span, .. }
+                | ExpressionError::UnsupportedUnaryOperator { span, .. }
+                | ExpressionError::UnsupportedBinaryOperator { span, .. } => Some(*span),
                 ExpressionError::MissingToken { .. } => None,
             },
             SpicyError::Subcircuit(se) => match se {
@@ -148,6 +152,18 @@ pub enum ExpressionError {
         op: crate::lexer::TokenKind,
         span: Span,
     },
+
+    #[error("placeholder not evaluatable: {id:?} at span {span:?}")]
+    UnevaluatablePlaceholder { id: crate::expr::PlaceholderId, span: Span },
+
+    #[error("unknown identifier '{name}' at span {span:?}")]
+    UnknownIdentifier { name: String, span: Span },
+
+    #[error("unsupported unary operator {op:?} at span {span:?}")]
+    UnsupportedUnaryOperator { op: crate::lexer::TokenKind, span: Span },
+
+    #[error("unsupported binary operator {op:?} at span {span:?}")]
+    UnsupportedBinaryOperator { op: crate::lexer::TokenKind, span: Span },
 }
 
 #[derive(Debug, Error)]

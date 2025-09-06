@@ -35,10 +35,41 @@ impl<'s> ParamParser<'s> {
             current_param: 0,
         }
     }
+
+    fn parse_named_param(
+        &mut self,
+        cursor: &mut StmtCursor,
+    ) -> Result<&'s str, SpicyError> {
+        let Ok(ident) = cursor.expect(TokenKind::Ident) else {
+            return Err(ParserError::MissingToken {
+                message: "ident",
+                span: cursor.span,
+            }
+            .into());
+        };
+        let ident_str = token_text(self.input, ident);
+
+        if !self.params_order.contains(&ident_str) {
+            return Err(ParserError::InvalidParam {
+                param: ident_str.to_string(),
+                span: cursor.span,
+            }
+            .into());
+        }
+
+        let Ok(_equal_sign) = cursor.expect(TokenKind::Equal) else {
+            return Err(ParserError::MissingToken {
+                message: "equal",
+                span: cursor.span,
+            }
+            .into());
+        };
+        Ok(ident_str)
+    }
 }
 
 impl<'s> Iterator for ParamParser<'s> {
-    type Item = (&'s str, StmtCursor<'s>);
+    type Item = Result<(&'s str, StmtCursor<'s>), SpicyError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_param >= self.param_cursors.len() {
@@ -48,20 +79,18 @@ impl<'s> Iterator for ParamParser<'s> {
             let item = if !self.named_mode {
                 if cursor.contains(TokenKind::Equal) {
                     self.named_mode = true;
-                    let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
-                    let ident_str = token_text(self.input, ident);
-                    assert_eq!(ident_str, self.params_order[self.current_param]);
-                    let _equal_sign = cursor.expect(TokenKind::Equal).expect("Must be equal");
-                    Some((ident_str, cursor))
+                    match self.parse_named_param(&mut cursor) {
+                        Ok(ident) => Some(Ok((ident, cursor))),
+                        Err(e) => Some(Err(e)),
+                    }
                 } else {
-                    Some((self.params_order[self.current_param], cursor))
+                    Some(Ok((self.params_order[self.current_param], cursor)))
                 }
             } else {
-                let ident = cursor.expect(TokenKind::Ident).expect("Must be ident");
-                let ident_str = token_text(self.input, ident);
-                assert_eq!(ident_str, self.params_order[self.current_param]);
-                let _equal_sign = cursor.expect(TokenKind::Equal).expect("Must be equal");
-                Some((ident_str, cursor))
+                match self.parse_named_param(&mut cursor) {
+                    Ok(ident) => Some(Ok((ident, cursor))),
+                    Err(e) => Some(Err(e)),
+                }
             };
             self.current_param += 1;
             item
@@ -98,15 +127,17 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_value(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Value, SpicyError> {
+        cursor.skip_ws();
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
-            // TOOD: maybe we can change the expresion to only evalute once
+            // TODO: maybe we can change the expression to only evaluate once
             let expr = self
                 .placeholder_map
                 .get(id)
                 .cloned()
                 .expect("id must be in map");
-            expr.evaluate(scope);
+            let evaluated = expr.evaluate(scope)?;
+            return Ok(evaluated);
         }
         Ok(parse_value(cursor, self.input)?)
     }
@@ -129,7 +160,15 @@ impl<'s> Parser<'s> {
                 .get(id)
                 .cloned()
                 .expect("id must be in map");
-            expr.evaluate(scope);
+            let evaluated = expr.evaluate(scope)?;
+            // TODO: kinda ugly
+            if evaluated.get_value() == 0.0 {
+                return Ok(false);
+            }
+            if evaluated.get_value() == 1.0 {
+                return Ok(true);
+            }
+            return Err(ParserError::ExpectedBoolZeroOrOne { span: token.span }.into());
         }
         Ok(parse_bool(cursor, self.input)?)
     }
@@ -148,10 +187,11 @@ impl<'s> Parser<'s> {
 
         let resistance = self.parse_value(cursor, scope)?;
         let mut resistor = Resistor::new(name, cursor.span, positive, negative, resistance);
-        // TODO: i kinda want to support type safety on the params (like noisy is always a bool)
+
         let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
         let params = ParamParser::new(self.input, params_order, cursor);
-        for (ident, mut cursor) in params {
+        for item in params {
+            let (ident, mut cursor) = item?;
             match ident {
                 "ac" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -215,7 +255,8 @@ impl<'s> Parser<'s> {
         let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
         let params = ParamParser::new(self.input, params_order, cursor);
 
-        for (ident, mut cursor) in params {
+        for item in params {
+            let (ident, mut cursor) = item?;
             match ident {
                 "m" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -277,7 +318,8 @@ impl<'s> Parser<'s> {
         let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
         let params = ParamParser::new(self.input, params_order, cursor);
 
-        for (ident, mut cursor) in params {
+        for item in params {
+            let (ident, mut cursor) = item?;
             match ident {
                 "nt" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -550,6 +592,7 @@ pub fn parse(input: &str) -> Result<Deck, SpicyError> {
     let placeholders_map = substitute_expressions(&mut stream, &input)?;
     let unexpanded_deck = collect_subckts(stream, &input)?;
     let expanded_deck = expand_subckts(unexpanded_deck, &input)?;
+    println!("placeholders_map: {:?}", placeholders_map);
     let mut parser = Parser::new(expanded_deck, placeholders_map, input);
     let deck = parser.parse()?;
     Ok(deck)

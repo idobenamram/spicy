@@ -1462,7 +1462,6 @@ dependencies = [
 name = "spicy_parser"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "insta",
  "rstest",
  "serde",
@@ -1489,6 +1488,7 @@ dependencies = [
  "ndarray-linalg",
  "rstest",
  "spicy_parser",
+ "thiserror",
 ]
 
 [[package]]

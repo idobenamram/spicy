@@ -1,3 +1,4 @@
+use crate::Span;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{ExpressionParser, PlaceholderMap};
 use crate::lexer::{Token, TokenKind};
@@ -31,19 +32,30 @@ fn brace_to_placeholders(
     while let Some(tok) = cursor.next() {
         if tok.kind == TokenKind::LeftBrace {
             let start_pos = cursor.pos() - 1;
-            let mut found_right_brace = false;
+            let mut right_brace = None;
 
             let mut expression_tokens = Vec::new();
             while let Some(tok) = cursor.next() {
                 if tok.kind == TokenKind::RightBrace {
-                    found_right_brace = true;
+                    right_brace = Some(tok);
                     break;
                 }
                 expression_tokens.push(tok.clone());
             }
 
-            if !found_right_brace {
+            let Some(right_brace) = right_brace else {
                 return Err(ParserError::UnmatchedBrace { span: tok.span })?;
+            };
+
+            if expression_tokens.is_empty()
+                || expression_tokens
+                    .iter()
+                    .all(|t| t.kind == TokenKind::WhiteSpace)
+            {
+                // we found a {} with nothing inside
+                return Err(ParserError::EmptyExpressionInsideBraces {
+                    span: Span::new(tok.span.start, right_brace.span.end),
+                })?;
             }
 
             let end_pos = cursor.pos() - 1;
@@ -90,5 +102,24 @@ mod tests {
         );
         let json = serde_json::to_string_pretty(&output).expect("serialize output to json");
         insta::assert_snapshot!(name, json);
+    }
+
+    #[test]
+    fn test_empty_expression_in_braces() {
+        let input = "R1 N001 N002 { } 1k";
+        let mut statements = Statements::new(input).expect("statements");
+
+        let err = substitute_expressions(&mut statements, input).unwrap_err();
+        let err = match err {
+            SpicyError::Parser(e) => e,
+            _ => panic!("expected parser error"),
+        };
+        assert!(matches!(
+            err,
+            ParserError::EmptyExpressionInsideBraces {
+                // make sure we include the entire `{ }` in the span
+                span: Span { start: 13, end: 15 }
+            }
+        ));
     }
 }

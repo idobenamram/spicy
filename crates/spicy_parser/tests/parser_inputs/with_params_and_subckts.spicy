@@ -1,0 +1,13 @@
+title with params, expressions, and subcircuits
+.param rbase=1k scale=2
+.subckt RNET a b r=10k scale=3
+.param local=3
+R1 a b {r*scale*local}
+.ends
+* top-level devices use expressions and params
+Rtop in out {rbase*scale}
+X1 in out RNET r=3k 
+.op
+.end
+
+

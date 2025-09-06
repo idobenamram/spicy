@@ -1,0 +1,75 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "title with params, expressions, and subcircuits",
+    commands: [
+        Op(
+            OpCommand {
+                span: Span {
+                    start: 241,
+                    end: 243,
+                },
+            },
+        ),
+    ],
+    devices: [
+        Resistor(
+            Resistor {
+                name: "Rtop",
+                span: Span {
+                    start: 194,
+                    end: 218,
+                },
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "out",
+                },
+                resistance: Value {
+                    value: 2000.0,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "1_R1",
+                span: Span {
+                    start: 118,
+                    end: 139,
+                },
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "out",
+                },
+                resistance: Value {
+                    value: 27000.0,
+                    exponent: None,
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+    ],
+}

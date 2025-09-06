@@ -271,7 +271,7 @@ mod tests {
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let stream = Statements::new(&input_content);
+        let stream = Statements::new(&input_content).expect("failed to create statements");
 
         let name = format!(
             "statements-{}",

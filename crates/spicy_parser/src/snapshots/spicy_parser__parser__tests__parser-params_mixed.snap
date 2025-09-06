@@ -1,0 +1,445 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "params mixing",
+    commands: [
+        Op(
+            OpCommand {
+                span: Span {
+                    start: 314,
+                    end: 316,
+                },
+            },
+        ),
+    ],
+    devices: [
+        Resistor(
+            Resistor {
+                name: "R1",
+                span: Span {
+                    start: 14,
+                    end: 84,
+                },
+                positive: Node {
+                    name: "n1",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 4.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: Some(
+                    Value {
+                        value: 300.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                dtemp: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc1: Some(
+                    Value {
+                        value: 0.1,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc2: Some(
+                    Value {
+                        value: 0.01,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                noisy: Some(
+                    true,
+                ),
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "R2",
+                span: Span {
+                    start: 86,
+                    end: 117,
+                },
+                positive: Node {
+                    name: "n1",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                resistance: Value {
+                    value: 2.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 280.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                dtemp: Some(
+                    Value {
+                        value: 0.2,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc1: Some(
+                    Value {
+                        value: 0.02,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc2: Some(
+                    Value {
+                        value: 0.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                noisy: None,
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "R3",
+                span: Span {
+                    start: 119,
+                    end: 150,
+                },
+                positive: Node {
+                    name: "n1",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                resistance: Value {
+                    value: 3.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: Some(
+                    Value {
+                        value: 7.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 9.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: Some(
+                    true,
+                ),
+            },
+        ),
+        Capacitor(
+            Capacitor {
+                name: "C1",
+                span: Span {
+                    start: 152,
+                    end: 215,
+                },
+                positive: Node {
+                    name: "n2",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                capacitance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                mname: None,
+                m: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: Some(
+                    Value {
+                        value: 300.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                dtemp: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc1: Some(
+                    Value {
+                        value: 0.1,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc2: Some(
+                    Value {
+                        value: 0.01,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                ic: Some(
+                    Value {
+                        value: 0.5,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+            },
+        ),
+        Capacitor(
+            Capacitor {
+                name: "C2",
+                span: Span {
+                    start: 217,
+                    end: 250,
+                },
+                positive: Node {
+                    name: "n2",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                capacitance: Value {
+                    value: 2.0,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                mname: None,
+                m: Some(
+                    Value {
+                        value: 4.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: Some(
+                    Value {
+                        value: 260.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                dtemp: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc1: Some(
+                    Value {
+                        value: 0.2,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                tc2: Some(
+                    Value {
+                        value: 0.02,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                ic: Some(
+                    Value {
+                        value: 0.1,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+            },
+        ),
+        Capacitor(
+            Capacitor {
+                name: "C3",
+                span: Span {
+                    start: 252,
+                    end: 282,
+                },
+                positive: Node {
+                    name: "n2",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                capacitance: Value {
+                    value: 3.0,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                mname: None,
+                m: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                ic: Some(
+                    Value {
+                        value: 0.3,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "n3",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                mode: DC {
+                    value: Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                },
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V2",
+                positive: Node {
+                    name: "n3",
+                },
+                negative: Node {
+                    name: "n4",
+                },
+                mode: DC {
+                    value: Value {
+                        value: 1.2,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                },
+            },
+        ),
+    ],
+}

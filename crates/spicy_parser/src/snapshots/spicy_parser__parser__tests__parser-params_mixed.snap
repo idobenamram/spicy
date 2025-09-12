@@ -412,13 +412,14 @@ Deck {
                 negative: Node {
                     name: "0",
                 },
-                mode: DC {
-                    value: Value {
+                dc: Some(
+                    Value {
                         value: 5.0,
                         exponent: None,
                         suffix: None,
                     },
-                },
+                ),
+                ac: None,
             },
         ),
         VoltageSource(
@@ -430,15 +431,16 @@ Deck {
                 negative: Node {
                     name: "n4",
                 },
-                mode: DC {
-                    value: Value {
+                dc: Some(
+                    Value {
                         value: 1.2,
                         exponent: None,
                         suffix: Some(
                             Kilo,
                         ),
                     },
-                },
+                ),
+                ac: None,
             },
         ),
     ],

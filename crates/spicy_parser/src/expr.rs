@@ -103,13 +103,6 @@ impl Expr {
         }
     }
 
-    fn float(value: f64, span: Span) -> Expr {
-        Expr {
-            span,
-            r#type: ExprType::Value(Value::new(value, None, None)),
-        }
-    }
-
     pub fn value(value: Value, span: Span) -> Expr {
         Expr {
             span,
@@ -319,6 +312,7 @@ impl ScopeArena {
     }
 
     /// Get by key, walking up parents until found (rootward)
+    #[allow(dead_code)]
     pub fn get_param_in_scope(&self, id: ScopeId, key: &str) -> Option<&Expr> {
         let mut cur = Some(id);
         while let Some(eid) = cur {

@@ -3,10 +3,10 @@ use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expression_phase::substitute_expressions;
 use crate::lexer::{Span, TokenKind, token_text};
 use crate::netlist_types::{
-    Capacitor, Command, CommandType, DcCommand, Device, DeviceType, IndependentSource,
-    IndependentSourceMode, Inductor, Node, OpCommand, Resistor,
+    AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
+    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor,
 };
-use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_value};
+use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
 use crate::statement_phase::{Statements, StmtCursor};
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt, collect_subckts, expand_subckts};
 
@@ -36,10 +36,7 @@ impl<'s> ParamParser<'s> {
         }
     }
 
-    fn parse_named_param(
-        &mut self,
-        cursor: &mut StmtCursor,
-    ) -> Result<&'s str, SpicyError> {
+    fn parse_named_param(&mut self, cursor: &mut StmtCursor) -> Result<&'s str, SpicyError> {
         let Ok(ident) = cursor.expect(TokenKind::Ident) else {
             return Err(ParserError::MissingToken {
                 message: "ident",
@@ -171,6 +168,41 @@ impl<'s> Parser<'s> {
             return Err(ParserError::ExpectedBoolZeroOrOne { span: token.span }.into());
         }
         Ok(parse_bool(cursor, self.input)?)
+    }
+
+    fn parse_usize(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<usize, SpicyError> {
+        if let Some(token) = cursor.consume(TokenKind::Placeholder) {
+            let id = token.id.expect("must have a placeholder id");
+            // TOOD: maybe we can change the expresion to only evalute once
+            let expr = self
+                .placeholder_map
+                .get(id)
+                .cloned()
+                .expect("id must be in map");
+            let evaluated = expr.evaluate(scope)?;
+            let value = evaluated.get_value();
+            // TODO: baba
+            // Check if value is an integer (no fractional part)
+            if value.fract() == 0.0 {
+                // Safe to cast to usize if non-negative
+                if value >= 0.0 {
+                    return Ok(value as usize);
+                } else {
+                    return Err(ParserError::InvalidNumericLiteral {
+                        span: token.span,
+                        lexeme: format!("{:?}", evaluated),
+                    }
+                    .into());
+                }
+            } else {
+                return Err(ParserError::InvalidNumericLiteral {
+                    span: token.span,
+                    lexeme: format!("{:?}", evaluated),
+                }
+                .into());
+            }
+        }
+        Ok(parse_usize(cursor, self.input)?)
     }
 
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
@@ -366,6 +398,37 @@ impl<'s> Parser<'s> {
         Ok(inductor)
     }
 
+    fn parse_source_value(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+        operation: &str,
+        independent_source: &mut IndependentSource,
+    ) -> Result<(), SpicyError> {
+        match operation {
+            "DC" => independent_source.set_dc(self.parse_value(cursor, scope)?),
+            "AC" => {
+                let mag = self.parse_value(cursor, scope)?;
+                let mut phasor = Phasor::new(mag);
+                if let Some(_) = cursor.peek_non_whitespace() {
+                    let phase = self.parse_value(cursor, scope)?;
+                    phasor.set_phase(phase);
+                }
+
+                independent_source.set_ac(phasor);
+            }
+            _ => {
+                return Err(ParserError::InvalidOperation {
+                    operation: operation.to_string(),
+                    span: cursor.span,
+                }
+                .into());
+            }
+        };
+
+        Ok(())
+    }
+
     // VXXXXXXX N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
     // + <DISTOF1 <F1MAG <F1PHASE>>> <DISTOF2 <F2MAG <F2PHASE>>>
     // IYYYYYYY N+ N- <<DC> DC/TRAN VALUE> <AC <ACMAG <ACPHASE>>>
@@ -379,28 +442,29 @@ impl<'s> Parser<'s> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
+        let mut independent_source = IndependentSource::new(name, positive, negative);
         let operation = parse_ident(cursor, self.input)?;
 
-        let mode = match operation.as_str() {
-            "DC" => IndependentSourceMode::DC {
-                value: self.parse_value(cursor, scope)?,
-            },
-            "AC" => unimplemented!("AC not supported yet"),
-            _ => {
-                return Err(ParserError::InvalidOperation {
-                    operation,
-                    span: cursor.span,
+        self.parse_source_value(cursor, scope, &operation, &mut independent_source)?;
+        let next_token = cursor.peek_non_whitespace();
+
+        match next_token {
+            Some(token) if token.kind == TokenKind::Ident => {
+                let operation = parse_ident(cursor, self.input)?;
+                self.parse_source_value(cursor, scope, &operation, &mut independent_source)?;
+            }
+            Some(token) => {
+                return Err(ParserError::UnexpectedToken {
+                    expected: "ident".to_string(),
+                    found: token.kind,
+                    span: token.span,
                 }
                 .into());
             }
-        };
+            None => {}
+        }
 
-        Ok(IndependentSource {
-            name,
-            positive,
-            negative,
-            mode,
-        })
+        Ok(independent_source)
     }
 
     fn parse_device(&self, statement: &ScopedStmt) -> Result<Device, SpicyError> {
@@ -458,17 +522,17 @@ impl<'s> Parser<'s> {
 
     // .dc srcnam vstart vstop vincr [src2 start2 stop2 incr2]
     fn parse_dc_command(
-        &mut self,
+        &self,
         cursor: &mut StmtCursor,
-        statement_span: Span,
+        scope: &Scope,
     ) -> Result<DcCommand, SpicyError> {
         let srcnam = parse_ident(cursor, self.input)?;
-        let vstart = parse_value(cursor, self.input)?;
-        let vstop = parse_value(cursor, self.input)?;
-        let vincr = parse_value(cursor, self.input)?;
+        let vstart = self.parse_value(cursor, scope)?;
+        let vstop = self.parse_value(cursor, scope)?;
+        let vincr = self.parse_value(cursor, scope)?;
 
         Ok(DcCommand {
-            span: statement_span,
+            span: cursor.span,
             srcnam,
             vstart,
             vstop,
@@ -476,36 +540,61 @@ impl<'s> Parser<'s> {
         })
     }
 
-    fn parse_command_type(&mut self, cursor: &mut StmtCursor) -> Result<CommandType, SpicyError> {
-        cursor.expect(TokenKind::Dot).expect("must be dot");
-        let kind = cursor.expect(TokenKind::Ident)?;
-
-        let kind_string = token_text(self.input, kind);
-        let command = match CommandType::from_str(&kind_string) {
-            Some(command) => command,
-            None => {
-                return Err(ParserError::InvalidCommandType {
-                    s: kind_string.to_string(),
+    fn parse_ac_command(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+    ) -> Result<AcCommand, SpicyError> {
+        let ac_sweep_type = parse_ident(cursor, self.input)?;
+        let points_per_sweep = self.parse_usize(cursor, scope)?;
+        let ac_sweep_type = match ac_sweep_type.as_str() {
+            "DEC" | "dec" => AcSweepType::Dec(points_per_sweep),
+            "OCT" | "oct" => AcSweepType::Oct(points_per_sweep),
+            "LIN" | "lin" => AcSweepType::Lin(points_per_sweep),
+            _ => {
+                return Err(ParserError::InvalidOperation {
+                    operation: ac_sweep_type,
                     span: cursor.span,
                 }
                 .into());
             }
         };
+        let fstart = self.parse_value(cursor, scope)?;
+        let fstop = self.parse_value(cursor, scope)?;
 
-        Ok(command)
+        Ok(AcCommand {
+            span: cursor.span,
+            ac_sweep_type,
+            fstart,
+            fstop,
+        })
     }
 
-    fn parse_command_attrs(
-        &mut self,
-        cursor: &mut StmtCursor,
-        statement_span: Span,
-        command_type: CommandType,
-    ) -> Result<Command, SpicyError> {
+    fn parse_command(&self, statement: &ScopedStmt) -> Result<Command, SpicyError> {
+        let mut cursor = statement.stmt.into_cursor();
+        cursor.expect(TokenKind::Dot)?;
+        let ident = cursor.expect(TokenKind::Ident)?;
+        let ident_string = token_text(self.input, ident);
+        let command_type = CommandType::from_str(&ident_string).ok_or_else(|| {
+            ParserError::InvalidCommandType {
+                s: ident_string.to_string(),
+                span: cursor.span,
+            }
+        })?;
+
+        let scope = self
+            .expanded_deck
+            .scope_arena
+            .get(statement.scope)
+            .ok_or_else(|| ParserError::MissingScope {
+                span: statement.stmt.span,
+            })?;
+
         let command = match command_type {
-            CommandType::DC => Command::Dc(self.parse_dc_command(cursor, statement_span)?),
-            CommandType::Op => Command::Op(OpCommand {
-                span: statement_span,
-            }),
+            CommandType::DC => Command::Dc(self.parse_dc_command(&mut cursor, scope)?),
+            CommandType::Op => Command::Op(OpCommand { span: cursor.span }),
+            CommandType::AC => Command::Ac(self.parse_ac_command(&mut cursor, scope)?),
+            CommandType::End => Command::End,
             _ => {
                 return Err(ParserError::UnexpectedCommandType {
                     s: command_type.to_string(),
@@ -535,7 +624,7 @@ impl<'s> Parser<'s> {
         let mut devices = vec![];
 
         while let Some(statement) = statements_iter.next() {
-            let mut cursor = statement.stmt.into_cursor();
+            let cursor = statement.stmt.into_cursor();
 
             let first_token = cursor.peek().ok_or_else(|| ParserError::MissingToken {
                 message: "token",
@@ -544,18 +633,13 @@ impl<'s> Parser<'s> {
 
             match first_token.kind {
                 TokenKind::Dot => {
-                    let command = self.parse_command_type(&mut cursor)?;
-                    match command {
-                        CommandType::End => {
+                    match self.parse_command(&statement)? {
+                        Command::End => {
                             // once we see an end command we stop
                             break;
                         }
-                        _ => {
-                            commands.push(self.parse_command_attrs(
-                                &mut cursor,
-                                statement.stmt.span,
-                                command,
-                            )?);
+                        command => {
+                            commands.push(command);
                         }
                     }
                 }
@@ -592,7 +676,6 @@ pub fn parse(input: &str) -> Result<Deck, SpicyError> {
     let placeholders_map = substitute_expressions(&mut stream, &input)?;
     let unexpanded_deck = collect_subckts(stream, &input)?;
     let expanded_deck = expand_subckts(unexpanded_deck, &input)?;
-    println!("placeholders_map: {:?}", placeholders_map);
     let mut parser = Parser::new(expanded_deck, placeholders_map, input);
     let deck = parser.parse()?;
     Ok(deck)

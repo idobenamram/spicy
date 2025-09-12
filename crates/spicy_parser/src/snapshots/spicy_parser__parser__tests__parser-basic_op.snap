@@ -54,15 +54,16 @@ Deck {
                 negative: Node {
                     name: "0",
                 },
-                mode: DC {
-                    value: Value {
+                dc: Some(
+                    Value {
                         value: 1.0,
                         exponent: None,
                         suffix: Some(
                             Milli,
                         ),
                     },
-                },
+                ),
+                ac: None,
             },
         ),
         Capacitor(

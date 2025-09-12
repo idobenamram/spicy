@@ -1,0 +1,96 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "AC test with voltage source DC and AC",
+    commands: [
+        Ac(
+            AcCommand {
+                span: Span {
+                    start: 74,
+                    end: 89,
+                },
+                ac_sweep_type: Lin(
+                    3,
+                ),
+                fstart: Value {
+                    value: 10.0,
+                    exponent: None,
+                    suffix: None,
+                },
+                fstop: Value {
+                    value: 100.0,
+                    exponent: None,
+                    suffix: None,
+                },
+            },
+        ),
+    ],
+    devices: [
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                ac: Some(
+                    Phasor {
+                        mag: Value {
+                            value: 1.5,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        phase: Some(
+                            Value {
+                                value: 45.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "R1",
+                span: Span {
+                    start: 62,
+                    end: 72,
+                },
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+    ],
+}

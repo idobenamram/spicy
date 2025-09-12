@@ -31,10 +31,12 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     let mut exponent: Option<f64> = None;
     let mut suffix: Option<ValueSuffix> = None;
 
-    let mut t = cursor.next_non_whitespace().ok_or_else(|| ParserError::MissingToken {
-        message: "Expected number or minus",
-        span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
-    })?;
+    let mut t = cursor
+        .next_non_whitespace()
+        .ok_or_else(|| ParserError::MissingToken {
+            message: "Expected number or minus",
+            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+        })?;
 
     // Optional leading minus
     if matches!(t.kind, TokenKind::Minus) {
@@ -158,6 +160,18 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         value,
         exponent,
         suffix,
+    })
+}
+
+pub(crate) fn parse_usize(cursor: &mut StmtCursor, src: &str) -> Result<usize, SpicyError> {
+    let usize = cursor.expect_non_whitespace(TokenKind::Number)?;
+    let usize_text = token_text(src, usize);
+    usize_text.parse::<usize>().map_err(|_| {
+        ParserError::InvalidNumericLiteral {
+            span: usize.span,
+            lexeme: usize_text.to_string(),
+        }
+        .into()
     })
 }
 

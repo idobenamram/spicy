@@ -63,9 +63,26 @@ pub struct DcCommand {
 }
 
 #[derive(Debug, Clone)]
+pub enum AcSweepType {
+    Dec(usize),
+    Oct(usize),
+    Lin(usize),
+}
+
+#[derive(Debug, Clone)]
+pub struct AcCommand {
+    pub span: Span,
+    pub ac_sweep_type: AcSweepType,
+    pub fstart: Value,
+    pub fstop: Value,
+}
+
+#[derive(Debug, Clone)]
 pub enum Command {
     Op(OpCommand),
     Dc(DcCommand),
+    Ac(AcCommand),
+    End,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -316,17 +333,43 @@ impl Inductor {
 }
 
 #[derive(Debug, Clone)]
-pub enum IndependentSourceMode {
-    DC { value: Value },
-    // TODO: support AC
+pub struct Phasor {
+    pub mag: Value,
+    pub phase: Option<Value>,
 }
+
+impl Phasor {
+    pub fn new(mag: Value) -> Self {
+        Self { mag, phase: None }
+    }
+
+    pub fn set_phase(&mut self, phase: Value) {
+        self.phase = Some(phase);
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct IndependentSource {
     pub name: String,
     pub positive: Node,
     pub negative: Node,
-    pub mode: IndependentSourceMode,
+    pub dc: Option<Value>,
+    pub ac: Option<Phasor>,
+}
+
+impl IndependentSource {
+    pub fn new(name: String, positive: Node, negative: Node) -> Self {
+        Self { name, positive, negative, dc: None, ac: None }
+    }
+
+    pub fn set_dc(&mut self, value: Value) {
+        self.dc = Some(value);
+    }
+
+    pub fn set_ac(&mut self, value: Phasor) {
+        self.ac = Some(value);
+    }
 }
 
 #[derive(Debug, Clone)]

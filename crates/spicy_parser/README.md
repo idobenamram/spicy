@@ -1,4 +1,4 @@
-# spicy_parser
+# Spicy Parser
 
 Netlist parser for Spicy. 
 

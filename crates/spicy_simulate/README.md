@@ -1,4 +1,4 @@
-# spicy_simulate
+# Spicy Simulate
 
 MNA-based circuit analyzers for Spicy. Consumes a `spicy_parser::parser::Deck` and computes results for various analyses.
 

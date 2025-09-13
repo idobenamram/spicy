@@ -6,3 +6,7 @@ edition = "2024"
 [dependencies]
 spicy_parser = { path = "../spicy_parser" }
 spicy_simulate = { path = "../spicy_simulate" }
+ratatui = "0.26"
+crossterm = "0.27"
+anyhow = "1"
+crossbeam-channel = "0.5"

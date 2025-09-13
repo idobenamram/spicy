@@ -69,10 +69,6 @@ fn brace_to_placeholders(
     }
 
     for (start_pos, end_pos, replacement) in replacements.into_iter().rev() {
-        println!(
-            "replacement {:?}, start_pos: {}, end_pos: {}",
-            replacement, start_pos, end_pos
-        );
         statement.replace_tokens(start_pos, end_pos, vec![replacement]);
     }
     Ok(())

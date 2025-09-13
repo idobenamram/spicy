@@ -1,4 +1,4 @@
-# spicy_cli
+# Spicy Cli
 
 Terminal CLI and TUI for Spicy.
 

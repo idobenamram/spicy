@@ -3,7 +3,6 @@ use std::fs;
 
 use spicy_parser::parser::parse;
 use spicy_simulate::simulate;
-use spicy_parser::error::{SpicyError, LexerError, ParserError, ExpressionError, SubcircuitError};
 use spicy_parser::Span;
 
 fn main() {

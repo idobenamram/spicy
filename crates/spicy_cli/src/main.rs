@@ -2,12 +2,33 @@ use std::env;
 use std::fs;
 
 use spicy_parser::parser::parse;
-use spicy_simulate::simulate;
 use spicy_parser::Span;
+use spicy_simulate::simulate; // kept for non-TUI mode
+
+mod tui;
 
 fn main() {
-    let path = env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("Usage: spicy_cli <netlist.spicy>");
+    // Simple arg parsing: `--tui <file>` enables TUI; otherwise legacy CLI
+    let args = env::args().skip(1).collect::<Vec<_>>();
+
+    if !args.is_empty() && args[0] == "--tui" {
+        let path = args.get(1).cloned().unwrap_or_else(|| {
+            eprintln!("Usage: spicy_cli --tui <netlist.spicy>");
+            std::process::exit(1);
+        });
+        if let Err(e) = tui::run_tui(&path) {
+            // try to gracefully restore terminal
+            let _ = tui::term::restore_terminal();
+            eprintln!("TUI error: {}", e);
+            std::process::exit(1);
+        }
+        let _ = tui::term::restore_terminal();
+        return;
+    }
+
+    // Legacy non-TUI path
+    let path = args.get(0).cloned().unwrap_or_else(|| {
+        eprintln!("Usage: spicy_cli <netlist.spicy>  or  spicy_cli --tui <netlist.spicy>");
         std::process::exit(1);
     });
 
@@ -28,7 +49,6 @@ fn main() {
         }
     }
 }
-
 
 fn render_error_snippet(src: &str, span: Span) {
     let len = src.len();
@@ -54,5 +74,4 @@ fn render_error_snippet(src: &str, span: Span) {
     let underline = "~".repeat(width);
     eprintln!("     | {:space$}\x1b[31m{}\x1b[0m", "", underline, space = col);
 }
-
 

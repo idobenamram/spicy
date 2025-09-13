@@ -97,6 +97,17 @@ impl Nodes {
     }
 }
 
+#[derive(Debug)]
+pub struct OperatingPointResult {
+    pub voltages: Vec<(String, f64)>,
+    pub currents: Vec<(String, f64)>,
+}
+
+#[derive(Debug)]
+pub struct DcSweepResult {
+    pub results: Vec<(OperatingPointResult, f64)>,
+}
+
 fn stamp_resistor(g: &mut Array2<f64>, resistor: &Resistor, nodes: &Nodes) {
     let node1 = nodes.get_node_index(&resistor.positive.name);
     let node2 = nodes.get_node_index(&resistor.negative.name);
@@ -394,7 +405,7 @@ fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>)
     (m, s_vec)
 }
 
-fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array1<f64>)> {
+pub fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array1<f64>)> {
     let freqs = ac_frequencies(cmd);
     let nodes = Nodes::new(&deck.devices);
     let n = nodes.node_len();
@@ -419,10 +430,10 @@ fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array1<f6
             let vi = xi[i];
             let mag = (vr * vr + vi * vi).sqrt();
             let phase = vi.atan2(vr) * 180.0 / PI;
-            println!(
-                "f={:.6} Hz  {}: {:.6} ∠ {:.3}°",
-                f, node_names[i], mag, phase
-            );
+            // println!(
+            //     "f={:.6} Hz  {}: {:.6} ∠ {:.3}°",
+            //     f, node_names[i], mag, phase
+            // );
         }
 
         out.push((f, xr, xi));
@@ -431,7 +442,7 @@ fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array1<f6
     out
 }
 
-fn simulate_op(deck: &Deck) -> Array1<f64> {
+pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
     let nodes = Nodes::new(&deck.devices);
 
     let n = nodes.node_len();
@@ -456,26 +467,30 @@ fn simulate_op(deck: &Deck) -> Array1<f64> {
         }
     }
 
-    println!("m: {:?}", m);
-    println!("s: {:?}", s);
+    // // println!("m: {:?}", m);
+    // println!("s: {:?}", s);
     let lu = m.factorize_into().expect("Failed to factorize matrix");
     // [V] node voltages
     // [I] branch currents for voltage sources (also inductors)
     let x = lu.solve(&s).expect("Failed to solve linear system");
 
+    let mut voltages = Vec::new();
+    let mut currents = Vec::new();
     let node_names = nodes.get_node_names();
     for (i, voltage) in x.slice(s![..n]).iter().enumerate() {
         let name = &node_names[i];
-        println!("{}: {:.6}V", name, voltage);
+        voltages.push((name.to_string(), *voltage));
+        // println!("{}: {:.6}V", name, voltage);
     }
 
     let source_names = nodes.get_source_names();
     for (i, current) in x.slice(s![n..]).iter().enumerate() {
         let name = &source_names[i];
-        println!("{}: {:.6}A", name, current);
+        currents.push((name.to_string(), *current));
+        // println!("{}: {:.6}A", name, current);
     }
 
-    x
+    OperatingPointResult { voltages, currents }
 }
 
 fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
@@ -483,7 +498,7 @@ fn sweep(vstart: f64, vstop: f64, vinc: f64) -> Vec<f64> {
     (0..=nsteps).map(|i| vstart + i as f64 * vinc).collect()
 }
 
-fn simulate_dc(deck: &Deck, command: &DcCommand) -> Vec<Array1<f64>> {
+pub fn simulate_dc(deck: &Deck, command: &DcCommand) -> DcSweepResult {
     let srcnam = &command.srcnam;
     let vstart = command.vstart.get_value();
     let vstop = command.vstop.get_value();
@@ -497,7 +512,7 @@ fn simulate_dc(deck: &Deck, command: &DcCommand) -> Vec<Array1<f64>> {
     let mut m = Array2::<f64>::zeros((n + k, n + k));
     let mut s_before = Array1::<f64>::zeros(n + k);
 
-    println!("srcnam: {:?}", srcnam);
+    // println!("srcnam: {:?}", srcnam);
     let source_index = deck
         .devices
         .iter()
@@ -543,20 +558,24 @@ fn simulate_dc(deck: &Deck, command: &DcCommand) -> Vec<Array1<f64>> {
         let x = lu.solve(&s).expect("Failed to solve linear system");
 
         let node_names = nodes.get_node_names();
+        let mut voltages = Vec::new();
+        let mut currents = Vec::new();
         for (index, voltage) in x.slice(s![..n]).iter().enumerate() {
             let name = &node_names[index];
-            println!("{}: {:.6}V", name, voltage);
+            voltages.push((name.to_string(), *voltage));
+            // println!("{}: {:.6}V", name, voltage);
         }
 
         let source_names = nodes.get_source_names();
         for (i, current) in x.slice(s![n..]).iter().enumerate() {
             let name = &source_names[i];
-            println!("{}: {:.6}A", name, current);
+            currents.push((name.to_string(), *current));
+            // println!("{}: {:.6}A", name, current);
         }
-        results.push(x);
+        results.push((OperatingPointResult { voltages, currents }, v));
     }
 
-    results
+    DcSweepResult { results }
 }
 
 pub fn simulate(deck: Deck) {

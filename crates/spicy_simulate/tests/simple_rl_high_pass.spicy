@@ -1,0 +1,6 @@
+* Series R–L, take Vout across L
+* R=100, L=10mH  ->  ωc = R/L = 100/0.01 = 10,000 rad/s; fc almost equal 1591.55 Hz
+V1 in 0 AC 1 0
+R1 in out 100
+L1 out 0 10m
+.AC DEC 20 10 1e6

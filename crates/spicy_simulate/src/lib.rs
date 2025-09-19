@@ -128,7 +128,7 @@ fn stamp_resistor(g: &mut Array2<f64>, resistor: &Resistor, nodes: &Nodes) {
     }
 }
 
-fn stamp_current_source(i: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
+fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     let value = match &device.dc {
@@ -137,10 +137,10 @@ fn stamp_current_source(i: &mut Array1<f64>, device: &IndependentSource, nodes: 
     };
 
     if let Some(node1) = node1 {
-        i[node1] += value;
+        s[node1] += value;
     }
     if let Some(node2) = node2 {
-        i[node2] -= value;
+        s[node2] -= value;
     }
 }
 
@@ -289,10 +289,58 @@ fn stamp_voltage_source_incidence_real(
     }
 }
 
+fn stamp_voltage_source_phasor_ac(
+    br: &mut Array1<f64>,
+    bi: &mut Array1<f64>,
+    device: &IndependentSource,
+    nodes: &Nodes,
+) {
+    let k = nodes
+        .get_voltage_source_index(&device.name)
+        .expect("should exist");
+
+    if let Some(phasor) = &device.ac {
+        let mag = phasor.mag.get_value();
+        let phase = phasor.phase.clone().unwrap_or(Value::zero()).get_value();
+        let ph = phase * PI / 180.0;
+        let re = mag * ph.cos();
+        let im = mag * ph.sin();
+        br[k] += re;
+        bi[k] += im;
+    }
+}
+
+fn stamp_current_source_phasor_ac(
+    br: &mut Array1<f64>,
+    bi: &mut Array1<f64>,
+    device: &IndependentSource,
+    nodes: &Nodes,
+) {
+    if let Some(ac) = &device.ac {
+        let mag = ac.mag.get_value();
+        let phase = ac.phase.clone().unwrap_or(Value::zero()).get_value();
+        let ph = phase * PI / 180.0;
+        let re = mag * ph.cos();
+        let im = mag * ph.sin();
+
+        let n1 = nodes.get_node_index(&device.positive.name);
+        let n2 = nodes.get_node_index(&device.negative.name);
+
+        if let Some(n1) = n1 {
+            br[n1] -= re;
+            bi[n1] -= im;
+        }
+        if let Some(n2) = n2 {
+            br[n2] += re;
+            bi[n2] += im;
+        }
+    }
+}
+
 fn ac_frequencies(cmd: &AcCommand) -> Vec<f64> {
     let fstart = cmd.fstart.get_value();
-    let fstop  = cmd.fstop.get_value();
-    assert!(fstop > fstart, ".AC: fstop must be > fstart");
+    let fstop = cmd.fstop.get_value();
+    assert!(fstop > fstart, ".AC: fstop {:?} must be > fstart {:?}", fstop, fstart);
 
     const EPS: f64 = 1e-12;
 
@@ -373,17 +421,11 @@ fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>)
                 stamp_inductor_ac_mna(&mut ar, &mut ai, &dev, &nodes, w);
             }
             Device::VoltageSource(dev) => {
-                // Incidence into ar; AC magnitude/phase handling TBD in parser -> RHS remains 0 if not specified
                 stamp_voltage_source_incidence_real(&mut ar, &dev, &nodes);
-                // If your parser carries AC {mag, phase}, convert to (br/bi) here.
-                // Example (pseudo): if let Some((mag, phase_deg)) = dev.ac_spec { let ph = phase_deg * PI/180.0; bi_or_br... }
+                stamp_voltage_source_phasor_ac(&mut br, &mut bi, &dev, &nodes);
             }
-            Device::CurrentSource(_dev) => {
-                // In small-signal AC, DC sources are turned off. If parser supplies AC value, add to (br/bi) here.
-                // Example (pseudo):
-                // let phasor = mag * (cos(ph) + j sin(ph));
-                // br[node_a] -= Re(phasor); br[node_b] += Re(phasor);
-                // bi[node_a] -= Im(phasor); bi[node_b] += Im(phasor);
+            Device::CurrentSource(dev) => {
+                stamp_current_source_phasor_ac(&mut br, &mut bi, &dev, &nodes);
             }
         }
     }
@@ -430,10 +472,10 @@ pub fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array
             let vi = xi[i];
             let mag = (vr * vr + vi * vi).sqrt();
             let phase = vi.atan2(vr) * 180.0 / PI;
-            // println!(
-            //     "f={:.6} Hz  {}: {:.6} ∠ {:.3}°",
-            //     f, node_names[i], mag, phase
-            // );
+            println!(
+                "f={:.6} Hz  {}: {:.6} ∠ {:.3}°",
+                f, node_names[i], mag, phase
+            );
         }
 
         out.push((f, xr, xi));

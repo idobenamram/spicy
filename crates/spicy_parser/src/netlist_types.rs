@@ -14,6 +14,7 @@ pub enum CommandType {
     AC,
     DC,
     Op,
+    Trans,
     Subcircuit,
     Ends,
     Param,
@@ -26,6 +27,7 @@ impl CommandType {
             "AC" | "ac" => Some(CommandType::AC),
             "DC" | "dc" => Some(CommandType::DC),
             "OP" | "op" => Some(CommandType::Op),
+            "TRANS" | "trans" => Some(CommandType::Trans),
             "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
             "ENDS" | "ends" => Some(CommandType::Ends),
             "PARAM" | "param" => Some(CommandType::Param),
@@ -39,6 +41,7 @@ impl CommandType {
             CommandType::AC => "AC",
             CommandType::DC => "DC",
             CommandType::Op => "OP",
+            CommandType::Trans => "TRANS",
             CommandType::Subcircuit => "SUBCKT",
             CommandType::Ends => "ENDS",
             CommandType::Param => "PARAM",
@@ -78,10 +81,18 @@ pub struct AcCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct TransCommand {
+    pub span: Span,
+    pub tstep: Value,
+    pub tstop: Value,
+}
+
+#[derive(Debug, Clone)]
 pub enum Command {
     Op(OpCommand),
     Dc(DcCommand),
     Ac(AcCommand),
+    Trans(TransCommand),
     End,
 }
 

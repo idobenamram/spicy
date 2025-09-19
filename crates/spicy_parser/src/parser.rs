@@ -4,7 +4,7 @@ use crate::expression_phase::substitute_expressions;
 use crate::lexer::{Span, TokenKind, token_text};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
-    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor,
+    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TransCommand,
 };
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
 use crate::statement_phase::{Statements, StmtCursor};
@@ -570,6 +570,21 @@ impl<'s> Parser<'s> {
         })
     }
 
+    fn parse_trans_command(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+    ) -> Result<TransCommand, SpicyError> {
+        let tstep = self.parse_value(cursor, scope)?;
+        let tstop = self.parse_value(cursor, scope)?;
+
+        Ok(TransCommand {
+            span: cursor.span,
+            tstep,
+            tstop,
+        })
+    }
+
     fn parse_command(&self, statement: &ScopedStmt) -> Result<Command, SpicyError> {
         let mut cursor = statement.stmt.into_cursor();
         cursor.expect(TokenKind::Dot)?;
@@ -594,6 +609,7 @@ impl<'s> Parser<'s> {
             CommandType::DC => Command::Dc(self.parse_dc_command(&mut cursor, scope)?),
             CommandType::Op => Command::Op(OpCommand { span: cursor.span }),
             CommandType::AC => Command::Ac(self.parse_ac_command(&mut cursor, scope)?),
+            CommandType::Trans => Command::Trans(self.parse_trans_command(&mut cursor, scope)?),
             CommandType::End => Command::End,
             _ => {
                 return Err(ParserError::UnexpectedCommandType {

@@ -1,5 +1,8 @@
 use crossbeam_channel::{Receiver, Sender};
-use spicy_simulate::{DcSweepResult, OperatingPointResult, simulate_dc, simulate_op};
+use spicy_simulate::{
+    dc::{simulate_dc, simulate_op},
+    DcSweepResult, OperatingPointResult,
+};
 
 use crate::tui::app::{App, Diagnostic, Tab};
 use spicy_parser::{netlist_types::Command, parser::parse};

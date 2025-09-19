@@ -90,15 +90,14 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         _ => panic!("Invalid start of numeric value"),
     }
 
+    // TODO: i don't think you can have a suffix and an exponent at the same time
+    // TODO: also this can definitly use a cleanup
     // Optional exponent: e|E [+-]? digits (no whitespace inside the literal)
     if let Some(peek) = cursor.peek() {
         if matches!(peek.kind, TokenKind::Ident) {
             let ident_text = token_text(src, peek);
             if ident_text == "e" || ident_text == "E" {
-                cursor.next().ok_or(ParserError::MissingToken {
-                    message: "Expected digits after exponent",
-                    span: peek.span,
-                })?;
+                cursor.next().expect("just peeked");
 
                 let mut exp_str = String::new();
                 // optional sign
@@ -134,6 +133,23 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                     ParserError::InvalidExponentDigits {
                         span: exp_digits.span,
                         lexeme: exp_digits_str,
+                    }
+                })?);
+            } else if ident_text.starts_with("e") || ident_text.starts_with("E") {
+                cursor.next().expect("just peeked");
+                // Split ident after 'e' or 'E' and assume it is the exponent digits
+                let (_e_char, exp_digits_str) = ident_text.split_at(1);
+                if exp_digits_str.is_empty() {
+                    return Err(ParserError::MissingToken {
+                        message: "Expected digits after exponent",
+                        span: peek.span,
+                    }
+                    .into());
+                }
+                exponent = Some(exp_digits_str.parse::<f64>().map_err(|_| {
+                    ParserError::InvalidExponentDigits {
+                        span: peek.span,
+                        lexeme: exp_digits_str.to_string(),
                     }
                 })?);
             }

@@ -1,0 +1,5 @@
+* RC LPF: R=1k, C=1uF  ->  fc = 1/(2πRC) almost equal 159.155 Hz
+V1 in 0 AC 1 0
+R1 in out 1k
+C1 out 0 1u
+.AC DEC 5 1 1e5

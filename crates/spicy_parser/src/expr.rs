@@ -28,6 +28,10 @@ impl Value {
         }
     }
 
+    pub fn zero() -> Self {
+        Self::new(0.0, None, None)
+    }
+
     pub fn get_value(&self) -> f64 {
         let mut value = self.value;
         if let Some(exponent) = self.exponent {

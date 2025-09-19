@@ -10,6 +10,9 @@ pub enum TokenKind {
     Number,
     Equal,
     Dot,
+    Colon,
+    GreaterThan,
+    LessThan,
     Placeholder,
     Asterisk,
     WhiteSpace,
@@ -140,6 +143,9 @@ impl<'s> Lexer<'s> {
             '(' => Ok(Token::single(TokenKind::LeftParen, start)),
             ')' => Ok(Token::single(TokenKind::RightParen, start)),
             ',' => Ok(Token::single(TokenKind::Comma, start)),
+            ':' => Ok(Token::single(TokenKind::Colon, start)),
+            '>' => Ok(Token::single(TokenKind::GreaterThan, start)),
+            '<' => Ok(Token::single(TokenKind::LessThan, start)),
             _ => return Err(LexerError::UnexpectedCharacter { ch: c, span: Span::new(start, start) }),
         };
         tok

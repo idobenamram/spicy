@@ -81,7 +81,14 @@ impl<'s> Iterator for ParamParser<'s> {
                         Err(e) => Some(Err(e)),
                     }
                 } else {
-                    Some(Ok((self.params_order[self.current_param], cursor)))
+                    match self.params_order.get(self.current_param) {
+                        Some(p) => Some(Ok((*p, cursor))),
+                        None => Some(Err(ParserError::TooManyParameters {
+                            index: self.current_param,
+                            span: cursor.span,
+                        }
+                        .into())),
+                    }
                 }
             } else {
                 match self.parse_named_param(&mut cursor) {

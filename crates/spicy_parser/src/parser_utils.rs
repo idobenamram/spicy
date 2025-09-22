@@ -87,7 +87,9 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
             }
             number_str.push_str(token_text(src, frac));
         }
-        _ => panic!("Invalid start of numeric value"),
+        _ => {
+            return Err(ParserError::InvalidStartNumeric { span: t.span }.into());
+        }
     }
 
     // TODO: i don't think you can have a suffix and an exponent at the same time

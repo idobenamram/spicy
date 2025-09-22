@@ -47,8 +47,11 @@ pub fn draw_netlist(f: &mut Frame, area: Rect, app: &App) {
         body.height as usize,
         &app.diags,
     );
+    let wrap = ratatui::widgets::Wrap { trim: false };
     f.render_widget(
-        Paragraph::new(view).block(Block::default().borders(Borders::ALL)),
+        Paragraph::new(view)
+            .block(Block::default().borders(Borders::ALL))
+            .wrap(wrap),
         body,
     );
 }

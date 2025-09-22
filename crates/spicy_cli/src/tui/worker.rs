@@ -1,11 +1,11 @@
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
-    dc::{simulate_dc, simulate_op},
     DcSweepResult, OperatingPointResult,
+    dc::{simulate_dc, simulate_op},
 };
 
-use crate::tui::app::{App, Diagnostic, Tab};
-use spicy_parser::{netlist_types::Command, parser::parse};
+use crate::tui::app::{App, Tab};
+use spicy_parser::{error::SpicyError, netlist_types::Command, parser::parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
@@ -14,7 +14,7 @@ pub enum SimCmd {
 
 #[derive(Debug)]
 pub enum SimMsg {
-    Diagnostics(Vec<Diagnostic>),
+    Diagnostics(Vec<SpicyError>),
     SimulationStarted,
     Op(OperatingPointResult),
     Dc(DcSweepResult),
@@ -40,18 +40,7 @@ pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
                     Ok(deck) => deck,
                     Err(e) => {
                         let mut diags = Vec::new();
-                        if let Some(span) = e.error_span() {
-                            let line = offset_to_line(&netlist, span.start);
-                            diags.push(Diagnostic {
-                                line,
-                                msg: e.to_string(),
-                            });
-                        } else {
-                            diags.push(Diagnostic {
-                                line: 1,
-                                msg: e.to_string(),
-                            });
-                        }
+                        diags.push(e);
                         let _ = tx.send(SimMsg::Diagnostics(diags));
                         continue;
                     }

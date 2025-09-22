@@ -62,22 +62,22 @@ impl SpicyError {
 
 #[derive(Debug, Error)]
 pub enum LexerError {
-    #[error("unexpected character '{ch}' at span {span:?}")]
+    #[error("unexpected character '{ch}'")]
     UnexpectedCharacter { ch: char, span: Span },
 
-    #[error("identifier must start with an alphabetic character at span {span:?}")]
+    #[error("identifier must start with an alphabetic character")]
     InvalidIdentifierStart { span: Span },
 }
 
 #[derive(Debug, Error)]
 pub enum ParserError {
-    #[error("empty statement at span {span:?}")]
+    #[error("empty statement")]
     EmptyStatement { span: Span },
 
-    #[error("line continuation '+' without a previous statement at span {span:?}")]
+    #[error("line continuation '+' without a previous statement")]
     ContinuationWithoutPrevious { span: Span },
 
-    #[error("unexpected token {found:?} at span {span:?} (expected {expected})")]
+    #[error("unexpected token {found:?} (expected {expected})")]
     UnexpectedToken {
         expected: String,
         found: crate::lexer::TokenKind,
@@ -87,58 +87,58 @@ pub enum ParserError {
     #[error("missing token: {message}")]
     MissingToken { message: &'static str, span: Span },
 
-    #[error("invalid start of numeric value at span {span:?}")]
+    #[error("invalid start of numeric value")]
     InvalidStartNumeric { span: Span },
 
-    #[error("expected digits after '.' at span {span:?}")]
+    #[error("expected digits after '.'")]
     ExpectedDigitsAfterDot { span: Span },
 
-    #[error("invalid exponent digits '{lexeme}' at span {span:?}")]
+    #[error("invalid exponent digits '{lexeme}'")]
     InvalidExponentDigits { span: Span, lexeme: String },
 
-    #[error("invalid numeric literal '{lexeme}' at span {span:?}")]
+    #[error("invalid numeric literal '{lexeme}'")]
     InvalidNumericLiteral { span: Span, lexeme: String },
 
-    #[error("expected boolean '0' or '1' at span {span:?}")]
+    #[error("expected boolean '0' or '1'")]
     ExpectedBoolZeroOrOne { span: Span },
 
-    #[error("expected identifier at span {span:?}")]
+    #[error("expected identifier")]
     ExpectedIdent { span: Span },
 
-    #[error("missing placeholder id at span {span:?}")]
+    #[error("missing placeholder id")]
     MissingPlaceholderId { span: Span },
 
-    #[error("invalid param: {param} at span {span:?}")]
+    #[error("invalid param: {param}")]
     InvalidParam { param: String, span: Span },
 
-    #[error("invalid operation: {operation} at span {span:?}")]
+    #[error("invalid operation: {operation}")]
     InvalidOperation { operation: String, span: Span },
 
-    #[error("invalid command type: {s} at span {span:?}")]
+    #[error("invalid command type: {s}")]
     InvalidCommandType { s: String, span: Span },
 
-    #[error("unexpected command type: {s} at span {span:?}")]
+    #[error("unexpected command type: {s}")]
     UnexpectedCommandType { s: String, span: Span },
 
     #[error("invalid device type: {s}")]
     InvalidDeviceType { s: String },
 
-    #[error("missing scope at span {span:?}")]
+    #[error("missing scope")]
     MissingScope { span: Span },
 
-    #[error("missing title at span {span:?}")]
+    #[error("missing title")]
     MissingTitle { span: Span },
 
-    #[error("unmatched '{{' at span {span:?}")]
+    #[error("unmatched '{{'")]
     UnmatchedBrace { span: Span },
 
-    #[error("empty expression inside braces at span {span:?}")]
+    #[error("empty expression inside braces")]
     EmptyExpressionInsideBraces { span: Span },
 }
 
 #[derive(Debug, Error)]
 pub enum ExpressionError {
-    #[error("unexpected token {found:?} at span {span:?}")]
+    #[error("unexpected token {found:?}")]
     UnexpectedToken {
         found: crate::lexer::TokenKind,
         span: Span,
@@ -147,28 +147,37 @@ pub enum ExpressionError {
     #[error("missing token: {message}")]
     MissingToken { message: &'static str },
 
-    #[error("bad prefix operator {op:?} at span {span:?}")]
+    #[error("bad prefix operator {op:?}")]
     BadPrefixOperator {
         op: crate::lexer::TokenKind,
         span: Span,
     },
 
-    #[error("placeholder not evaluatable: {id:?} at span {span:?}")]
-    UnevaluatablePlaceholder { id: crate::expr::PlaceholderId, span: Span },
+    #[error("placeholder not evaluatable: {id:?}")]
+    UnevaluatablePlaceholder {
+        id: crate::expr::PlaceholderId,
+        span: Span,
+    },
 
-    #[error("unknown identifier '{name}' at span {span:?}")]
+    #[error("unknown identifier '{name}'")]
     UnknownIdentifier { name: String, span: Span },
 
-    #[error("unsupported unary operator {op:?} at span {span:?}")]
-    UnsupportedUnaryOperator { op: crate::lexer::TokenKind, span: Span },
+    #[error("unsupported unary operator {op:?}")]
+    UnsupportedUnaryOperator {
+        op: crate::lexer::TokenKind,
+        span: Span,
+    },
 
-    #[error("unsupported binary operator {op:?} at span {span:?}")]
-    UnsupportedBinaryOperator { op: crate::lexer::TokenKind, span: Span },
+    #[error("unsupported binary operator {op:?}")]
+    UnsupportedBinaryOperator {
+        op: crate::lexer::TokenKind,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Error)]
 pub enum SubcircuitError {
-    #[error("missing subcircuit name at span {span:?}")]
+    #[error("missing subcircuit name")]
     MissingSubcircuitName { span: Span },
 
     #[error("subcircuit not found: {name}")]

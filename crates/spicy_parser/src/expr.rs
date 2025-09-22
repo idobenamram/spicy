@@ -149,7 +149,6 @@ impl Expr {
     }
 
     pub fn evaluate(self, scope: &Scope) -> Result<Value, SpicyError> {
-        println!("evaluating expr with type: {:?}", self.r#type);
         match self.r#type {
             ExprType::Value(value) => Ok(value),
             // TODO: support layered expressions with no loops
@@ -160,7 +159,11 @@ impl Expr {
             .into()),
             ExprType::Ident(name) => {
                 let Some(expr) = scope.param_map.get_param(&name).cloned() else {
-                    return Err(ExpressionError::UnknownIdentifier { name, span: self.span }.into());
+                    return Err(ExpressionError::UnknownIdentifier {
+                        name,
+                        span: self.span,
+                    }
+                    .into());
                 };
                 expr.evaluate(scope)
             }
@@ -169,7 +172,11 @@ impl Expr {
                     let value = operand.evaluate(scope)?;
                     Ok(Value::new(-value.get_value(), None, None))
                 }
-                _ => Err(ExpressionError::UnsupportedUnaryOperator { op, span: self.span }.into()),
+                _ => Err(ExpressionError::UnsupportedUnaryOperator {
+                    op,
+                    span: self.span,
+                }
+                .into()),
             },
             ExprType::Binary { op, left, right } => match op {
                 TokenKind::Plus => {
@@ -192,7 +199,11 @@ impl Expr {
                     let right_value = right.evaluate(scope)?;
                     Ok(left_value / right_value)
                 }
-                _ => Err(ExpressionError::UnsupportedBinaryOperator { op, span: self.span }.into()),
+                _ => Err(ExpressionError::UnsupportedBinaryOperator {
+                    op,
+                    span: self.span,
+                }
+                .into()),
             },
         }
     }

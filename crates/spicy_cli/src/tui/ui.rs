@@ -11,7 +11,22 @@ use spicy_parser::error::SpicyError;
 use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
 use crate::tui::app::{App, Tab};
-use crate::tui::graph::{Graph, Series};
+use crate::tui::graph::{Graph, Series, compute_y_bounds};
+
+fn palette_color(index: usize) -> Color {
+    // Stable color mapping for series
+    const COLORS: [Color; 8] = [
+        Color::Yellow,
+        Color::Cyan,
+        Color::LightMagenta,
+        Color::Green,
+        Color::Blue,
+        Color::LightRed,
+        Color::LightCyan,
+        Color::Magenta,
+    ];
+    COLORS[index % COLORS.len()]
+}
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -188,26 +203,21 @@ pub fn draw_tran(
         app.trans_selected_nodes.clone()
     };
 
-    let mut y_min = f64::INFINITY;
-    let mut y_max = f64::NEG_INFINITY;
     let mut datasets: Vec<Series> = Vec::new();
-    let colors = [Color::Yellow, Color::Cyan, Color::LightMagenta, Color::Green, Color::Blue];
-
     for (si, idx) in show_indices.iter().enumerate() {
-        let mut points: Vec<(f64, f64)> = Vec::with_capacity(tr.samples.len());
-        for (ti, t) in tr.times.iter().enumerate() {
-            if *idx < tr.samples[ti].len() {
-                let y = tr.samples[ti][*idx];
-                y_min = y_min.min(y);
-                y_max = y_max.max(y);
-                points.push((*t, y));
-            }
-        }
-        let name = tr.node_names.get(*idx).cloned().unwrap_or_else(|| format!("n{}", idx));
-        datasets.push(Series { name, color: colors[si % colors.len()], points });
+        let values: Vec<f64> = tr
+            .samples
+            .iter()
+            .map(|s| if *idx < s.len() { s[*idx] } else { 0.0 })
+            .collect();
+        let name = tr
+            .node_names
+            .get(*idx)
+            .cloned()
+            .unwrap_or_else(|| format!("n{}", idx));
+        datasets.push(Series::from_times_and_values(name, palette_color(si), &tr.times, &values));
     }
-    if y_min == f64::INFINITY { y_min = 0.0; y_max = 1.0; }
-    if (y_max - y_min).abs() < 1e-12 { y_max = y_min + 1.0; }
+    let [y_min, y_max] = compute_y_bounds(&datasets);
 
     let g = Graph {
         title: "transient",
@@ -217,23 +227,43 @@ pub fn draw_tran(
         y_bounds: [y_min, y_max],
         series: datasets,
         x_is_time: true,
-        x_label_count: 5,
-        y_label_count: 5,
+        x_label_count: 0,
+        y_label_count: 0,
     };
     g.render(f, chunks[0]);
 
-    // Right: node list with selection
+    draw_tran_node_list(f, chunks[1], app, tr);
+}
+
+fn draw_tran_node_list(
+    f: &mut Frame,
+    area: Rect,
+    app: &crate::tui::app::App,
+    tr: &spicy_simulate::trans::TransientResult,
+) {
     let mut rows: Vec<Row> = Vec::new();
+    let current = app.trans_list_index.min(tr.node_names.len().saturating_sub(1));
     for (i, name) in tr.node_names.iter().enumerate() {
         let selected = app.trans_selected_nodes.contains(&i);
+        let is_current = i == current;
         let marker = if selected { "[x]" } else { "[ ]" };
-        rows.push(Row::new(vec![Cell::from(marker), Cell::from(name.clone())]));
+        let sel_cell = if is_current { format!(">{}", marker) } else { format!(" {}", marker) };
+        let mut row = Row::new(vec![Cell::from(sel_cell), Cell::from(name.clone())]);
+        if is_current {
+            let style = if app.focus_right {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            };
+            row = row.style(style);
+        }
+        rows.push(row);
     }
-    let node_table = Table::new(rows, [Constraint::Length(4), Constraint::Min(0)])
+    let node_table = Table::new(rows, [Constraint::Length(6), Constraint::Min(0)])
         .header(Row::new(vec![Cell::from("sel"), Cell::from("node")])
             .style(Style::default().add_modifier(Modifier::BOLD)))
         .block(Block::default().borders(Borders::ALL).title("nodes"));
-    f.render_widget(node_table, chunks[1]);
+    f.render_widget(node_table, area);
 }
 
 pub fn split_v(area: Rect, top: u16) -> [Rect; 2] {

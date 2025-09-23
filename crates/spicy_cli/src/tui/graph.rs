@@ -39,8 +39,10 @@ impl<'a> Graph<'a> {
             .collect();
 
         // Compute labels
-        let x_labels = make_labels(self.x_bounds[0], self.x_bounds[1], self.x_label_count, if self.x_is_time { LabelKind::Time } else { LabelKind::Number });
-        let y_labels = make_labels(self.y_bounds[0], self.y_bounds[1], self.y_label_count, LabelKind::Number);
+        let x_count = if self.x_label_count == 0 { ((area.width as usize) / 12).clamp(3, 8) } else { self.x_label_count };
+        let y_count = if self.y_label_count == 0 { ((area.height as usize) / 3).clamp(3, 8) } else { self.y_label_count };
+        let x_labels = make_labels(self.x_bounds[0], self.x_bounds[1], x_count, if self.x_is_time { LabelKind::Time } else { LabelKind::Number });
+        let y_labels = make_labels(self.y_bounds[0], self.y_bounds[1], y_count, LabelKind::Number);
 
         let chart = Chart::new(datasets)
             .x_axis(
@@ -128,6 +130,32 @@ fn format_si(x: f64) -> String {
         else if ax >= 1e-9 { (1e9, "n") }
         else { (1e12, "p") };
     format!("{:.3}{}", x * scale, suffix)
+}
+
+impl Series {
+    pub fn from_times_and_values(name: String, color: Color, times: &[f64], values: &[f64]) -> Self {
+        let points: Vec<(f64, f64)> = times
+            .iter()
+            .copied()
+            .zip(values.iter().copied())
+            .collect();
+        Self { name, color, points }
+    }
+}
+
+pub fn compute_y_bounds(series: &[Series]) -> [f64; 2] {
+    let mut min_v = f64::INFINITY;
+    let mut max_v = f64::NEG_INFINITY;
+    for s in series {
+        for &(_, y) in &s.points {
+            if y < min_v { min_v = y; }
+            if y > max_v { max_v = y; }
+        }
+    }
+    if min_v == f64::INFINITY { return [0.0, 1.0]; }
+    if (max_v - min_v).abs() < 1e-9 { return [min_v - 0.5, max_v + 0.5]; }
+    let pad = (max_v - min_v) * 0.05;
+    [min_v - pad, max_v + pad]
 }
 
 

@@ -1,7 +1,11 @@
+use crate::nodes::Nodes;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
-use spicy_parser::{netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor}, parser::Deck, Value};
-use crate::nodes::Nodes;
+use spicy_parser::{
+    Value,
+    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor},
+    parser::Deck,
+};
 
 #[derive(Debug)]
 pub struct OperatingPointResult {
@@ -50,8 +54,6 @@ fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: 
     }
 }
 
-
-
 fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
@@ -88,7 +90,7 @@ fn stamp_voltage_source_value(s: &mut Array1<f64>, device: &IndependentSource, n
     s[src_index] = value;
 }
 
-fn stamp_voltage_source(
+pub(crate) fn stamp_voltage_source(
     m: &mut Array2<f64>,
     s: &mut Array1<f64>,
     device: &IndependentSource,
@@ -125,9 +127,7 @@ fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, device: &Inductor, n
     s[src_index] = 0.0;
 }
 
-pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
-    let nodes = Nodes::new(&deck.devices);
-
+pub(crate) fn simulate_op_inner(nodes: &Nodes, devices: &Vec<Device>) -> Array1<f64> {
     let n = nodes.node_len();
     let k = nodes.source_len();
     // Modified nodal analysis matrix
@@ -140,7 +140,7 @@ pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
     // current and voltage source vectors
     let mut s = Array1::<f64>::zeros(n + k);
 
-    for device in &deck.devices {
+    for device in devices {
         match device {
             Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
             Device::Capacitor(_) => {} // capcitors are just open circuits
@@ -157,20 +157,27 @@ pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
     // [I] branch currents for voltage sources (also inductors)
     let x = lu.solve(&s).expect("Failed to solve linear system");
 
+    x
+}
+
+pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
+    let nodes = Nodes::new(&deck.devices);
+    let n = nodes.node_len();
+
+    let x = simulate_op_inner(&nodes, &deck.devices);
+
     let mut voltages = Vec::new();
     let mut currents = Vec::new();
     let node_names = nodes.get_node_names();
     for (i, voltage) in x.slice(s![..n]).iter().enumerate() {
         let name = &node_names[i];
         voltages.push((name.to_string(), *voltage));
-        // println!("{}: {:.6}V", name, voltage);
     }
 
     let source_names = nodes.get_source_names();
     for (i, current) in x.slice(s![n..]).iter().enumerate() {
         let name = &source_names[i];
         currents.push((name.to_string(), *current));
-        // println!("{}: {:.6}A", name, current);
     }
 
     OperatingPointResult { voltages, currents }

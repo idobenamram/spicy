@@ -4,7 +4,7 @@ use crate::expression_phase::substitute_expressions;
 use crate::lexer::{Span, TokenKind, token_text};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
-    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TransCommand,
+    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
 };
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
 use crate::statement_phase::{Statements, StmtCursor};
@@ -574,14 +574,35 @@ impl<'s> Parser<'s> {
         &self,
         cursor: &mut StmtCursor,
         scope: &Scope,
-    ) -> Result<TransCommand, SpicyError> {
+    ) -> Result<TranCommand, SpicyError> {
         let tstep = self.parse_value(cursor, scope)?;
         let tstop = self.parse_value(cursor, scope)?;
 
-        Ok(TransCommand {
+        let mut uic = false;
+        match cursor.peek_non_whitespace() {
+            Some(t) if t.kind == TokenKind::Ident => {
+                let ident = parse_ident(cursor, self.input)?;
+                if ident.to_uppercase() == "UIC" {
+                    uic = true;
+                } else {
+                    return Err(ParserError::UnexpectedToken {
+                        expected: "UIC".to_string(),
+                        found: t.kind,
+                        span: t.span,
+                    }
+                    .into());
+                }
+            }
+            _ => {
+                unimplemented!("tstart and tmax are not yet implemented")
+            }
+        }
+
+        Ok(TranCommand {
             span: cursor.span,
             tstep,
             tstop,
+            uic,
         })
     }
 
@@ -609,7 +630,7 @@ impl<'s> Parser<'s> {
             CommandType::DC => Command::Dc(self.parse_dc_command(&mut cursor, scope)?),
             CommandType::Op => Command::Op(OpCommand { span: cursor.span }),
             CommandType::AC => Command::Ac(self.parse_ac_command(&mut cursor, scope)?),
-            CommandType::Trans => Command::Trans(self.parse_trans_command(&mut cursor, scope)?),
+            CommandType::Tran => Command::Tran(self.parse_trans_command(&mut cursor, scope)?),
             CommandType::End => Command::End,
             _ => {
                 return Err(ParserError::UnexpectedCommandType {

@@ -12,6 +12,7 @@ pub mod ac;
 pub mod dc;
 pub mod trans;
 pub use dc::{DcSweepResult, OperatingPointResult};
+pub use trans::TransientResult;
 
 pub fn simulate(deck: Deck) {
     for command in &deck.commands {

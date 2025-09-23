@@ -15,10 +15,28 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
         KeyCode::Char('g') if !app.focus_right => app.scroll = 0,
         KeyCode::Char('h') => app.tab = prev_tab(app.tab),
         KeyCode::Char('l') => app.tab = next_tab(app.tab),
-        // KeyCode::Char('J') => app.out_idx = (app.out_idx + 1).min(app.outputs.len().saturating_sub(1)),
-        // KeyCode::Char('K') => app.out_idx = app.out_idx.saturating_sub(1),
+        // transient tab node selection
+        KeyCode::Down if app.focus_right && matches!(app.tab, Tab::Trans) => {
+            app.trans_list_index = app.trans_list_index.saturating_add(1);
+        }
+        KeyCode::Up if app.focus_right && matches!(app.tab, Tab::Trans) => {
+            app.trans_list_index = app.trans_list_index.saturating_sub(1);
+        }
+        KeyCode::Enter if app.focus_right && matches!(app.tab, Tab::Trans) => {
+            if let Some(tr) = &app.trans {
+                if !tr.node_names.is_empty() {
+                    let idx = app.trans_list_index.min(tr.node_names.len().saturating_sub(1));
+                    if let Some(pos) = app.trans_selected_nodes.iter().position(|&i| i == idx) {
+                        app.trans_selected_nodes.remove(pos);
+                    } else {
+                        app.trans_selected_nodes.push(idx);
+                    }
+                }
+            }
+        }
         KeyCode::Char('1') => app.tab = Tab::Op,
         KeyCode::Char('2') => app.tab = Tab::DC,
+        KeyCode::Char('3') => app.tab = Tab::Trans,
         // KeyCode::Char('3') => app.tab = Tab::Ac,
         KeyCode::Char('r') => { tx.send(SimCmd::RunCurrentTab(app.tab))?; app.running = true; }
         _ => {}

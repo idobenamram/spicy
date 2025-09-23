@@ -210,7 +210,18 @@ fn simulation_step<'a>(
     x
 }
 
-pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> Vec<(f64, Array1<f64>)> {
+#[derive(Debug, Clone)]
+pub struct TransientResult {
+    pub times: Vec<f64>,
+    /// names for node voltages (index aligned with solution vector 0..n-1)
+    pub node_names: Vec<String>,
+    /// names for voltage source currents (index aligned after nodes)
+    pub source_names: Vec<String>,
+    /// one sample per time with all unknowns (node voltages and source currents)
+    pub samples: Vec<Vec<f64>>,
+}
+
+pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
     let tstep = cmd.tstep.get_value();
     let tstop = cmd.tstop.get_value();
 
@@ -233,11 +244,13 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> Vec<(f64, Array1<f64>)>
         previous: initial_condition,
     };
 
-    let mut results = Vec::new();
+    let mut times: Vec<f64> = Vec::new();
+    let mut samples: Vec<Vec<f64>> = Vec::new();
 
     // initial sample at t=0 using current state (before any transient step)
     // note this means that for UIC even the the voltage source nodes will have a value of 0 at t=0
-    results.push((0.0, integrator.get_previous_output().clone()));
+    times.push(0.0);
+    samples.push(integrator.get_previous_output().to_vec());
 
     let steps = steps(config.step, tstop);
     for step in steps.into_iter().skip(1) {
@@ -246,8 +259,14 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> Vec<(f64, Array1<f64>)>
         integrator.save_previous_voltage(x.clone());
         config.use_device_ic = false;
 
-        results.push((step, x));
+        times.push(step);
+        samples.push(x.to_vec());
     }
 
-    results
+    TransientResult {
+        times,
+        node_names: nodes.get_node_names(),
+        source_names: nodes.get_source_names(),
+        samples,
+    }
 }

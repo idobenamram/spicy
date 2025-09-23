@@ -1,10 +1,11 @@
-use spicy_parser::{Span, error::SpicyError};
-use spicy_simulate::{DcSweepResult, OperatingPointResult};
+use spicy_parser::{error::SpicyError};
+use spicy_simulate::{DcSweepResult, OperatingPointResult, TransientResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tab {
     Op,
     DC,
+    Trans,
 }
 
 #[derive(Debug)]
@@ -20,6 +21,10 @@ pub struct App {
     pub tab: Tab,
     pub op: Option<OperatingPointResult>,
     pub dc: Option<DcSweepResult>,
+    pub trans: Option<TransientResult>,
+    // Transient UI state
+    pub trans_selected_nodes: Vec<usize>,
+    pub trans_list_index: usize,
 
     // Infra
     pub running: bool,
@@ -37,6 +42,9 @@ impl App {
             tab: Tab::Op,
             op: None,
             dc: None,
+            trans: None,
+            trans_selected_nodes: Vec::new(),
+            trans_list_index: 0,
             running: false,
             focus_right: false,
         }
@@ -46,7 +54,8 @@ impl App {
 pub fn prev_tab(tab: Tab) -> Tab {
     match tab {
         Tab::Op => Tab::DC,
-        Tab::DC => Tab::Op,
+        Tab::DC => Tab::Trans,
+        Tab::Trans => Tab::Op,
         // Tab::Trans => Tab::Op,
         // Tab::Ac => Tab::Trans,
     }
@@ -55,7 +64,8 @@ pub fn prev_tab(tab: Tab) -> Tab {
 pub fn next_tab(tab: Tab) -> Tab {
     match tab {
         Tab::Op => Tab::DC,
-        Tab::DC => Tab::Op,
+        Tab::DC => Tab::Trans,
+        Tab::Trans => Tab::Op,
         // Tab::Trans => Tab::Ac,
         // Tab::Ac => Tab::Op,
     }

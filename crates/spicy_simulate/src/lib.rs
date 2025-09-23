@@ -25,7 +25,7 @@ pub fn simulate(deck: Deck) {
             Command::Ac(command_params) => {
                 let _ = simulate_ac(&deck, &command_params);
             }
-            Command::Trans(command_params) => {
+            Command::Tran(command_params) => {
                 let _ = simulate_trans(&deck, &command_params);
             }
             Command::End => break,

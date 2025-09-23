@@ -14,7 +14,7 @@ pub enum CommandType {
     AC,
     DC,
     Op,
-    Trans,
+    Tran,
     Subcircuit,
     Ends,
     Param,
@@ -27,7 +27,7 @@ impl CommandType {
             "AC" | "ac" => Some(CommandType::AC),
             "DC" | "dc" => Some(CommandType::DC),
             "OP" | "op" => Some(CommandType::Op),
-            "TRANS" | "trans" => Some(CommandType::Trans),
+            "TRAN" | "tran" => Some(CommandType::Tran),
             "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
             "ENDS" | "ends" => Some(CommandType::Ends),
             "PARAM" | "param" => Some(CommandType::Param),
@@ -41,7 +41,7 @@ impl CommandType {
             CommandType::AC => "AC",
             CommandType::DC => "DC",
             CommandType::Op => "OP",
-            CommandType::Trans => "TRANS",
+            CommandType::Tran => "TRAN",
             CommandType::Subcircuit => "SUBCKT",
             CommandType::Ends => "ENDS",
             CommandType::Param => "PARAM",
@@ -81,10 +81,15 @@ pub struct AcCommand {
 }
 
 #[derive(Debug, Clone)]
-pub struct TransCommand {
+pub struct TranCommand {
     pub span: Span,
+    /// printing or plotting increment for line-printer output.
+    /// it is also the suggest computing increment.
     pub tstep: Value,
+    /// the final time for the simulation
     pub tstop: Value,
+    /// use initial conditions
+    pub uic: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +97,7 @@ pub enum Command {
     Op(OpCommand),
     Dc(DcCommand),
     Ac(AcCommand),
-    Trans(TransCommand),
+    Tran(TranCommand),
     End,
 }
 

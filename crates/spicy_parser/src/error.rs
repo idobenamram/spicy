@@ -39,7 +39,8 @@ impl SpicyError {
                 | ParserError::InvalidOperation { span, .. }
                 | ParserError::InvalidParam { span, .. }
                 | ParserError::UnmatchedBrace { span }
-                | ParserError::EmptyExpressionInsideBraces { span } => Some(*span),
+                | ParserError::EmptyExpressionInsideBraces { span }
+                | ParserError::TooManyParameters { span, .. } => Some(*span),
                 ParserError::MissingToken { .. } | ParserError::InvalidDeviceType { .. } => None,
             },
             SpicyError::Expression(ee) => match ee {
@@ -134,6 +135,9 @@ pub enum ParserError {
 
     #[error("empty expression inside braces")]
     EmptyExpressionInsideBraces { span: Span },
+
+    #[error("too many parameters provided (parameter {index} exceeds expected count)")]
+    TooManyParameters { index: usize, span: Span },
 }
 
 #[derive(Debug, Error)]

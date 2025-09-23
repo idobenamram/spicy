@@ -11,6 +11,7 @@ use spicy_parser::error::SpicyError;
 use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
 use crate::tui::app::{App, Tab};
+use crate::tui::graph::{Graph, Series};
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -119,12 +120,17 @@ pub fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
             UiSpan::styled("↯ ", Style::default().fg(Color::Cyan)),
             UiSpan::raw("dc"),
         ]),
+        Line::from(vec![
+            UiSpan::styled("⏱ ", Style::default().fg(Color::LightMagenta)),
+            UiSpan::raw("tran"),
+        ]),
     ];
 
     let tabs = Tabs::new(titles)
         .select(match app.tab {
             Tab::Op => 0,
             Tab::DC => 1,
+            Tab::Trans => 2,
         })
         .block(Block::default().borders(Borders::ALL));
 
@@ -145,6 +151,10 @@ pub fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
         && let Some(dc) = &app.dc
     {
         draw_dc(f, body, dc);
+    } else if app.tab == Tab::Trans
+        && let Some(tr) = &app.trans
+    {
+        draw_tran(f, body, app, tr);
     } else {
         f.render_widget(
             Paragraph::new("no results").block(Block::default().borders(Borders::ALL)),
@@ -158,6 +168,72 @@ pub fn draw_dc(f: &mut Frame, area: Rect, _dc: &DcSweepResult) {
         Paragraph::new(" DC sweep (rendering TBD) ").block(Block::default().borders(Borders::ALL)),
         area,
     );
+}
+
+pub fn draw_tran(
+    f: &mut Frame,
+    area: Rect,
+    app: &crate::tui::app::App,
+    tr: &spicy_simulate::trans::TransientResult,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(area);
+
+    // Left: Chart with GraphType::Line
+    let show_indices = if app.trans_selected_nodes.is_empty() {
+        vec![0usize]
+    } else {
+        app.trans_selected_nodes.clone()
+    };
+
+    let mut y_min = f64::INFINITY;
+    let mut y_max = f64::NEG_INFINITY;
+    let mut datasets: Vec<Series> = Vec::new();
+    let colors = [Color::Yellow, Color::Cyan, Color::LightMagenta, Color::Green, Color::Blue];
+
+    for (si, idx) in show_indices.iter().enumerate() {
+        let mut points: Vec<(f64, f64)> = Vec::with_capacity(tr.samples.len());
+        for (ti, t) in tr.times.iter().enumerate() {
+            if *idx < tr.samples[ti].len() {
+                let y = tr.samples[ti][*idx];
+                y_min = y_min.min(y);
+                y_max = y_max.max(y);
+                points.push((*t, y));
+            }
+        }
+        let name = tr.node_names.get(*idx).cloned().unwrap_or_else(|| format!("n{}", idx));
+        datasets.push(Series { name, color: colors[si % colors.len()], points });
+    }
+    if y_min == f64::INFINITY { y_min = 0.0; y_max = 1.0; }
+    if (y_max - y_min).abs() < 1e-12 { y_max = y_min + 1.0; }
+
+    let g = Graph {
+        title: "transient",
+        x_label: "time",
+        y_label: "V",
+        x_bounds: [*tr.times.first().unwrap_or(&0.0), *tr.times.last().unwrap_or(&1.0)],
+        y_bounds: [y_min, y_max],
+        series: datasets,
+        x_is_time: true,
+        x_label_count: 5,
+        y_label_count: 5,
+    };
+    g.render(f, chunks[0]);
+
+    // Right: node list with selection
+    let mut rows: Vec<Row> = Vec::new();
+    for (i, name) in tr.node_names.iter().enumerate() {
+        let selected = app.trans_selected_nodes.contains(&i);
+        let marker = if selected { "[x]" } else { "[ ]" };
+        rows.push(Row::new(vec![Cell::from(marker), Cell::from(name.clone())]));
+    }
+    let node_table = Table::new(rows, [Constraint::Length(4), Constraint::Min(0)])
+        .header(Row::new(vec![Cell::from("sel"), Cell::from("node")])
+            .style(Style::default().add_modifier(Modifier::BOLD)))
+        .block(Block::default().borders(Borders::ALL).title("nodes"));
+    f.render_widget(node_table, chunks[1]);
 }
 
 pub fn split_v(area: Rect, top: u16) -> [Rect; 2] {

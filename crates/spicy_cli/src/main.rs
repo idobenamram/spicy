@@ -1,9 +1,11 @@
 use std::env;
 use std::fs;
 
-use spicy_parser::parser::parse;
 use spicy_parser::Span;
-use spicy_simulate::simulate; // kept for non-TUI mode
+use spicy_parser::parser::parse;
+use spicy_simulate::simulate;
+
+use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
 
 mod tui;
 
@@ -51,27 +53,23 @@ fn main() {
 }
 
 fn render_error_snippet(src: &str, span: Span) {
-    let len = src.len();
-    if len == 0 { return; }
-    let start = span.start.min(len.saturating_sub(1));
-    let end = span.end.min(len.saturating_sub(1));
-    if start > end { return; }
-
-    // find line bounds
-    let line_start = src[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_end = src[end + 1..].find('\n').map(|i| end + 1 + i).unwrap_or(len);
-    let line = &src[line_start..line_end];
-
-    // compute columns by char count
-    let prefix = &src[line_start..start];
-    let highlight = &src[start..=end];
+    let Some(ld) = LineDiagnostic::new(src, span) else {
+        return;
+    };
+    let prefix = &src[ld.line_start..span.start];
+    let highlight = &src[span.start..=span.end];
+    let line = &src[ld.line_start..ld.line_end];
     let col = prefix.chars().count();
     let width = highlight.chars().count().max(1);
 
     // optionally include line number
-    let line_no = src[..line_start].chars().filter(|&c| c == '\n').count() + 1;
+    let line_no = src[..ld.line_start].chars().filter(|&c| c == '\n').count() + 1;
     eprintln!("{:>4} | {}", line_no, line);
     let underline = "~".repeat(width);
-    eprintln!("     | {:space$}\x1b[31m{}\x1b[0m", "", underline, space = col);
+    eprintln!(
+        "     | {:space$}\x1b[31m{}\x1b[0m",
+        "",
+        underline,
+        space = col
+    );
 }
-

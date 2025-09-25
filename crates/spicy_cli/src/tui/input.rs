@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::tui::app::{App, Tab, prev_tab, next_tab};
+use crate::tui::app::{App, Tab};
 use crate::tui::worker::SimCmd;
 
 pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<bool> {
@@ -13,8 +13,8 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
         KeyCode::Char('k') if !app.focus_right => app.scroll = app.scroll.saturating_sub(1),
         KeyCode::Char('g') if !app.focus_right && k.modifiers.contains(KeyModifiers::SHIFT) => app.scroll = app.netlist.len().saturating_sub(1),
         KeyCode::Char('g') if !app.focus_right => app.scroll = 0,
-        KeyCode::Char('h') => app.tab = prev_tab(app.tab),
-        KeyCode::Char('l') => app.tab = next_tab(app.tab),
+        KeyCode::Char('h') => app.tab = app.tab.next(),
+        KeyCode::Char('l') => app.tab = app.tab.prev(),
         // transient tab node selection
         KeyCode::Down if app.focus_right && matches!(app.tab, Tab::Trans) => {
             app.trans_list_index = app.trans_list_index.saturating_add(1);

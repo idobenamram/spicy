@@ -142,11 +142,7 @@ pub fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
     ];
 
     let tabs = Tabs::new(titles)
-        .select(match app.tab {
-            Tab::Op => 0,
-            Tab::DC => 1,
-            Tab::Trans => 2,
-        })
+        .select(app.tab as u8 as usize)
         .block(Block::default().borders(Borders::ALL));
 
     let tabs_style = if app.focus_right {
@@ -204,26 +200,44 @@ pub fn draw_tran(
     };
 
     let mut datasets: Vec<Series> = Vec::new();
-    for (si, idx) in show_indices.iter().enumerate() {
+
+    for (index, output_index) in show_indices.iter().enumerate() {
         let values: Vec<f64> = tr
             .samples
             .iter()
-            .map(|s| if *idx < s.len() { s[*idx] } else { 0.0 })
+            .map(|s| {
+                if *output_index < s.len() {
+                    s[*output_index]
+                } else {
+                    0.0
+                }
+            })
             .collect();
+
         let name = tr
             .node_names
-            .get(*idx)
+            .get(*output_index)
             .cloned()
-            .unwrap_or_else(|| format!("n{}", idx));
-        datasets.push(Series::from_times_and_values(name, palette_color(si), &tr.times, &values));
+            .unwrap_or_else(|| format!("n{}", output_index));
+
+        datasets.push(Series::from_times_and_values(
+            name,
+            palette_color(index),
+            &tr.times,
+            &values,
+        ));
     }
+
     let [y_min, y_max] = compute_y_bounds(&datasets);
 
     let g = Graph {
         title: "transient",
         x_label: "time",
         y_label: "V",
-        x_bounds: [*tr.times.first().unwrap_or(&0.0), *tr.times.last().unwrap_or(&1.0)],
+        x_bounds: [
+            *tr.times.first().unwrap_or(&0.0),
+            *tr.times.last().unwrap_or(&1.0),
+        ],
         y_bounds: [y_min, y_max],
         series: datasets,
         x_is_time: true,
@@ -242,26 +256,38 @@ fn draw_tran_node_list(
     tr: &spicy_simulate::trans::TransientResult,
 ) {
     let mut rows: Vec<Row> = Vec::new();
-    let current = app.trans_list_index.min(tr.node_names.len().saturating_sub(1));
+    let current = app
+        .trans_list_index
+        .min(tr.node_names.len().saturating_sub(1));
     for (i, name) in tr.node_names.iter().enumerate() {
         let selected = app.trans_selected_nodes.contains(&i);
         let is_current = i == current;
         let marker = if selected { "[x]" } else { "[ ]" };
-        let sel_cell = if is_current { format!(">{}", marker) } else { format!(" {}", marker) };
+        let sel_cell = if is_current {
+            format!(">{}", marker)
+        } else {
+            format!(" {}", marker)
+        };
         let mut row = Row::new(vec![Cell::from(sel_cell), Cell::from(name.clone())]);
         if is_current {
             let style = if app.focus_right {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
             } else {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             };
             row = row.style(style);
         }
         rows.push(row);
     }
     let node_table = Table::new(rows, [Constraint::Length(6), Constraint::Min(0)])
-        .header(Row::new(vec![Cell::from("sel"), Cell::from("node")])
-            .style(Style::default().add_modifier(Modifier::BOLD)))
+        .header(
+            Row::new(vec![Cell::from("sel"), Cell::from("node")])
+                .style(Style::default().add_modifier(Modifier::BOLD)),
+        )
         .block(Block::default().borders(Borders::ALL).title("nodes"));
     f.render_widget(node_table, area);
 }

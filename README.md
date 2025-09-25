@@ -2,6 +2,8 @@
 
 Spicy is a small Rust project for  running basic circuit simulations using Modified Nodal Analysis (MNA).
 
+![Tui example](assets/tui_example.png)
+
 ## Crates
 
 - Parser: see `crates/spicy_parser` ([README](crates/spicy_parser/README.md))

@@ -44,33 +44,30 @@ fn get_previous_voltage(
 }
 
 #[derive(Debug)]
-pub enum Integrator {
+pub enum Integrator<'a> {
     BackwardEuler {
         previous: Array1<f64>,
     },
     Trapezoidal {
         previous_output: Array1<f64>,
-        previous_currents: HashMap<String, f64>,
+        previous_currents: HashMap<&'a str, f64>,
     },
 }
 
-impl Integrator {
+impl<'a> Integrator<'a> {
     fn capcitor_values(
         &self,
         device: &Capacitor,
-        nodes: &Nodes,
-        step: f64,
-        use_device_ic: bool,
+        positive: Option<usize>,
+        negative: Option<usize>,
+        config: &TransientConfig,
     ) -> (f64, f64) {
-        let positive = nodes.get_node_index(&device.positive.name);
-        let negative = nodes.get_node_index(&device.negative.name);
-
         match self {
             Integrator::BackwardEuler { previous } => {
                 let c = device.capacitance.get_value();
-                let g = c / step;
+                let g = c / config.step;
                 let previous_voltage =
-                    get_previous_voltage(previous, positive, negative, &device.ic, use_device_ic);
+                    get_previous_voltage(previous, positive, negative, &device.ic, config.use_device_ic);
                 let i = g * previous_voltage;
                 (g, i)
             }
@@ -79,29 +76,29 @@ impl Integrator {
                 previous_currents,
             } => {
                 let c = device.capacitance.get_value();
-                let g = 2.0 * c / step;
+                let g = 2.0 * c / config.step;
                 let previous_voltage = get_previous_voltage(
                     previous_output,
                     positive,
                     negative,
                     &device.ic,
-                    use_device_ic,
+                    config.use_device_ic,
                 );
-                let previous_current = previous_currents.get(&device.name).unwrap_or(&0.0);
+                let previous_current = previous_currents.get(device.name.as_str()).unwrap_or(&0.0);
                 let i = -g * previous_voltage - previous_current;
                 (g, i)
             }
         }
     }
 
-    fn save_capcitor_current(&mut self, device: &Capacitor, current: f64) {
+    fn save_capcitor_current(&mut self, device: &'a Capacitor, current: f64) {
         match self {
             Integrator::BackwardEuler { previous: _ } => {}
             Integrator::Trapezoidal {
                 previous_currents, ..
             } => {
                 // TODO: i hate this clone
-                previous_currents.insert(device.name.clone(), current);
+                previous_currents.insert(device.name.as_str(), current);
             }
         }
     }
@@ -130,12 +127,11 @@ impl Integrator {
 }
 
 #[derive(Debug)]
-struct TransientState {
+struct TransientConfig {
     /// the increment time
     step: f64,
     /// should only be valid when uic is true and we are on the first iteration
     use_device_ic: bool,
-    integrator: Integrator,
 }
 
 fn stamp_capacitor_trans(
@@ -165,10 +161,11 @@ fn stamp_capacitor_trans(
     }
 }
 
-fn simulation_step(
+fn simulation_step<'a>(
     nodes: &Nodes,
-    devices: &Vec<Device>,
-    state: &mut TransientState,
+    devices: &'a Vec<Device>,
+    config: &TransientConfig,
+    integrator: &mut Integrator<'a>,
 ) -> Array1<f64> {
     let n = nodes.node_len();
     let k = nodes.source_len();
@@ -180,21 +177,24 @@ fn simulation_step(
         match device {
             Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
             Device::Capacitor(device) => {
-                let (g, i) = state.integrator.capcitor_values(
+                let positive = nodes.get_node_index(&device.positive.name);
+                let negative = nodes.get_node_index(&device.negative.name);
+
+                let (g, i) = integrator.capcitor_values(
                     device,
-                    nodes,
-                    state.step,
-                    state.use_device_ic,
+                    positive,
+                    negative,
+                    config
                 );
                 stamp_capacitor_trans(
                     &mut m,
                     &mut s,
-                    nodes.get_node_index(&device.positive.name),
-                    nodes.get_node_index(&device.negative.name),
+                    positive,
+                    negative,
                     g,
                     i,
                 );
-                state.integrator.save_capcitor_current(device, i);
+                integrator.save_capcitor_current(device, i);
             }
             // TODO: we don't support functions on the sources yet
             Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, &device, &nodes),
@@ -224,27 +224,27 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> Vec<(f64, Array1<f64>)>
         true => Array1::<f64>::zeros(n + k),
     };
 
-    let mut state = TransientState {
+    let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
         step: tstep,
         use_device_ic: cmd.uic,
-        integrator: Integrator::BackwardEuler {
-            previous: initial_condition,
-        },
+    };
+    let mut integrator = Integrator::BackwardEuler {
+        previous: initial_condition,
     };
 
     let mut results = Vec::new();
 
     // initial sample at t=0 using current state (before any transient step)
     // note this means that for UIC even the the voltage source nodes will have a value of 0 at t=0
-    results.push((0.0, state.integrator.get_previous_output().clone()));
+    results.push((0.0, integrator.get_previous_output().clone()));
 
-    let steps = steps(state.step, tstop);
+    let steps = steps(config.step, tstop);
     for step in steps.into_iter().skip(1) {
-        let x = simulation_step(&nodes, &deck.devices, &mut state);
+        let x = simulation_step(&nodes, &deck.devices, &config, &mut integrator);
 
-        state.integrator.save_previous_voltage(x.clone());
-        state.use_device_ic = false;
+        integrator.save_previous_voltage(x.clone());
+        config.use_device_ic = false;
 
         results.push((step, x));
     }

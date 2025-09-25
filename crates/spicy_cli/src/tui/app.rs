@@ -1,11 +1,29 @@
-use spicy_parser::{Span, error::SpicyError};
-use spicy_simulate::{DcSweepResult, OperatingPointResult};
+use spicy_parser::{error::SpicyError};
+use spicy_simulate::{DcSweepResult, OperatingPointResult, TransientResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Tab {
     Op,
     DC,
+    Trans,
 }
+
+const TABS: [Tab; 3] = [Tab::Op, Tab::DC, Tab::Trans];
+
+impl Tab {
+    pub fn next(self) -> Tab {
+        let idx = self as usize;
+        let next_idx = (idx + 1) % TABS.len();
+        TABS[next_idx]
+    }
+    pub fn prev(self) -> Tab {
+        let idx = self as usize;
+        let prev_idx = (idx - 1) % TABS.len();
+        TABS[prev_idx]
+    }
+}
+
 
 #[derive(Debug)]
 pub struct App {
@@ -20,6 +38,10 @@ pub struct App {
     pub tab: Tab,
     pub op: Option<OperatingPointResult>,
     pub dc: Option<DcSweepResult>,
+    pub trans: Option<TransientResult>,
+    // Transient UI state
+    pub trans_selected_nodes: Vec<usize>,
+    pub trans_list_index: usize,
 
     // Infra
     pub running: bool,
@@ -37,26 +59,12 @@ impl App {
             tab: Tab::Op,
             op: None,
             dc: None,
+            trans: None,
+            trans_selected_nodes: Vec::new(),
+            trans_list_index: 0,
             running: false,
             focus_right: false,
         }
     }
 }
 
-pub fn prev_tab(tab: Tab) -> Tab {
-    match tab {
-        Tab::Op => Tab::DC,
-        Tab::DC => Tab::Op,
-        // Tab::Trans => Tab::Op,
-        // Tab::Ac => Tab::Trans,
-    }
-}
-
-pub fn next_tab(tab: Tab) -> Tab {
-    match tab {
-        Tab::Op => Tab::DC,
-        Tab::DC => Tab::Op,
-        // Tab::Trans => Tab::Ac,
-        // Tab::Ac => Tab::Op,
-    }
-}

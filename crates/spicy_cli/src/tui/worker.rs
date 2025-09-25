@@ -1,7 +1,8 @@
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
-    DcSweepResult, OperatingPointResult,
+    DcSweepResult, OperatingPointResult, TransientResult,
     dc::{simulate_dc, simulate_op},
+    trans::simulate_trans,
 };
 
 use crate::tui::app::{App, Tab};
@@ -18,6 +19,7 @@ pub enum SimMsg {
     SimulationStarted,
     Op(OperatingPointResult),
     Dc(DcSweepResult),
+    Transient(TransientResult),
     Done,
 }
 
@@ -27,6 +29,7 @@ pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
         SimMsg::SimulationStarted => app.running = true,
         SimMsg::Op(op) => app.op = Some(op),
         SimMsg::Dc(dc) => app.dc = Some(dc),
+        SimMsg::Transient(tr) => app.trans = Some(tr),
         SimMsg::Done => app.running = false,
     }
 }
@@ -34,7 +37,7 @@ pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
 pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
     while let Ok(cmd) = rx.recv() {
         match cmd {
-            SimCmd::RunCurrentTab(tab) => {
+            SimCmd::RunCurrentTab(_tab) => {
                 // Parse
                 let deck = match parse(&netlist) {
                     Ok(deck) => deck,
@@ -56,6 +59,11 @@ pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
                         Command::Dc(command_params) => {
                             let dc = simulate_dc(&deck, &command_params);
                             let _ = tx.send(SimMsg::Dc(dc));
+                            continue;
+                        }
+                        Command::Tran(command_params) => {
+                            let tr = simulate_trans(&deck, &command_params);
+                            let _ = tx.send(SimMsg::Transient(tr));
                             continue;
                         }
                         _ => {}

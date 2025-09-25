@@ -11,6 +11,22 @@ use spicy_parser::error::SpicyError;
 use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
 use crate::tui::app::{App, Tab};
+use crate::tui::graph::{Graph, Series, compute_y_bounds};
+
+fn palette_color(index: usize) -> Color {
+    // Stable color mapping for series
+    const COLORS: [Color; 8] = [
+        Color::Yellow,
+        Color::Cyan,
+        Color::LightMagenta,
+        Color::Green,
+        Color::Blue,
+        Color::LightRed,
+        Color::LightCyan,
+        Color::Magenta,
+    ];
+    COLORS[index % COLORS.len()]
+}
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -119,13 +135,14 @@ pub fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
             UiSpan::styled("↯ ", Style::default().fg(Color::Cyan)),
             UiSpan::raw("dc"),
         ]),
+        Line::from(vec![
+            UiSpan::styled("⏱ ", Style::default().fg(Color::LightMagenta)),
+            UiSpan::raw("tran"),
+        ]),
     ];
 
     let tabs = Tabs::new(titles)
-        .select(match app.tab {
-            Tab::Op => 0,
-            Tab::DC => 1,
-        })
+        .select(app.tab as u8 as usize)
         .block(Block::default().borders(Borders::ALL));
 
     let tabs_style = if app.focus_right {
@@ -145,6 +162,10 @@ pub fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
         && let Some(dc) = &app.dc
     {
         draw_dc(f, body, dc);
+    } else if app.tab == Tab::Trans
+        && let Some(tr) = &app.trans
+    {
+        draw_tran(f, body, app, tr);
     } else {
         f.render_widget(
             Paragraph::new("no results").block(Block::default().borders(Borders::ALL)),
@@ -158,6 +179,117 @@ pub fn draw_dc(f: &mut Frame, area: Rect, _dc: &DcSweepResult) {
         Paragraph::new(" DC sweep (rendering TBD) ").block(Block::default().borders(Borders::ALL)),
         area,
     );
+}
+
+pub fn draw_tran(
+    f: &mut Frame,
+    area: Rect,
+    app: &crate::tui::app::App,
+    tr: &spicy_simulate::trans::TransientResult,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(area);
+
+    // Left: Chart with GraphType::Line
+    let show_indices = if app.trans_selected_nodes.is_empty() {
+        vec![0usize]
+    } else {
+        app.trans_selected_nodes.clone()
+    };
+
+    let mut datasets: Vec<Series> = Vec::new();
+
+    for (index, output_index) in show_indices.iter().enumerate() {
+        let values: Vec<f64> = tr
+            .samples
+            .iter()
+            .map(|s| {
+                if *output_index < s.len() {
+                    s[*output_index]
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+
+        let name = tr
+            .node_names
+            .get(*output_index)
+            .cloned()
+            .unwrap_or_else(|| format!("n{}", output_index));
+
+        datasets.push(Series::from_times_and_values(
+            name,
+            palette_color(index),
+            &tr.times,
+            &values,
+        ));
+    }
+
+    let [y_min, y_max] = compute_y_bounds(&datasets);
+
+    let g = Graph {
+        title: "transient",
+        x_label: "time",
+        y_label: "V",
+        x_bounds: [
+            *tr.times.first().unwrap_or(&0.0),
+            *tr.times.last().unwrap_or(&1.0),
+        ],
+        y_bounds: [y_min, y_max],
+        series: datasets,
+        x_is_time: true,
+        x_label_count: 0,
+        y_label_count: 0,
+    };
+    g.render(f, chunks[0]);
+
+    draw_tran_node_list(f, chunks[1], app, tr);
+}
+
+fn draw_tran_node_list(
+    f: &mut Frame,
+    area: Rect,
+    app: &crate::tui::app::App,
+    tr: &spicy_simulate::trans::TransientResult,
+) {
+    let mut rows: Vec<Row> = Vec::new();
+    let current = app
+        .trans_list_index
+        .min(tr.node_names.len().saturating_sub(1));
+    for (i, name) in tr.node_names.iter().enumerate() {
+        let selected = app.trans_selected_nodes.contains(&i);
+        let is_current = i == current;
+        let marker = if selected { "[x]" } else { "[ ]" };
+        let sel_cell = if is_current {
+            format!(">{}", marker)
+        } else {
+            format!(" {}", marker)
+        };
+        let mut row = Row::new(vec![Cell::from(sel_cell), Cell::from(name.clone())]);
+        if is_current {
+            let style = if app.focus_right {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            };
+            row = row.style(style);
+        }
+        rows.push(row);
+    }
+    let node_table = Table::new(rows, [Constraint::Length(6), Constraint::Min(0)])
+        .header(
+            Row::new(vec![Cell::from("sel"), Cell::from("node")])
+                .style(Style::default().add_modifier(Modifier::BOLD)),
+        )
+        .block(Block::default().borders(Borders::ALL).title("nodes"));
+    f.render_widget(node_table, area);
 }
 
 pub fn split_v(area: Rect, top: u16) -> [Rect; 2] {

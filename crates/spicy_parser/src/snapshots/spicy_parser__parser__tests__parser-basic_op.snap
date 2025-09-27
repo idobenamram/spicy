@@ -55,13 +55,15 @@ Deck {
                     name: "0",
                 },
                 dc: Some(
-                    Value {
-                        value: 1.0,
-                        exponent: None,
-                        suffix: Some(
-                            Milli,
-                        ),
-                    },
+                    Constant(
+                        Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: Some(
+                                Milli,
+                            ),
+                        },
+                    ),
                 ),
                 ac: None,
             },

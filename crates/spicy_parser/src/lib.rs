@@ -6,6 +6,7 @@ mod expression_phase;
 mod parser_utils;
 pub mod parser;
 pub mod netlist_types;
+pub mod netlist_waveform;
 pub mod error;
 pub use lexer::Span;
 pub use expr::Value;

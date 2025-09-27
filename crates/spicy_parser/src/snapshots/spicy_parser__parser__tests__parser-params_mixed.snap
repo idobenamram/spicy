@@ -413,11 +413,13 @@ Deck {
                     name: "0",
                 },
                 dc: Some(
-                    Value {
-                        value: 5.0,
-                        exponent: None,
-                        suffix: None,
-                    },
+                    Constant(
+                        Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                    ),
                 ),
                 ac: None,
             },
@@ -432,13 +434,15 @@ Deck {
                     name: "n4",
                 },
                 dc: Some(
-                    Value {
-                        value: 1.2,
-                        exponent: None,
-                        suffix: Some(
-                            Kilo,
-                        ),
-                    },
+                    Constant(
+                        Value {
+                            value: 1.2,
+                            exponent: None,
+                            suffix: Some(
+                                Kilo,
+                            ),
+                        },
+                    ),
                 ),
                 ac: None,
             },

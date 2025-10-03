@@ -1,0 +1,8 @@
+* Sinusoidal voltage source driving a resistor divider
+V1 in 0 SIN(0 1 1)
+R1 in out 1k
+R2 out 0 2k
+.TRAN 0.001 1 uic
+.END
+
+

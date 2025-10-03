@@ -141,8 +141,10 @@ impl WaveForm {
                 if t < td {
                     return v0;
                 }
+
+                let input = (2.0 * PI * f * (t - td) + ph).rem_euclid(2.0 * PI);
                 let y =
-                    v0 + va * f64::exp(-(t - td) * theta) * f64::sin(2.0 * PI * f * (t - td) + ph);
+                    v0 + va * f64::exp(-(t - td) * theta) * f64::sin(input);
                 return y;
             }
             WaveForm::Exponential {

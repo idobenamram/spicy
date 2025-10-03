@@ -52,7 +52,7 @@ fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: 
     }
 }
 
-fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
+pub(crate) fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     let src_index = nodes

@@ -4,7 +4,7 @@ use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
     Value,
     netlist_types::Device,
-    netlist_types::{AcCommand, AcSweepType, Capacitor, IndependentSource, Inductor},
+    netlist_types::{AcCommand, AcSweepType, IndependentSource, Inductor},
     parser::Deck,
 };
 

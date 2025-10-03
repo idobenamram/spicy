@@ -1,9 +1,9 @@
+use crate::error::{ParserError, SpicyError};
 use crate::{
     lexer::{Lexer, Span, Token, TokenKind, token_text},
     netlist_types::{CommandType, DeviceType},
 };
 use serde::Serialize;
-use crate::error::{ParserError, SpicyError};
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct Statement {
@@ -14,7 +14,9 @@ pub(crate) struct Statement {
 impl Statement {
     fn new(tokens: Vec<Token>) -> Result<Self, ParserError> {
         if tokens.is_empty() {
-            return Err(ParserError::EmptyStatement { span: Span::new(0, 0) });
+            return Err(ParserError::EmptyStatement {
+                span: Span::new(0, 0),
+            });
         }
 
         let start = tokens[0].span.start;
@@ -44,7 +46,11 @@ pub(crate) struct StmtCursor<'a> {
 
 impl<'a> StmtCursor<'a> {
     pub(crate) fn new(tokens: &'a [Token], span: Span) -> Self {
-        Self { toks: tokens, i: 0, span }
+        Self {
+            toks: tokens,
+            i: 0,
+            span,
+        }
     }
 
     #[inline]
@@ -129,10 +135,17 @@ impl<'a> StmtCursor<'a> {
             }
             .into());
         }
-        Err(ParserError::MissingToken { message: "token", span: self.peek_span().unwrap_or(Span::new(0, 0)) }.into())
+        Err(ParserError::MissingToken {
+            message: "token",
+            span: self.peek_span().unwrap_or(Span::new(0, 0)),
+        }
+        .into())
     }
 
-    pub(crate) fn expect_non_whitespace(&mut self, kind: TokenKind) -> Result<&'a Token, SpicyError> {
+    pub(crate) fn expect_non_whitespace(
+        &mut self,
+        kind: TokenKind,
+    ) -> Result<&'a Token, SpicyError> {
         self.skip_ws();
         self.expect(kind)
     }
@@ -152,7 +165,11 @@ impl<'a> StmtCursor<'a> {
         false
     }
 
-    pub(crate) fn consume_if_device(&mut self, input: &'a str, device: DeviceType) -> Option<&'a str> {
+    pub(crate) fn consume_if_device(
+        &mut self,
+        input: &'a str,
+        device: DeviceType,
+    ) -> Option<&'a str> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if let Some(t) = self.consume(TokenKind::Ident) {
@@ -199,6 +216,27 @@ impl<'a> StmtCursor<'a> {
         }
 
         result
+    }
+
+    pub(crate) fn split_on(&mut self, stop_on: TokenKind) -> Result<StmtCursor<'a>, SpicyError> {
+        let mut before = None;
+
+        for (offset, tok) in self.toks[self.i..].iter().enumerate() {
+            if tok.kind == stop_on {
+                before = Some(StmtCursor {
+                    toks: &self.toks[self.i..self.i + offset],
+                    span: Span::new(self.i, self.i + offset),
+                    i: 0,
+                });
+                self.i += offset;
+                break;
+            }
+        }
+
+        Ok(before.ok_or_else(|| ParserError::MissingToken {
+            message: "expected token",
+            span: self.span,
+        })?)
     }
 }
 

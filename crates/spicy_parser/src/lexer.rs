@@ -38,17 +38,24 @@ impl TokenKind {
 pub struct Span {
     pub start: usize,
     pub end: usize,
+    pub source_index: u16
 }
 
+
 impl Span {
-    pub fn new(start: usize, end: usize) -> Self {
-        Self { start, end }
+    pub fn new(start: usize, end: usize, source_index: u16) -> Self {
+        Self { start, end, source_index }
+    }
+
+    pub fn single(pos: usize, source_index: u16) -> Self {
+        Self { start: pos, end: pos, source_index }
     }
 
     pub fn expand(&self) -> Self {
         Self {
             start: self.start - 1,
-            end: self.end + 1
+            end: self.end + 1,
+            source_index: self.source_index,
         }
     }
 }
@@ -61,22 +68,22 @@ pub(crate) struct Token {
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, start: usize, end: usize) -> Self {
-        Self { kind, id: None, span: Span::new(start, end) }
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, id: None, span }
     }
-    pub fn single(kind: TokenKind, pos: usize) -> Self {
+    pub fn single(kind: TokenKind, start: usize, source_index: u16) -> Self {
         Self {
             kind,
             id: None,
-            span: Span::new(pos, pos),
+            span: Span::single(start, source_index),
         }
     }
 
-    pub fn end(pos: usize) -> Self {
+    pub fn end(pos: usize, source_index: u16) -> Self {
         Self {
             kind: TokenKind::EOF,
             id: None,
-            span: Span::new(pos, pos),
+            span: Span::new(pos, pos, source_index),
         }
     }
 
@@ -91,62 +98,64 @@ impl Token {
 
 pub(crate) struct Lexer<'s> {
     s: Scanner<'s>,
+    source_index: u16,
 }
 
 impl<'s> Lexer<'s> {
-    pub fn new(input: &'s str) -> Self {
+    pub fn new(input: &'s str, source_index: u16) -> Self {
         Lexer {
             s: Scanner::new(input),
+            source_index,
         }
     }
 
     fn whitespace(&mut self, start: usize) -> Token {
         self.s.eat_while(|c: char| c.is_whitespace() && c != '\n');
-        Token::new(TokenKind::WhiteSpace, start, self.s.cursor() - 1)
+        Token::new(TokenKind::WhiteSpace, Span::new(start, self.s.cursor() - 1, self.source_index))
     }
 
     fn newline(&mut self, start: usize) -> Token {
         self.s.eat_while(|c: char| c == '\n');
-        Token::new(TokenKind::Newline, start, self.s.cursor() - 1)
+        Token::new(TokenKind::Newline, Span::new(start, self.s.cursor() - 1, self.source_index))
     }
 
     fn identifier(&mut self, first_char: char, start: usize) -> Result<Token, LexerError> {
         // ensure first character is alphabetic, then consume remaining alphanumeric characters
         if !first_char.is_alphabetic() {
-            return Err(LexerError::InvalidIdentifierStart { span: Span::new(start, start) });
+            return Err(LexerError::InvalidIdentifierStart { span: Span::new(start, start, self.source_index) });
         }
         self.s.eat_while(|c: char| c.is_alphanumeric());
         let identifier_end = self.s.cursor() - 1;
 
-        Ok(Token::new(TokenKind::Ident, start, identifier_end))
+        Ok(Token::new(TokenKind::Ident, Span::new(start, identifier_end, self.source_index)))
     }
 
     fn number(&mut self, start: usize) -> Token {
         // eat while numeric characters
         self.s.eat_while(|c: char| c.is_numeric());
         let number_end = self.s.cursor() - 1;
-        Token::new(TokenKind::Number, start, number_end)
+        Token::new(TokenKind::Number, Span::new(start, number_end, self.source_index))
     }
 
     fn netlist(&mut self, c: char, start: usize) -> Result<Token, LexerError> {
         let tok = match c {
             c if c.is_alphabetic() => self.identifier(c, start),
             c if c.is_ascii_digit() => Ok(self.number(start)),
-            '*' => Ok(Token::single(TokenKind::Asterisk, start)),
-            '-' => Ok(Token::single(TokenKind::Minus, start)),
-            '+' => Ok(Token::single(TokenKind::Plus, start)),
-            '=' => Ok(Token::single(TokenKind::Equal, start)),
-            '/' => Ok(Token::single(TokenKind::Slash, start)),
-            '.' => Ok(Token::single(TokenKind::Dot, start)),
-            '{' => Ok(Token::single(TokenKind::LeftBrace, start)),
-            '}' => Ok(Token::single(TokenKind::RightBrace, start)),
-            '(' => Ok(Token::single(TokenKind::LeftParen, start)),
-            ')' => Ok(Token::single(TokenKind::RightParen, start)),
-            ',' => Ok(Token::single(TokenKind::Comma, start)),
-            ':' => Ok(Token::single(TokenKind::Colon, start)),
-            '>' => Ok(Token::single(TokenKind::GreaterThan, start)),
-            '<' => Ok(Token::single(TokenKind::LessThan, start)),
-            _ => return Err(LexerError::UnexpectedCharacter { ch: c, span: Span::new(start, start) }),
+            '*' => Ok(Token::single(TokenKind::Asterisk, start, self.source_index)),
+            '-' => Ok(Token::single(TokenKind::Minus, start, self.source_index)),
+            '+' => Ok(Token::single(TokenKind::Plus, start, self.source_index)),
+            '=' => Ok(Token::single(TokenKind::Equal, start, self.source_index)),
+            '/' => Ok(Token::single(TokenKind::Slash, start, self.source_index)),
+            '.' => Ok(Token::single(TokenKind::Dot, start, self.source_index)),
+            '{' => Ok(Token::single(TokenKind::LeftBrace, start, self.source_index)),
+            '}' => Ok(Token::single(TokenKind::RightBrace, start, self.source_index)),
+            '(' => Ok(Token::single(TokenKind::LeftParen, start, self.source_index)),
+            ')' => Ok(Token::single(TokenKind::RightParen, start, self.source_index)),
+            ',' => Ok(Token::single(TokenKind::Comma, start, self.source_index)),
+            ':' => Ok(Token::single(TokenKind::Colon, start, self.source_index)),
+            '>' => Ok(Token::single(TokenKind::GreaterThan, start, self.source_index)),
+            '<' => Ok(Token::single(TokenKind::LessThan, start, self.source_index)),
+            _ => return Err(LexerError::UnexpectedCharacter { ch: c, span: Span::single(start, self.source_index) }),
         };
         tok
     }

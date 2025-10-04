@@ -2,11 +2,6 @@ use crate::{
     error::{IncludeError, SpicyError}, netlist_types::CommandType, statement_phase::{Statement, Statements, StmtCursor}, ParseOptions, Span
 };
 
-pub struct StatementWithSource<'a> {
-    pub statement: Statement,
-    pub source_map: u16,
-}
-
 fn span_text<'a>(src: &'a str, span: Span) -> &'a str {
     &src[span.start..=span.end]
 }

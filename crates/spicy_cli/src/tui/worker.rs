@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
@@ -36,20 +36,21 @@ pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     }
 }
 
-pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
+pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
+    let input = std::fs::read_to_string(&netlist_path).unwrap();
+    let source_map = SourceMap::new(netlist_path.clone(), input);
+    let mut parse_options = ParseOptions {
+        work_dir: PathBuf::from(&netlist_path).parent().unwrap().to_path_buf(),
+        source_path: PathBuf::from(&netlist_path),
+        source_map,
+    };
     while let Ok(cmd) = rx.recv() {
         match cmd {
             SimCmd::RunCurrentTab(_tab) => {
                 // Parse
                 // TODO: fix
-                let parse_options = ParseOptions {
-                    work_dir: PathBuf::from(""),
-                    source_path: PathBuf::from(""),
-                    input: &netlist,
-                };
-                let mut source_map = SourceMap::new(parse_options.source_path.clone());
 
-                let deck = match parse(&parse_options, &mut source_map) {
+                let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
                         let mut diags = Vec::new();

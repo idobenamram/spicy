@@ -52,14 +52,14 @@ fn main() {
         eprintln!("Failed to read {}: {}", path, e);
         std::process::exit(1);
     });
-    let parser_options = ParseOptions {
+    let source_map = SourceMap::new(PathBuf::from(&path), input);
+    let mut parser_options = ParseOptions {
         work_dir: PathBuf::from(&path).parent().unwrap().to_path_buf(),
         source_path: PathBuf::from(&path),
-        input: &input,
+        source_map,
     };
-    let mut source_map = SourceMap::new(parser_options.source_path.clone());
 
-    match parse(&parser_options, &mut source_map) {
+    match parse(&mut parser_options) {
         Ok(deck) => {
             let base = std::path::Path::new(&path)
                 .file_stem()
@@ -74,7 +74,7 @@ fn main() {
         Err(e) => {
             eprintln!("Parse error: {}", e);
             if let Some(span) = e.error_span()
-                && let Some(input_path) = source_map.get_source(span.source_index)
+                && let Some(input_path) = parser_options.source_map.get_path(span.source_index)
             {
                 eprintln!("");
                 let input = fs::read_to_string(input_path).unwrap_or_else(|e| {

@@ -1,12 +1,12 @@
-use crate::Span;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{ExpressionParser, PlaceholderMap};
 use crate::lexer::{Token, TokenKind};
 use crate::statement_phase::{Statement, Statements};
+use crate::{ParseOptions, Span};
 
 pub fn substitute_expressions(
     statements: &mut Statements,
-    input: &str,
+    input: &ParseOptions,
 ) -> Result<PlaceholderMap, SpicyError> {
     let mut placeholders = PlaceholderMap::default();
 
@@ -23,7 +23,7 @@ pub fn substitute_expressions(
 /// allocate PlaceholderId and push a single Placeholder token instead.
 fn brace_to_placeholders(
     statement: &mut Statement,
-    src: &str,
+    input: &ParseOptions,
     pm: &mut PlaceholderMap,
 ) -> Result<(), SpicyError> {
     let mut cursor = statement.into_cursor();
@@ -59,6 +59,8 @@ fn brace_to_placeholders(
             }
 
             let end_pos = cursor.pos() - 1;
+            // todo: fix this
+            let src = &input.source_map.get_content(tok.span.source_index).unwrap();
             let parsed_expression = ExpressionParser::new(
                 src,
                 expression_tokens.as_slice(),

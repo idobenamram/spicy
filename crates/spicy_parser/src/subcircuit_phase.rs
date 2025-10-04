@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::SourceMap;
 use crate::error::{SpicyError, SubcircuitError};
 use crate::expr::ScopeArena;
 use crate::expr::{Params, Scope, ScopeId};
@@ -46,7 +47,7 @@ pub(crate) struct ScopedStmt {
 
 pub(crate) fn collect_subckts(
     stmts: Statements,
-    input: &str,
+    source_map: &SourceMap,
 ) -> Result<UnexpandedDeck, SpicyError> {
     let mut out = Vec::new();
     let mut table = SubcktTable::default();
@@ -56,6 +57,9 @@ pub(crate) fn collect_subckts(
 
     while let Some(s) = it.next() {
         let mut cursor = s.into_cursor();
+        // todo: fix this
+        let input = source_map.get_content(s.span.source_index).unwrap();
+
         if cursor.consume_if_command(input, CommandType::Param) {
             parse_dot_param(&mut cursor, input, &mut root_env.param_map)?;
             continue;
@@ -196,7 +200,7 @@ pub(crate) struct ExpandedDeck {
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
 pub(crate) fn expand_subckts<'a>(
     mut unexpanded_deck: UnexpandedDeck,
-    src: &'a str,
+    source_map: &SourceMap,
 ) -> Result<ExpandedDeck, SpicyError> {
     let mut out = Vec::new();
 
@@ -204,6 +208,8 @@ pub(crate) fn expand_subckts<'a>(
     for s in unexpanded_deck.statements.into_iter() {
         let mut cursor = s.into_cursor();
 
+        // todo: fix this
+        let src = source_map.get_content(s.span.source_index).unwrap();
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
             let instance_name = instance_name.to_string();
             let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src)?;

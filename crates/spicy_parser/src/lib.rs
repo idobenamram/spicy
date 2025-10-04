@@ -26,19 +26,14 @@ use crate::{
 #[cfg(test)]
 mod test_utils;
 
-pub struct ParseOptions<'a> {
+pub struct ParseOptions {
     pub work_dir: PathBuf,
     pub source_path: PathBuf,
-    pub input: &'a str,
+    pub source_map: SourceMap,
 }
 
-impl<'a> ParseOptions<'a> {
-    pub fn read_file(
-        &self,
-        path_str: &str,
-        span: Span,
-        source_map: &mut SourceMap,
-    ) -> Result<(String, u16), SpicyError> {
+impl ParseOptions {
+    pub fn read_file(&mut self, path_str: &str, span: Span) -> Result<(String, u16), SpicyError> {
         let path = Path::new(path_str);
         if path.is_absolute() {
             let content = std::fs::read_to_string(&path).map_err(|error| {
@@ -49,7 +44,9 @@ impl<'a> ParseOptions<'a> {
                 })
             })?;
             let path_buf = path.to_path_buf();
-            let source_index = source_map.new_source(path_buf.clone());
+            let source_index = self
+                .source_map
+                .new_source(path_buf.clone(), content.clone());
             return Ok((content, source_index));
         }
 
@@ -65,7 +62,9 @@ impl<'a> ParseOptions<'a> {
                 })
             })?;
             let path_buf = candidate1.clone();
-            let source_index = source_map.new_source(path_buf.clone());
+            let source_index = self
+                .source_map
+                .new_source(path_buf.clone(), content.clone());
             return Ok((content, source_index));
         }
         checked_paths.push(candidate1);
@@ -82,7 +81,9 @@ impl<'a> ParseOptions<'a> {
                     })
                 })?;
                 let path_buf = candidate2.clone();
-                let source_index = source_map.new_source(path_buf.clone());
+                let source_index = self
+                    .source_map
+                    .new_source(path_buf.clone(), content.clone());
                 return Ok((content, source_index));
             }
             checked_paths.push(candidate2);
@@ -99,13 +100,16 @@ impl<'a> ParseOptions<'a> {
     }
 }
 
-pub fn parse(options: &ParseOptions, source_map: &mut SourceMap) -> Result<Deck, SpicyError> {
-    let stream = statement_phase::Statements::new(&options.input, source_map.main_index())?;
-    let mut stream = include_libs(stream, options, source_map)?;
-    let placeholders_map = substitute_expressions(&mut stream, &options.input)?;
-    let unexpanded_deck = collect_subckts(stream, &options.input)?;
-    let expanded_deck = expand_subckts(unexpanded_deck, &options.input)?;
-    let mut parser = InstanceParser::new(expanded_deck, placeholders_map, options.input);
+pub fn parse(options: &mut ParseOptions) -> Result<Deck, SpicyError> {
+    let stream = statement_phase::Statements::new(
+        &options.source_map.get_main_content(),
+        options.source_map.main_index(),
+    )?;
+    let mut stream = include_libs(stream, options)?;
+    let placeholders_map = substitute_expressions(&mut stream, &options)?;
+    let unexpanded_deck = collect_subckts(stream, &options.source_map)?;
+    let expanded_deck = expand_subckts(unexpanded_deck, &options.source_map)?;
+    let mut parser = InstanceParser::new(expanded_deck, placeholders_map, &options.source_map);
     let deck = parser.parse()?;
 
     Ok(deck)

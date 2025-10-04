@@ -1,7 +1,8 @@
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
 };
+
+use serde::Serialize;
 
 use crate::{
     ParseOptions, Span,
@@ -16,6 +17,23 @@ pub struct SourceMap {
     contents: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct SourceFileId(u16);
+
+/// for tests outside crate
+impl SourceFileId {
+    pub fn dummy() -> Self {
+        Self(0)
+    }
+}
+
+#[cfg(test)]
+impl SourceFileId {
+    pub fn new(index: u16) -> Self {
+        Self(index)
+    }
+}
+
 impl SourceMap {
     const MAIN_INDEX: u16 = 0;
 
@@ -26,19 +44,19 @@ impl SourceMap {
         }
     }
 
-    pub fn new_source(&mut self, path: PathBuf, content: String) -> u16 {
-        let new_index = self.paths.len() as u16;
+    pub fn new_source(&mut self, path: PathBuf, content: String) -> SourceFileId {
+        let new_index = SourceFileId(self.paths.len() as u16);
         self.paths.push(path);
         self.contents.push(content);
         new_index
     }
 
-    pub const fn main_index(&self) -> u16 {
-        Self::MAIN_INDEX
+    pub const fn main_index(&self) -> SourceFileId {
+        SourceFileId(Self::MAIN_INDEX)
     }
 
-    pub fn get_path(&self, index: u16) -> Option<&Path> {
-        self.paths.get(index as usize).map(|x| x.as_path())
+    pub fn get_path(&self, index: SourceFileId) -> Option<&Path> {
+        self.paths.get(index.0 as usize).map(|x| x.as_path())
     }
 
     pub fn get_main_content(&self) -> &str {
@@ -47,9 +65,9 @@ impl SourceMap {
             .expect("main index always exists")
     }
 
-    pub fn get_content(&self, index: u16) -> &str {
+    pub fn get_content(&self, index: SourceFileId) -> &str {
         self.contents
-            .get(index as usize)
+            .get(index.0 as usize)
             .expect("index always exists")
     }
 }

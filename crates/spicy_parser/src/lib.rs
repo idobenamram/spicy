@@ -3,7 +3,7 @@ mod expr;
 mod expression_phase;
 pub mod instance_parser;
 mod lexer;
-mod libs_phase;
+pub mod libs_phase;
 pub mod netlist_types;
 pub mod netlist_waveform;
 mod parser_utils;
@@ -19,7 +19,7 @@ use crate::{
     error::{IncludeError, SpicyError},
     expression_phase::substitute_expressions,
     instance_parser::{Deck, InstanceParser},
-    libs_phase::include_libs,
+    libs_phase::{include_libs, SourceFileId},
     subcircuit_phase::{collect_subckts, expand_subckts},
 };
 
@@ -33,7 +33,7 @@ pub struct ParseOptions {
 }
 
 impl ParseOptions {
-    pub fn read_file(&mut self, path_str: &str, span: Span) -> Result<(String, u16), SpicyError> {
+    pub fn read_file(&mut self, path_str: &str, span: Span) -> Result<(String, SourceFileId), SpicyError> {
         let path = Path::new(path_str);
         if path.is_absolute() {
             let content = std::fs::read_to_string(&path).map_err(|error| {

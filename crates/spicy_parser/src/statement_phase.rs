@@ -1,4 +1,5 @@
 use crate::error::{ParserError, SpicyError};
+use crate::libs_phase::SourceFileId;
 use crate::{
     lexer::{Lexer, Span, Token, TokenKind, token_text},
     netlist_types::{CommandType, DeviceType},
@@ -283,7 +284,7 @@ impl Statements {
         Ok(merged)
     }
 
-    pub(crate) fn new(input: &str, source_index: u16) -> Result<Self, SpicyError> {
+    pub(crate) fn new(input: &str, source_index: SourceFileId) -> Result<Self, SpicyError> {
         let mut lexer = Lexer::new(input, source_index);
         let mut statements = Vec::with_capacity(lexer.num_new_lines);
         let mut token = lexer.next()?;
@@ -318,7 +319,7 @@ mod tests {
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let stream = Statements::new(&input_content).expect("failed to create statements");
+        let stream = Statements::new(&input_content, SourceFileId::new(0)).expect("failed to create statements");
 
         let name = format!(
             "statements-{}",

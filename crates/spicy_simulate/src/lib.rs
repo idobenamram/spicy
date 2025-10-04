@@ -82,12 +82,15 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
 mod tests {
     use super::*;
     use rstest::rstest;
+    use spicy_parser::libs_phase::SourceFileId;
     use spicy_parser::Value;
     use spicy_parser::netlist_types::Node;
     use spicy_parser::netlist_types::{Capacitor, Device, Resistor};
 
     use spicy_parser::Span;
-    use spicy_parser::instance_parser::parse;
+    use spicy_parser::parse;
+    use spicy_parser::{ParseOptions, SourceMap};
+    
 
     use std::path::PathBuf;
 
@@ -96,7 +99,7 @@ mod tests {
     fn make_resistor(name: &str, n1: &str, n2: &str, value: f64) -> Resistor {
         Resistor::new(
             name.to_string(),
-            Span::new(0, 0),
+            Span::new(0, 0, SourceFileId::dummy()),
             Node {
                 name: n1.to_string(),
             },
@@ -109,7 +112,7 @@ mod tests {
     fn make_capacitor(name: &str, n1: &str, n2: &str, value: f64) -> Capacitor {
         Capacitor::new(
             name.to_string(),
-            Span::new(0, 0),
+            Span::new(0, 0, SourceFileId::dummy()),
             Node {
                 name: n1.to_string(),
             },
@@ -150,8 +153,15 @@ mod tests {
 
     #[rstest]
     fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
+
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = parse(&input_content).expect("parse");
+        let source_map = SourceMap::new(input.clone(), input_content);
+        let mut input_options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            source_map,
+        };
+        let deck = parse(&mut input_options).expect("parse");
         let output = simulate_op(&deck);
         let name = format!(
             "simulate-op-{}",
@@ -166,7 +176,13 @@ mod tests {
     #[rstest]
     fn test_simulate_dc(#[files("tests/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = parse(&input_content).expect("parse");
+        let source_map = SourceMap::new(input.clone(), input_content);
+        let mut input_options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            source_map,
+        };
+        let deck = parse(&mut input_options).expect("parse");
         let command = deck.commands[1].clone();
         let output = match command {
             Command::Dc(command) => simulate_dc(&deck, &command),

@@ -273,17 +273,24 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::ParseOptions;
     use crate::expression_phase::substitute_expressions;
     use std::path::PathBuf;
 
     #[rstest]
     fn test_subcircuit_phase(#[files("tests/subcircuit_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut statements = Statements::new(&input_content, 0).expect("statements");
-        let _placeholders_map = substitute_expressions(&mut statements, &input_content);
-        let unexpanded_deck = collect_subckts(statements, &input_content).expect("collect subckts");
-        let expanded_deck =
-            expand_subckts(unexpanded_deck, &input_content).expect("expand subckts");
+        let source_map = SourceMap::new(input.clone(), input_content.clone());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+        };
+        let mut statements =
+            Statements::new(&input_content, input_options.source_map.main_index()).expect("statements");
+        let _placeholders_map = substitute_expressions(&mut statements, &input_options);
+        let unexpanded_deck = collect_subckts(statements, &input_options.source_map).expect("collect subckts");
+        let expanded_deck = expand_subckts(unexpanded_deck, &input_options.source_map).expect("expand subckts");
 
         let name = format!(
             "subcircuit-{}",

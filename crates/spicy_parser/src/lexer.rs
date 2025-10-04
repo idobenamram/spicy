@@ -1,4 +1,4 @@
-use crate::error::LexerError;
+use crate::{error::LexerError, libs_phase::SourceFileId};
 use serde::Serialize;
 use unscanny::Scanner;
 
@@ -39,11 +39,11 @@ impl TokenKind {
 pub struct Span {
     pub start: usize,
     pub end: usize,
-    pub source_index: u16,
+    pub source_index: SourceFileId,
 }
 
 impl Span {
-    pub fn new(start: usize, end: usize, source_index: u16) -> Self {
+    pub fn new(start: usize, end: usize, source_index: SourceFileId) -> Self {
         Self {
             start,
             end,
@@ -51,7 +51,7 @@ impl Span {
         }
     }
 
-    pub fn single(pos: usize, source_index: u16) -> Self {
+    pub fn single(pos: usize, source_index: SourceFileId) -> Self {
         Self {
             start: pos,
             end: pos,
@@ -83,7 +83,7 @@ impl Token {
             span,
         }
     }
-    pub fn single(kind: TokenKind, start: usize, source_index: u16) -> Self {
+    pub fn single(kind: TokenKind, start: usize, source_index: SourceFileId) -> Self {
         Self {
             kind,
             id: None,
@@ -91,7 +91,7 @@ impl Token {
         }
     }
 
-    pub fn end(pos: usize, source_index: u16) -> Self {
+    pub fn end(pos: usize, source_index: SourceFileId) -> Self {
         Self {
             kind: TokenKind::EOF,
             id: None,
@@ -110,12 +110,12 @@ impl Token {
 
 pub(crate) struct Lexer<'s> {
     s: Scanner<'s>,
-    source_index: u16,
+    source_index: SourceFileId,
     pub num_new_lines: usize,
 }
 
 impl<'s> Lexer<'s> {
-    pub fn new(input: &'s str, source_index: u16) -> Self {
+    pub fn new(input: &'s str, source_index: SourceFileId) -> Self {
         let num_new_lines = input.lines().count();
         Lexer {
             s: Scanner::new(input),
@@ -245,7 +245,7 @@ mod tests {
     fn test_lexer(#[files("tests/lexer_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let mut lexer = Lexer::new(&input_content, 0);
+        let mut lexer = Lexer::new(&input_content, SourceFileId::new(0));
         let mut tokens = vec![];
         loop {
             let token = lexer.next().expect("lexing should succeed in tests");

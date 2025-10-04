@@ -857,13 +857,13 @@ mod tests {
         use crate::parse;
 
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let input_options = ParseOptions {
+        let mut source_map = SourceMap::new(input.clone(), input_content);
+        let mut input_options = ParseOptions {
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
-            input: &input_content,
+            source_map,
         };
-        let mut source_map = SourceMap::new(input.clone());
-        let deck = parse(&input_options, &mut source_map).expect("parse");
+        let deck = parse(&mut input_options).expect("parse");
 
         let name = format!(
             "parser-{}",

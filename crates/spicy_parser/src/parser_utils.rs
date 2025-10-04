@@ -215,8 +215,12 @@ pub(crate) fn parse_value_or_placeholder(
     if let Some(placeholder) = cursor.consume(TokenKind::Placeholder) {
         return Ok(Expr::placeholder(placeholder.id.unwrap(), placeholder.span));
     }
-    // TODO: get the correct span
-    Ok(Expr::value(parse_value(cursor, src)?, Span::new(0, 0, 0)))
+    // TODO: i think value should just have a span
+    let cursor_span = cursor.peek_span().ok_or_else(|| ParserError::MissingToken {
+        message: "Expected cursor span",
+        span: cursor.peek_span(),
+    })?;
+    Ok(Expr::value(parse_value(cursor, src)?, cursor_span))
 }
 
 pub(crate) fn parse_equal_expr(

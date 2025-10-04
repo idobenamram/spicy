@@ -362,12 +362,13 @@ fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
 
 pub(crate) struct ExpressionParser<'s> {
     input: &'s str,
-    source_index: u16,
     expression_cursor: StmtCursor<'s>,
 }
 
 impl<'s> ExpressionParser<'s> {
-    pub(crate) fn new(input: &'s str, tokens: &'s [Token], source_index: u16) -> Self {
+    pub(crate) fn new(input: &'s str, tokens: &'s [Token]) -> Self {
+        // todo: can we assume all tokens are from the source index?
+        let source_index = tokens[0].span.source_index;
         let span = Span::new(
             tokens[0].span.start,
             tokens[tokens.len() - 1].span.end,
@@ -376,7 +377,6 @@ impl<'s> ExpressionParser<'s> {
         ExpressionParser {
             input,
             expression_cursor: StmtCursor::new(tokens, span),
-            source_index,
         }
     }
 

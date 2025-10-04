@@ -61,13 +61,8 @@ fn brace_to_placeholders(
             let end_pos = cursor.pos() - 1;
             // todo: fix this
             let src = &input.source_map.get_content(tok.span.source_index).unwrap();
-            let parsed_expression = ExpressionParser::new(
-                src,
-                expression_tokens.as_slice(),
-                // todo: can we assume all tokens are from the same source_index?
-                expression_tokens[0].span.source_index,
-            )
-            .parse()?;
+            let parsed_expression =
+                ExpressionParser::new(src, expression_tokens.as_slice()).parse()?;
 
             let expanded_span = parsed_expression.span.expand();
             let id = pm.fresh(parsed_expression);

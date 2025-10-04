@@ -286,7 +286,7 @@ impl Statements {
 
     pub(crate) fn new(input: &str, source_index: SourceFileId) -> Result<Self, SpicyError> {
         let mut lexer = Lexer::new(input, source_index);
-        let mut statements = Vec::with_capacity(lexer.num_new_lines);
+        let mut statements = Vec::new();
         let mut token = lexer.next()?;
 
         let mut statement = Vec::with_capacity(1024);

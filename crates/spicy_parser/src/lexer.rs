@@ -111,16 +111,13 @@ impl Token {
 pub(crate) struct Lexer<'s> {
     s: Scanner<'s>,
     source_index: SourceFileId,
-    pub num_new_lines: usize,
 }
 
 impl<'s> Lexer<'s> {
     pub fn new(input: &'s str, source_index: SourceFileId) -> Self {
-        let num_new_lines = input.lines().count();
         Lexer {
             s: Scanner::new(input),
             source_index,
-            num_new_lines,
         }
     }
 

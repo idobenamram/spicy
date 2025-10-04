@@ -211,25 +211,25 @@ impl Expr {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
-pub struct PlaceholderId(pub u64);
+pub struct PlaceholderId(u64);
 
 #[derive(Debug, Default, Serialize)]
 pub struct PlaceholderMap {
     pub(crate) next: u64,
-    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<PlaceholderId, Expr>,
+    pub(crate) map: Vec<Expr>,
 }
 
 impl PlaceholderMap {
     pub fn fresh(&mut self, expr: Expr) -> PlaceholderId {
         let id = PlaceholderId(self.next);
         self.next += 1;
-        self.map.insert(id, expr);
+        self.map.push(expr);
         id
     }
 
-    pub fn get(&self, id: PlaceholderId) -> Option<&Expr> {
-        self.map.get(&id)
+    pub fn get(&self, id: PlaceholderId) -> &Expr {
+        // techinically you can unwrap here
+        self.map.get(id.0 as usize).expect("id should be in map")
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::error::{ParserError, SpicyError};
 use crate::expr::Value;
 use crate::expr::{Expr, Params};
-use crate::lexer::{Span, TokenKind, token_text};
+use crate::lexer::{TokenKind, token_text};
 use crate::netlist_types::Node;
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;

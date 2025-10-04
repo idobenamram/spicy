@@ -1,16 +1,15 @@
 use crate::SourceMap;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
-use crate::expression_phase::substitute_expressions;
-use crate::lexer::{Span, Token, TokenKind, token_text};
+use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
     IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
-use crate::statement_phase::{Statements, StmtCursor};
-use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt, collect_subckts, expand_subckts};
+use crate::statement_phase::{StmtCursor};
+use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
 
 #[derive(Debug)]
 pub struct Deck {
@@ -148,8 +147,7 @@ impl<'s> InstanceParser<'s> {
             let expr = self
                 .placeholder_map
                 .get(id)
-                .cloned()
-                .expect("id must be in map");
+                .clone();
             let evaluated = expr.evaluate(scope)?;
             return Ok(evaluated);
         }
@@ -282,8 +280,7 @@ impl<'s> InstanceParser<'s> {
             let expr = self
                 .placeholder_map
                 .get(id)
-                .cloned()
-                .expect("id must be in map");
+                .clone();
             let evaluated = expr.evaluate(scope)?;
             // TODO: kinda ugly
             if evaluated.get_value() == 0.0 {
@@ -305,8 +302,7 @@ impl<'s> InstanceParser<'s> {
             let expr = self
                 .placeholder_map
                 .get(id)
-                .cloned()
-                .expect("id must be in map");
+                .clone();
             let evaluated = expr.evaluate(scope)?;
             let value = evaluated.get_value();
             // TODO: baba

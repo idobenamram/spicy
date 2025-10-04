@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 pub use expr::Value;
 pub use lexer::Span;
+pub use libs_phase::SourceMap;
 
 use crate::{
     error::{IncludeError, SpicyError},
@@ -32,29 +33,40 @@ pub struct ParseOptions<'a> {
 }
 
 impl<'a> ParseOptions<'a> {
-    pub fn read_file(&self, path_str: &str, span: Span) -> Result<String, SpicyError> {
+    pub fn read_file(
+        &self,
+        path_str: &str,
+        span: Span,
+        source_map: &mut SourceMap,
+    ) -> Result<(String, u16), SpicyError> {
         let path = Path::new(path_str);
         if path.is_absolute() {
-            return std::fs::read_to_string(&path).map_err(|e| {
-                SpicyError::Include(crate::error::IncludeError::FileNotFound {
+            let content = std::fs::read_to_string(&path).map_err(|error| {
+                SpicyError::Include(IncludeError::IOError {
                     path: path.to_path_buf(),
-                    checked_paths: vec![],
                     span,
+                    error,
                 })
-            });
+            })?;
+            let path_buf = path.to_path_buf();
+            let source_index = source_map.new_source(path_buf.clone());
+            return Ok((content, source_index));
         }
 
         let mut checked_paths = vec![];
         // Try joining with work_dir first
         let candidate1 = self.work_dir.join(path);
         if candidate1.exists() {
-            return std::fs::read_to_string(&candidate1).map_err(|e| {
+            let content = std::fs::read_to_string(&candidate1).map_err(|e| {
                 SpicyError::Include(IncludeError::IOError {
-                    path: candidate1,
+                    path: candidate1.clone(),
                     span,
                     error: e,
                 })
-            });
+            })?;
+            let path_buf = candidate1.clone();
+            let source_index = source_map.new_source(path_buf.clone());
+            return Ok((content, source_index));
         }
         checked_paths.push(candidate1);
 
@@ -62,13 +74,16 @@ impl<'a> ParseOptions<'a> {
         if let Some(parent) = self.source_path.parent() {
             let candidate2 = parent.join(path);
             if candidate2.exists() {
-                return std::fs::read_to_string(&candidate2).map_err(|e| {
+                let content = std::fs::read_to_string(&candidate2).map_err(|e| {
                     SpicyError::Include(IncludeError::IOError {
-                        path: candidate2,
+                        path: candidate2.clone(),
                         span,
                         error: e,
                     })
-                });
+                })?;
+                let path_buf = candidate2.clone();
+                let source_index = source_map.new_source(path_buf.clone());
+                return Ok((content, source_index));
             }
             checked_paths.push(candidate2);
         }
@@ -84,9 +99,9 @@ impl<'a> ParseOptions<'a> {
     }
 }
 
-pub fn parse(options: &ParseOptions) -> Result<Deck, SpicyError> {
-    let mut stream = statement_phase::Statements::new(&options.input)?;
-    let stream_with_libs = include_libs(stream, options)?;
+pub fn parse(options: &ParseOptions, source_map: &mut SourceMap) -> Result<Deck, SpicyError> {
+    let stream = statement_phase::Statements::new(&options.input, source_map.main_index())?;
+    let mut stream = include_libs(stream, options, source_map)?;
     let placeholders_map = substitute_expressions(&mut stream, &options.input)?;
     let unexpanded_deck = collect_subckts(stream, &options.input)?;
     let expanded_deck = expand_subckts(unexpanded_deck, &options.input)?;

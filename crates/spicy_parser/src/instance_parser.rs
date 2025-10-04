@@ -1,7 +1,7 @@
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expression_phase::substitute_expressions;
-use crate::lexer::{token_text, Span, Token, TokenKind};
+use crate::lexer::{Span, Token, TokenKind, token_text};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
     IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
@@ -41,7 +41,7 @@ impl<'s> ParamParser<'s> {
         let Ok(ident) = cursor.expect(TokenKind::Ident) else {
             return Err(ParserError::MissingToken {
                 message: "ident",
-                span: cursor.span,
+                span: Some(cursor.span),
             }
             .into());
         };
@@ -58,7 +58,7 @@ impl<'s> ParamParser<'s> {
         let Ok(_equal_sign) = cursor.expect(TokenKind::Equal) else {
             return Err(ParserError::MissingToken {
                 message: "equal",
-                span: cursor.span,
+                span: Some(cursor.span),
             }
             .into());
         };
@@ -180,13 +180,13 @@ impl<'s> InstanceParser<'s> {
                         offset: values.get(0).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected offset value for SIN waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         amplitude: values.get(1).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected amplitude value for SIN waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         frequency: values.get(2).cloned(),
@@ -201,13 +201,13 @@ impl<'s> InstanceParser<'s> {
                         initial_value: values.get(0).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected initial value for EXP waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         pulsed_value: values.get(1).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected pulsed value for EXP waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         rise_delay_time: values.get(2).cloned(),
@@ -224,13 +224,13 @@ impl<'s> InstanceParser<'s> {
                         voltage1: values.get(0).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected voltage1 value for PULSE waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         voltage2: values.get(1).cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected voltage2 value for PULSE waveform",
-                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                                span: cursor.peek_span(),
                             }
                         })?,
                         delay: values.get(2).cloned(),
@@ -303,14 +303,14 @@ impl<'s> InstanceParser<'s> {
                     return Ok(value as usize);
                 } else {
                     return Err(ParserError::InvalidNumericLiteral {
-                        span: token.span,
+                        span: Some(token.span),
                         lexeme: format!("{:?}", evaluated),
                     }
                     .into());
                 }
             } else {
                 return Err(ParserError::InvalidNumericLiteral {
-                    span: token.span,
+                    span: Some(token.span),
                     lexeme: format!("{:?}", evaluated),
                 }
                 .into());
@@ -536,9 +536,7 @@ impl<'s> InstanceParser<'s> {
 
                     independent_source.set_ac(phasor);
                 }
-                _ => {
-                    independent_source.set_dc(self.parse_waveform(&token, cursor, scope)?)
-                }
+                _ => independent_source.set_dc(self.parse_waveform(&token, cursor, scope)?),
             };
         } else {
             independent_source.set_dc(WaveForm::Constant(self.parse_value(cursor, scope)?))
@@ -764,14 +762,11 @@ impl<'s> InstanceParser<'s> {
         // TODO: clone is sadge
         let mut statements_iter = self.expanded_deck.statements.clone().into_iter();
         // first line should be a title
-        let title =
-            self.parse_title(
-                &statements_iter
-                    .next()
-                    .ok_or_else(|| ParserError::MissingTitle {
-                        span: Span::new(0, 0),
-                    })?,
-            );
+        let title = self.parse_title(
+            &statements_iter
+                .next()
+                .ok_or_else(|| ParserError::MissingTitle)?,
+        );
 
         let mut commands = vec![];
         let mut devices = vec![];
@@ -781,7 +776,7 @@ impl<'s> InstanceParser<'s> {
 
             let first_token = cursor.peek().ok_or_else(|| ParserError::MissingToken {
                 message: "token",
-                span: cursor.span,
+                span: Some(cursor.span),
             })?;
 
             match first_token.kind {
@@ -824,18 +819,26 @@ impl<'s> InstanceParser<'s> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
 
-    use super::*;
+    use crate::{ParseOptions, libs_phase::SourceMap};
+
     use std::path::PathBuf;
 
     #[rstest]
     fn test_parser(#[files("tests/parser_inputs/*.spicy")] input: PathBuf) {
+        use crate::parse;
+
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let deck = parse(&input_content).expect("parse");
+        let input_options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            input: &input_content,
+        };
+        let mut source_map = SourceMap::new(input.clone());
+        let deck = parse(&input_options, &mut source_map).expect("parse");
 
         let name = format!(
             "parser-{}",

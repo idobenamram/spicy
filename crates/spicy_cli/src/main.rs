@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Parser;
-use spicy_parser::{ParseOptions, Span, parse};
-use spicy_simulate::{simulate, SimulateOptions};
+use spicy_parser::{ParseOptions, SourceMap, Span, parse};
+use spicy_simulate::{SimulateOptions, simulate};
 
 use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
 
@@ -57,20 +57,30 @@ fn main() {
         source_path: PathBuf::from(&path),
         input: &input,
     };
+    let mut source_map = SourceMap::new(parser_options.source_path.clone());
 
-    match parse(&parser_options) {
+    match parse(&parser_options, &mut source_map) {
         Ok(deck) => {
             let base = std::path::Path::new(&path)
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "spicy".to_string());
-            let opts = SimulateOptions { write_raw: args.raw, output_base: Some(base) };
+            let opts = SimulateOptions {
+                write_raw: args.raw,
+                output_base: Some(base),
+            };
             simulate(deck, opts);
         }
         Err(e) => {
             eprintln!("Parse error: {}", e);
-            if let Some(span) = e.error_span() {
+            if let Some(span) = e.error_span()
+                && let Some(input_path) = source_map.get_source(span.source_index)
+            {
                 eprintln!("");
+                let input = fs::read_to_string(input_path).unwrap_or_else(|e| {
+                    eprintln!("Failed to read {}: {}", input_path.display(), e);
+                    std::process::exit(1);
+                });
                 render_error_snippet(&input, span);
             }
             std::process::exit(2);

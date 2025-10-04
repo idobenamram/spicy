@@ -8,7 +8,7 @@ use spicy_simulate::{
 };
 
 use crate::tui::app::{App, Tab};
-use spicy_parser::{error::SpicyError, netlist_types::Command, parse, ParseOptions};
+use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, netlist_types::Command, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
@@ -47,8 +47,9 @@ pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
                     source_path: PathBuf::from(""),
                     input: &netlist,
                 };
+                let mut source_map = SourceMap::new(parse_options.source_path.clone());
 
-                let deck = match parse(&parse_options) {
+                let deck = match parse(&parse_options, &mut source_map) {
                     Ok(deck) => deck,
                     Err(e) => {
                         let mut diags = Vec::new();

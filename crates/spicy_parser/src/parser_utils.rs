@@ -11,7 +11,7 @@ pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<Node, Spi
         .next_non_whitespace()
         .ok_or_else(|| ParserError::MissingToken {
             message: "node",
-            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            span: cursor.peek_span(),
         })?;
 
     if !matches!(node.kind, TokenKind::Ident | TokenKind::Number) {
@@ -35,7 +35,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         .next_non_whitespace()
         .ok_or_else(|| ParserError::MissingToken {
             message: "Expected number or minus",
-            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            span: cursor.peek_span(),
         })?;
 
     // Optional leading minus
@@ -45,7 +45,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
             .next_non_whitespace()
             .ok_or_else(|| ParserError::MissingToken {
                 message: "Expected digits or '.' after '-'",
-                span: t.span,
+                span: Some(t.span),
             })?;
     }
 
@@ -64,7 +64,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                             .next_non_whitespace()
                             .ok_or_else(|| ParserError::MissingToken {
                                 message: "Expected token after '.'",
-                                span: peek.span,
+                                span: Some(peek.span),
                             })?;
 
                     if !matches!(frac.kind, TokenKind::Number) {
@@ -80,7 +80,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                 .next_non_whitespace()
                 .ok_or_else(|| ParserError::MissingToken {
                     message: "Expected digits after '.'",
-                    span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                    span: cursor.peek_span(),
                 })?;
             if !matches!(frac.kind, TokenKind::Number) {
                 return Err(ParserError::ExpectedDigitsAfterDot { span: frac.span }.into());
@@ -118,7 +118,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                 }
                 let exp_digits = cursor.next().ok_or(ParserError::MissingToken {
                     message: "Expected digits after exponent",
-                    span: peek.span,
+                    span: Some(peek.span),
                 })?;
 
                 let exp_digits_str = token_text(src, exp_digits).to_string();
@@ -144,7 +144,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                 if exp_digits_str.is_empty() {
                     return Err(ParserError::MissingToken {
                         message: "Expected digits after exponent",
-                        span: peek.span,
+                        span: Some(peek.span),
                     }
                     .into());
                 }
@@ -170,7 +170,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     let value: f64 = number_str
         .parse()
         .map_err(|_| ParserError::InvalidNumericLiteral {
-            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            span: cursor.peek_span(),
             lexeme: number_str,
         })?;
 
@@ -182,11 +182,11 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
 }
 
 pub(crate) fn parse_usize(cursor: &mut StmtCursor, src: &str) -> Result<usize, SpicyError> {
-    let usize = cursor.expect_non_whitespace(TokenKind::Number)?;
-    let usize_text = token_text(src, usize);
+    let usize_token = cursor.expect_non_whitespace(TokenKind::Number)?;
+    let usize_text = token_text(src, usize_token);
     usize_text.parse::<usize>().map_err(|_| {
         ParserError::InvalidNumericLiteral {
-            span: usize.span,
+            span: Some(usize_token.span),
             lexeme: usize_text.to_string(),
         }
         .into()
@@ -216,7 +216,7 @@ pub(crate) fn parse_value_or_placeholder(
         return Ok(Expr::placeholder(placeholder.id.unwrap(), placeholder.span));
     }
     // TODO: get the correct span
-    Ok(Expr::value(parse_value(cursor, src)?, Span::new(0, 0)))
+    Ok(Expr::value(parse_value(cursor, src)?, Span::new(0, 0, 0)))
 }
 
 pub(crate) fn parse_equal_expr(

@@ -123,7 +123,7 @@ impl Expr {
 
     fn unary(op: Token, operand: Expr) -> Expr {
         Expr {
-            span: Span::new(op.span.start, op.span.end),
+            span: op.span,
             r#type: ExprType::Unary {
                 op: op.kind,
                 operand: Box::new(operand),
@@ -133,7 +133,8 @@ impl Expr {
 
     fn binary(op: TokenKind, lhs: Expr, rhs: Expr) -> Expr {
         Expr {
-            span: Span::new(lhs.span.start, rhs.span.end),
+            // we assume lhs and rhs are both from the same source
+            span: Span::new(lhs.span.start, rhs.span.end, lhs.span.source_index),
             r#type: ExprType::Binary {
                 op,
                 left: Box::new(lhs),
@@ -361,15 +362,21 @@ fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
 
 pub(crate) struct ExpressionParser<'s> {
     input: &'s str,
+    source_index: u16,
     expression_cursor: StmtCursor<'s>,
 }
 
 impl<'s> ExpressionParser<'s> {
-    pub(crate) fn new(input: &'s str, tokens: &'s [Token]) -> Self {
-        let span = Span::new(tokens[0].span.start, tokens[tokens.len() - 1].span.end);
+    pub(crate) fn new(input: &'s str, tokens: &'s [Token], source_index: u16) -> Self {
+        let span = Span::new(
+            tokens[0].span.start,
+            tokens[tokens.len() - 1].span.end,
+            source_index,
+        );
         ExpressionParser {
             input,
             expression_cursor: StmtCursor::new(tokens, span),
+            source_index,
         }
     }
 

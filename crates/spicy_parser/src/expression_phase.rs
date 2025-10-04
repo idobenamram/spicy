@@ -54,13 +54,18 @@ fn brace_to_placeholders(
             {
                 // we found a {} with nothing inside
                 return Err(ParserError::EmptyExpressionInsideBraces {
-                    span: Span::new(tok.span.start, right_brace.span.end),
+                    span: Span::new(tok.span.start, right_brace.span.end, tok.span.source_index),
                 })?;
             }
 
             let end_pos = cursor.pos() - 1;
-            let parsed_expression =
-                ExpressionParser::new(src, expression_tokens.as_slice()).parse()?;
+            let parsed_expression = ExpressionParser::new(
+                src,
+                expression_tokens.as_slice(),
+                // todo: can we assume all tokens are from the same source_index?
+                expression_tokens[0].span.source_index,
+            )
+            .parse()?;
 
             let expanded_span = parsed_expression.span.expand();
             let id = pm.fresh(parsed_expression);

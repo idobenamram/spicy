@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::Span;
 use crate::error::{SpicyError, SubcircuitError};
 use crate::expr::ScopeArena;
 use crate::expr::{Params, Scope, ScopeId};
@@ -45,7 +44,10 @@ pub(crate) struct ScopedStmt {
     pub scope: ScopeId,
 }
 
-pub(crate) fn collect_subckts(stmts: Statements, input: &str) -> Result<UnexpandedDeck, SpicyError> {
+pub(crate) fn collect_subckts(
+    stmts: Statements,
+    input: &str,
+) -> Result<UnexpandedDeck, SpicyError> {
     let mut out = Vec::new();
     let mut table = SubcktTable::default();
     let mut scope_arena = ScopeArena::new();
@@ -156,7 +158,7 @@ fn parse_x_device(
     let subcircuit_name = nodes
         .pop()
         .ok_or_else(|| SubcircuitError::MissingSubcircuitName {
-            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            span: cursor.peek_span(),
         })?
         .name;
 
@@ -271,7 +273,7 @@ mod tests {
     #[rstest]
     fn test_subcircuit_phase(#[files("tests/subcircuit_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut statements = Statements::new(&input_content).expect("statements");
+        let mut statements = Statements::new(&input_content, 0).expect("statements");
         let _placeholders_map = substitute_expressions(&mut statements, &input_content);
         let unexpanded_deck = collect_subckts(statements, &input_content).expect("collect subckts");
         let expanded_deck =

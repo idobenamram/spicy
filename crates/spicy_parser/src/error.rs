@@ -26,18 +26,15 @@ impl SpicyError {
                 LexerError::InvalidIdentifierStart { span } => Some(*span),
             },
             SpicyError::Parser(pe) => match pe {
-                ParserError::EmptyStatement { span }
-                | ParserError::ContinuationWithoutPrevious { span }
+                ParserError::ContinuationWithoutPrevious { span }
                 | ParserError::UnexpectedToken { span, .. }
                 | ParserError::InvalidStartNumeric { span }
                 | ParserError::ExpectedDigitsAfterDot { span }
                 | ParserError::InvalidExponentDigits { span, .. }
-                | ParserError::InvalidNumericLiteral { span, .. }
                 | ParserError::ExpectedBoolZeroOrOne { span }
                 | ParserError::ExpectedIdent { span }
                 | ParserError::MissingPlaceholderId { span }
                 | ParserError::MissingScope { span }
-                | ParserError::MissingTitle { span }
                 | ParserError::UnexpectedCommandType { span, .. }
                 | ParserError::InvalidCommandType { span, .. }
                 | ParserError::InvalidOperation { span, .. }
@@ -45,7 +42,11 @@ impl SpicyError {
                 | ParserError::UnmatchedBrace { span }
                 | ParserError::EmptyExpressionInsideBraces { span }
                 | ParserError::TooManyParameters { span, .. } => Some(*span),
-                ParserError::MissingToken { .. } | ParserError::InvalidDeviceType { .. } => None,
+                ParserError::MissingToken { .. }
+                | ParserError::InvalidDeviceType { .. }
+                | ParserError::EmptyStatement
+                | ParserError::MissingTitle => None,
+                ParserError::InvalidNumericLiteral { span, .. } => *span,
             },
             SpicyError::Expression(ee) => match ee {
                 ExpressionError::UnexpectedToken { span, .. }
@@ -57,12 +58,14 @@ impl SpicyError {
                 ExpressionError::MissingToken { .. } => None,
             },
             SpicyError::Subcircuit(se) => match se {
-                SubcircuitError::MissingSubcircuitName { span }
-                | SubcircuitError::NoNodes { span, .. } => Some(*span),
+                SubcircuitError::MissingSubcircuitName { span } => *span,
+                SubcircuitError::NoNodes { span, .. } => Some(*span),
                 SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
             },
             SpicyError::Include(ie) => match ie {
-                IncludeError::ExpectedPath { span } => Some(*span),
+                IncludeError::ExpectedPath { span }
+                | IncludeError::FileNotFound { span, .. }
+                | IncludeError::IOError { span, .. } => Some(*span),
             },
         }
     }
@@ -80,7 +83,7 @@ pub enum LexerError {
 #[derive(Debug, Error)]
 pub enum ParserError {
     #[error("empty statement")]
-    EmptyStatement { span: Span },
+    EmptyStatement,
 
     #[error("line continuation '+' without a previous statement")]
     ContinuationWithoutPrevious { span: Span },
@@ -93,7 +96,10 @@ pub enum ParserError {
     },
 
     #[error("missing token: {message}")]
-    MissingToken { message: &'static str, span: Span },
+    MissingToken {
+        message: &'static str,
+        span: Option<Span>,
+    },
 
     #[error("invalid start of numeric value")]
     InvalidStartNumeric { span: Span },
@@ -105,7 +111,7 @@ pub enum ParserError {
     InvalidExponentDigits { span: Span, lexeme: String },
 
     #[error("invalid numeric literal '{lexeme}'")]
-    InvalidNumericLiteral { span: Span, lexeme: String },
+    InvalidNumericLiteral { span: Option<Span>, lexeme: String },
 
     #[error("expected boolean '0' or '1'")]
     ExpectedBoolZeroOrOne { span: Span },
@@ -135,7 +141,7 @@ pub enum ParserError {
     MissingScope { span: Span },
 
     #[error("missing title")]
-    MissingTitle { span: Span },
+    MissingTitle,
 
     #[error("unmatched '{{'")]
     UnmatchedBrace { span: Span },
@@ -189,7 +195,7 @@ pub enum ExpressionError {
 #[derive(Debug, Error)]
 pub enum SubcircuitError {
     #[error("missing subcircuit name")]
-    MissingSubcircuitName { span: Span },
+    MissingSubcircuitName { span: Option<Span> },
 
     #[error("subcircuit not found: {name}")]
     NotFound { name: String },
@@ -210,8 +216,12 @@ pub enum IncludeError {
     #[error("expected path")]
     ExpectedPath { span: Span },
 
-    #[error("file not found: {path}")]
-    FileNotFound { path: PathBuf, checked_paths: Vec<PathBuf>, span: Span },
+    #[error("file not found: {path}\nchecked paths:\n{checked_paths:#?}")]
+    FileNotFound {
+        path: PathBuf,
+        checked_paths: Vec<PathBuf>,
+        span: Span,
+    },
 
     #[error("IO error: {error}")]
     IOError {

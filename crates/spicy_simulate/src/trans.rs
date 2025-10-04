@@ -4,12 +4,12 @@ use ndarray::{Array1, Array2};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
     Value,
-    netlist_types::{Capacitor, Device, TranCommand},
+    netlist_types::{Capacitor, Device, IndependentSource, TranCommand},
     parser::Deck,
 };
 
 use crate::{
-    dc::{simulate_op_inner, stamp_resistor, stamp_voltage_source},
+    dc::{simulate_op_inner, stamp_resistor, stamp_voltage_source_incidence},
     nodes::Nodes,
 };
 
@@ -66,8 +66,13 @@ impl<'a> Integrator<'a> {
             Integrator::BackwardEuler { previous } => {
                 let c = device.capacitance.get_value();
                 let g = c / config.step;
-                let previous_voltage =
-                    get_previous_voltage(previous, positive, negative, &device.ic, config.use_device_ic);
+                let previous_voltage = get_previous_voltage(
+                    previous,
+                    positive,
+                    negative,
+                    &device.ic,
+                    config.use_device_ic,
+                );
                 let i = g * previous_voltage;
                 (g, i)
             }
@@ -130,6 +135,10 @@ impl<'a> Integrator<'a> {
 struct TransientConfig {
     /// the increment time
     step: f64,
+    /// the final time for the simulation
+    tstop: f64,
+    /// the current time
+    t: f64,
     /// should only be valid when uic is true and we are on the first iteration
     use_device_ic: bool,
 }
@@ -161,6 +170,25 @@ fn stamp_capacitor_trans(
     }
 }
 
+fn stamp_voltage_source_trans(
+    m: &mut Array2<f64>,
+    s: &mut Array1<f64>,
+    device: &IndependentSource,
+    nodes: &Nodes,
+    config: &TransientConfig,
+) {
+    stamp_voltage_source_incidence(m, device, nodes);
+    let src_index = nodes
+        .get_voltage_source_index(&device.name)
+        .expect("should exist");
+
+    let value = match &device.dc {
+        Some(value) => value.compute(config.t, config.step, config.tstop),
+        None => 0.0,
+    };
+    s[src_index] = value;
+}
+
 fn simulation_step<'a>(
     nodes: &Nodes,
     devices: &'a Vec<Device>,
@@ -180,24 +208,12 @@ fn simulation_step<'a>(
                 let positive = nodes.get_node_index(&device.positive.name);
                 let negative = nodes.get_node_index(&device.negative.name);
 
-                let (g, i) = integrator.capcitor_values(
-                    device,
-                    positive,
-                    negative,
-                    config
-                );
-                stamp_capacitor_trans(
-                    &mut m,
-                    &mut s,
-                    positive,
-                    negative,
-                    g,
-                    i,
-                );
+                let (g, i) = integrator.capcitor_values(device, positive, negative, config);
+                stamp_capacitor_trans(&mut m, &mut s, positive, negative, g, i);
                 integrator.save_capcitor_current(device, i);
             }
             // TODO: we don't support functions on the sources yet
-            Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, &device, &nodes),
+            Device::VoltageSource(device) => stamp_voltage_source_trans(&mut m, &mut s, &device, &nodes, config),
             _ => {
                 unimplemented!("Unsupported device type: {:?}", device)
             }
@@ -238,6 +254,8 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
     let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
         step: tstep,
+        tstop: tstop,
+        t: 0.0,
         use_device_ic: cmd.uic,
     };
     let mut integrator = Integrator::BackwardEuler {
@@ -258,6 +276,7 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
 
         integrator.save_previous_voltage(x.clone());
         config.use_device_ic = false;
+        config.t = step;
 
         times.push(step);
         samples.push(x.to_vec());

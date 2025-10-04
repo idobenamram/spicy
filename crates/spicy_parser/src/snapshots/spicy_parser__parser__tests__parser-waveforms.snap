@@ -1,0 +1,672 @@
+---
+source: crates/spicy_parser/src/parser.rs
+expression: deck
+---
+Deck {
+    title: "waveforms coverage for independent sources",
+    commands: [],
+    devices: [
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 10.0,
+                            exponent: None,
+                            suffix: Some(
+                                Kilo,
+                            ),
+                        },
+                    ),
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 10.0,
+                            exponent: None,
+                            suffix: Some(
+                                Kilo,
+                            ),
+                        },
+                    ),
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 10.0,
+                            exponent: None,
+                            suffix: Some(
+                                Kilo,
+                            ),
+                        },
+                    ),
+                ),
+                ac: Some(
+                    Phasor {
+                        mag: Value {
+                            value: 3.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        phase: Some(
+                            Value {
+                                value: 0.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V1",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        voltage2: Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        delay: None,
+                        rise_time: None,
+                        fall_time: None,
+                        pulse_width: None,
+                        period: None,
+                        number_of_pulses: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        CurrentSource(
+            IndependentSource {
+                name: "I1",
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: Some(
+                                Milli,
+                            ),
+                        },
+                        voltage2: Value {
+                            value: 2.0,
+                            exponent: None,
+                            suffix: Some(
+                                Milli,
+                            ),
+                        },
+                        delay: None,
+                        rise_time: None,
+                        fall_time: None,
+                        pulse_width: None,
+                        period: None,
+                        number_of_pulses: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V2",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        voltage2: Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        delay: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        rise_time: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        fall_time: Some(
+                            Value {
+                                value: 3.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        pulse_width: Some(
+                            Value {
+                                value: 10.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        period: None,
+                        number_of_pulses: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V3",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        voltage2: Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        delay: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        rise_time: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        fall_time: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        pulse_width: Some(
+                            Value {
+                                value: 4.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        period: Some(
+                            Value {
+                                value: 10.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        number_of_pulses: Some(
+                            3,
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V4",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        voltage2: Value {
+                            value: 3.3,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        delay: Some(
+                            Value {
+                                value: 5.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        rise_time: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        fall_time: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        pulse_width: Some(
+                            Value {
+                                value: 20.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        period: Some(
+                            Value {
+                                value: 50.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        number_of_pulses: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V5",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Sinusoidal {
+                        offset: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        amplitude: Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        frequency: None,
+                        delay: None,
+                        damping_factor: None,
+                        phase: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V6",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Sinusoidal {
+                        offset: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        amplitude: Value {
+                            value: 2.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        frequency: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Kilo,
+                                ),
+                            },
+                        ),
+                        delay: Some(
+                            Value {
+                                value: 10.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        damping_factor: Some(
+                            Value {
+                                value: 100.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                        phase: Some(
+                            Value {
+                                value: 45.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        CurrentSource(
+            IndependentSource {
+                name: "I2",
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Sinusoidal {
+                        offset: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        amplitude: Value {
+                            value: 0.5,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        frequency: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Kilo,
+                                ),
+                            },
+                        ),
+                        delay: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        damping_factor: Some(
+                            Value {
+                                value: 0.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                        phase: Some(
+                            Value {
+                                value: 0.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V7",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Exponential {
+                        initial_value: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        pulsed_value: Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        rise_delay_time: None,
+                        rise_time_constant: None,
+                        fall_delay_time: None,
+                        fall_time_constant: None,
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        VoltageSource(
+            IndependentSource {
+                name: "V8",
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Exponential {
+                        initial_value: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        pulsed_value: Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        rise_delay_time: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        rise_time_constant: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        fall_delay_time: Some(
+                            Value {
+                                value: 10.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        fall_time_constant: Some(
+                            Value {
+                                value: 3.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+        ),
+        CurrentSource(
+            IndependentSource {
+                name: "I3",
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Exponential {
+                        initial_value: Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        pulsed_value: Value {
+                            value: 4.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        rise_delay_time: Some(
+                            Value {
+                                value: 5.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        rise_time_constant: Some(
+                            Value {
+                                value: 0.5,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                        fall_delay_time: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        fall_time_constant: Some(
+                            Value {
+                                value: 0.75,
+                                exponent: None,
+                                suffix: Some(
+                                    Nano,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+        ),
+    ],
+}

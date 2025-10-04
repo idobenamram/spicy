@@ -1,11 +1,12 @@
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expression_phase::substitute_expressions;
-use crate::lexer::{Span, TokenKind, token_text};
+use crate::lexer::{token_text, Span, Token, TokenKind};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
     IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
 };
+use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
 use crate::statement_phase::{Statements, StmtCursor};
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt, collect_subckts, expand_subckts};
@@ -144,6 +145,112 @@ impl<'s> Parser<'s> {
             return Ok(evaluated);
         }
         Ok(parse_value(cursor, self.input)?)
+    }
+
+    fn parse_in_parentheses(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+    ) -> Result<Vec<Value>, SpicyError> {
+        cursor.expect(TokenKind::LeftParen)?;
+        let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
+        let mut values = Vec::new();
+        for mut value_tokens in in_parentheses.split_on_whitespace().into_iter() {
+            // TODO: should probably support typechecking here
+            let value = self.parse_value(&mut value_tokens, scope)?;
+            values.push(value);
+        }
+        cursor.expect(TokenKind::RightParen)?;
+
+        Ok(values)
+    }
+
+    fn parse_waveform(
+        &self,
+        ident_token: &Token,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+    ) -> Result<WaveForm, SpicyError> {
+        let ident = token_text(self.input, ident_token);
+        let waveform =
+            match ident.to_uppercase().as_str() {
+                "SIN" => {
+                    let values = self.parse_in_parentheses(cursor, scope)?;
+                    WaveForm::Sinusoidal {
+                        offset: values.get(0).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected offset value for SIN waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        amplitude: values.get(1).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected amplitude value for SIN waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        frequency: values.get(2).cloned(),
+                        delay: values.get(3).cloned(),
+                        damping_factor: values.get(4).cloned(),
+                        phase: values.get(5).cloned(),
+                    }
+                }
+                "EXP" => {
+                    let values = self.parse_in_parentheses(cursor, scope)?;
+                    WaveForm::Exponential {
+                        initial_value: values.get(0).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected initial value for EXP waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        pulsed_value: values.get(1).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected pulsed value for EXP waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        rise_delay_time: values.get(2).cloned(),
+                        rise_time_constant: values.get(3).cloned(),
+                        fall_delay_time: values.get(4).cloned(),
+                        fall_time_constant: values.get(5).cloned(),
+                    }
+                }
+                "PULSE" => {
+                    // TODO: the right thing to do here for type safety is probably something like we did
+                    // with ParamParser, then we don't need to cast the number of pulses to a u64
+                    let values = self.parse_in_parentheses(cursor, scope)?;
+                    WaveForm::Pulse {
+                        voltage1: values.get(0).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected voltage1 value for PULSE waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        voltage2: values.get(1).cloned().ok_or_else(|| {
+                            ParserError::MissingToken {
+                                message: "expected voltage2 value for PULSE waveform",
+                                span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+                            }
+                        })?,
+                        delay: values.get(2).cloned(),
+                        rise_time: values.get(3).cloned(),
+                        fall_time: values.get(4).cloned(),
+                        pulse_width: values.get(5).cloned(),
+                        period: values.get(6).cloned(),
+                        number_of_pulses: values.get(7).cloned().map(|v| v.get_value() as u64),
+                    }
+                }
+                _ => {
+                    return Err(ParserError::InvalidOperation {
+                        operation: ident.to_string(),
+                        span: ident_token.span,
+                    }
+                    .into());
+                }
+            };
+
+        return Ok(waveform);
     }
 
     fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Node, SpicyError> {
@@ -409,29 +516,33 @@ impl<'s> Parser<'s> {
         &self,
         cursor: &mut StmtCursor,
         scope: &Scope,
-        operation: &str,
         independent_source: &mut IndependentSource,
     ) -> Result<(), SpicyError> {
-        match operation {
-            "DC" => independent_source.set_dc(self.parse_value(cursor, scope)?),
-            "AC" => {
-                let mag = self.parse_value(cursor, scope)?;
-                let mut phasor = Phasor::new(mag);
-                if let Some(_) = cursor.peek_non_whitespace() {
-                    let phase = self.parse_value(cursor, scope)?;
-                    phasor.set_phase(phase);
-                }
+        cursor.skip_ws();
+        if let Some(token) = cursor.consume(TokenKind::Ident) {
+            let operation = token_text(self.input, token);
 
-                independent_source.set_ac(phasor);
-            }
-            _ => {
-                return Err(ParserError::InvalidOperation {
-                    operation: operation.to_string(),
-                    span: cursor.span,
+            match operation {
+                "DC" => {
+                    independent_source.set_dc(WaveForm::Constant(self.parse_value(cursor, scope)?))
                 }
-                .into());
-            }
-        };
+                "AC" => {
+                    let mag = self.parse_value(cursor, scope)?;
+                    let mut phasor = Phasor::new(mag);
+                    if let Some(_) = cursor.peek_non_whitespace() {
+                        let phase = self.parse_value(cursor, scope)?;
+                        phasor.set_phase(phase);
+                    }
+
+                    independent_source.set_ac(phasor);
+                }
+                _ => {
+                    independent_source.set_dc(self.parse_waveform(&token, cursor, scope)?)
+                }
+            };
+        } else {
+            independent_source.set_dc(WaveForm::Constant(self.parse_value(cursor, scope)?))
+        }
 
         Ok(())
     }
@@ -450,15 +561,13 @@ impl<'s> Parser<'s> {
         let negative = self.parse_node(cursor, scope)?;
 
         let mut independent_source = IndependentSource::new(name, positive, negative);
-        let operation = parse_ident(cursor, self.input)?;
 
-        self.parse_source_value(cursor, scope, &operation, &mut independent_source)?;
+        self.parse_source_value(cursor, scope, &mut independent_source)?;
         let next_token = cursor.peek_non_whitespace();
 
         match next_token {
             Some(token) if token.kind == TokenKind::Ident => {
-                let operation = parse_ident(cursor, self.input)?;
-                self.parse_source_value(cursor, scope, &operation, &mut independent_source)?;
+                self.parse_source_value(cursor, scope, &mut independent_source)?;
             }
             Some(token) => {
                 return Err(ParserError::UnexpectedToken {

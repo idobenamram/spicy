@@ -1,0 +1,41 @@
+waveforms coverage for independent sources
+
+V1 in 0 10k
+V1 in 0 DC 10k
+V1 in 0 10k AC 3 0
+* PULSE basic with required args only (v1 v2)
+V1 in 0 PULSE(0 5)
+I1 out 0 PULSE(1m 2m)
+
+* PULSE with delay, rise, fall, width, period
+V2 in 0 PULSE(0 5 1u 2u 3u 10u)
+
+* PULSE with all including number of pulses
+V3 in 0 PULSE(0 5 1u 2u 2u 4u 10u 3)
+
+* PULSE with expressions and units
+.param vhi=3.3 vlo=0 td1=5n tr=1n tf=1n pw=20n per=50n
+V4 in 0 PULSE({vlo} {vhi} {td1} {tr} {tf} {pw} {per})
+
+* SIN with required args (offset amplitude)
+V5 in 0 SIN(0 1)
+
+* SIN with frequency, delay, damping, phase
+V6 in 0 SIN(0 2 1k 10u 100 45)
+
+* SIN with expressions
+.param off=0 amp=0.5 f=2k td2=1u theta=0.0 phase=0
+I2 out 0 SIN({off} {amp} {f} {td2} {theta} {phase})
+
+* EXP with required args (v1 v2)
+V7 in 0 EXP(0 5)
+
+* EXP with all optional args
+V8 in 0 EXP(0 5 1u 2u 10u 3u)
+
+* EXP with expressions and units
+.param v1=1 v2=4 td3=2n tau1=0.5n td4=6n tau2=0.75n
+I3 out 0 EXP({v1} {v2} {td1} {tau1} {td2} {tau2})
+
+.END
+

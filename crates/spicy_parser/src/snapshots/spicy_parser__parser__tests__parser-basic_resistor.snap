@@ -165,7 +165,39 @@ Deck {
                 },
                 resistance: Value {
                     value: 2.5,
-                    exponent: None,
+                    exponent: Some(
+                        3.0,
+                    ),
+                    suffix: None,
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "R6",
+                span: Span {
+                    start: 104,
+                    end: 118,
+                },
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "out",
+                },
+                resistance: Value {
+                    value: 2.5,
+                    exponent: Some(
+                        3.0,
+                    ),
                     suffix: None,
                 },
                 ac: None,
@@ -182,8 +214,8 @@ Deck {
             Resistor {
                 name: "R7",
                 span: Span {
-                    start: 104,
-                    end: 119,
+                    start: 120,
+                    end: 135,
                 },
                 positive: Node {
                     name: "in",
@@ -212,8 +244,8 @@ Deck {
             Resistor {
                 name: "R8",
                 span: Span {
-                    start: 121,
-                    end: 135,
+                    start: 137,
+                    end: 151,
                 },
                 positive: Node {
                     name: "in",
@@ -242,8 +274,8 @@ Deck {
             Resistor {
                 name: "R9",
                 span: Span {
-                    start: 137,
-                    end: 149,
+                    start: 153,
+                    end: 165,
                 },
                 positive: Node {
                     name: "in",
@@ -272,8 +304,8 @@ Deck {
             Resistor {
                 name: "R10",
                 span: Span {
-                    start: 151,
-                    end: 166,
+                    start: 167,
+                    end: 182,
                 },
                 positive: Node {
                     name: "in",
@@ -302,8 +334,8 @@ Deck {
             Resistor {
                 name: "R11",
                 span: Span {
-                    start: 168,
-                    end: 180,
+                    start: 184,
+                    end: 196,
                 },
                 positive: Node {
                     name: "in",
@@ -332,8 +364,8 @@ Deck {
             Resistor {
                 name: "R12",
                 span: Span {
-                    start: 182,
-                    end: 196,
+                    start: 198,
+                    end: 212,
                 },
                 positive: Node {
                     name: "in",
@@ -362,8 +394,8 @@ Deck {
             Resistor {
                 name: "R13",
                 span: Span {
-                    start: 198,
-                    end: 211,
+                    start: 214,
+                    end: 227,
                 },
                 positive: Node {
                     name: "in",
@@ -392,8 +424,8 @@ Deck {
             Resistor {
                 name: "R14",
                 span: Span {
-                    start: 213,
-                    end: 227,
+                    start: 229,
+                    end: 243,
                 },
                 positive: Node {
                     name: "in",
@@ -422,8 +454,8 @@ Deck {
             Resistor {
                 name: "R15",
                 span: Span {
-                    start: 229,
-                    end: 241,
+                    start: 245,
+                    end: 257,
                 },
                 positive: Node {
                     name: "in",
@@ -452,8 +484,8 @@ Deck {
             Resistor {
                 name: "R16",
                 span: Span {
-                    start: 243,
-                    end: 255,
+                    start: 259,
+                    end: 271,
                 },
                 positive: Node {
                     name: "in",
@@ -482,8 +514,8 @@ Deck {
             Resistor {
                 name: "R17",
                 span: Span {
-                    start: 257,
-                    end: 274,
+                    start: 273,
+                    end: 289,
                 },
                 positive: Node {
                     name: "in",
@@ -496,9 +528,7 @@ Deck {
                     exponent: Some(
                         -3.0,
                     ),
-                    suffix: Some(
-                        Kilo,
-                    ),
+                    suffix: None,
                 },
                 ac: None,
                 m: None,
@@ -514,8 +544,8 @@ Deck {
             Resistor {
                 name: "R18",
                 span: Span {
-                    start: 276,
-                    end: 291,
+                    start: 291,
+                    end: 306,
                 },
                 positive: Node {
                     name: "in",
@@ -544,8 +574,8 @@ Deck {
             Resistor {
                 name: "R19",
                 span: Span {
-                    start: 293,
-                    end: 309,
+                    start: 308,
+                    end: 324,
                 },
                 positive: Node {
                     name: "in",

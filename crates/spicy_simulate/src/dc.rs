@@ -2,9 +2,7 @@ use crate::nodes::Nodes;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
-    Value,
-    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor},
-    parser::Deck,
+    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor}, netlist_waveform::WaveForm, parser::Deck, Value
 };
 
 #[derive(Debug)]
@@ -42,7 +40,7 @@ fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: 
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     let value = match &device.dc {
-        Some(value) => value.get_value(),
+        Some(value) => value.compute(0.0, 0.0, 0.0),
         None => 0.0,
     };
 
@@ -54,7 +52,7 @@ fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: 
     }
 }
 
-fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
+pub(crate) fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     let src_index = nodes
@@ -84,7 +82,7 @@ fn stamp_voltage_source_value(s: &mut Array1<f64>, device: &IndependentSource, n
         .expect("should exist");
 
     let value = match &device.dc {
-        Some(value) => value.get_value(),
+        Some(value) => value.compute(0.0, 0.0, 0.0),
         None => 0.0,
     };
     s[src_index] = value;
@@ -233,7 +231,7 @@ pub fn simulate_dc(deck: &Deck, command: &DcCommand) -> DcSweepResult {
         let mut s = s_before.clone();
         let device = deck.devices[source_index].clone();
         // TODO: this sucks
-        let value = Value::new(v, None, None);
+        let value = WaveForm::Constant(Value::new(v, None, None));
         match device {
             Device::VoltageSource(mut device) => {
                 device.dc = Some(value);

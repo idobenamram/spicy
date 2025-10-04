@@ -2,7 +2,11 @@
 
 use serde::Serialize;
 
-use crate::{error::{ParserError, SpicyError}, expr::Value, lexer::Span};
+use crate::{
+    error::{ParserError, SpicyError},
+    expr::Value,
+    lexer::Span, netlist_waveform::WaveForm,
+};
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
 pub struct Node {
@@ -292,7 +296,6 @@ pub struct Inductor {
     pub ic: Option<Value>,
 }
 
-
 impl Inductor {
     pub fn new(
         name: String,
@@ -370,16 +373,22 @@ pub struct IndependentSource {
     pub name: String,
     pub positive: Node,
     pub negative: Node,
-    pub dc: Option<Value>,
+    pub dc: Option<WaveForm>,
     pub ac: Option<Phasor>,
 }
 
 impl IndependentSource {
     pub fn new(name: String, positive: Node, negative: Node) -> Self {
-        Self { name, positive, negative, dc: None, ac: None }
+        Self {
+            name,
+            positive,
+            negative,
+            dc: None,
+            ac: None,
+        }
     }
 
-    pub fn set_dc(&mut self, value: Value) {
+    pub fn set_dc(&mut self, value: WaveForm) {
         self.dc = Some(value);
     }
 
@@ -398,7 +407,6 @@ pub enum Device {
 }
 
 impl Device {
-
     pub fn name(&self) -> &str {
         match self {
             Device::Resistor(r) => &r.name,
@@ -418,7 +426,6 @@ impl Device {
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ValueSuffix {

@@ -1,0 +1,4 @@
+* cycle root A
+.include root_cycle_b.spicy
+R1 in out 1k
+.end

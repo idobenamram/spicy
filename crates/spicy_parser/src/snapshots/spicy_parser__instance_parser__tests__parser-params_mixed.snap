@@ -1,5 +1,5 @@
 ---
-source: crates/spicy_parser/src/parser.rs
+source: crates/spicy_parser/src/instance_parser.rs
 expression: deck
 ---
 Deck {
@@ -10,6 +10,9 @@ Deck {
                 span: Span {
                     start: 314,
                     end: 316,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
             },
         ),
@@ -21,6 +24,9 @@ Deck {
                 span: Span {
                     start: 14,
                     end: 84,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n1",
@@ -95,6 +101,9 @@ Deck {
                 span: Span {
                     start: 86,
                     end: 117,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n1",
@@ -167,6 +176,9 @@ Deck {
                 span: Span {
                     start: 119,
                     end: 150,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n1",
@@ -217,6 +229,9 @@ Deck {
                 span: Span {
                     start: 152,
                     end: 215,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n2",
@@ -289,6 +304,9 @@ Deck {
                 span: Span {
                     start: 217,
                     end: 250,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n2",
@@ -361,6 +379,9 @@ Deck {
                 span: Span {
                     start: 252,
                     end: 282,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "n2",

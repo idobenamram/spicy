@@ -285,6 +285,7 @@ mod tests {
             source_map,
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
+            max_include_depth: 10,
         };
         let mut statements =
             Statements::new(&input_content, input_options.source_map.main_index()).expect("statements");

@@ -160,6 +160,7 @@ mod tests {
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
             source_map,
+            max_include_depth: 10,
         };
         let deck = parse(&mut input_options).expect("parse");
         let output = simulate_op(&deck);
@@ -181,6 +182,7 @@ mod tests {
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
             source_map,
+            max_include_depth: 10,
         };
         let deck = parse(&mut input_options).expect("parse");
         let command = deck.commands[1].clone();

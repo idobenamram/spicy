@@ -57,6 +57,7 @@ fn main() {
         work_dir: PathBuf::from(&path).parent().unwrap().to_path_buf(),
         source_path: PathBuf::from(&path),
         source_map,
+        max_include_depth: 10,
     };
 
     match parse(&mut parser_options) {
@@ -73,9 +74,8 @@ fn main() {
         }
         Err(e) => {
             eprintln!("Parse error: {}", e);
-            if let Some(span) = e.error_span()
-                && let Some(input_path) = parser_options.source_map.get_path(span.source_index)
-            {
+            if let Some(span) = e.error_span() {
+                let input_path = parser_options.source_map.get_path(span.source_index);
                 eprintln!("");
                 let input = fs::read_to_string(input_path).unwrap_or_else(|e| {
                     eprintln!("Failed to read {}: {}", input_path.display(), e);

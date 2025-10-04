@@ -65,7 +65,9 @@ impl SpicyError {
             SpicyError::Include(ie) => match ie {
                 IncludeError::ExpectedPath { span }
                 | IncludeError::FileNotFound { span, .. }
-                | IncludeError::IOError { span, .. } => Some(*span),
+                | IncludeError::IOError { span, .. }
+                | IncludeError::MaxDepthExceeded { span, .. }
+                | IncludeError::CycleDetected { span, .. } => Some(*span),
             },
         }
     }
@@ -229,4 +231,10 @@ pub enum IncludeError {
         span: Span,
         error: std::io::Error,
     },
+
+    #[error("maximum include depth exceeded at depth {depth}")]
+    MaxDepthExceeded { span: Span, depth: usize },
+
+    #[error("include cycle detected involving: {path}")]
+    CycleDetected { span: Span, path: PathBuf },
 }

@@ -1,5 +1,5 @@
 ---
-source: crates/spicy_parser/src/parser.rs
+source: crates/spicy_parser/src/instance_parser.rs
 expression: deck
 ---
 Deck {
@@ -12,6 +12,9 @@ Deck {
                 span: Span {
                     start: 15,
                     end: 26,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -42,6 +45,9 @@ Deck {
                 span: Span {
                     start: 28,
                     end: 44,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -72,6 +78,9 @@ Deck {
                 span: Span {
                     start: 46,
                     end: 58,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -100,6 +109,9 @@ Deck {
                 span: Span {
                     start: 60,
                     end: 71,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -128,6 +140,9 @@ Deck {
                 span: Span {
                     start: 73,
                     end: 86,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -156,6 +171,9 @@ Deck {
                 span: Span {
                     start: 88,
                     end: 102,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -186,6 +204,9 @@ Deck {
                 span: Span {
                     start: 104,
                     end: 118,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -216,6 +237,9 @@ Deck {
                 span: Span {
                     start: 120,
                     end: 135,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -246,6 +270,9 @@ Deck {
                 span: Span {
                     start: 137,
                     end: 151,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -276,6 +303,9 @@ Deck {
                 span: Span {
                     start: 153,
                     end: 165,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -306,6 +336,9 @@ Deck {
                 span: Span {
                     start: 167,
                     end: 182,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -336,6 +369,9 @@ Deck {
                 span: Span {
                     start: 184,
                     end: 196,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -366,6 +402,9 @@ Deck {
                 span: Span {
                     start: 198,
                     end: 212,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -396,6 +435,9 @@ Deck {
                 span: Span {
                     start: 214,
                     end: 227,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -426,6 +468,9 @@ Deck {
                 span: Span {
                     start: 229,
                     end: 243,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -456,6 +501,9 @@ Deck {
                 span: Span {
                     start: 245,
                     end: 257,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -486,6 +534,9 @@ Deck {
                 span: Span {
                     start: 259,
                     end: 271,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -516,6 +567,9 @@ Deck {
                 span: Span {
                     start: 273,
                     end: 289,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -546,6 +600,9 @@ Deck {
                 span: Span {
                     start: 291,
                     end: 306,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -576,6 +633,9 @@ Deck {
                 span: Span {
                     start: 308,
                     end: 324,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",

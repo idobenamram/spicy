@@ -43,6 +43,7 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
         work_dir: PathBuf::from(&netlist_path).parent().unwrap().to_path_buf(),
         source_path: PathBuf::from(&netlist_path),
         source_map,
+        max_include_depth: 10,
     };
     while let Ok(cmd) = rx.recv() {
         match cmd {

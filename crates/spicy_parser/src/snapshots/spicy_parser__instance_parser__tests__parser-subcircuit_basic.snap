@@ -1,0 +1,97 @@
+---
+source: crates/spicy_parser/src/instance_parser.rs
+expression: deck
+---
+Deck {
+    title: "basic subcircuit",
+    commands: [],
+    devices: [
+        VoltageSource(
+            IndependentSource {
+                name: "1_V1",
+                positive: Node {
+                    name: "vcc",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                    ),
+                ),
+                ac: None,
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "1_R1",
+                span: Span {
+                    start: 57,
+                    end: 68,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: Node {
+                    name: "in",
+                },
+                negative: Node {
+                    name: "out",
+                },
+                resistance: Value {
+                    value: 1.0,
+                    exponent: None,
+                    suffix: Some(
+                        Kilo,
+                    ),
+                },
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+        Capacitor(
+            Capacitor {
+                name: "1_C2",
+                span: Span {
+                    start: 70,
+                    end: 84,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: Node {
+                    name: "out",
+                },
+                negative: Node {
+                    name: "0",
+                },
+                capacitance: Value {
+                    value: 0.1,
+                    exponent: None,
+                    suffix: Some(
+                        Micro,
+                    ),
+                },
+                mname: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                ic: None,
+            },
+        ),
+    ],
+}

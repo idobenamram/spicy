@@ -19,7 +19,7 @@ use crate::{
     error::{IncludeError, SpicyError},
     expression_phase::substitute_expressions,
     instance_parser::{Deck, InstanceParser},
-    libs_phase::{include_libs, SourceFileId},
+    libs_phase::{SourceFileId, include_libs},
     subcircuit_phase::{collect_subckts, expand_subckts},
 };
 
@@ -30,11 +30,18 @@ pub struct ParseOptions {
     pub work_dir: PathBuf,
     pub source_path: PathBuf,
     pub source_map: SourceMap,
+    pub max_include_depth: usize,
 }
 
 impl ParseOptions {
-    pub fn read_file(&mut self, path_str: &str, span: Span) -> Result<(String, SourceFileId), SpicyError> {
+    pub fn read_file(
+        &mut self,
+        path_str: &str,
+        span: Span,
+    ) -> Result<(SourceFileId, &str), SpicyError> {
         let path = Path::new(path_str);
+
+        // Absolute path: read directly
         if path.is_absolute() {
             let content = std::fs::read_to_string(&path).map_err(|error| {
                 SpicyError::Include(IncludeError::IOError {
@@ -43,14 +50,23 @@ impl ParseOptions {
                     error,
                 })
             })?;
+            // SourceMap::new_source canonicalizes path
             let path_buf = path.to_path_buf();
-            let source_index = self
+            let (source_index, content) = self
                 .source_map
-                .new_source(path_buf.clone(), content.clone());
-            return Ok((content, source_index));
+                .new_source(path_buf.clone(), content)
+                .map_err(|error| {
+                    SpicyError::Include(IncludeError::IOError {
+                        path: path_buf.clone(),
+                        span,
+                        error,
+                    })
+                })?;
+            return Ok((source_index, content));
         }
 
         let mut checked_paths = vec![];
+
         // Try joining with work_dir first
         let candidate1 = self.work_dir.join(path);
         if candidate1.exists() {
@@ -62,10 +78,17 @@ impl ParseOptions {
                 })
             })?;
             let path_buf = candidate1.clone();
-            let source_index = self
+            let (source_index, content) = self
                 .source_map
-                .new_source(path_buf.clone(), content.clone());
-            return Ok((content, source_index));
+                .new_source(path_buf.clone(), content.clone())
+                .map_err(|error| {
+                    SpicyError::Include(IncludeError::IOError {
+                        path: path_buf.clone(),
+                        span,
+                        error,
+                    })
+                })?;
+            return Ok((source_index, content));
         }
         checked_paths.push(candidate1);
 
@@ -81,10 +104,17 @@ impl ParseOptions {
                     })
                 })?;
                 let path_buf = candidate2.clone();
-                let source_index = self
+                let (source_index, content) = self
                     .source_map
-                    .new_source(path_buf.clone(), content.clone());
-                return Ok((content, source_index));
+                    .new_source(path_buf.clone(), content.clone())
+                    .map_err(|error| {
+                        SpicyError::Include(IncludeError::IOError {
+                            path: path_buf.clone(),
+                            span,
+                            error,
+                        })
+                    })?;
+                return Ok((source_index, content));
             }
             checked_paths.push(candidate2);
         }

@@ -1,0 +1,2 @@
+* parent-only root at parent dir
+.include lib_c.spicy

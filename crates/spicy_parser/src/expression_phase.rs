@@ -93,6 +93,7 @@ mod tests {
             source_map,
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
+            max_include_depth: 10,
         };
         let mut statements =
             Statements::new(&input_content, SourceFileId::new(0)).expect("statements");
@@ -118,6 +119,7 @@ mod tests {
             source_map,
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),
+            max_include_depth: 10,
         };
         let mut statements = Statements::new(input, SourceFileId::new(0)).expect("statements");
 

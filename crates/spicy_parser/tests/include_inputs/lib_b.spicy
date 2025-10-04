@@ -1,0 +1,3 @@
+* lib_b contents
+.include lib_c.spicy
+R3 in out 3k

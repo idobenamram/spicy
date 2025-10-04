@@ -1,0 +1,4 @@
+* nested include root
+.include lib_b.spicy
+R1 in 0 1k
+.end

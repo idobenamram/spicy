@@ -12,6 +12,9 @@ Statements {
                     span: Span {
                         start: 0,
                         end: 3,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -20,6 +23,9 @@ Statements {
                     span: Span {
                         start: 4,
                         end: 4,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -28,6 +34,9 @@ Statements {
                     span: Span {
                         start: 5,
                         end: 6,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -36,6 +45,9 @@ Statements {
                     span: Span {
                         start: 7,
                         end: 8,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -44,6 +56,9 @@ Statements {
                     span: Span {
                         start: 9,
                         end: 9,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -52,6 +67,9 @@ Statements {
                     span: Span {
                         start: 10,
                         end: 10,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -60,6 +78,9 @@ Statements {
                     span: Span {
                         start: 11,
                         end: 14,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -68,6 +89,9 @@ Statements {
                     span: Span {
                         start: 15,
                         end: 15,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -76,12 +100,18 @@ Statements {
                     span: Span {
                         start: 16,
                         end: 20,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
             ],
             span: Span {
                 start: 0,
                 end: 20,
+                source_index: SourceFileId(
+                    0,
+                ),
             },
         },
         Statement {
@@ -92,6 +122,9 @@ Statements {
                     span: Span {
                         start: 22,
                         end: 22,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -100,6 +133,9 @@ Statements {
                     span: Span {
                         start: 23,
                         end: 23,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -108,6 +144,9 @@ Statements {
                     span: Span {
                         start: 24,
                         end: 27,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -116,6 +155,9 @@ Statements {
                     span: Span {
                         start: 28,
                         end: 28,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -124,6 +166,9 @@ Statements {
                     span: Span {
                         start: 29,
                         end: 30,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -132,6 +177,9 @@ Statements {
                     span: Span {
                         start: 31,
                         end: 31,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -140,6 +188,9 @@ Statements {
                     span: Span {
                         start: 32,
                         end: 32,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -148,6 +199,9 @@ Statements {
                     span: Span {
                         start: 33,
                         end: 33,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -156,6 +210,9 @@ Statements {
                     span: Span {
                         start: 34,
                         end: 36,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -164,6 +221,9 @@ Statements {
                     span: Span {
                         start: 37,
                         end: 37,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -172,12 +232,18 @@ Statements {
                     span: Span {
                         start: 38,
                         end: 44,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
             ],
             span: Span {
                 start: 22,
                 end: 44,
+                source_index: SourceFileId(
+                    0,
+                ),
             },
         },
         Statement {
@@ -188,6 +254,9 @@ Statements {
                     span: Span {
                         start: 46,
                         end: 47,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -196,6 +265,9 @@ Statements {
                     span: Span {
                         start: 48,
                         end: 48,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -204,6 +276,9 @@ Statements {
                     span: Span {
                         start: 49,
                         end: 50,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -212,6 +287,9 @@ Statements {
                     span: Span {
                         start: 51,
                         end: 51,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -220,6 +298,9 @@ Statements {
                     span: Span {
                         start: 52,
                         end: 54,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -228,6 +309,9 @@ Statements {
                     span: Span {
                         start: 57,
                         end: 57,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -236,6 +320,9 @@ Statements {
                     span: Span {
                         start: 58,
                         end: 58,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -244,6 +331,9 @@ Statements {
                     span: Span {
                         start: 59,
                         end: 59,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -252,12 +342,18 @@ Statements {
                     span: Span {
                         start: 60,
                         end: 60,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
             ],
             span: Span {
                 start: 46,
                 end: 60,
+                source_index: SourceFileId(
+                    0,
+                ),
             },
         },
         Statement {
@@ -268,6 +364,9 @@ Statements {
                     span: Span {
                         start: 62,
                         end: 63,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -276,6 +375,9 @@ Statements {
                     span: Span {
                         start: 64,
                         end: 64,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -284,6 +386,9 @@ Statements {
                     span: Span {
                         start: 65,
                         end: 66,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -292,6 +397,9 @@ Statements {
                     span: Span {
                         start: 67,
                         end: 67,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -300,6 +408,9 @@ Statements {
                     span: Span {
                         start: 68,
                         end: 70,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -308,6 +419,9 @@ Statements {
                     span: Span {
                         start: 73,
                         end: 73,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -316,6 +430,9 @@ Statements {
                     span: Span {
                         start: 74,
                         end: 74,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -324,12 +441,18 @@ Statements {
                     span: Span {
                         start: 75,
                         end: 75,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
             ],
             span: Span {
                 start: 62,
                 end: 75,
+                source_index: SourceFileId(
+                    0,
+                ),
             },
         },
         Statement {
@@ -340,6 +463,9 @@ Statements {
                     span: Span {
                         start: 77,
                         end: 77,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
                 Token {
@@ -348,12 +474,18 @@ Statements {
                     span: Span {
                         start: 78,
                         end: 80,
+                        source_index: SourceFileId(
+                            0,
+                        ),
                     },
                 },
             ],
             span: Span {
                 start: 77,
                 end: 80,
+                source_index: SourceFileId(
+                    0,
+                ),
             },
         },
     ],

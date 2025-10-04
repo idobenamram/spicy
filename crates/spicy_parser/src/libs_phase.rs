@@ -12,25 +12,24 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SourceMap {
-    map: HashMap<u16, PathBuf>,
-    content_map: HashMap<PathBuf, String>,
+    paths: Vec<PathBuf>,
+    contents: Vec<String>,
 }
 
 impl SourceMap {
     const MAIN_INDEX: u16 = 0;
 
     pub fn new(main_file: PathBuf, content: String) -> Self {
-        let mut map = HashMap::new();
-        map.insert(Self::MAIN_INDEX, main_file.clone());
-        let mut content_map = HashMap::new();
-        content_map.insert(main_file, content);
-        Self { map, content_map }
+        Self {
+            paths: vec![main_file],
+            contents: vec![content],
+        }
     }
 
     pub fn new_source(&mut self, path: PathBuf, content: String) -> u16 {
-        let new_index = self.map.len() as u16;
-        self.map.insert(new_index, path.clone());
-        self.content_map.insert(path, content);
+        let new_index = self.paths.len() as u16;
+        self.paths.push(path);
+        self.contents.push(content);
         new_index
     }
 
@@ -39,23 +38,19 @@ impl SourceMap {
     }
 
     pub fn get_path(&self, index: u16) -> Option<&Path> {
-        self.map.get(&index).map(|x| x.as_path())
+        self.paths.get(index as usize).map(|x| x.as_path())
     }
 
     pub fn get_main_content(&self) -> &str {
-        self.content_map
-            .get(
-                self.map
-                    .get(&Self::MAIN_INDEX)
-                    .expect("main index always exists"),
-            )
-            .map(|s| s.as_str())
-            .unwrap()
+        self.contents
+            .get(Self::MAIN_INDEX as usize)
+            .expect("main index always exists")
     }
 
-    pub fn get_content(&self, index: u16) -> Option<&str> {
-        let path = self.get_path(index)?;
-        self.content_map.get(path).map(|s| s.as_str())
+    pub fn get_content(&self, index: u16) -> &str {
+        self.contents
+            .get(index as usize)
+            .expect("index always exists")
     }
 }
 

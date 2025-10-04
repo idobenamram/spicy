@@ -127,8 +127,7 @@ impl<'s> InstanceParser<'s> {
         // todo: fix this
         let input = self
             .source_map
-            .get_content(statement.stmt.span.source_index)
-            .unwrap();
+            .get_content(statement.stmt.span.source_index);
         input[statement.stmt.span.start..=statement.stmt.span.end].to_string()
     }
 
@@ -136,8 +135,7 @@ impl<'s> InstanceParser<'s> {
         // todo: fix this
         let input = self
             .source_map
-            .get_content(statement.stmt.span.source_index)
-            .unwrap();
+            .get_content(statement.stmt.span.source_index);
         let comment = input[statement.stmt.span.start..=statement.stmt.span.end].to_string();
         comment
     }
@@ -156,10 +154,7 @@ impl<'s> InstanceParser<'s> {
             return Ok(evaluated);
         }
         // todo: fix this
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         Ok(parse_value(cursor, input)?)
     }
 
@@ -187,10 +182,7 @@ impl<'s> InstanceParser<'s> {
         cursor: &mut StmtCursor,
         scope: &Scope,
     ) -> Result<WaveForm, SpicyError> {
-        let input = self
-            .source_map
-            .get_content(ident_token.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(ident_token.span.source_index);
         let ident = token_text(input, ident_token);
         let waveform =
             match ident.to_uppercase().as_str() {
@@ -274,10 +266,7 @@ impl<'s> InstanceParser<'s> {
     }
 
     fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Node, SpicyError> {
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let node = parse_node(cursor, input)?;
         if let Some(node) = scope.node_mapping.get(&node) {
             Ok(node.clone())
@@ -305,10 +294,7 @@ impl<'s> InstanceParser<'s> {
             }
             return Err(ParserError::ExpectedBoolZeroOrOne { span: token.span }.into());
         }
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         Ok(parse_bool(cursor, input)?)
     }
 
@@ -344,10 +330,7 @@ impl<'s> InstanceParser<'s> {
                 .into());
             }
         }
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         Ok(parse_usize(cursor, input)?)
     }
 
@@ -367,10 +350,7 @@ impl<'s> InstanceParser<'s> {
         let mut resistor = Resistor::new(name, cursor.span, positive, negative, resistance);
 
         let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
         for item in params {
             let (ident, mut cursor) = item?;
@@ -435,10 +415,7 @@ impl<'s> InstanceParser<'s> {
         let mut capacitor = Capacitor::new(name, cursor.span, positive, negative, capacitance);
 
         let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
@@ -502,10 +479,7 @@ impl<'s> InstanceParser<'s> {
         let mut inductor = Inductor::new(name, cursor.span, positive, negative, inductance);
 
         let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
@@ -564,10 +538,7 @@ impl<'s> InstanceParser<'s> {
     ) -> Result<(), SpicyError> {
         cursor.skip_ws();
         if let Some(token) = cursor.consume(TokenKind::Ident) {
-            let input = self
-                .source_map
-                .get_content(token.span.source_index)
-                .unwrap();
+            let input = self.source_map.get_content(token.span.source_index);
 
             let operation = token_text(input, token);
 
@@ -634,10 +605,7 @@ impl<'s> InstanceParser<'s> {
         let mut cursor = statement.stmt.into_cursor();
         let ident = cursor.expect(TokenKind::Ident)?;
 
-        let input = self
-            .source_map
-            .get_content(ident.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident).to_string();
         let (first, _) = ident_string.split_at(1);
 
@@ -693,10 +661,7 @@ impl<'s> InstanceParser<'s> {
         cursor: &mut StmtCursor,
         scope: &Scope,
     ) -> Result<DcCommand, SpicyError> {
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let srcnam = parse_ident(cursor, input)?;
         let vstart = self.parse_value(cursor, scope)?;
         let vstop = self.parse_value(cursor, scope)?;
@@ -716,10 +681,7 @@ impl<'s> InstanceParser<'s> {
         cursor: &mut StmtCursor,
         scope: &Scope,
     ) -> Result<AcCommand, SpicyError> {
-        let input = self
-            .source_map
-            .get_content(cursor.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(cursor.span.source_index);
         let ac_sweep_type = parse_ident(cursor, input)?;
         let points_per_sweep = self.parse_usize(cursor, scope)?;
         let ac_sweep_type = match ac_sweep_type.as_str() {
@@ -756,7 +718,7 @@ impl<'s> InstanceParser<'s> {
         let mut uic = false;
         match cursor.peek_non_whitespace() {
             Some(t) if t.kind == TokenKind::Ident => {
-                let input = self.source_map.get_content(t.span.source_index).unwrap();
+                let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
                 if ident.to_uppercase() == "UIC" {
                     uic = true;
@@ -786,10 +748,7 @@ impl<'s> InstanceParser<'s> {
         let mut cursor = statement.stmt.into_cursor();
         cursor.expect(TokenKind::Dot)?;
         let ident = cursor.expect(TokenKind::Ident)?;
-        let input = self
-            .source_map
-            .get_content(ident.span.source_index)
-            .unwrap();
+        let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident);
         let command_type = CommandType::from_str(&ident_string).ok_or_else(|| {
             ParserError::InvalidCommandType {

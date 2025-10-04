@@ -285,11 +285,12 @@ impl Statements {
 
     pub(crate) fn new(input: &str, source_index: u16) -> Result<Self, SpicyError> {
         let mut lexer = Lexer::new(input, source_index);
-        let mut statements = vec![];
+        let mut statements = Vec::with_capacity(lexer.num_new_lines);
         let mut token = lexer.next()?;
 
+        let mut statement = Vec::with_capacity(1024);
         while token.kind != TokenKind::EOF {
-            let mut statement = vec![];
+            statement.clear();
             while token.kind != TokenKind::Newline && token.kind != TokenKind::EOF {
                 statement.push(token);
                 token = lexer.next()?;
@@ -297,7 +298,7 @@ impl Statements {
 
             // skip newlines
             token = lexer.next()?;
-            statements.push(Statement::new(statement)?);
+            statements.push(Statement::new(statement.clone())?);
         }
 
         // Merge statements with trailing '+' continuation

@@ -58,7 +58,7 @@ pub(crate) fn collect_subckts(
     while let Some(s) = it.next() {
         let mut cursor = s.into_cursor();
         // todo: fix this
-        let input = source_map.get_content(s.span.source_index).unwrap();
+        let input = source_map.get_content(s.span.source_index);
 
         if cursor.consume_if_command(input, CommandType::Param) {
             parse_dot_param(&mut cursor, input, &mut root_env.param_map)?;
@@ -209,7 +209,7 @@ pub(crate) fn expand_subckts<'a>(
         let mut cursor = s.into_cursor();
 
         // todo: fix this
-        let src = source_map.get_content(s.span.source_index).unwrap();
+        let src = source_map.get_content(s.span.source_index);
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
             let instance_name = instance_name.to_string();
             let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src)?;

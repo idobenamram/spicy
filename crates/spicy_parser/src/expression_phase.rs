@@ -60,7 +60,7 @@ fn brace_to_placeholders(
 
             let end_pos = cursor.pos() - 1;
             // todo: fix this
-            let src = &input.source_map.get_content(tok.span.source_index).unwrap();
+            let src = &input.source_map.get_content(tok.span.source_index);
             let parsed_expression =
                 ExpressionParser::new(src, expression_tokens.as_slice()).parse()?;
 

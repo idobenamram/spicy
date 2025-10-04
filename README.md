@@ -34,6 +34,14 @@ cargo insta review
 
 Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
+
+# TODO:
+- [ ] output raw files
+- [ ] suport libs and models in parser
+- [ ] add diodes
+- [ ] add BJT transistor
+
+
 ## License
 
 MIT

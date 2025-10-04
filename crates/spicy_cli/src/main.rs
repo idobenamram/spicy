@@ -1,21 +1,36 @@
-use std::env;
 use std::fs;
 
+use clap::Parser;
 use spicy_parser::Span;
 use spicy_parser::parser::parse;
-use spicy_simulate::simulate;
+use spicy_simulate::{simulate, SimulateOptions};
 
 use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
 
 mod tui;
 
-fn main() {
-    // Simple arg parsing: `--tui <file>` enables TUI; otherwise legacy CLI
-    let args = env::args().skip(1).collect::<Vec<_>>();
+#[derive(Parser, Debug)]
+#[command(name = "spicy_cli", about = "Spicy circuit simulator", version)]
+struct Args {
+    /// Run interactive TUI
+    #[arg(long)]
+    tui: bool,
 
-    if !args.is_empty() && args[0] == "--tui" {
-        let path = args.get(1).cloned().unwrap_or_else(|| {
-            eprintln!("Usage: spicy_cli --tui <netlist.spicy>");
+    /// Write LTSpice .raw output alongside input name
+    #[arg(long)]
+    raw: bool,
+
+    /// Input netlist file
+    #[arg(value_name = "NETLIST", required_unless_present = "tui")]
+    netlist: Option<String>,
+}
+
+fn main() {
+    let args = Args::parse();
+
+    if args.tui {
+        let path = args.netlist.unwrap_or_else(|| {
+            eprintln!("--tui requires a <netlist.spicy> argument");
             std::process::exit(1);
         });
         if let Err(e) = tui::run_tui(&path) {
@@ -28,9 +43,8 @@ fn main() {
         return;
     }
 
-    // Legacy non-TUI path
-    let path = args.get(0).cloned().unwrap_or_else(|| {
-        eprintln!("Usage: spicy_cli <netlist.spicy>  or  spicy_cli --tui <netlist.spicy>");
+    let path = args.netlist.unwrap_or_else(|| {
+        eprintln!("Missing <netlist.spicy> argument");
         std::process::exit(1);
     });
 
@@ -40,7 +54,14 @@ fn main() {
     });
 
     match parse(&input) {
-        Ok(deck) => simulate(deck),
+        Ok(deck) => {
+            let base = std::path::Path::new(&path)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "spicy".to_string());
+            let opts = SimulateOptions { write_raw: args.raw, output_base: Some(base) };
+            simulate(deck, opts);
+        }
         Err(e) => {
             eprintln!("Parse error: {}", e);
             if let Some(span) = e.error_span() {

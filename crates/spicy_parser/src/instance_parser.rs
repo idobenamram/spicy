@@ -103,19 +103,19 @@ impl<'s> Iterator for ParamParser<'s> {
     }
 }
 
-pub(crate) struct Parser<'s> {
+pub(crate) struct InstanceParser<'s> {
     expanded_deck: ExpandedDeck,
     placeholder_map: PlaceholderMap,
     input: &'s str,
 }
 
-impl<'s> Parser<'s> {
+impl<'s> InstanceParser<'s> {
     pub(crate) fn new(
         expanded_deck: ExpandedDeck,
         placeholder_map: PlaceholderMap,
         input: &'s str,
     ) -> Self {
-        Parser {
+        InstanceParser {
             expanded_deck,
             placeholder_map,
             input,
@@ -824,15 +824,6 @@ impl<'s> Parser<'s> {
     }
 }
 
-pub fn parse(input: &str) -> Result<Deck, SpicyError> {
-    let mut stream = Statements::new(input)?;
-    let placeholders_map = substitute_expressions(&mut stream, &input)?;
-    let unexpanded_deck = collect_subckts(stream, &input)?;
-    let expanded_deck = expand_subckts(unexpanded_deck, &input)?;
-    let mut parser = Parser::new(expanded_deck, placeholders_map, input);
-    let deck = parser.parse()?;
-    Ok(deck)
-}
 
 #[cfg(test)]
 mod tests {

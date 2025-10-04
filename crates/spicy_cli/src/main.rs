@@ -1,8 +1,8 @@
 use std::fs;
+use std::path::PathBuf;
 
 use clap::Parser;
-use spicy_parser::Span;
-use spicy_parser::parser::parse;
+use spicy_parser::{ParseOptions, Span, parse};
 use spicy_simulate::{simulate, SimulateOptions};
 
 use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
@@ -52,8 +52,13 @@ fn main() {
         eprintln!("Failed to read {}: {}", path, e);
         std::process::exit(1);
     });
+    let parser_options = ParseOptions {
+        work_dir: PathBuf::from(&path).parent().unwrap().to_path_buf(),
+        source_path: PathBuf::from(&path),
+        input: &input,
+    };
 
-    match parse(&input) {
+    match parse(&parser_options) {
         Ok(deck) => {
             let base = std::path::Path::new(&path)
                 .file_stem()

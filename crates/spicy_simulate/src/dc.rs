@@ -2,7 +2,7 @@ use crate::nodes::Nodes;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
-    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor}, netlist_waveform::WaveForm, parser::Deck, Value
+    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor}, netlist_waveform::WaveForm, instance_parser::Deck, Value
 };
 
 #[derive(Debug)]

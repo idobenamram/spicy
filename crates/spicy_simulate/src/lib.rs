@@ -1,5 +1,5 @@
 use spicy_parser::netlist_types::Command;
-use spicy_parser::parser::Deck;
+use spicy_parser::instance_parser::Deck;
 
 use crate::{
     ac::simulate_ac,
@@ -87,7 +87,7 @@ mod tests {
     use spicy_parser::netlist_types::{Capacitor, Device, Resistor};
 
     use spicy_parser::Span;
-    use spicy_parser::parser::parse;
+    use spicy_parser::instance_parser::parse;
 
     use std::path::PathBuf;
 

@@ -5,7 +5,7 @@ use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
     Value,
     netlist_types::{Capacitor, Device, IndependentSource, TranCommand},
-    parser::Deck,
+    instance_parser::Deck,
 };
 
 use crate::{

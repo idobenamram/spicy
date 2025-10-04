@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
     DcSweepResult, OperatingPointResult, TransientResult,
@@ -6,7 +8,7 @@ use spicy_simulate::{
 };
 
 use crate::tui::app::{App, Tab};
-use spicy_parser::{error::SpicyError, netlist_types::Command, parser::parse};
+use spicy_parser::{error::SpicyError, netlist_types::Command, parse, ParseOptions};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
@@ -39,7 +41,14 @@ pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
         match cmd {
             SimCmd::RunCurrentTab(_tab) => {
                 // Parse
-                let deck = match parse(&netlist) {
+                // TODO: fix
+                let parse_options = ParseOptions {
+                    work_dir: PathBuf::from(""),
+                    source_path: PathBuf::from(""),
+                    input: &netlist,
+                };
+
+                let deck = match parse(&parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
                         let mut diags = Vec::new();

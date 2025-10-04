@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 use crate::Span;
@@ -12,6 +14,8 @@ pub enum SpicyError {
     Expression(#[from] ExpressionError),
     #[error(transparent)]
     Subcircuit(#[from] SubcircuitError),
+    #[error(transparent)]
+    Include(#[from] IncludeError),
 }
 
 impl SpicyError {
@@ -56,6 +60,9 @@ impl SpicyError {
                 SubcircuitError::MissingSubcircuitName { span }
                 | SubcircuitError::NoNodes { span, .. } => Some(*span),
                 SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
+            },
+            SpicyError::Include(ie) => match ie {
+                IncludeError::ExpectedPath { span } => Some(*span),
             },
         }
     }
@@ -196,4 +203,20 @@ pub enum SubcircuitError {
 
     #[error("subcircuit {name} has no nodes")]
     NoNodes { name: String, span: Span },
+}
+
+#[derive(Debug, Error)]
+pub enum IncludeError {
+    #[error("expected path")]
+    ExpectedPath { span: Span },
+
+    #[error("file not found: {path}")]
+    FileNotFound { path: PathBuf, checked_paths: Vec<PathBuf>, span: Span },
+
+    #[error("IO error: {error}")]
+    IOError {
+        path: PathBuf,
+        span: Span,
+        error: std::io::Error,
+    },
 }

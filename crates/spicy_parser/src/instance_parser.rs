@@ -8,7 +8,7 @@ use crate::netlist_types::{
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
-use crate::statement_phase::{StmtCursor};
+use crate::statement_phase::StmtCursor;
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
 
 #[derive(Debug)]
@@ -144,10 +144,7 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TODO: maybe we can change the expression to only evaluate once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
+            let expr = self.placeholder_map.get(id).clone();
             let evaluated = expr.evaluate(scope)?;
             return Ok(evaluated);
         }
@@ -163,8 +160,9 @@ impl<'s> InstanceParser<'s> {
     ) -> Result<Vec<Value>, SpicyError> {
         cursor.expect(TokenKind::LeftParen)?;
         let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
-        let mut values = Vec::new();
-        for mut value_tokens in in_parentheses.split_on_whitespace().into_iter() {
+        let split = in_parentheses.split_on_whitespace();
+        let mut values = Vec::with_capacity(split.len());
+        for mut value_tokens in split.into_iter() {
             // TODO: should probably support typechecking here
             let value = self.parse_value(&mut value_tokens, scope)?;
             values.push(value);
@@ -277,10 +275,7 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
+            let expr = self.placeholder_map.get(id).clone();
             let evaluated = expr.evaluate(scope)?;
             // TODO: kinda ugly
             if evaluated.get_value() == 0.0 {
@@ -299,10 +294,7 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
+            let expr = self.placeholder_map.get(id).clone();
             let evaluated = expr.evaluate(scope)?;
             let value = evaluated.get_value();
             // TODO: baba

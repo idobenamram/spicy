@@ -3,7 +3,7 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use chrono::Local;
-use spicy_parser::parser::Deck;
+use spicy_parser::instance_parser::Deck;
 
 use crate::{DcSweepResult, OperatingPointResult, TransientResult};
 

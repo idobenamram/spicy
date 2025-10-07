@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::Span;
+use crate::SourceMap;
 use crate::error::{SpicyError, SubcircuitError};
 use crate::expr::ScopeArena;
 use crate::expr::{Params, Scope, ScopeId};
@@ -45,7 +45,10 @@ pub(crate) struct ScopedStmt {
     pub scope: ScopeId,
 }
 
-pub(crate) fn collect_subckts(stmts: Statements, input: &str) -> Result<UnexpandedDeck, SpicyError> {
+pub(crate) fn collect_subckts(
+    stmts: Statements,
+    source_map: &SourceMap,
+) -> Result<UnexpandedDeck, SpicyError> {
     let mut out = Vec::new();
     let mut table = SubcktTable::default();
     let mut scope_arena = ScopeArena::new();
@@ -54,6 +57,9 @@ pub(crate) fn collect_subckts(stmts: Statements, input: &str) -> Result<Unexpand
 
     while let Some(s) = it.next() {
         let mut cursor = s.into_cursor();
+        // todo: fix this
+        let input = source_map.get_content(s.span.source_index);
+
         if cursor.consume_if_command(input, CommandType::Param) {
             parse_dot_param(&mut cursor, input, &mut root_env.param_map)?;
             continue;
@@ -156,7 +162,7 @@ fn parse_x_device(
     let subcircuit_name = nodes
         .pop()
         .ok_or_else(|| SubcircuitError::MissingSubcircuitName {
-            span: cursor.peek_span().unwrap_or(Span::new(0, 0)),
+            span: cursor.peek_span(),
         })?
         .name;
 
@@ -194,7 +200,7 @@ pub(crate) struct ExpandedDeck {
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
 pub(crate) fn expand_subckts<'a>(
     mut unexpanded_deck: UnexpandedDeck,
-    src: &'a str,
+    source_map: &SourceMap,
 ) -> Result<ExpandedDeck, SpicyError> {
     let mut out = Vec::new();
 
@@ -202,6 +208,8 @@ pub(crate) fn expand_subckts<'a>(
     for s in unexpanded_deck.statements.into_iter() {
         let mut cursor = s.into_cursor();
 
+        // todo: fix this
+        let src = source_map.get_content(s.span.source_index);
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
             let instance_name = instance_name.to_string();
             let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src)?;
@@ -265,17 +273,25 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::ParseOptions;
     use crate::expression_phase::substitute_expressions;
     use std::path::PathBuf;
 
     #[rstest]
     fn test_subcircuit_phase(#[files("tests/subcircuit_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut statements = Statements::new(&input_content).expect("statements");
-        let _placeholders_map = substitute_expressions(&mut statements, &input_content);
-        let unexpanded_deck = collect_subckts(statements, &input_content).expect("collect subckts");
-        let expanded_deck =
-            expand_subckts(unexpanded_deck, &input_content).expect("expand subckts");
+        let source_map = SourceMap::new(input.clone(), input_content.clone());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+        let mut statements =
+            Statements::new(&input_content, input_options.source_map.main_index()).expect("statements");
+        let _placeholders_map = substitute_expressions(&mut statements, &input_options);
+        let unexpanded_deck = collect_subckts(statements, &input_options.source_map).expect("collect subckts");
+        let expanded_deck = expand_subckts(unexpanded_deck, &input_options.source_map).expect("expand subckts");
 
         let name = format!(
             "subcircuit-{}",

@@ -1,9 +1,0 @@
----
-source: crates/spicy_parser/src/parser.rs
-expression: deck
----
-Deck {
-    title: "basic subcircuit",
-    commands: [],
-    devices: [],
-}

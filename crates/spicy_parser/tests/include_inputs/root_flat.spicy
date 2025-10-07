@@ -1,0 +1,4 @@
+* flat include root
+.include lib_a.spicy
+R1 in out 1k
+.end

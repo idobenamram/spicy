@@ -13,12 +13,15 @@ pub struct Node {
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CommandType {
     AC,
     DC,
     Op,
     Tran,
+    Lib,
+    ENDL,
+    Include,
     Subcircuit,
     Ends,
     Param,
@@ -32,6 +35,9 @@ impl CommandType {
             "DC" | "dc" => Some(CommandType::DC),
             "OP" | "op" => Some(CommandType::Op),
             "TRAN" | "tran" => Some(CommandType::Tran),
+            "LIB" | "lib" => Some(CommandType::Lib),
+            "ENDL" | "endl" => Some(CommandType::ENDL),
+            "INCLUDE" | "include" => Some(CommandType::Include),
             "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
             "ENDS" | "ends" => Some(CommandType::Ends),
             "PARAM" | "param" => Some(CommandType::Param),
@@ -46,6 +52,9 @@ impl CommandType {
             CommandType::DC => "DC",
             CommandType::Op => "OP",
             CommandType::Tran => "TRAN",
+            CommandType::Lib => "LIB",
+            CommandType::ENDL => "ENDL",
+            CommandType::Include => "INCLUDE",
             CommandType::Subcircuit => "SUBCKT",
             CommandType::Ends => "ENDS",
             CommandType::Param => "PARAM",
@@ -148,6 +157,7 @@ pub struct Resistor {
     pub negative: Node,
     pub resistance: Value,
     pub ac: Option<Value>,
+    // multiplier - replicates the resistor in parallel
     pub m: Option<Value>,
     pub scale: Option<Value>,
     pub temp: Option<Value>,
@@ -219,6 +229,7 @@ pub struct Capacitor {
     pub negative: Node,
     pub capacitance: Value,
     pub mname: Option<String>,
+    // multiplier - replicates the capacitor in parallel
     pub m: Option<Value>,
     pub scale: Option<Value>,
     pub temp: Option<Value>,

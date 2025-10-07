@@ -1,6 +1,9 @@
 basic subcircuit
 .SUBCKT INV in out vdd gnd
+V1 vdd gnd 5
 R1 in out 1k
+C2 out gnd 0.1u
 .ENDS
+X1 in out vcc 0 INV
 .END
 

@@ -1,5 +1,5 @@
 ---
-source: crates/spicy_parser/src/parser.rs
+source: crates/spicy_parser/src/instance_parser.rs
 expression: deck
 ---
 Deck {
@@ -10,6 +10,9 @@ Deck {
                 span: Span {
                     start: 241,
                     end: 243,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
             },
         ),
@@ -21,6 +24,9 @@ Deck {
                 span: Span {
                     start: 194,
                     end: 218,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",
@@ -49,6 +55,9 @@ Deck {
                 span: Span {
                     start: 118,
                     end: 139,
+                    source_index: SourceFileId(
+                        0,
+                    ),
                 },
                 positive: Node {
                     name: "in",

@@ -36,8 +36,9 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 
 # TODO:
-- [ ] output raw files
-- [ ] suport libs and models in parser
+- [x] output raw files
+- [ ] support models in parser
+- [ ] support libs in parser
 - [ ] add diodes
 - [ ] add BJT transistor
 

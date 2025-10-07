@@ -1,0 +1,114 @@
+---
+source: crates/spicy_simulate/src/lib.rs
+assertion_line: 201
+expression: output
+---
+DcSweepResult {
+    results: [
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "in",
+                        1.0,
+                    ),
+                    (
+                        "out",
+                        0.6666666666666666,
+                    ),
+                ],
+                currents: [
+                    (
+                        "V1",
+                        -0.0003333333333333334,
+                    ),
+                ],
+            },
+            1.0,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "in",
+                        2.0,
+                    ),
+                    (
+                        "out",
+                        1.3333333333333333,
+                    ),
+                ],
+                currents: [
+                    (
+                        "V1",
+                        -0.0006666666666666668,
+                    ),
+                ],
+            },
+            2.0,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "in",
+                        3.0,
+                    ),
+                    (
+                        "out",
+                        2.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "V1",
+                        -0.001,
+                    ),
+                ],
+            },
+            3.0,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "in",
+                        4.0,
+                    ),
+                    (
+                        "out",
+                        2.6666666666666665,
+                    ),
+                ],
+                currents: [
+                    (
+                        "V1",
+                        -0.0013333333333333335,
+                    ),
+                ],
+            },
+            4.0,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "in",
+                        5.0,
+                    ),
+                    (
+                        "out",
+                        3.333333333333333,
+                    ),
+                ],
+                currents: [
+                    (
+                        "V1",
+                        -0.001666666666666667,
+                    ),
+                ],
+            },
+            5.0,
+        ),
+    ],
+}

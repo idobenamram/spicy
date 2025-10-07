@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -9,7 +10,7 @@ use crate::tui::app::App;
 use crate::tui::input::handle_key;
 use crate::tui::term::setup_terminal;
 use crate::tui::ui::ui;
-use crate::tui::worker::{apply_sim_update, worker_loop, SimCmd};
+use crate::tui::worker::{SimCmd, apply_sim_update, worker_loop};
 
 pub fn run_tui(path: &str) -> Result<()> {
     let input = fs::read_to_string(path)?;
@@ -20,7 +21,8 @@ pub fn run_tui(path: &str) -> Result<()> {
 
     // Spawn worker thread
     let netlist_for_worker = input.clone();
-    std::thread::spawn(move || worker_loop(netlist_for_worker, rx_cmd, tx_msg));
+    let netlist_path = Path::new(path).to_path_buf();
+    std::thread::spawn(move || worker_loop(netlist_path, rx_cmd, tx_msg));
 
     let mut app = App::new(path.to_string(), input);
 
@@ -30,7 +32,9 @@ pub fn run_tui(path: &str) -> Result<()> {
         // non-blocking input
         if event::poll(Duration::from_millis(16))? {
             if let CEvent::Key(k) = event::read()? {
-                if handle_key(k, &mut app, &tx_cmd)? { break; }
+                if handle_key(k, &mut app, &tx_cmd)? {
+                    break;
+                }
             }
         }
 
@@ -41,4 +45,3 @@ pub fn run_tui(path: &str) -> Result<()> {
     }
     Ok(())
 }
-

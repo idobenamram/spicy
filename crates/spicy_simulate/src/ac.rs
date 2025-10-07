@@ -5,7 +5,7 @@ use spicy_parser::{
     Value,
     netlist_types::Device,
     netlist_types::{AcCommand, AcSweepType, IndependentSource, Inductor},
-    parser::Deck,
+    instance_parser::Deck,
 };
 
 use crate::dc::stamp_resistor;

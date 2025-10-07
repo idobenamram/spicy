@@ -36,6 +36,3 @@ V8 in 0 EXP(0 5 1u 2u 10u 3u)
 * EXP with expressions and units
 .param v1=1 v2=4 td3=2n tau1=0.5n td4=6n tau2=0.75n
 I3 out 0 EXP({v1} {v2} {td1} {tau1} {td2} {tau2})
-
-.END
-

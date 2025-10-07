@@ -1,12 +1,12 @@
-use crate::Span;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{ExpressionParser, PlaceholderMap};
 use crate::lexer::{Token, TokenKind};
 use crate::statement_phase::{Statement, Statements};
+use crate::{ParseOptions, Span};
 
 pub fn substitute_expressions(
     statements: &mut Statements,
-    input: &str,
+    input: &ParseOptions,
 ) -> Result<PlaceholderMap, SpicyError> {
     let mut placeholders = PlaceholderMap::default();
 
@@ -23,7 +23,7 @@ pub fn substitute_expressions(
 /// allocate PlaceholderId and push a single Placeholder token instead.
 fn brace_to_placeholders(
     statement: &mut Statement,
-    src: &str,
+    input: &ParseOptions,
     pm: &mut PlaceholderMap,
 ) -> Result<(), SpicyError> {
     let mut cursor = statement.into_cursor();
@@ -54,11 +54,12 @@ fn brace_to_placeholders(
             {
                 // we found a {} with nothing inside
                 return Err(ParserError::EmptyExpressionInsideBraces {
-                    span: Span::new(tok.span.start, right_brace.span.end),
+                    span: Span::new(tok.span.start, right_brace.span.end, tok.span.source_index),
                 })?;
             }
 
             let end_pos = cursor.pos() - 1;
+            let src = &input.source_map.get_content(tok.span.source_index);
             let parsed_expression =
                 ExpressionParser::new(src, expression_tokens.as_slice()).parse()?;
 
@@ -80,14 +81,24 @@ mod tests {
     use serde_json;
 
     use super::*;
+    use crate::SourceMap;
+    use crate::libs_phase::SourceFileId;
     use std::path::PathBuf;
 
     #[rstest]
     fn test_expression_phase(#[files("tests/expression_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut statements = Statements::new(&input_content).expect("statements");
+        let source_map = SourceMap::new(input.clone(), input_content.clone());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+        let mut statements =
+            Statements::new(&input_content, SourceFileId::new(0)).expect("statements");
 
-        let output = substitute_expressions(&mut statements, &input_content).expect("expressions");
+        let output = substitute_expressions(&mut statements, &input_options).expect("expressions");
 
         let name = format!(
             "expression-{}",
@@ -103,18 +114,26 @@ mod tests {
     #[test]
     fn test_empty_expression_in_braces() {
         let input = "R1 N001 N002 { } 1k";
-        let mut statements = Statements::new(input).expect("statements");
+        let source_map = SourceMap::new(".".into(), input.to_string());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+        let mut statements = Statements::new(input, SourceFileId::new(0)).expect("statements");
 
-        let err = substitute_expressions(&mut statements, input).unwrap_err();
+        let err = substitute_expressions(&mut statements, &input_options).unwrap_err();
         let err = match err {
             SpicyError::Parser(e) => e,
             _ => panic!("expected parser error"),
         };
+        let source_index = input_options.source_map.main_index();
         assert!(matches!(
             err,
             ParserError::EmptyExpressionInsideBraces {
                 // make sure we include the entire `{ }` in the span
-                span: Span { start: 13, end: 15 }
+                span: Span { start: 13, end: 15, source_index }
             }
         ));
     }

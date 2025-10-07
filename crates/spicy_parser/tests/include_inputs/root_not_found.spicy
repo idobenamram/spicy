@@ -1,0 +1,2 @@
+* include missing file
+.include does_not_exist.spicy

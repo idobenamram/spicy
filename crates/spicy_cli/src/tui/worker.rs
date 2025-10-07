@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
     DcSweepResult, OperatingPointResult, TransientResult,
@@ -6,7 +8,7 @@ use spicy_simulate::{
 };
 
 use crate::tui::app::{App, Tab};
-use spicy_parser::{error::SpicyError, netlist_types::Command, parser::parse};
+use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, netlist_types::Command, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
@@ -34,12 +36,22 @@ pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     }
 }
 
-pub fn worker_loop(netlist: String, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
+pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
+    let input = std::fs::read_to_string(&netlist_path).unwrap();
+    let source_map = SourceMap::new(netlist_path.clone(), input);
+    let mut parse_options = ParseOptions {
+        work_dir: PathBuf::from(&netlist_path).parent().unwrap().to_path_buf(),
+        source_path: PathBuf::from(&netlist_path),
+        source_map,
+        max_include_depth: 10,
+    };
     while let Ok(cmd) = rx.recv() {
         match cmd {
             SimCmd::RunCurrentTab(_tab) => {
                 // Parse
-                let deck = match parse(&netlist) {
+                // TODO: fix
+
+                let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
                         let mut diags = Vec::new();

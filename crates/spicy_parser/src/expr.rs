@@ -123,7 +123,7 @@ impl Expr {
 
     fn unary(op: Token, operand: Expr) -> Expr {
         Expr {
-            span: Span::new(op.span.start, op.span.end),
+            span: op.span,
             r#type: ExprType::Unary {
                 op: op.kind,
                 operand: Box::new(operand),
@@ -133,7 +133,8 @@ impl Expr {
 
     fn binary(op: TokenKind, lhs: Expr, rhs: Expr) -> Expr {
         Expr {
-            span: Span::new(lhs.span.start, rhs.span.end),
+            // we assume lhs and rhs are both from the same source
+            span: Span::new(lhs.span.start, rhs.span.end, lhs.span.source_index),
             r#type: ExprType::Binary {
                 op,
                 left: Box::new(lhs),
@@ -210,25 +211,25 @@ impl Expr {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
-pub struct PlaceholderId(pub u64);
+pub struct PlaceholderId(u64);
 
 #[derive(Debug, Default, Serialize)]
 pub struct PlaceholderMap {
     pub(crate) next: u64,
-    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<PlaceholderId, Expr>,
+    pub(crate) map: Vec<Expr>,
 }
 
 impl PlaceholderMap {
     pub fn fresh(&mut self, expr: Expr) -> PlaceholderId {
         let id = PlaceholderId(self.next);
         self.next += 1;
-        self.map.insert(id, expr);
+        self.map.push(expr);
         id
     }
 
-    pub fn get(&self, id: PlaceholderId) -> Option<&Expr> {
-        self.map.get(&id)
+    pub fn get(&self, id: PlaceholderId) -> &Expr {
+        // techinically you can unwrap here
+        self.map.get(id.0 as usize).expect("id should be in map")
     }
 }
 
@@ -366,7 +367,13 @@ pub(crate) struct ExpressionParser<'s> {
 
 impl<'s> ExpressionParser<'s> {
     pub(crate) fn new(input: &'s str, tokens: &'s [Token]) -> Self {
-        let span = Span::new(tokens[0].span.start, tokens[tokens.len() - 1].span.end);
+        // todo: can we assume all tokens are from the source index?
+        let source_index = tokens[0].span.source_index;
+        let span = Span::new(
+            tokens[0].span.start,
+            tokens[tokens.len() - 1].span.end,
+            source_index,
+        );
         ExpressionParser {
             input,
             expression_cursor: StmtCursor::new(tokens, span),

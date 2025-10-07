@@ -1,0 +1,2 @@
+* search precedence root
+.include lib_a.spicy

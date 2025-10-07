@@ -1,4 +1,5 @@
 use crate::error::{ParserError, SpicyError};
+use crate::libs_phase::SourceFileId;
 use crate::{
     lexer::{Lexer, Span, Token, TokenKind, token_text},
     netlist_types::{CommandType, DeviceType},
@@ -14,16 +15,16 @@ pub(crate) struct Statement {
 impl Statement {
     fn new(tokens: Vec<Token>) -> Result<Self, ParserError> {
         if tokens.is_empty() {
-            return Err(ParserError::EmptyStatement {
-                span: Span::new(0, 0),
-            });
+            return Err(ParserError::EmptyStatement);
         }
 
         let start = tokens[0].span.start;
         let end = tokens[tokens.len() - 1].span.end;
+        // we assume all tokens are from the same span
+        let source_index = tokens[0].span.source_index;
 
         Ok(Self {
-            span: Span::new(start, end),
+            span: Span::new(start, end, source_index),
             tokens,
         })
     }
@@ -137,7 +138,7 @@ impl<'a> StmtCursor<'a> {
         }
         Err(ParserError::MissingToken {
             message: "token",
-            span: self.peek_span().unwrap_or(Span::new(0, 0)),
+            span: self.peek_span(),
         }
         .into())
     }
@@ -163,6 +164,23 @@ impl<'a> StmtCursor<'a> {
         }
         self.rewind(checkpoint);
         false
+    }
+    
+    pub(crate) fn consume_if_commands(&mut self, input: &str, commands: &[CommandType]) -> Option<CommandType> {
+        let checkpoint = self.checkpoint();
+        self.skip_ws();
+        if let Some(_) = self.consume(TokenKind::Dot) {
+            if let Some(kind) = self.consume(TokenKind::Ident) {
+                let command_type = CommandType::from_str(token_text(input, kind));
+                for command in commands {
+                    if command_type == Some(*command) {
+                        return Some(*command);
+                    }
+                }
+            }
+        }
+        self.rewind(checkpoint);
+        None
     }
 
     pub(crate) fn consume_if_device(
@@ -197,9 +215,13 @@ impl<'a> StmtCursor<'a> {
             let idx = self.i + offset;
             if matches!(tok.kind, TokenKind::WhiteSpace) {
                 if start < idx {
+                    // assume all tokens are from the same source index
+                    let span_start = self.toks[start].span.start;
+                    let span_end = self.toks[idx - 1].span.end;
+                    let source_index = self.toks[start].span.source_index;
                     result.push(StmtCursor {
                         toks: &self.toks[start..idx],
-                        span: Span::new(start, idx),
+                        span: Span::new(span_start, span_end, source_index),
                         i: 0,
                     });
                 }
@@ -208,9 +230,12 @@ impl<'a> StmtCursor<'a> {
         }
 
         if start < self.toks.len() {
+            let span_start = self.toks[start].span.start;
+            let span_end = self.toks[self.toks.len() - 1].span.end;
+            let source_index = self.toks[start].span.source_index;
             result.push(StmtCursor {
                 toks: &self.toks[start..],
-                span: Span::new(start, self.toks.len() - start),
+                span: Span::new(span_start, span_end, source_index),
                 i: 0,
             });
         }
@@ -223,9 +248,10 @@ impl<'a> StmtCursor<'a> {
 
         for (offset, tok) in self.toks[self.i..].iter().enumerate() {
             if tok.kind == stop_on {
+                let source_index = self.toks[self.i].span.source_index;
                 before = Some(StmtCursor {
                     toks: &self.toks[self.i..self.i + offset],
-                    span: Span::new(self.i, self.i + offset),
+                    span: Span::new(self.i, self.i + offset, source_index),
                     i: 0,
                 });
                 self.i += offset;
@@ -235,7 +261,7 @@ impl<'a> StmtCursor<'a> {
 
         Ok(before.ok_or_else(|| ParserError::MissingToken {
             message: "expected token",
-            span: self.span,
+            span: Some(self.span),
         })?)
     }
 }
@@ -275,13 +301,14 @@ impl Statements {
         Ok(merged)
     }
 
-    pub(crate) fn new(input: &str) -> Result<Self, SpicyError> {
-        let mut lexer = Lexer::new(input);
-        let mut statements = vec![];
+    pub(crate) fn new(input: &str, source_index: SourceFileId) -> Result<Self, SpicyError> {
+        let mut lexer = Lexer::new(input, source_index);
+        let mut statements = Vec::new();
         let mut token = lexer.next()?;
 
+        let mut statement = Vec::with_capacity(1024);
         while token.kind != TokenKind::EOF {
-            let mut statement = vec![];
+            statement.clear();
             while token.kind != TokenKind::Newline && token.kind != TokenKind::EOF {
                 statement.push(token);
                 token = lexer.next()?;
@@ -289,7 +316,7 @@ impl Statements {
 
             // skip newlines
             token = lexer.next()?;
-            statements.push(Statement::new(statement)?);
+            statements.push(Statement::new(statement.clone())?);
         }
 
         // Merge statements with trailing '+' continuation
@@ -309,7 +336,8 @@ mod tests {
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let stream = Statements::new(&input_content).expect("failed to create statements");
+        let stream = Statements::new(&input_content, SourceFileId::new(0))
+            .expect("failed to create statements");
 
         let name = format!(
             "statements-{}",

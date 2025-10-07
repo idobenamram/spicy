@@ -5,6 +5,7 @@ use std::{
 
 use serde::Serialize;
 
+use crate::parser_utils::parse_ident;
 use crate::{
     ParseOptions, Span,
     error::{IncludeError, SpicyError},
@@ -110,8 +111,110 @@ fn parse_include<'a>(
     )
     .trim()
     .to_string();
-    let (source_index, file_content) = options.read_file(&path, path_cursor.span)?;
-    Ok((Statements::new(&file_content, source_index)?, source_index))
+
+    handle_lib_command(options, &path, path_cursor.span, None)
+}
+
+fn parse_lib_command<'a>(
+    cursor: &mut StmtCursor<'a>,
+    options: &mut ParseOptions,
+) -> Result<(Statements, SourceFileId), SpicyError> {
+    let cursors = cursor.split_on_whitespace();
+    let path_cursor = cursors
+        .first()
+        .ok_or_else(|| SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
+    let lib_cursor_opt = cursors.get(1);
+    let path = span_text(
+        options
+            .source_map
+            .get_content(path_cursor.span.source_index),
+        path_cursor.span,
+    )
+    .trim()
+    .to_string();
+
+    // optional target library name (case-insensitive)
+    let libname_opt = lib_cursor_opt.map(|lib_cursor| {
+        span_text(
+            options.source_map.get_content(lib_cursor.span.source_index),
+            lib_cursor.span,
+        )
+        .trim()
+        .to_string()
+    });
+
+    handle_lib_command(options, &path, path_cursor.span, libname_opt)
+}
+
+fn handle_lib_command(
+    options: &mut ParseOptions,
+    path: &str,
+    path_span: Span,
+    libname: Option<String>,
+) -> Result<(Statements, SourceFileId), SpicyError> {
+    let (source_index, file_content) = options.read_file(&path, path_span)?;
+    let all = Statements::new(&file_content, source_index)?;
+    if libname.is_none() {
+        // Behave like include: return all statements except .LIB/.ENDL wrappers
+        let mut filtered = Vec::new();
+        for s in all.statements.into_iter() {
+            let src = file_content;
+            let mut c = s.into_cursor();
+            if c.consume_if_command(src, CommandType::Lib) {
+                continue;
+            }
+            if c.consume_if_command(src, CommandType::ENDL) {
+                continue;
+            }
+            filtered.push(s);
+        }
+        return Ok((
+            Statements {
+                statements: filtered,
+            },
+            source_index,
+        ));
+    }
+    let libname = libname.unwrap();
+
+    // Extract only the statements within .LIB <libname> ... .ENDL
+    let mut in_block = false;
+    let mut out_stmts = Vec::new();
+    for s in all.statements.into_iter() {
+        let src = file_content;
+        let mut c = s.into_cursor();
+        if c.consume_if_command(src, CommandType::Lib) {
+            let name = parse_ident(&mut c, src)?;
+            if !in_block && name.eq_ignore_ascii_case(&libname) {
+                in_block = true;
+            }
+            continue;
+        } else if c.consume_if_command(src, CommandType::ENDL) {
+            if in_block {
+                break;
+            }
+            continue;
+        }
+
+        if in_block {
+            out_stmts.push(s);
+        }
+    }
+
+    if out_stmts.is_empty() {
+        return Err(SpicyError::Include(IncludeError::LibSectionNotFound {
+            span: path_span,
+            lib: libname.to_string(),
+            path: options.source_map.get_path(source_index).to_path_buf(),
+        }));
+    }
+
+    Ok((
+        Statements {
+            statements: out_stmts,
+        },
+        source_index,
+    ))
 }
 
 fn expand_includes(
@@ -126,8 +229,16 @@ fn expand_includes(
         // TODO: kinda sucky that you have to get the input for each statement
         let input = options.source_map.get_content(stmt.span.source_index);
         let mut cursor = stmt.into_cursor();
-        if cursor.consume_if_command(input, CommandType::Include) {
-            let (included_stmts, source_id) = parse_include(&mut cursor, options)?;
+
+        if let Some(command) =
+            cursor.consume_if_commands(input, &[CommandType::Include, CommandType::Lib])
+        {
+            let (included_stmts, source_id) = match command {
+                CommandType::Include => parse_include(&mut cursor, options)?,
+                CommandType::Lib => parse_lib_command(&mut cursor, options)?,
+                _ => unreachable!(),
+            };
+
             // cycle detection using canonicalized path
             let path = options.source_map.get_path(source_id).to_path_buf();
             if stack.contains(&path) {
@@ -190,9 +301,67 @@ mod tests {
         let root = crate_dir.join("tests/include_inputs/root_flat.spicy");
         let dir = root.parent().unwrap();
         let mut opts = make_opts(&root, dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         assert_eq!(expanded.statements.len(), 5);
+    }
+
+    #[test]
+    fn lib_select_section_ok() {
+        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let root = crate_dir.join("tests/include_inputs/root_lib_select.spicy");
+        let dir = root.parent().unwrap();
+        let mut opts = make_opts(&root, dir, 8);
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
+        let expanded = include_libs(stmts, &mut opts).unwrap();
+        // Expect: selected mos2 section (Rlib2) + Rmain
+        assert_eq!(expanded.statements.len(), 4);
+        let mut found = false;
+        for st in &expanded.statements {
+            let src = opts.source_map.get_content(st.span.source_index);
+            if src[st.span.start..=st.span.end].contains("Rlib2") {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "expected Rlib2 from mos2 section");
+    }
+
+    #[test]
+    fn lib_without_name_behaves_like_include() {
+        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let root = crate_dir.join("tests/include_inputs/root_lib_all.spicy");
+        let dir = root.parent().unwrap();
+        let mut opts = make_opts(&root, dir, 8);
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
+        let expanded = include_libs(stmts, &mut opts).unwrap();
+        // Should include both library sections' statements (Rlib1 and Rlib2) plus Rmain
+        let src_strings: Vec<String> = expanded
+            .statements
+            .iter()
+            .map(|st| {
+                opts.source_map.get_content(st.span.source_index)[st.span.start..=st.span.end]
+                    .to_string()
+            })
+            .collect();
+        let has_lib1 = src_strings.iter().any(|s| s.contains("Rlib1"));
+        let has_lib2 = src_strings.iter().any(|s| s.contains("Rlib2"));
+        assert!(
+            has_lib1 && has_lib2,
+            "expected both Rlib1 and Rlib2 in expansion"
+        );
     }
 
     #[test]
@@ -201,7 +370,11 @@ mod tests {
         let root = crate_dir.join("tests/include_inputs/root_nested.spicy");
         let dir = root.parent().unwrap();
         let mut opts = make_opts(&root, dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         assert_eq!(expanded.statements.len(), 7);
     }
@@ -212,7 +385,11 @@ mod tests {
         let root = crate_dir.join("tests/include_inputs/root_duplicate.spicy");
         let dir = root.parent().unwrap();
         let mut opts = make_opts(&root, dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         // lib_a twice + local R1
         assert_eq!(expanded.statements.len(), 7);
@@ -224,7 +401,11 @@ mod tests {
         let root = crate_dir.join("tests/include_inputs/root_cycle_a.spicy");
         let dir = root.parent().unwrap();
         let mut opts = make_opts(&root, dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let err = include_libs(stmts, &mut opts).unwrap_err();
         match err {
             SpicyError::Include(IncludeError::CycleDetected { .. }) => {}
@@ -239,7 +420,11 @@ mod tests {
         let dir = root.parent().unwrap();
         // chain length is 5 files; set depth small to trigger
         let mut opts = make_opts(&root, dir, 2);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let err = include_libs(stmts, &mut opts).unwrap_err();
         match err {
             SpicyError::Include(IncludeError::MaxDepthExceeded { .. }) => {}
@@ -253,7 +438,11 @@ mod tests {
         let root = crate_dir.join("tests/include_inputs/root_not_found.spicy");
         let dir = root.parent().unwrap();
         let mut opts = make_opts(&root, dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let err = include_libs(stmts, &mut opts).unwrap_err();
         match err {
             SpicyError::Include(IncludeError::FileNotFound { .. }) => {}
@@ -274,7 +463,11 @@ mod tests {
             source_map: SourceMap::new(dummy_main.clone(), main_content),
             max_include_depth: 8,
         };
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         assert_eq!(expanded.statements.len(), 3);
     }
@@ -285,7 +478,11 @@ mod tests {
         let work_dir = crate_dir.join("tests/include_inputs/alt");
         let root = crate_dir.join("tests/include_inputs/sub/root_search_precedence.spicy");
         let mut opts = make_opts(&root, &work_dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         // Find a statement from lib_a and assert its path comes from alt/
         let main_idx = opts.source_map.main_index();
@@ -294,7 +491,11 @@ mod tests {
             if st.span.source_index != main_idx {
                 let p = opts.source_map.get_path(st.span.source_index);
                 if p.file_name().and_then(|s| s.to_str()) == Some("lib_a.spicy") {
-                    if p.parent().and_then(|pp| pp.file_name()).and_then(|s| s.to_str()) == Some("alt") {
+                    if p.parent()
+                        .and_then(|pp| pp.file_name())
+                        .and_then(|s| s.to_str())
+                        == Some("alt")
+                    {
                         found_alt = true;
                         break;
                     }
@@ -312,7 +513,11 @@ mod tests {
         // Root lives in parent directory; should resolve lib_c from parent
         let root = crate_dir.join("tests/include_inputs/root_parent_only.spicy");
         let mut opts = make_opts(&root, &work_dir, 8);
-        let stmts = Statements::new(opts.source_map.get_main_content(), opts.source_map.main_index()).unwrap();
+        let stmts = Statements::new(
+            opts.source_map.get_main_content(),
+            opts.source_map.main_index(),
+        )
+        .unwrap();
         let expanded = include_libs(stmts, &mut opts).unwrap();
         let main_idx = opts.source_map.main_index();
         let mut found_parent = false;
@@ -320,13 +525,20 @@ mod tests {
             if st.span.source_index != main_idx {
                 let p = opts.source_map.get_path(st.span.source_index);
                 if p.file_name().and_then(|s| s.to_str()) == Some("lib_c.spicy") {
-                    if p.parent().and_then(|pp| pp.file_name()).and_then(|s| s.to_str()) == Some("include_inputs") {
+                    if p.parent()
+                        .and_then(|pp| pp.file_name())
+                        .and_then(|s| s.to_str())
+                        == Some("include_inputs")
+                    {
                         found_parent = true;
                         break;
                     }
                 }
             }
         }
-        assert!(found_parent, "expected lib_c resolved from source parent directory");
+        assert!(
+            found_parent,
+            "expected lib_c resolved from source parent directory"
+        );
     }
 }

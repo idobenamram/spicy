@@ -13,7 +13,7 @@ pub struct Node {
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CommandType {
     AC,
     DC,

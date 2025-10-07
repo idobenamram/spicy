@@ -67,7 +67,8 @@ impl SpicyError {
                 | IncludeError::FileNotFound { span, .. }
                 | IncludeError::IOError { span, .. }
                 | IncludeError::MaxDepthExceeded { span, .. }
-                | IncludeError::CycleDetected { span, .. } => Some(*span),
+                | IncludeError::CycleDetected { span, .. }
+                | IncludeError::LibSectionNotFound { span, .. } => Some(*span),
             },
         }
     }
@@ -237,4 +238,7 @@ pub enum IncludeError {
 
     #[error("include cycle detected involving: {path}")]
     CycleDetected { span: Span, path: PathBuf },
+
+    #[error("library section '{lib}' not found in: {path}")]
+    LibSectionNotFound { span: Span, lib: String, path: PathBuf },
 }

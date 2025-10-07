@@ -165,6 +165,23 @@ impl<'a> StmtCursor<'a> {
         self.rewind(checkpoint);
         false
     }
+    
+    pub(crate) fn consume_if_commands(&mut self, input: &str, commands: &[CommandType]) -> Option<CommandType> {
+        let checkpoint = self.checkpoint();
+        self.skip_ws();
+        if let Some(_) = self.consume(TokenKind::Dot) {
+            if let Some(kind) = self.consume(TokenKind::Ident) {
+                let command_type = CommandType::from_str(token_text(input, kind));
+                for command in commands {
+                    if command_type == Some(*command) {
+                        return Some(*command);
+                    }
+                }
+            }
+        }
+        self.rewind(checkpoint);
+        None
+    }
 
     pub(crate) fn consume_if_device(
         &mut self,
@@ -319,7 +336,8 @@ mod tests {
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
 
-        let stream = Statements::new(&input_content, SourceFileId::new(0)).expect("failed to create statements");
+        let stream = Statements::new(&input_content, SourceFileId::new(0))
+            .expect("failed to create statements");
 
         let name = format!(
             "statements-{}",

@@ -1,0 +1,8 @@
+* library file with two sections
+.LIB mos1
+Rlib1 a b 1k
+.ENDL
+
+.LIB mos2
+Rlib2 a b 2k
+.ENDL

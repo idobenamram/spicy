@@ -1,0 +1,4 @@
+* .lib without name behaves like include (no .LIB/.ENDL wrappers)
+.lib lib_sections.spicy
+Rmain x y 10
+.end

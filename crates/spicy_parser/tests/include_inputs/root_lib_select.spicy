@@ -1,0 +1,4 @@
+* select specific lib section
+.lib lib_sections.spicy mos2
+Rmain x y 10
+.end

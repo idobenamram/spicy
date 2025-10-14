@@ -366,7 +366,7 @@ pub fn render_netlist_lines(
             // simply display it at the top
             let mut spans = Vec::new();
             spans.push(UiSpan::styled(
-                format!("! "),
+                "! ".to_string(),
                 Style::default().fg(Color::Red),
             ));
             spans.push(UiSpan::styled(
@@ -405,7 +405,7 @@ pub fn render_netlist_lines(
                     "^".repeat(mid.len()),
                     err_style.add_modifier(Modifier::BOLD),
                 ));
-                diag_spans.push(UiSpan::styled(format!(" {}", diag.to_string()), err_style));
+                diag_spans.push(UiSpan::styled(format!(" {}", diag), err_style));
                 lines.push(Line::from(diag_spans));
             }
             None => {

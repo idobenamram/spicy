@@ -140,11 +140,11 @@ pub(crate) fn simulate_op_inner(nodes: &Nodes, devices: &Vec<Device>) -> Array1<
 
     for device in devices {
         match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
+            Device::Resistor(device) => stamp_resistor(&mut m, device, nodes),
             Device::Capacitor(_) => {} // capcitors are just open circuits
-            Device::Inductor(device) => stamp_inductor(&mut m, &mut s, &device, &nodes),
-            Device::CurrentSource(device) => stamp_current_source(&mut s, &device, &nodes),
-            Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, &device, &nodes),
+            Device::Inductor(device) => stamp_inductor(&mut m, &mut s, device, nodes),
+            Device::CurrentSource(device) => stamp_current_source(&mut s, device, nodes),
+            Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, device, nodes),
         }
     }
 
@@ -153,9 +153,9 @@ pub(crate) fn simulate_op_inner(nodes: &Nodes, devices: &Vec<Device>) -> Array1<
     let lu = m.factorize_into().expect("Failed to factorize matrix");
     // [V] node voltages
     // [I] branch currents for voltage sources (also inductors)
-    let x = lu.solve(&s).expect("Failed to solve linear system");
+    
 
-    x
+    lu.solve(&s).expect("Failed to solve linear system")
 }
 
 pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
@@ -208,15 +208,15 @@ pub fn simulate_dc(deck: &Deck, command: &DcCommand) -> DcSweepResult {
         .expect("Source not found");
     for device in &deck.devices {
         match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
+            Device::Resistor(device) => stamp_resistor(&mut m, device, &nodes),
             Device::Capacitor(_) => {} // capcitors are just open circuits
-            Device::Inductor(device) => stamp_inductor(&mut m, &mut s_before, &device, &nodes),
+            Device::Inductor(device) => stamp_inductor(&mut m, &mut s_before, device, &nodes),
             Device::VoltageSource(device) => {
-                stamp_voltage_source_incidence(&mut m, &device, &nodes);
+                stamp_voltage_source_incidence(&mut m, device, &nodes);
             }
             Device::CurrentSource(device) => {
                 if device.name != *srcnam {
-                    stamp_current_source(&mut s_before, &device, &nodes);
+                    stamp_current_source(&mut s_before, device, &nodes);
                 }
             }
         }

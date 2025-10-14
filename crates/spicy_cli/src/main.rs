@@ -76,7 +76,7 @@ fn main() {
             eprintln!("Parse error: {}", e);
             if let Some(span) = e.error_span() {
                 let input_path = parser_options.source_map.get_path(span.source_index);
-                eprintln!("");
+                eprintln!();
                 let input = fs::read_to_string(input_path).unwrap_or_else(|e| {
                     eprintln!("Failed to read {}: {}", input_path.display(), e);
                     std::process::exit(1);

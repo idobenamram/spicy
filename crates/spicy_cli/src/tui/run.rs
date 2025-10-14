@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -30,13 +30,11 @@ pub fn run_tui(path: &str) -> Result<()> {
         terminal.draw(|f| ui(f, &app))?;
 
         // non-blocking input
-        if event::poll(Duration::from_millis(16))? {
-            if let CEvent::Key(k) = event::read()? {
-                if handle_key(k, &mut app, &tx_cmd)? {
+        if event::poll(Duration::from_millis(16))?
+            && let CEvent::Key(k) = event::read()?
+                && handle_key(k, &mut app, &tx_cmd)? {
                     break;
                 }
-            }
-        }
 
         // handle simulator messages
         while let Ok(msg) = rx_msg.try_recv() {

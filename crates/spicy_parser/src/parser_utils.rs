@@ -49,7 +49,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         number_str.push('-');
         t = cursor
             .next_non_whitespace()
-            .ok_or_else(|| ParserError::MissingToken {
+            .ok_or(ParserError::MissingToken {
                 message: "Expected digits or '.' after '-'",
                 span: Some(t.span),
             })?;
@@ -60,15 +60,15 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         TokenKind::Number => {
             number_str.push_str(token_text(src, t));
             // Optional fractional part if next immediate token is a dot
-            if let Some(peek) = cursor.peek() {
-                if matches!(peek.kind, TokenKind::Dot) {
+            if let Some(peek) = cursor.peek()
+                && matches!(peek.kind, TokenKind::Dot) {
                     cursor.next().expect("just check for dot");
                     number_str.push('.');
 
                     let frac =
                         cursor
                             .next_non_whitespace()
-                            .ok_or_else(|| ParserError::MissingToken {
+                            .ok_or(ParserError::MissingToken {
                                 message: "Expected token after '.'",
                                 span: Some(peek.span),
                             })?;
@@ -78,7 +78,6 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                     }
                     number_str.push_str(token_text(src, frac));
                 }
-            }
         }
         TokenKind::Dot => {
             number_str.push('.');
@@ -101,8 +100,8 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     // TODO: i don't think you can have a suffix and an exponent at the same time
     // TODO: also this can definitly use a cleanup
     // Optional exponent: e|E [+-]? digits (no whitespace inside the literal)
-    if let Some(peek) = cursor.peek() {
-        if matches!(peek.kind, TokenKind::Ident) {
+    if let Some(peek) = cursor.peek()
+        && matches!(peek.kind, TokenKind::Ident) {
             let ident_text = token_text(src, peek);
             if ident_text == "e" || ident_text == "E" {
                 cursor.next().expect("just peeked");
@@ -162,16 +161,14 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
                 })?);
             }
         }
-    }
 
     // Optional suffix as trailing identifier without whitespace
-    if let Some(peek) = cursor.peek() {
-        if matches!(peek.kind, TokenKind::Ident) {
+    if let Some(peek) = cursor.peek()
+        && matches!(peek.kind, TokenKind::Ident) {
             let ident = cursor.next().expect("just peeked");
             let ident_text = token_text(src, ident);
             suffix = ValueSuffix::from_str(ident_text);
         }
-    }
 
     let value: f64 = number_str
         .parse()
@@ -234,7 +231,7 @@ pub(crate) fn parse_expr_into_value(
         let evaluated = expr.evaluate(scope)?;
         return Ok(evaluated);
     }
-    Ok(parse_value(cursor, src)?)
+    parse_value(cursor, src)
 }
 
 pub(crate) fn parse_value_or_placeholder(

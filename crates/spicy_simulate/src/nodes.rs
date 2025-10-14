@@ -40,7 +40,7 @@ impl Nodes {
 
     pub(crate) fn get_node_names(&self) -> Vec<String> {
         let mut names = vec![String::new(); self.nodes.len()];
-        for (name, _) in &self.nodes {
+        for name in self.nodes.keys() {
             if let Some(index) = self.get_node_index(name) {
                 names[index] = name.clone();
             }
@@ -50,7 +50,7 @@ impl Nodes {
 
     pub(crate) fn get_source_names(&self) -> Vec<String> {
         let mut names = vec![String::new(); self.source_len()];
-        for (name, _) in &self.voltage_sources {
+        for name in self.voltage_sources.keys() {
             if let Some(index) = self.voltage_sources.get(name).copied() {
                 names[index] = name.clone();
             }
@@ -68,18 +68,12 @@ impl Nodes {
     }
 
     pub(crate) fn get_voltage_source_index(&self, name: &str) -> Option<usize> {
-        if let Some(index) = self.voltage_sources.get(name).copied() {
-            Some(self.node_len() + index)
-        } else {
-            None
-        }
+        self.voltage_sources.get(name).copied().map(|index| self.node_len() + index)
     }
 
     // TODO: save this?
     pub(crate) fn node_len(&self) -> usize {
-        self.nodes
-            .iter()
-            .map(|(_, x)| *x)
+        self.nodes.values().copied()
             .max()
             .expect("no nodes found")
     }

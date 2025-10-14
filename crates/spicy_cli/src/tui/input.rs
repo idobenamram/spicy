@@ -23,8 +23,8 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             app.trans_list_index = app.trans_list_index.saturating_sub(1);
         }
         KeyCode::Enter if app.focus_right && matches!(app.tab, Tab::Trans) => {
-            if let Some(tr) = &app.trans {
-                if !tr.node_names.is_empty() {
+            if let Some(tr) = &app.trans
+                && !tr.node_names.is_empty() {
                     let idx = app.trans_list_index.min(tr.node_names.len().saturating_sub(1));
                     if let Some(pos) = app.trans_selected_nodes.iter().position(|&i| i == idx) {
                         app.trans_selected_nodes.remove(pos);
@@ -32,7 +32,6 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
                         app.trans_selected_nodes.push(idx);
                     }
                 }
-            }
         }
         KeyCode::Char('1') => app.tab = Tab::Op,
         KeyCode::Char('2') => app.tab = Tab::DC,

@@ -164,7 +164,8 @@ impl<'s> Lexer<'s> {
     }
 
     fn netlist(&mut self, c: char, start: usize) -> Result<Token, LexerError> {
-        let tok = match c {
+        
+        match c {
             c if c.is_alphabetic() => self.identifier(c, start),
             c if c.is_ascii_digit() => Ok(self.number(start)),
             '*' => Ok(Token::single(TokenKind::Asterisk, start, self.source_index)),
@@ -207,24 +208,23 @@ impl<'s> Lexer<'s> {
                 self.source_index,
             )),
             _ => {
-                return Err(LexerError::UnexpectedCharacter {
+                Err(LexerError::UnexpectedCharacter {
                     ch: c,
                     span: Span::single(start, self.source_index),
-                });
+                })
             }
-        };
-        tok
+        }
     }
 
     pub fn next(&mut self) -> Result<Token, LexerError> {
         let start = self.s.cursor();
-        let t = match self.s.eat() {
+        
+        match self.s.eat() {
             Some(c) if c == '\n' => Ok(self.newline(start)),
             Some(c) if c.is_whitespace() => Ok(self.whitespace(start)),
             Some(c) => self.netlist(c, start),
             None => Ok(Token::end(start, self.source_index)),
-        };
-        t
+        }
     }
 }
 

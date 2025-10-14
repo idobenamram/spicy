@@ -381,7 +381,7 @@ impl<'s> ExpressionParser<'s> {
     }
 
     pub(crate) fn parse(&mut self) -> Result<Expr, SpicyError> {
-        Ok(self.parse_expr(0)?)
+        self.parse_expr(0)
     }
 
     fn parse_expr(&mut self, min_bp: u8) -> Result<Expr, SpicyError> {
@@ -406,7 +406,7 @@ impl<'s> ExpressionParser<'s> {
                 lhs.expand()
             }
             Some(t) if t.kind == TokenKind::Minus => {
-                let ((), r_bp) = prefix_binding_power(&t);
+                let ((), r_bp) = prefix_binding_power(t);
                 let rhs = self.parse_expr(r_bp)?;
                 Expr::unary(*t, rhs)
             }

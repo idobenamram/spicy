@@ -44,7 +44,7 @@ impl ParseOptions {
 
         // Absolute path: read directly
         if path.is_absolute() {
-            let content = std::fs::read_to_string(&path).map_err(|error| {
+            let content = std::fs::read_to_string(path).map_err(|error| {
                 SpicyError::Include(IncludeError::IOError {
                     path: path.to_path_buf(),
                     span,
@@ -133,11 +133,11 @@ impl ParseOptions {
 
 pub fn parse(options: &mut ParseOptions) -> Result<Deck, SpicyError> {
     let stream = statement_phase::Statements::new(
-        &options.source_map.get_main_content(),
+        options.source_map.get_main_content(),
         options.source_map.main_index(),
     )?;
     let mut stream = include_libs(stream, options)?;
-    let placeholders_map = substitute_expressions(&mut stream, &options)?;
+    let placeholders_map = substitute_expressions(&mut stream, options)?;
     let unexpanded_deck = collect_subckts(stream, &options.source_map)?;
     let expanded_deck = expand_subckts(unexpanded_deck, &options.source_map, &placeholders_map)?;
     let mut parser = InstanceParser::new(expanded_deck, placeholders_map, &options.source_map);

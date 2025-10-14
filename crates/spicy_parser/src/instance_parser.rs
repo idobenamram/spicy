@@ -850,7 +850,7 @@ mod tests {
         use crate::parse;
 
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let mut source_map = SourceMap::new(input.clone(), input_content);
+        let source_map = SourceMap::new(input.clone(), input_content);
         let mut input_options = ParseOptions {
             work_dir: PathBuf::from("."),
             source_path: PathBuf::from("."),

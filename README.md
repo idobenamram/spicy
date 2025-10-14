@@ -36,12 +36,17 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 
 # TODO:
+
+** Parser **:
 - [x] output raw files
 - [x] support libs in parser
-- [ ] support models in parser
+- [x] support models in parser
 - [ ] add diodes
 - [ ] add BJT transistor
 
+
+** Simulation **
+- [ ] simple implementation of KLU
 
 ## License
 

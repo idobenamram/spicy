@@ -163,7 +163,7 @@ fn handle_lib_command(
             if c.consume_if_command(src, CommandType::Lib) {
                 continue;
             }
-            if c.consume_if_command(src, CommandType::ENDL) {
+            if c.consume_if_command(src, CommandType::Endl) {
                 continue;
             }
             filtered.push(s);
@@ -185,11 +185,11 @@ fn handle_lib_command(
         let mut c = s.into_cursor();
         if c.consume_if_command(src, CommandType::Lib) {
             let name = parse_ident(&mut c, src)?;
-            if !in_block && name.eq_ignore_ascii_case(&libname) {
+            if !in_block && name.text.eq_ignore_ascii_case(&libname) {
                 in_block = true;
             }
             continue;
-        } else if c.consume_if_command(src, CommandType::ENDL) {
+        } else if c.consume_if_command(src, CommandType::Endl) {
             if in_block {
                 break;
             }

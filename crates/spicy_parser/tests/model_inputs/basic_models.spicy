@@ -1,0 +1,7 @@
+* basic models with params
+.param rbase=50 scale=2
+.param cbase=0.5e-6
+.param lbase=5e-3
+.model R1 R resistance={rbase*scale} tc1=1e-3 tc2=2e-3 w=2 l=3
+.model Cfast C cap=1e-6 tc1=5e-4 tc2=1e-4
+.model Lslow L ind={lbase*2} tc1=1e-5 tc2=2e-5

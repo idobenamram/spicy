@@ -123,7 +123,6 @@ impl<'s> InstanceParser<'s> {
     }
 
     fn parse_title(&self, statement: &ScopedStmt) -> String {
-        // todo: fix this
         let input = self
             .source_map
             .get_content(statement.stmt.span.source_index);
@@ -131,7 +130,6 @@ impl<'s> InstanceParser<'s> {
     }
 
     fn parse_comment(&self, statement: &ScopedStmt) -> String {
-        // todo: fix this
         let input = self
             .source_map
             .get_content(statement.stmt.span.source_index);
@@ -151,7 +149,6 @@ impl<'s> InstanceParser<'s> {
             let evaluated = expr.evaluate(scope)?;
             return Ok(evaluated);
         }
-        // todo: fix this
         let input = self.source_map.get_content(cursor.span.source_index);
         Ok(parse_value(cursor, input)?)
     }
@@ -665,7 +662,7 @@ impl<'s> InstanceParser<'s> {
 
         Ok(DcCommand {
             span: cursor.span,
-            srcnam,
+            srcnam: srcnam.text.to_string(),
             vstart,
             vstop,
             vincr,
@@ -680,13 +677,13 @@ impl<'s> InstanceParser<'s> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let ac_sweep_type = parse_ident(cursor, input)?;
         let points_per_sweep = self.parse_usize(cursor, scope)?;
-        let ac_sweep_type = match ac_sweep_type.as_str() {
+        let ac_sweep_type = match ac_sweep_type.text {
             "DEC" | "dec" => AcSweepType::Dec(points_per_sweep),
             "OCT" | "oct" => AcSweepType::Oct(points_per_sweep),
             "LIN" | "lin" => AcSweepType::Lin(points_per_sweep),
             _ => {
                 return Err(ParserError::InvalidOperation {
-                    operation: ac_sweep_type,
+                    operation: ac_sweep_type.text.to_string(),
                     span: cursor.span,
                 }
                 .into());
@@ -716,7 +713,7 @@ impl<'s> InstanceParser<'s> {
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
-                if ident.to_uppercase() == "UIC" {
+                if ident.text.to_uppercase() == "UIC" {
                     uic = true;
                 } else {
                     return Err(ParserError::UnexpectedToken {

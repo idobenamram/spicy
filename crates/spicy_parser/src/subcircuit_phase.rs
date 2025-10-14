@@ -4,8 +4,10 @@ use serde::Serialize;
 
 use crate::SourceMap;
 use crate::error::{SpicyError, SubcircuitError};
-use crate::expr::ScopeArena;
 use crate::expr::{Params, Scope, ScopeId};
+use crate::expr::{PlaceholderMap, ScopeArena};
+use crate::netlist_models::{ModelStatementTable, ModelTable};
+use crate::netlist_models::partial_parse_model_command;
 use crate::netlist_types::Node;
 use crate::netlist_types::{CommandType, DeviceType};
 use crate::parser_utils::{
@@ -20,6 +22,7 @@ use crate::test_utils::serialize_sorted_map;
 pub(crate) struct UnexpandedDeck {
     pub scope_arena: ScopeArena,
     pub global_params: ScopeId,
+    pub model_table: ModelStatementTable,
     pub subckt_table: SubcktTable,
     pub statements: Vec<Statement>,
 }
@@ -51,6 +54,7 @@ pub(crate) fn collect_subckts(
 ) -> Result<UnexpandedDeck, SpicyError> {
     let mut out = Vec::new();
     let mut table = SubcktTable::default();
+    let mut model_table = ModelStatementTable::default();
     let mut scope_arena = ScopeArena::new();
     let (root_env, root_env_id) = scope_arena.new_root();
     let mut it = stmts.statements.into_iter();
@@ -64,6 +68,13 @@ pub(crate) fn collect_subckts(
             parse_dot_param(&mut cursor, input, &mut root_env.param_map)?;
             continue;
         }
+
+        if cursor.consume_if_command(input, CommandType::Model) {
+            let model_statement = partial_parse_model_command(cursor, input)?;
+            model_table.insert(model_statement)?;
+            continue;
+        }
+
         if cursor.consume_if_command(input, CommandType::Subcircuit) {
             let mut subckt = parse_subckt_command(&mut cursor, input)?;
             let mut body = Vec::new();
@@ -72,6 +83,11 @@ pub(crate) fn collect_subckts(
                 let mut inner_cursor = next.into_cursor();
                 if inner_cursor.consume_if_command(input, CommandType::Param) {
                     parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params)?;
+                    continue;
+                }
+                if inner_cursor.consume_if_command(input, CommandType::Model) {
+                    let model_statement = partial_parse_model_command(inner_cursor, input)?;
+                    model_table.insert(model_statement)?;
                     continue;
                 }
                 // collect body until .ends
@@ -91,6 +107,7 @@ pub(crate) fn collect_subckts(
     Ok(UnexpandedDeck {
         scope_arena,
         global_params: root_env_id,
+        model_table,
         subckt_table: table,
         statements: out,
     })
@@ -122,7 +139,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl
     }
 
     Ok(SubcktDecl {
-        name,
+        name: name.text.to_string(),
         nodes,
         default_params,
         local_params: Params::new(),
@@ -183,7 +200,7 @@ fn parse_x_device(
         }
 
         let (param_name, value) = parse_equal_expr(cursor, src)?;
-        param_overrides.set_param(param_name, value);
+        param_overrides.set_param(param_name.text.to_string(), value);
     }
 
     Ok((nodes, subcircuit_name, param_overrides))
@@ -192,6 +209,7 @@ fn parse_x_device(
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ExpandedDeck {
     pub scope_arena: ScopeArena,
+    pub model_table: ModelTable,
     pub global_params: ScopeId,
     pub subckt_table: SubcktTable,
     pub statements: Vec<ScopedStmt>,
@@ -201,6 +219,7 @@ pub(crate) struct ExpandedDeck {
 pub(crate) fn expand_subckts<'a>(
     mut unexpanded_deck: UnexpandedDeck,
     source_map: &SourceMap,
+    placeholder_map: &PlaceholderMap,
 ) -> Result<ExpandedDeck, SpicyError> {
     let mut out = Vec::new();
 
@@ -208,7 +227,6 @@ pub(crate) fn expand_subckts<'a>(
     for s in unexpanded_deck.statements.into_iter() {
         let mut cursor = s.into_cursor();
 
-        // todo: fix this
         let src = source_map.get_content(s.span.source_index);
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
             let instance_name = instance_name.to_string();
@@ -260,10 +278,21 @@ pub(crate) fn expand_subckts<'a>(
             scope: root_scope_id,
         });
     }
+
+    let models = unexpanded_deck.model_table.into_model_table(
+        source_map,
+        placeholder_map,
+        &unexpanded_deck
+            .scope_arena
+            .get(unexpanded_deck.global_params)
+            .expect("we always have a global scope"),
+    )?;
+
     Ok(ExpandedDeck {
         scope_arena: unexpanded_deck.scope_arena,
         global_params: unexpanded_deck.global_params,
         subckt_table: unexpanded_deck.subckt_table,
+        model_table: models,
         statements: out,
     })
 }
@@ -287,11 +316,18 @@ mod tests {
             source_path: PathBuf::from("."),
             max_include_depth: 10,
         };
-        let mut statements =
-            Statements::new(&input_content, input_options.source_map.main_index()).expect("statements");
-        let _placeholders_map = substitute_expressions(&mut statements, &input_options);
-        let unexpanded_deck = collect_subckts(statements, &input_options.source_map).expect("collect subckts");
-        let expanded_deck = expand_subckts(unexpanded_deck, &input_options.source_map).expect("expand subckts");
+        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+            .expect("statements");
+        let placeholders_map = substitute_expressions(&mut statements, &input_options)
+            .expect("substitute expressions");
+        let unexpanded_deck =
+            collect_subckts(statements, &input_options.source_map).expect("collect subckts");
+        let expanded_deck = expand_subckts(
+            unexpanded_deck,
+            &input_options.source_map,
+            &placeholders_map,
+        )
+        .expect("expand subckts");
 
         let name = format!(
             "subcircuit-{}",
@@ -302,6 +338,51 @@ mod tests {
         );
 
         let json = serde_json::to_string_pretty(&expanded_deck).expect("serialize output to json");
+        insta::assert_snapshot!(name, json);
+    }
+
+    #[rstest]
+    fn test_model_parsing(#[files("tests/model_inputs/*.spicy")] input: PathBuf) {
+        use serde_json;
+
+        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
+        let source_map = SourceMap::new(input.clone(), input_content.clone());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+
+        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+            .expect("statements");
+        let placeholders_map = substitute_expressions(&mut statements, &input_options)
+            .expect("substitute expressions");
+        let unexpanded_deck = collect_subckts(statements, &input_options.source_map)
+            .expect("collect subckts and models");
+
+        let global_scope = unexpanded_deck
+            .scope_arena
+            .get(unexpanded_deck.global_params)
+            .expect("global scope exists");
+        let model_table = unexpanded_deck
+            .model_table
+            .into_model_table(
+                &input_options.source_map,
+                &placeholders_map,
+                global_scope,
+            )
+            .expect("build model table");
+
+        let name = format!(
+            "models-{}",
+            input
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
+
+        let json = serde_json::to_string_pretty(&model_table).expect("serialize to json");
         insta::assert_snapshot!(name, json);
     }
 }

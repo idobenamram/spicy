@@ -1,0 +1,245 @@
+use serde::Serialize;
+use std::collections::HashMap;
+
+#[cfg(test)]
+use crate::test_utils::serialize_sorted_map;
+use crate::{
+    SourceMap, Span, Value,
+    error::{ParserError, SpicyError, SubcircuitError},
+    expr::{PlaceholderMap, Scope},
+    lexer::TokenKind,
+    parser_utils::{Ident, parse_expr_into_value, parse_ident},
+    statement_phase::{Statement, StmtCursor},
+};
+
+#[derive(Debug, Default, Clone, Serialize)]
+pub(crate) struct ModelTable {
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
+    pub map: HashMap<String, DeviceModel>,
+}
+
+#[derive(Debug, Default, Clone, Serialize)]
+pub(crate) struct ModelStatementTable {
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
+    pub map: HashMap<String, ModelStatement>,
+}
+
+impl ModelStatementTable {
+    pub(crate) fn insert(&mut self, model_statement: ModelStatement) -> Result<(), SpicyError> {
+        let name = model_statement.name.clone();
+        let span = model_statement.statement.span;
+        let old = self
+            .map
+            .insert(model_statement.name.clone(), model_statement);
+
+        if old.is_some() {
+            return Err(SubcircuitError::ModelAlreadyExists {
+                name,
+                span, // TODO: would have been nice to have both the first place and the second place we see the ident name
+            }
+            .into());
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn into_model_table(
+        self,
+        source_map: &SourceMap,
+        placeholder_map: &PlaceholderMap,
+        scope: &Scope,
+    ) -> Result<ModelTable, SpicyError> {
+        let map = self
+            .map
+            .into_iter()
+            .map(|(name, model_statement)| {
+                model_statement_to_device_model(model_statement, source_map, placeholder_map, scope)
+                    .map(|device_model| (name, device_model))
+            })
+            .collect::<Result<HashMap<String, DeviceModel>, SpicyError>>()?;
+
+        Ok(ModelTable { map })
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ModelStatement {
+    pub name: String,
+    pub model_type: DeviceModelType,
+    pub statement: Statement,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) enum DeviceModelType {
+    Resistor,
+    Capacitor,
+    Inductor,
+}
+
+impl DeviceModelType {
+    pub fn from_str(s: &str, span: Span) -> Result<DeviceModelType, SpicyError> {
+        match s.to_uppercase().to_string().as_str() {
+            "R" => Ok(DeviceModelType::Resistor),
+            "C" => Ok(DeviceModelType::Capacitor),
+            "L" => Ok(DeviceModelType::Inductor),
+            _ => {
+                return Err(SubcircuitError::InvalidDeviceModelType {
+                    s: s.to_string(),
+                    span,
+                }
+                .into());
+            }
+        }
+    }
+}
+
+pub(crate) fn partial_parse_model_command(
+    mut cursor: StmtCursor,
+    src: &str,
+) -> Result<ModelStatement, SpicyError> {
+    let name = parse_ident(&mut cursor, src)?;
+    let model_type_str = parse_ident(&mut cursor, src)?;
+    let model_type = DeviceModelType::from_str(model_type_str.text, model_type_str.span)?;
+    // TODO: kinda sucky we have to clone the statement tokens
+    let statement = cursor.into_statement();
+
+    Ok(ModelStatement {
+        name: name.text.to_string(),
+        model_type,
+        statement,
+    })
+}
+
+/// only supports params from global scope
+fn model_statement_to_device_model(
+    model_statement: ModelStatement,
+    source_map: &SourceMap,
+    placeholder_map: &PlaceholderMap,
+    scope: &Scope,
+) -> Result<DeviceModel, SpicyError> {
+    let input = source_map.get_content(model_statement.statement.span.source_index);
+
+    let mut cursor = model_statement.statement.into_cursor();
+    cursor.skip_ws();
+    let params_cursors = if let Some(_) = cursor.consume(TokenKind::LeftParen) {
+        let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
+        let params = in_parentheses.split_on_whitespace();
+        cursor.expect(TokenKind::RightParen)?;
+        params
+    } else {
+        cursor.split_on_whitespace()
+    };
+
+    let mut params = Vec::new();
+    for mut param in params_cursors {
+        let ident = parse_ident(&mut param, input)?;
+        param.expect(TokenKind::Equal)?;
+        let value = parse_expr_into_value(&mut param, input, &placeholder_map, scope)?;
+
+        params.push((ident, value));
+    }
+
+    Ok(match model_statement.model_type {
+        DeviceModelType::Resistor => DeviceModel::Resistor(ResistorModel::new(params)?),
+        DeviceModelType::Capacitor => DeviceModel::Capacitor(CapacitorModel::new(params)?),
+        DeviceModelType::Inductor => DeviceModel::Inductor(InductorModel::new(params)?),
+    })
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct ResistorModel {
+    resistance: Option<Value>,
+    tc1: Option<Value>,
+    tc2: Option<Value>,
+    w: Option<Value>,
+    l: Option<Value>,
+}
+
+impl ResistorModel {
+    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+        let mut model = Self::default();
+
+        for (ident, value) in params {
+            match ident.text {
+                "resistance" => model.resistance = Some(value),
+                "tc1" => model.tc1 = Some(value),
+                "tc2" => model.tc2 = Some(value),
+                "w" => model.w = Some(value),
+                "l" => model.l = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct CapacitorModel {
+    cap: Option<Value>,
+    tc1: Option<Value>,
+    tc2: Option<Value>,
+}
+
+impl CapacitorModel {
+    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+        let mut model = Self::default();
+
+        for (ident, value) in params {
+            match ident.text {
+                "cap" => model.cap = Some(value),
+                "tc1" => model.tc1 = Some(value),
+                "tc2" => model.tc2 = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct InductorModel {
+    inductance: Option<Value>,
+    tc1: Option<Value>,
+    tc2: Option<Value>,
+}
+
+impl InductorModel {
+    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+        let mut model = Self::default();
+
+        for (ident, value) in params {
+            match ident.text {
+                "ind" => model.inductance = Some(value),
+                "tc1" => model.tc1 = Some(value),
+                "tc2" => model.tc2 = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) enum DeviceModel {
+    Resistor(ResistorModel),
+    Capacitor(CapacitorModel),
+    Inductor(InductorModel),
+}

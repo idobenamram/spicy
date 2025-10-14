@@ -59,8 +59,10 @@ impl SpicyError {
             },
             SpicyError::Subcircuit(se) => match se {
                 SubcircuitError::MissingSubcircuitName { span } => *span,
+                SubcircuitError::InvalidDeviceModelType { span, .. } => Some(*span),
                 SubcircuitError::NoNodes { span, .. } => Some(*span),
                 SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
+                SubcircuitError::ModelAlreadyExists { span, .. } => Some(*span),
             },
             SpicyError::Include(ie) => match ie {
                 IncludeError::ExpectedPath { span }
@@ -212,6 +214,12 @@ pub enum SubcircuitError {
 
     #[error("subcircuit {name} has no nodes")]
     NoNodes { name: String, span: Span },
+
+    #[error("invalid device model type: {s}")]
+    InvalidDeviceModelType { s: String, span: Span },
+
+    #[error("model {name} already exists")]
+    ModelAlreadyExists { name: String, span: Span },
 }
 
 #[derive(Debug, Error)]

@@ -18,6 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system OpenBLAS (for ndarray-linalg openblas-system)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
+
       - name: Install Rust (stable) with clippy
         uses: dtolnay/rust-toolchain@stable
         with:

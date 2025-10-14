@@ -5,6 +5,7 @@ pub mod instance_parser;
 mod lexer;
 pub mod libs_phase;
 pub mod netlist_types;
+mod netlist_models;
 pub mod netlist_waveform;
 mod parser_utils;
 mod statement_phase;
@@ -138,7 +139,7 @@ pub fn parse(options: &mut ParseOptions) -> Result<Deck, SpicyError> {
     let mut stream = include_libs(stream, options)?;
     let placeholders_map = substitute_expressions(&mut stream, &options)?;
     let unexpanded_deck = collect_subckts(stream, &options.source_map)?;
-    let expanded_deck = expand_subckts(unexpanded_deck, &options.source_map)?;
+    let expanded_deck = expand_subckts(unexpanded_deck, &options.source_map, &placeholders_map)?;
     let mut parser = InstanceParser::new(expanded_deck, placeholders_map, &options.source_map);
     let deck = parser.parse()?;
 

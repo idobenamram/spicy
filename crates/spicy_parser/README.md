@@ -7,7 +7,7 @@ Netlist parser for Spicy.
 - Statement phase (statement_phase.rs): split tokens into statements with spans
 - Include Libraries (libs_phase.rs): look for include and lib commands to add to statements
 - Expression phase (expression_phase.rs): switch {} expressions with placeholders with ids
-- Subcircuit phase (subcircuit_phase.rs): collect and expand subcircuits an parameters
+- Subcircuit phase (subcircuit_phase.rs): collect and expand subcircuits an parameters, also collect .model commands and store them for instance parser
 - Instance parser (instance_parser.rs): parse the expanded instances and commands into a final Deck
 
 ## Errors and spans

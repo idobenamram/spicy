@@ -34,11 +34,14 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 2000.0,
-                    exponent: None,
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 2000.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -65,11 +68,14 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 27000.0,
-                    exponent: None,
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 27000.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,

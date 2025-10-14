@@ -264,6 +264,14 @@ impl<'a> StmtCursor<'a> {
             span: Some(self.span),
         })?)
     }
+
+    pub(crate) fn into_statement(self) -> Statement {
+        Statement {
+            tokens: self.toks[self.i..].to_vec(),
+            // TODO: fix the span to only include the new statement?
+            span: self.span,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -331,6 +339,8 @@ mod tests {
 
     use super::*;
     use std::path::PathBuf;
+    use crate::lexer::{TokenKind, token_text};
+    use crate::libs_phase::SourceFileId;
 
     #[rstest]
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {
@@ -347,5 +357,45 @@ mod tests {
                 .unwrap_or_else(|| "unknown".to_string())
         );
         insta::assert_debug_snapshot!(name, stream);
+    }
+
+    #[test]
+    fn test_split_on_whitespace() {
+        // param1=value1 param2=123\n
+        let input = "param1=value1 param2=123\n";
+        let stmt = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = stmt.statements[0].into_cursor();
+
+        // split_on_whitespace should create two segments: "param1=value1" and "param2=123"
+        let segments = cursor.split_on_whitespace();
+        assert_eq!(segments.len(), 2);
+
+        // First segment tokens should be: Ident '=' Ident
+        assert_eq!(segments[0].toks.len(), 3);
+        assert!(matches!(segments[0].toks[0].kind, TokenKind::Ident));
+        assert!(matches!(segments[0].toks[1].kind, TokenKind::Equal));
+        assert!(matches!(segments[0].toks[2].kind, TokenKind::Ident));
+
+        // Second segment tokens should be: Ident '=' Number
+        assert_eq!(segments[1].toks.len(), 3);
+        assert!(matches!(segments[1].toks[0].kind, TokenKind::Ident));
+        assert!(matches!(segments[1].toks[1].kind, TokenKind::Equal));
+        assert!(matches!(segments[1].toks[2].kind, TokenKind::Number));
+    }
+
+    #[test]
+    fn test_split_on() {
+        // param1=value1\n
+        let input = "param1=value1\n";
+        let stmt = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let mut cursor = stmt.statements[0].into_cursor();
+
+        // split_on '=' should return the identifier before '=' and advance the cursor to '='
+        let before_eq = cursor
+            .split_on(TokenKind::Equal)
+            .expect("should find '=' in segment");
+        assert_eq!(before_eq.toks.len(), 1);
+        assert_eq!(token_text(input, &before_eq.toks[0]), "param1");
+        assert!(matches!(cursor.peek().unwrap().kind, TokenKind::Equal));
     }
 }

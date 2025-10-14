@@ -168,6 +168,9 @@ expression: json
       }
     ]
   },
+  "model_table": {
+    "map": {}
+  },
   "global_params": 0,
   "subckt_table": {
     "map": {

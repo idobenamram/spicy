@@ -1,10 +1,16 @@
+use crate::Span;
 use crate::error::{ParserError, SpicyError};
-use crate::expr::Value;
+use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expr::{Expr, Params};
 use crate::lexer::{TokenKind, token_text};
 use crate::netlist_types::Node;
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;
+
+pub(crate) struct Ident<'a> {
+    pub text: &'a str,
+    pub span: Span,
+}
 
 pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<Node, SpicyError> {
     let node = cursor
@@ -203,9 +209,32 @@ pub(crate) fn parse_bool(cursor: &mut StmtCursor, src: &str) -> Result<bool, Spi
     }
 }
 
-pub(crate) fn parse_ident(cursor: &mut StmtCursor, src: &str) -> Result<String, SpicyError> {
+pub(crate) fn parse_ident<'a>(
+    cursor: &mut StmtCursor,
+    src: &'a str,
+) -> Result<Ident<'a>, SpicyError> {
     let ident = cursor.expect_non_whitespace(TokenKind::Ident)?;
-    Ok(token_text(src, ident).to_string())
+    Ok(Ident {
+        text: token_text(src, ident),
+        span: ident.span,
+    })
+}
+
+pub(crate) fn parse_expr_into_value(
+    cursor: &mut StmtCursor,
+    src: &str,
+    placeholder_map: &PlaceholderMap,
+    scope: &Scope,
+) -> Result<Value, SpicyError> {
+    cursor.skip_ws();
+    if let Some(token) = cursor.consume(TokenKind::Placeholder) {
+        let id = token.id.expect("must have a placeholder id");
+        // TODO: maybe we can change the expression to only evaluate once
+        let expr = placeholder_map.get(id).clone();
+        let evaluated = expr.evaluate(scope)?;
+        return Ok(evaluated);
+    }
+    Ok(parse_value(cursor, src)?)
 }
 
 pub(crate) fn parse_value_or_placeholder(
@@ -216,17 +245,19 @@ pub(crate) fn parse_value_or_placeholder(
         return Ok(Expr::placeholder(placeholder.id.unwrap(), placeholder.span));
     }
     // TODO: i think value should just have a span
-    let cursor_span = cursor.peek_span().ok_or_else(|| ParserError::MissingToken {
-        message: "Expected cursor span",
-        span: cursor.peek_span(),
-    })?;
+    let cursor_span = cursor
+        .peek_span()
+        .ok_or_else(|| ParserError::MissingToken {
+            message: "Expected cursor span",
+            span: cursor.peek_span(),
+        })?;
     Ok(Expr::value(parse_value(cursor, src)?, cursor_span))
 }
 
-pub(crate) fn parse_equal_expr(
+pub(crate) fn parse_equal_expr<'a>(
     cursor: &mut StmtCursor,
-    src: &str,
-) -> Result<(String, Expr), SpicyError> {
+    src: &'a str,
+) -> Result<(Ident<'a>, Expr), SpicyError> {
     let ident = parse_ident(cursor, src)?;
     cursor.expect(TokenKind::Equal)?;
     let value = parse_value_or_placeholder(cursor, src)?;
@@ -245,7 +276,7 @@ pub(crate) fn parse_dot_param(
             break;
         }
         let (ident, value) = parse_equal_expr(cursor, src)?;
-        env.set_param(ident, value);
+        env.set_param(ident.text.to_string(), value);
     }
     assert!(cursor.done(), "Expected end of statement");
     Ok(())

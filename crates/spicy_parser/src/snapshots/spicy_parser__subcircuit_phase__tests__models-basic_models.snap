@@ -1,0 +1,75 @@
+---
+source: crates/spicy_parser/src/subcircuit_phase.rs
+expression: json
+---
+{
+  "map": {
+    "Cfast": {
+      "Capacitor": {
+        "cap": {
+          "value": 1.0,
+          "exponent": -6.0,
+          "suffix": null
+        },
+        "tc1": {
+          "value": 5.0,
+          "exponent": -4.0,
+          "suffix": null
+        },
+        "tc2": {
+          "value": 1.0,
+          "exponent": -4.0,
+          "suffix": null
+        }
+      }
+    },
+    "Lslow": {
+      "Inductor": {
+        "inductance": {
+          "value": 0.01,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": {
+          "value": 1.0,
+          "exponent": -5.0,
+          "suffix": null
+        },
+        "tc2": {
+          "value": 2.0,
+          "exponent": -5.0,
+          "suffix": null
+        }
+      }
+    },
+    "R1": {
+      "Resistor": {
+        "resistance": {
+          "value": 100.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": {
+          "value": 1.0,
+          "exponent": -3.0,
+          "suffix": null
+        },
+        "tc2": {
+          "value": 2.0,
+          "exponent": -3.0,
+          "suffix": null
+        },
+        "w": {
+          "value": 2.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "l": {
+          "value": 3.0,
+          "exponent": null,
+          "suffix": null
+        }
+      }
+    }
+  }
+}

@@ -2,10 +2,112 @@
 source: crates/spicy_simulate/src/lib.rs
 expression: output
 ---
-[
-    [1.0, 0.0, 0.001], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
-    [2.0, 0.0, 0.002], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
-    [3.0, 0.0, 0.003], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
-    [4.0, 0.0, 0.004], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
-    [5.0, 0.0, 0.005], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
-]
+DcSweepResult {
+    results: [
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "n001",
+                        1.0,
+                    ),
+                    (
+                        "n002",
+                        0.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "L2",
+                        0.001,
+                    ),
+                ],
+            },
+            0.001,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "n001",
+                        2.0,
+                    ),
+                    (
+                        "n002",
+                        0.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "L2",
+                        0.002,
+                    ),
+                ],
+            },
+            0.002,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "n001",
+                        3.0,
+                    ),
+                    (
+                        "n002",
+                        0.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "L2",
+                        0.003,
+                    ),
+                ],
+            },
+            0.003,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "n001",
+                        4.0,
+                    ),
+                    (
+                        "n002",
+                        0.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "L2",
+                        0.004,
+                    ),
+                ],
+            },
+            0.004,
+        ),
+        (
+            OperatingPointResult {
+                voltages: [
+                    (
+                        "n001",
+                        5.0,
+                    ),
+                    (
+                        "n002",
+                        0.0,
+                    ),
+                ],
+                currents: [
+                    (
+                        "L2",
+                        0.005,
+                    ),
+                ],
+            },
+            0.005,
+        ),
+    ],
+}

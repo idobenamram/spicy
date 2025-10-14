@@ -64,7 +64,7 @@ impl<'a> Integrator<'a> {
     ) -> (f64, f64) {
         match self {
             Integrator::BackwardEuler { previous } => {
-                let c = device.capacitance.get_value();
+                let c = device.capacitance();
                 let g = c / config.step;
                 let previous_voltage = get_previous_voltage(
                     previous,
@@ -80,7 +80,7 @@ impl<'a> Integrator<'a> {
                 previous_output,
                 previous_currents,
             } => {
-                let c = device.capacitance.get_value();
+                let c = device.capacitance();
                 let g = 2.0 * c / config.step;
                 let previous_voltage = get_previous_voltage(
                     previous_output,

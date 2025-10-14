@@ -1,5 +1,5 @@
-use spicy_parser::netlist_types::Command;
 use spicy_parser::instance_parser::Deck;
+use spicy_parser::netlist_types::Command;
 
 use crate::{
     ac::simulate_ac,
@@ -82,22 +82,21 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
 mod tests {
     use super::*;
     use rstest::rstest;
-    use spicy_parser::libs_phase::SourceFileId;
     use spicy_parser::Value;
+    use spicy_parser::libs_phase::SourceFileId;
     use spicy_parser::netlist_types::Node;
     use spicy_parser::netlist_types::{Capacitor, Device, Resistor};
 
     use spicy_parser::Span;
     use spicy_parser::parse;
     use spicy_parser::{ParseOptions, SourceMap};
-    
 
     use std::path::PathBuf;
 
     use crate::nodes::Nodes;
 
     fn make_resistor(name: &str, n1: &str, n2: &str, value: f64) -> Resistor {
-        Resistor::new(
+        let mut r = Resistor::new(
             name.to_string(),
             Span::new(0, 0, SourceFileId::dummy()),
             Node {
@@ -106,11 +105,12 @@ mod tests {
             Node {
                 name: n2.to_string(),
             },
-            Value::new(value, None, None),
-        )
+        );
+        r.set_resistance(Value::new(value, None, None));
+        r
     }
     fn make_capacitor(name: &str, n1: &str, n2: &str, value: f64) -> Capacitor {
-        Capacitor::new(
+        let mut c = Capacitor::new(
             name.to_string(),
             Span::new(0, 0, SourceFileId::dummy()),
             Node {
@@ -119,8 +119,9 @@ mod tests {
             Node {
                 name: n2.to_string(),
             },
-            Value::new(value, None, None),
-        )
+        );
+        c.set_capacitance(Value::new(value, None, None));
+        c
     }
 
     #[test]
@@ -153,7 +154,6 @@ mod tests {
 
     #[rstest]
     fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
-
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let source_map = SourceMap::new(input.clone(), input_content);
         let mut input_options = ParseOptions {

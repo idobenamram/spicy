@@ -5,7 +5,9 @@ use serde::Serialize;
 use crate::{
     error::{ParserError, SpicyError},
     expr::Value,
-    lexer::Span, netlist_waveform::WaveForm,
+    lexer::Span,
+    netlist_models::{CapacitorModel, InductorModel, ResistorModel},
+    netlist_waveform::WaveForm,
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
@@ -20,8 +22,9 @@ pub enum CommandType {
     Op,
     Tran,
     Lib,
-    ENDL,
+    Endl,
     Include,
+    Model,
     Subcircuit,
     Ends,
     Param,
@@ -36,8 +39,9 @@ impl CommandType {
             "OP" | "op" => Some(CommandType::Op),
             "TRAN" | "tran" => Some(CommandType::Tran),
             "LIB" | "lib" => Some(CommandType::Lib),
-            "ENDL" | "endl" => Some(CommandType::ENDL),
+            "ENDL" | "endl" => Some(CommandType::Endl),
             "INCLUDE" | "include" => Some(CommandType::Include),
+            "MODEL" | "model" => Some(CommandType::Model),
             "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
             "ENDS" | "ends" => Some(CommandType::Ends),
             "PARAM" | "param" => Some(CommandType::Param),
@@ -53,8 +57,9 @@ impl CommandType {
             CommandType::Op => "OP",
             CommandType::Tran => "TRAN",
             CommandType::Lib => "LIB",
-            CommandType::ENDL => "ENDL",
+            CommandType::Endl => "ENDL",
             CommandType::Include => "INCLUDE",
+            CommandType::Model => "MODEL",
             CommandType::Subcircuit => "SUBCKT",
             CommandType::Ends => "ENDS",
             CommandType::Param => "PARAM",
@@ -155,7 +160,8 @@ pub struct Resistor {
     pub span: Span,
     pub positive: Node,
     pub negative: Node,
-    pub resistance: Value,
+    pub resistance: Option<Value>,
+    pub model: Option<ResistorModel>,
     pub ac: Option<Value>,
     // multiplier - replicates the resistor in parallel
     pub m: Option<Value>,
@@ -168,19 +174,14 @@ pub struct Resistor {
 }
 
 impl Resistor {
-    pub fn new(
-        name: String,
-        span: Span,
-        positive: Node,
-        negative: Node,
-        resistance: Value,
-    ) -> Self {
+    pub fn new(name: String, span: Span, positive: Node, negative: Node) -> Self {
         Self {
             name,
             span,
             positive,
             negative,
-            resistance,
+            resistance: None,
+            model: None,
             ac: None,
             m: None,
             scale: None,
@@ -190,6 +191,16 @@ impl Resistor {
             tc2: None,
             noisy: None,
         }
+    }
+    pub fn resistance(&self) -> f64 {
+        self.resistance.clone().unwrap_or(Value::zero()).get_value()
+    }
+
+    pub fn set_resistance(&mut self, value: Value) {
+        self.resistance = Some(value);
+    }
+    pub fn set_model(&mut self, model: ResistorModel) {
+        self.model = Some(model);
     }
 
     pub fn set_ac(&mut self, value: Value) {
@@ -227,7 +238,8 @@ pub struct Capacitor {
     pub span: Span,
     pub positive: Node,
     pub negative: Node,
-    pub capacitance: Value,
+    pub capacitance: Option<Value>,
+    pub model: Option<CapacitorModel>,
     pub mname: Option<String>,
     // multiplier - replicates the capacitor in parallel
     pub m: Option<Value>,
@@ -240,19 +252,14 @@ pub struct Capacitor {
 }
 
 impl Capacitor {
-    pub fn new(
-        name: String,
-        span: Span,
-        positive: Node,
-        negative: Node,
-        capacitance: Value,
-    ) -> Self {
+    pub fn new(name: String, span: Span, positive: Node, negative: Node) -> Self {
         Self {
             name,
             span,
             positive,
             negative,
-            capacitance,
+            capacitance: None,
+            model: None,
             mname: None,
             m: None,
             scale: None,
@@ -262,6 +269,20 @@ impl Capacitor {
             tc2: None,
             ic: None,
         }
+    }
+
+    pub fn capacitance(&self) -> f64 {
+        self.capacitance
+            .clone()
+            .unwrap_or(Value::zero())
+            .get_value()
+    }
+
+    pub fn set_capacitance(&mut self, value: Value) {
+        self.capacitance = Some(value);
+    }
+    pub fn set_model(&mut self, model: CapacitorModel) {
+        self.model = Some(model);
     }
 
     pub fn set_m(&mut self, value: Value) {
@@ -296,7 +317,8 @@ pub struct Inductor {
     pub span: Span,
     pub positive: Node,
     pub negative: Node,
-    pub inductance: Value,
+    pub inductance: Option<Value>,
+    pub model: Option<InductorModel>,
     pub nt: Option<Value>,
     pub m: Option<Value>,
     pub scale: Option<Value>,
@@ -308,19 +330,14 @@ pub struct Inductor {
 }
 
 impl Inductor {
-    pub fn new(
-        name: String,
-        span: Span,
-        positive: Node,
-        negative: Node,
-        inductance: Value,
-    ) -> Self {
+    pub fn new(name: String, span: Span, positive: Node, negative: Node) -> Self {
         Self {
             name,
             span,
             positive,
             negative,
-            inductance,
+            inductance: None,
+            model: None,
             nt: None,
             m: None,
             scale: None,
@@ -330,6 +347,18 @@ impl Inductor {
             tc2: None,
             ic: None,
         }
+    }
+
+    pub fn inductance(&self) -> f64 {
+        self.inductance.clone().unwrap_or(Value::zero()).get_value()
+    }
+
+    pub fn set_inductance(&mut self, value: Value) {
+        self.inductance = Some(value);
+    }
+
+    pub fn set_model(&mut self, model: InductorModel) {
+        self.model = Some(model);
     }
 
     pub fn set_nt(&mut self, value: Value) {
@@ -377,7 +406,6 @@ impl Phasor {
         self.phase = Some(phase);
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct IndependentSource {

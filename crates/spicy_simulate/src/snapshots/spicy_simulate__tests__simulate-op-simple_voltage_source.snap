@@ -2,4 +2,21 @@
 source: crates/spicy_simulate/src/lib.rs
 expression: output
 ---
-[1.0, 0.6666666666666666, -0.0003333333333333334], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1
+OperatingPointResult {
+    voltages: [
+        (
+            "in",
+            1.0,
+        ),
+        (
+            "out",
+            0.6666666666666666,
+        ),
+    ],
+    currents: [
+        (
+            "V1",
+            -0.0003333333333333334,
+        ),
+    ],
+}

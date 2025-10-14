@@ -41,6 +41,8 @@ impl SpicyError {
                 | ParserError::InvalidParam { span, .. }
                 | ParserError::UnmatchedBrace { span }
                 | ParserError::EmptyExpressionInsideBraces { span }
+                | ParserError::MissingModel { span, .. }
+                | ParserError::InvalidModel { span, .. }
                 | ParserError::TooManyParameters { span, .. } => Some(*span),
                 ParserError::MissingToken { .. }
                 | ParserError::InvalidDeviceType { .. }
@@ -59,8 +61,10 @@ impl SpicyError {
             },
             SpicyError::Subcircuit(se) => match se {
                 SubcircuitError::MissingSubcircuitName { span } => *span,
+                SubcircuitError::InvalidDeviceModelType { span, .. } => Some(*span),
                 SubcircuitError::NoNodes { span, .. } => Some(*span),
                 SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
+                SubcircuitError::ModelAlreadyExists { span, .. } => Some(*span),
             },
             SpicyError::Include(ie) => match ie {
                 IncludeError::ExpectedPath { span }
@@ -140,6 +144,12 @@ pub enum ParserError {
     #[error("invalid device type: {s}")]
     InvalidDeviceType { s: String },
 
+    #[error("invalid model: {model}")]
+    InvalidModel { model: String, span: Span },
+
+    #[error("missing model: {model}")]
+    MissingModel { model: String, span: Span },
+
     #[error("missing scope")]
     MissingScope { span: Span },
 
@@ -212,6 +222,12 @@ pub enum SubcircuitError {
 
     #[error("subcircuit {name} has no nodes")]
     NoNodes { name: String, span: Span },
+
+    #[error("invalid device model type: {s}")]
+    InvalidDeviceModelType { s: String, span: Span },
+
+    #[error("model {name} already exists")]
+    ModelAlreadyExists { name: String, span: Span },
 }
 
 #[derive(Debug, Error)]

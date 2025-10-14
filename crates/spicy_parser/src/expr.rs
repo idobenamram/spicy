@@ -12,7 +12,7 @@ use std::collections::HashMap;
 #[cfg(test)]
 use crate::test_utils::serialize_sorted_map;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Copy)]
 pub struct Value {
     pub value: f64,
     pub exponent: Option<f64>,
@@ -149,59 +149,58 @@ impl Expr {
         }
     }
 
-    pub fn evaluate(self, scope: &Scope) -> Result<Value, SpicyError> {
-        match self.r#type {
-            ExprType::Value(value) => Ok(value),
-            // TODO: support layered expressions with no loops
-            ExprType::Placeholder(id) => Err(ExpressionError::UnevaluatablePlaceholder {
-                id,
-                span: self.span,
-            }
-            .into()),
+    pub fn evaluate(
+        &self,
+        scope: &Scope,
+        placeholders: &PlaceholderMap,
+    ) -> Result<Value, SpicyError> {
+        match &self.r#type {
+            ExprType::Value(value) => Ok(*value),
+            ExprType::Placeholder(id) => placeholders.get(*id).evaluate(scope, placeholders),
             ExprType::Ident(name) => {
-                let Some(expr) = scope.param_map.get_param(&name).cloned() else {
+                let Some(expr) = scope.param_map.get_param(name) else {
                     return Err(ExpressionError::UnknownIdentifier {
-                        name,
+                        name: name.clone(),
                         span: self.span,
                     }
                     .into());
                 };
-                expr.evaluate(scope)
+                expr.evaluate(scope, placeholders)
             }
             ExprType::Unary { op, operand } => match op {
                 TokenKind::Minus => {
-                    let value = operand.evaluate(scope)?;
+                    let value = operand.evaluate(scope, placeholders)?;
                     Ok(Value::new(-value.get_value(), None, None))
                 }
                 _ => Err(ExpressionError::UnsupportedUnaryOperator {
-                    op,
+                    op: *op,
                     span: self.span,
                 }
                 .into()),
             },
             ExprType::Binary { op, left, right } => match op {
                 TokenKind::Plus => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
+                    let left_value = left.evaluate(scope, placeholders)?;
+                    let right_value = right.evaluate(scope, placeholders)?;
                     Ok(left_value + right_value)
                 }
                 TokenKind::Minus => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
+                    let left_value = left.evaluate(scope, placeholders)?;
+                    let right_value = right.evaluate(scope, placeholders)?;
                     Ok(left_value - right_value)
                 }
                 TokenKind::Asterisk => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
+                    let left_value = left.evaluate(scope, placeholders)?;
+                    let right_value = right.evaluate(scope, placeholders)?;
                     Ok(left_value * right_value)
                 }
                 TokenKind::Slash => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
+                    let left_value = left.evaluate(scope, placeholders)?;
+                    let right_value = right.evaluate(scope, placeholders)?;
                     Ok(left_value / right_value)
                 }
                 _ => Err(ExpressionError::UnsupportedBinaryOperator {
-                    op,
+                    op: *op,
                     span: self.span,
                 }
                 .into()),

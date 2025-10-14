@@ -143,9 +143,9 @@ impl<'s> InstanceParser<'s> {
         cursor.skip_ws();
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
+            let expr = self.placeholder_map.get(id);
             // TODO: maybe we can change the expression to only evaluate once
-            let expr = self.placeholder_map.get(id).clone();
-            let evaluated = expr.evaluate(scope)?;
+            let evaluated = expr.evaluate(scope, &self.placeholder_map)?;
             return Ok(evaluated);
         }
         // todo: fix this
@@ -275,8 +275,8 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self.placeholder_map.get(id).clone();
-            let evaluated = expr.evaluate(scope)?;
+            let expr = self.placeholder_map.get(id);
+            let evaluated = expr.evaluate(scope, &self.placeholder_map)?;
             // TODO: kinda ugly
             if evaluated.get_value() == 0.0 {
                 return Ok(false);
@@ -294,8 +294,8 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self.placeholder_map.get(id).clone();
-            let evaluated = expr.evaluate(scope)?;
+            let expr = self.placeholder_map.get(id);
+            let evaluated = expr.evaluate(scope, &self.placeholder_map)?;
             let value = evaluated.get_value();
             // TODO: baba
             // Check if value is an integer (no fractional part)

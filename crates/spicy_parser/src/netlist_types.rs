@@ -5,7 +5,8 @@ use serde::Serialize;
 use crate::{
     error::{ParserError, SpicyError},
     expr::Value,
-    lexer::Span, netlist_waveform::WaveForm,
+    lexer::Span,
+    netlist_waveform::WaveForm,
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
@@ -378,7 +379,6 @@ impl Phasor {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct IndependentSource {
     pub name: String,
@@ -438,7 +438,7 @@ impl Device {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Copy)]
 pub enum ValueSuffix {
     Tera,
     Giga,

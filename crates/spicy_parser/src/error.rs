@@ -41,6 +41,8 @@ impl SpicyError {
                 | ParserError::InvalidParam { span, .. }
                 | ParserError::UnmatchedBrace { span }
                 | ParserError::EmptyExpressionInsideBraces { span }
+                | ParserError::MissingModel { span, .. }
+                | ParserError::InvalidModel { span, .. }
                 | ParserError::TooManyParameters { span, .. } => Some(*span),
                 ParserError::MissingToken { .. }
                 | ParserError::InvalidDeviceType { .. }
@@ -141,6 +143,12 @@ pub enum ParserError {
 
     #[error("invalid device type: {s}")]
     InvalidDeviceType { s: String },
+
+    #[error("invalid model: {model}")]
+    InvalidModel { model: String, span: Span },
+
+    #[error("missing model: {model}")]
+    MissingModel { model: String, span: Span },
 
     #[error("missing scope")]
     MissingScope { span: Span },

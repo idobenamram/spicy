@@ -286,7 +286,6 @@ pub(crate) fn expand_subckts<'a>(
         &unexpanded_deck
             .scope_arena
             .get(unexpanded_deck.global_params)
-            .expect("we always have a global scope"),
     )?;
 
     Ok(ExpandedDeck {
@@ -364,8 +363,8 @@ mod tests {
 
         let global_scope = unexpanded_deck
             .scope_arena
-            .get(unexpanded_deck.global_params)
-            .expect("global scope exists");
+            .get(unexpanded_deck.global_params);
+
         let model_table = unexpanded_deck
             .model_table
             .into_model_table(

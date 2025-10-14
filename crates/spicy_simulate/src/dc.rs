@@ -20,7 +20,7 @@ pub(crate) fn stamp_resistor(g: &mut Array2<f64>, resistor: &Resistor, nodes: &N
     let node1 = nodes.get_node_index(&resistor.positive.name);
     let node2 = nodes.get_node_index(&resistor.negative.name);
 
-    let conductance = 1.0 / resistor.resistance.get_value();
+    let conductance = 1.0 / resistor.resistance();
 
     if let Some(node1) = node1 {
         g[[node1, node1]] += conductance;

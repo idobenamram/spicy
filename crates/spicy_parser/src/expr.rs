@@ -309,7 +309,7 @@ impl ScopeArena {
             param_map: Default::default(),
             node_mapping: Default::default(),
         });
-        (self.get_mut(id).expect("just pushed"), id)
+        (self.get_mut(id), id)
     }
 
     pub fn new_child(&mut self, parent: ScopeId, mut env: Scope) -> ScopeId {
@@ -319,12 +319,12 @@ impl ScopeArena {
         id
     }
 
-    pub fn get(&self, id: ScopeId) -> Option<&Scope> {
-        self.nodes.get(id.0)
+    pub fn get(&self, id: ScopeId) -> &Scope {
+        self.nodes.get(id.0).expect("scopeId only created by this arena")
     }
 
-    pub fn get_mut(&mut self, id: ScopeId) -> Option<&mut Scope> {
-        self.nodes.get_mut(id.0)
+    pub fn get_mut(&mut self, id: ScopeId) -> &mut Scope {
+        self.nodes.get_mut(id.0).expect("scopeId only created by this arena")
     }
 
     /// Get by key, walking up parents until found (rootward)

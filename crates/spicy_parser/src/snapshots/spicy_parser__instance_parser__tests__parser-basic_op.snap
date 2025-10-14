@@ -34,13 +34,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 10.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -90,13 +93,16 @@ Deck {
                 negative: Node {
                     name: "0",
                 },
-                capacitance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Micro,
-                    ),
-                },
+                capacitance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                    },
+                ),
+                model: None,
                 mname: None,
                 m: None,
                 scale: None,

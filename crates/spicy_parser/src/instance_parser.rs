@@ -2,13 +2,16 @@ use crate::SourceMap;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
+use crate::netlist_models::{DeviceModel, ModelTable};
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
     IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
 };
 use crate::netlist_waveform::WaveForm;
-use crate::parser_utils::{parse_bool, parse_ident, parse_node, parse_usize, parse_value};
-use crate::statement_phase::{StmtCursor};
+use crate::parser_utils::{
+    parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize, parse_value,
+};
+use crate::statement_phase::StmtCursor;
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
 
 #[derive(Debug)]
@@ -138,19 +141,8 @@ impl<'s> InstanceParser<'s> {
     }
 
     fn parse_value(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Value, SpicyError> {
-        cursor.skip_ws();
-        if let Some(token) = cursor.consume(TokenKind::Placeholder) {
-            let id = token.id.expect("must have a placeholder id");
-            // TODO: maybe we can change the expression to only evaluate once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
-            let evaluated = expr.evaluate(scope)?;
-            return Ok(evaluated);
-        }
         let input = self.source_map.get_content(cursor.span.source_index);
-        Ok(parse_value(cursor, input)?)
+        parse_expr_into_value(cursor, input, &self.placeholder_map, scope)
     }
 
     fn parse_in_parentheses(
@@ -274,10 +266,7 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
+            let expr = self.placeholder_map.get(id).clone();
             let evaluated = expr.evaluate(scope)?;
             // TODO: kinda ugly
             if evaluated.get_value() == 0.0 {
@@ -296,10 +285,7 @@ impl<'s> InstanceParser<'s> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
             // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self
-                .placeholder_map
-                .get(id)
-                .clone();
+            let expr = self.placeholder_map.get(id).clone();
             let evaluated = expr.evaluate(scope)?;
             let value = evaluated.get_value();
             // TODO: baba
@@ -339,15 +325,49 @@ impl<'s> InstanceParser<'s> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
-        let resistance = self.parse_value(cursor, scope)?;
-        let mut resistor = Resistor::new(name, cursor.span, positive, negative, resistance);
+        let mut resistor = Resistor::new(name, cursor.span, positive, negative);
 
-        let params_order = vec!["ac", "m", "scale", "temp", "dtemp", "tc1", "tc2", "noisy"];
+        let params_order = vec![
+            "resistance",
+            "model",
+            "ac",
+            "m",
+            "scale",
+            "temp",
+            "dtemp",
+            "tc1",
+            "tc2",
+            "noisy",
+        ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
         for item in params {
             let (ident, mut cursor) = item?;
             match ident {
+                "resistance" => {
+                    let value = self.parse_value(&mut cursor, scope)?;
+                    resistor.set_resistance(value);
+                }
+                "model" => {
+                    let model_name = parse_ident(&mut cursor, input)?;
+                    let model = self
+                        .expanded_deck
+                        .model_table
+                        .get(&model_name.text.to_string())
+                        .ok_or_else(|| ParserError::MissingModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        })?;
+                    if let DeviceModel::Resistor(model) = model {
+                        resistor.set_model(model.clone());
+                    } else {
+                        return Err(ParserError::InvalidModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        }
+                        .into());
+                    }
+                }
                 "ac" => {
                     let value = self.parse_value(&mut cursor, scope)?;
                     resistor.set_ac(value);
@@ -404,16 +424,49 @@ impl<'s> InstanceParser<'s> {
         let negative = self.parse_node(cursor, scope)?;
 
         // TODO: support models
-        let capacitance = self.parse_value(cursor, scope)?;
-        let mut capacitor = Capacitor::new(name, cursor.span, positive, negative, capacitance);
+        let mut capacitor = Capacitor::new(name, cursor.span, positive, negative);
 
-        let params_order = vec!["m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
+        let params_order = vec![
+            "capacitance",
+            "model",
+            "m",
+            "scale",
+            "temp",
+            "dtemp",
+            "tc1",
+            "tc2",
+            "ic",
+        ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
             let (ident, mut cursor) = item?;
             match ident {
+                "capacitance" => {
+                    let value = self.parse_value(&mut cursor, scope)?;
+                    capacitor.set_capacitance(value);
+                }
+                "model" => {
+                    let model_name = parse_ident(&mut cursor, input)?;
+                    let model = self
+                        .expanded_deck
+                        .model_table
+                        .get(&model_name.text.to_string())
+                        .ok_or_else(|| ParserError::MissingModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        })?;
+                    if let DeviceModel::Capacitor(model) = model {
+                        capacitor.set_model(model.clone());
+                    } else {
+                        return Err(ParserError::InvalidModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        }
+                        .into());
+                    }
+                }
                 "m" => {
                     let value = self.parse_value(&mut cursor, scope)?;
                     capacitor.set_m(value);
@@ -467,17 +520,50 @@ impl<'s> InstanceParser<'s> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
-        let inductance = self.parse_value(cursor, scope)?;
+        let mut inductor = Inductor::new(name, cursor.span, positive, negative);
 
-        let mut inductor = Inductor::new(name, cursor.span, positive, negative, inductance);
-
-        let params_order = vec!["nt", "m", "scale", "temp", "dtemp", "tc1", "tc2", "ic"];
+        let params_order = vec![
+            "inductance",
+            "model",
+            "nt",
+            "m",
+            "scale",
+            "temp",
+            "dtemp",
+            "tc1",
+            "tc2",
+            "ic",
+        ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
             let (ident, mut cursor) = item?;
             match ident {
+                "inductance" => {
+                    let value = self.parse_value(&mut cursor, scope)?;
+                    inductor.set_inductance(value);
+                }
+                "model" => {
+                    let model_name = parse_ident(&mut cursor, input)?;
+                    let model = self
+                        .expanded_deck
+                        .model_table
+                        .get(&model_name.text.to_string())
+                        .ok_or_else(|| ParserError::MissingModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        })?;
+                    if let DeviceModel::Inductor(model) = model {
+                        inductor.set_model(model.clone());
+                    } else {
+                        return Err(ParserError::InvalidModel {
+                            model: model_name.text.to_string(),
+                            span: model_name.span,
+                        }
+                        .into());
+                    }
+                }
                 "nt" => {
                     let value = self.parse_value(&mut cursor, scope)?;
                     inductor.set_nt(value);
@@ -603,13 +689,7 @@ impl<'s> InstanceParser<'s> {
         let (first, _) = ident_string.split_at(1);
 
         let element_type = DeviceType::from_str(first)?;
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .ok_or_else(|| ParserError::MissingScope {
-                span: statement.stmt.span,
-            })?;
+        let scope = self.expanded_deck.scope_arena.get(statement.scope);
 
         let name = scope.get_device_name(&ident_string);
 
@@ -750,13 +830,7 @@ impl<'s> InstanceParser<'s> {
             }
         })?;
 
-        let scope = self
-            .expanded_deck
-            .scope_arena
-            .get(statement.scope)
-            .ok_or_else(|| ParserError::MissingScope {
-                span: statement.stmt.span,
-            })?;
+        let scope = self.expanded_deck.scope_arena.get(statement.scope);
 
         let command = match command_type {
             CommandType::DC => Command::Dc(self.parse_dc_command(&mut cursor, scope)?),

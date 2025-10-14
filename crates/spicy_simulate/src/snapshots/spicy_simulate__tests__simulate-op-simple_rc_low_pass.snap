@@ -1,23 +1,22 @@
 ---
 source: crates/spicy_simulate/src/lib.rs
-assertion_line: 174
 expression: output
 ---
 OperatingPointResult {
     voltages: [
         (
-            "n001",
-            2.0,
+            "in",
+            0.0,
         ),
         (
-            "n002",
+            "out",
             0.0,
         ),
     ],
     currents: [
         (
-            "L2",
-            0.002,
+            "V1",
+            0.0,
         ),
     ],
 }

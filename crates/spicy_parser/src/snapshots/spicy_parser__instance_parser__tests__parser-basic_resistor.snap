@@ -22,13 +22,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -55,13 +58,16 @@ Deck {
                 negative: Node {
                     name: "0",
                 },
-                resistance: Value {
-                    value: 1.1234,
-                    exponent: None,
-                    suffix: Some(
-                        Tera,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.1234,
+                        exponent: None,
+                        suffix: Some(
+                            Tera,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -88,11 +94,14 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: -10.0,
-                    exponent: None,
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: -10.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -119,11 +128,14 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 0.5,
-                    exponent: None,
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 0.5,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -150,11 +162,14 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 1.25,
-                    exponent: None,
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.25,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -181,13 +196,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 2.5,
-                    exponent: Some(
-                        3.0,
-                    ),
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            3.0,
+                        ),
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -214,13 +232,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 2.5,
-                    exponent: Some(
-                        3.0,
-                    ),
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            3.0,
+                        ),
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -247,13 +268,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 2.5,
-                    exponent: Some(
-                        -3.0,
-                    ),
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            -3.0,
+                        ),
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -280,13 +304,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: -3.0,
-                    exponent: Some(
-                        6.0,
-                    ),
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: -3.0,
+                        exponent: Some(
+                            6.0,
+                        ),
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -313,13 +340,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 10.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -346,13 +376,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 47.0,
-                    exponent: None,
-                    suffix: Some(
-                        Mega,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 47.0,
+                        exponent: None,
+                        suffix: Some(
+                            Mega,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -379,13 +412,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Milli,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Milli,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -412,13 +448,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 220.0,
-                    exponent: None,
-                    suffix: Some(
-                        Micro,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 220.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -445,13 +484,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 33.0,
-                    exponent: None,
-                    suffix: Some(
-                        Nano,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 33.0,
+                        exponent: None,
+                        suffix: Some(
+                            Nano,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -478,13 +520,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 4.7,
-                    exponent: None,
-                    suffix: Some(
-                        Pico,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 4.7,
+                        exponent: None,
+                        suffix: Some(
+                            Pico,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -511,13 +556,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 8.0,
-                    exponent: None,
-                    suffix: Some(
-                        Femto,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 8.0,
+                        exponent: None,
+                        suffix: Some(
+                            Femto,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -544,13 +592,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Atto,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Atto,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -577,13 +628,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 1.2,
-                    exponent: Some(
-                        -3.0,
-                    ),
-                    suffix: None,
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.2,
+                        exponent: Some(
+                            -3.0,
+                        ),
+                        suffix: None,
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -610,13 +664,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: 0.123,
-                    exponent: None,
-                    suffix: Some(
-                        Giga,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 0.123,
+                        exponent: None,
+                        suffix: Some(
+                            Giga,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,
@@ -643,13 +700,16 @@ Deck {
                 negative: Node {
                     name: "out",
                 },
-                resistance: Value {
-                    value: -0.99,
-                    exponent: None,
-                    suffix: Some(
-                        Tera,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: -0.99,
+                        exponent: None,
+                        suffix: Some(
+                            Tera,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,

@@ -83,13 +83,16 @@ Deck {
                 negative: Node {
                     name: "0",
                 },
-                resistance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: None,
                 m: None,
                 scale: None,

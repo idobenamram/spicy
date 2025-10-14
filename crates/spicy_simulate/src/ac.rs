@@ -20,7 +20,7 @@ fn stamp_capacitor_ac(
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     // Yc = j * w * C -> purely imaginary admittance placed on ai
-    let yc = w * device.capacitance.get_value();
+    let yc = w * device.capacitance();
 
     if let Some(n1) = node1 {
         ai[[n1, n1]] += yc;
@@ -58,7 +58,7 @@ fn stamp_inductor_ac_mna(
     }
 
     // KVL: v = (Va - Vb) - j*w*L*i = 0 -> put +w*L on imag diagonal of KVL row/col
-    let wl = w * device.inductance.get_value();
+    let wl = w * device.inductance();
     ai[[k, k]] += wl;
 }
 

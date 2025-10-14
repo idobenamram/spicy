@@ -80,7 +80,7 @@ pub(crate) fn collect_subckts(
             let mut subckt = parse_subckt_command(&mut cursor, input)?;
             let mut body = Vec::new();
             // TODO: this doesn't support nested subcircuits
-            while let Some(next) = it.next() {
+            for next in it.by_ref() {
                 let mut inner_cursor = next.into_cursor();
                 if inner_cursor.consume_if_command(input, CommandType::Param) {
                     parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params)?;
@@ -129,7 +129,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl
             break;
         };
         let node = parse_node(cursor, src)?;
-        if let Some(_) = cursor.consume(TokenKind::Equal) {
+        if cursor.consume(TokenKind::Equal).is_some() {
             let param_name = node.name;
             let value = parse_value_or_placeholder(cursor, src)?;
             default_params.set_param(param_name, value);
@@ -160,9 +160,9 @@ fn parse_x_device(
     loop {
         let mark = cursor.checkpoint();
         cursor.skip_ws();
-        let is_param_start = if let Some(_) = cursor.consume(TokenKind::Ident) {
-            let eq = cursor.consume(TokenKind::Equal).is_some();
-            eq
+        let is_param_start = if cursor.consume(TokenKind::Ident).is_some() {
+            
+            cursor.consume(TokenKind::Equal).is_some()
         } else {
             false
         };
@@ -217,7 +217,7 @@ pub(crate) struct ExpandedDeck {
 }
 
 /// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
-pub(crate) fn expand_subckts<'a>(
+pub(crate) fn expand_subckts(
     mut unexpanded_deck: UnexpandedDeck,
     source_map: &SourceMap,
     placeholder_map: &PlaceholderMap,
@@ -283,7 +283,7 @@ pub(crate) fn expand_subckts<'a>(
     let models = unexpanded_deck.model_table.into_model_table(
         source_map,
         placeholder_map,
-        &unexpanded_deck
+        unexpanded_deck
             .scope_arena
             .get(unexpanded_deck.global_params)
     )?;
@@ -404,7 +404,7 @@ mod tests {
             max_include_depth: 10,
         };
 
-        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+        let mut statements = Statements::new(input_content, input_options.source_map.main_index())
             .expect("statements");
         let _ = substitute_expressions(&mut statements, &input_options)
             .expect("substitute expressions");
@@ -437,7 +437,7 @@ mod tests {
             max_include_depth: 10,
         };
 
-        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+        let mut statements = Statements::new(input_content, input_options.source_map.main_index())
             .expect("statements");
         let _ = substitute_expressions(&mut statements, &input_options)
             .expect("substitute expressions");

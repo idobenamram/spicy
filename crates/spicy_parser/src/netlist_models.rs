@@ -86,11 +86,11 @@ impl DeviceModelType {
             "C" => Ok(DeviceModelType::Capacitor),
             "L" => Ok(DeviceModelType::Inductor),
             _ => {
-                return Err(SubcircuitError::InvalidDeviceModelType {
+                Err(SubcircuitError::InvalidDeviceModelType {
                     s: s.to_string(),
                     span,
                 }
-                .into());
+                .into())
             }
         }
     }
@@ -124,7 +124,7 @@ fn model_statement_to_device_model(
 
     let mut cursor = model_statement.statement.into_cursor();
     cursor.skip_ws();
-    let params_cursors = if let Some(_) = cursor.consume(TokenKind::LeftParen) {
+    let params_cursors = if cursor.consume(TokenKind::LeftParen).is_some() {
         let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
         let params = in_parentheses.split_on_whitespace();
         cursor.expect(TokenKind::RightParen)?;
@@ -137,7 +137,7 @@ fn model_statement_to_device_model(
     for mut param in params_cursors {
         let ident = parse_ident(&mut param, input)?;
         param.expect(TokenKind::Equal)?;
-        let value = parse_expr_into_value(&mut param, input, &placeholder_map, scope)?;
+        let value = parse_expr_into_value(&mut param, input, placeholder_map, scope)?;
 
         params.push((ident, value));
     }

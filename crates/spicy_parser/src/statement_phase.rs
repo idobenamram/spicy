@@ -154,14 +154,13 @@ impl<'a> StmtCursor<'a> {
     pub(crate) fn consume_if_command(&mut self, input: &str, command: CommandType) -> bool {
         let checkpoint = self.checkpoint();
         self.skip_ws();
-        if let Some(_) = self.consume(TokenKind::Dot) {
-            if let Some(kind) = self.consume(TokenKind::Ident) {
+        if self.consume(TokenKind::Dot).is_some()
+            && let Some(kind) = self.consume(TokenKind::Ident) {
                 let found_command = CommandType::from_str(token_text(input, kind)) == Some(command);
                 if found_command {
                     return true;
                 }
             }
-        }
         self.rewind(checkpoint);
         false
     }
@@ -169,8 +168,8 @@ impl<'a> StmtCursor<'a> {
     pub(crate) fn consume_if_commands(&mut self, input: &str, commands: &[CommandType]) -> Option<CommandType> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
-        if let Some(_) = self.consume(TokenKind::Dot) {
-            if let Some(kind) = self.consume(TokenKind::Ident) {
+        if self.consume(TokenKind::Dot).is_some()
+            && let Some(kind) = self.consume(TokenKind::Ident) {
                 let command_type = CommandType::from_str(token_text(input, kind));
                 for command in commands {
                     if command_type == Some(*command) {
@@ -178,7 +177,6 @@ impl<'a> StmtCursor<'a> {
                     }
                 }
             }
-        }
         self.rewind(checkpoint);
         None
     }
@@ -259,7 +257,7 @@ impl<'a> StmtCursor<'a> {
             }
         }
 
-        Ok(before.ok_or_else(|| ParserError::MissingToken {
+        Ok(before.ok_or(ParserError::MissingToken {
             message: "expected token",
             span: Some(self.span),
         })?)

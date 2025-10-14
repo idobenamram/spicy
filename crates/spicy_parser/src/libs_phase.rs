@@ -90,7 +90,7 @@ impl SourceMap {
     }
 }
 
-fn span_text<'a>(src: &'a str, span: Span) -> &'a str {
+fn span_text(src: &str, span: Span) -> &str {
     &src[span.start..=span.end]
 }
 
@@ -101,7 +101,7 @@ fn parse_include<'a>(
     let cursors = cursor.split_on_whitespace();
     let path_cursor = cursors
         .first()
-        .ok_or_else(|| SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
+        .ok_or(SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
 
     let path = span_text(
         options
@@ -122,7 +122,7 @@ fn parse_lib_command<'a>(
     let cursors = cursor.split_on_whitespace();
     let path_cursor = cursors
         .first()
-        .ok_or_else(|| SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
+        .ok_or(SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
     let lib_cursor_opt = cursors.get(1);
     let path = span_text(
         options
@@ -152,8 +152,8 @@ fn handle_lib_command(
     path_span: Span,
     libname: Option<String>,
 ) -> Result<(Statements, SourceFileId), SpicyError> {
-    let (source_index, file_content) = options.read_file(&path, path_span)?;
-    let all = Statements::new(&file_content, source_index)?;
+    let (source_index, file_content) = options.read_file(path, path_span)?;
+    let all = Statements::new(file_content, source_index)?;
     if libname.is_none() {
         // Behave like include: return all statements except .LIB/.ENDL wrappers
         let mut filtered = Vec::new();
@@ -244,7 +244,7 @@ fn expand_includes(
             if stack.contains(&path) {
                 return Err(SpicyError::Include(IncludeError::CycleDetected {
                     span: cursor.span,
-                    path: path,
+                    path,
                 }));
             }
             if depth + 1 > options.max_include_depth {
@@ -490,8 +490,8 @@ mod tests {
         for st in &expanded.statements {
             if st.span.source_index != main_idx {
                 let p = opts.source_map.get_path(st.span.source_index);
-                if p.file_name().and_then(|s| s.to_str()) == Some("lib_a.spicy") {
-                    if p.parent()
+                if p.file_name().and_then(|s| s.to_str()) == Some("lib_a.spicy")
+                    && p.parent()
                         .and_then(|pp| pp.file_name())
                         .and_then(|s| s.to_str())
                         == Some("alt")
@@ -499,7 +499,6 @@ mod tests {
                         found_alt = true;
                         break;
                     }
-                }
             }
         }
         assert!(found_alt, "expected lib_a resolved from work_dir alt");
@@ -524,8 +523,8 @@ mod tests {
         for st in &expanded.statements {
             if st.span.source_index != main_idx {
                 let p = opts.source_map.get_path(st.span.source_index);
-                if p.file_name().and_then(|s| s.to_str()) == Some("lib_c.spicy") {
-                    if p.parent()
+                if p.file_name().and_then(|s| s.to_str()) == Some("lib_c.spicy")
+                    && p.parent()
                         .and_then(|pp| pp.file_name())
                         .and_then(|s| s.to_str())
                         == Some("include_inputs")
@@ -533,7 +532,6 @@ mod tests {
                         found_parent = true;
                         break;
                     }
-                }
             }
         }
         assert!(

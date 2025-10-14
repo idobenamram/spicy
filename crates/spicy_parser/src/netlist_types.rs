@@ -138,7 +138,7 @@ impl DeviceType {
             "V" => Ok(DeviceType::VoltageSource),
             "I" => Ok(DeviceType::CurrentSource),
             "X" => Ok(DeviceType::Subcircuit),
-            _ => return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into()),
+            _ => Err(ParserError::InvalidDeviceType { s: s.to_string() }.into()),
         }
     }
 

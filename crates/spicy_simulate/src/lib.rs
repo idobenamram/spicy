@@ -42,7 +42,7 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
                 }
             }
             Command::Dc(command_params) => {
-                let dc = simulate_dc(&deck, &command_params);
+                let dc = simulate_dc(&deck, command_params);
                 if options.write_raw {
                     let base = options.get_output_base(&deck, "dc");
                     // detect if sweep is a voltage source by scanning devices
@@ -60,14 +60,14 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
                 }
             }
             Command::Ac(command_params) => {
-                let ac = simulate_ac(&deck, &command_params);
+                let ac = simulate_ac(&deck, command_params);
                 if options.write_raw {
                     let base = options.get_output_base(&deck, "ac");
                     let _ = raw_writer::write_ac_raw(&deck, &ac, &base);
                 }
             }
             Command::Tran(command_params) => {
-                let result = simulate_trans(&deck, &command_params);
+                let result = simulate_trans(&deck, command_params);
                 if options.write_raw {
                     let base = options.get_output_base(&deck, "tran");
                     let _ = raw_writer::write_transient_raw(&deck, &result, &base);

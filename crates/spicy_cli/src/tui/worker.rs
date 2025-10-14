@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
@@ -69,12 +69,12 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                             continue;
                         }
                         Command::Dc(command_params) => {
-                            let dc = simulate_dc(&deck, &command_params);
+                            let dc = simulate_dc(&deck, command_params);
                             let _ = tx.send(SimMsg::Dc(dc));
                             continue;
                         }
                         Command::Tran(command_params) => {
-                            let tr = simulate_trans(&deck, &command_params);
+                            let tr = simulate_trans(&deck, command_params);
                             let _ = tx.send(SimMsg::Transient(tr));
                             continue;
                         }

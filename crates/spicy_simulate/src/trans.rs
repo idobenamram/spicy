@@ -25,7 +25,9 @@ fn get_previous_voltage(
     ic: &Option<Value>,
     use_device_ic: bool,
 ) -> f64 {
-    let previous_voltage = if use_device_ic {
+    
+
+    if use_device_ic {
         // if we set the uic flag we should just take the initial condition from the device
         ic.clone().unwrap_or(Value::zero()).get_value()
     } else {
@@ -38,9 +40,7 @@ fn get_previous_voltage(
             (None, Some(negative)) => -previous_voltages[negative],
             (None, None) => 0.0, // TODO: should through an error
         }
-    };
-
-    previous_voltage
+    }
 }
 
 #[derive(Debug)]
@@ -203,7 +203,7 @@ fn simulation_step<'a>(
 
     for device in devices {
         match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, &device, &nodes),
+            Device::Resistor(device) => stamp_resistor(&mut m, device, nodes),
             Device::Capacitor(device) => {
                 let positive = nodes.get_node_index(&device.positive.name);
                 let negative = nodes.get_node_index(&device.negative.name);
@@ -213,7 +213,7 @@ fn simulation_step<'a>(
                 integrator.save_capcitor_current(device, i);
             }
             // TODO: we don't support functions on the sources yet
-            Device::VoltageSource(device) => stamp_voltage_source_trans(&mut m, &mut s, &device, &nodes, config),
+            Device::VoltageSource(device) => stamp_voltage_source_trans(&mut m, &mut s, device, nodes, config),
             _ => {
                 unimplemented!("Unsupported device type: {:?}", device)
             }
@@ -221,9 +221,9 @@ fn simulation_step<'a>(
     }
 
     let lu = m.factorize_into().expect("Failed to factorize matrix");
-    let x = lu.solve(&s).expect("Failed to solve linear system");
+    
 
-    x
+    lu.solve(&s).expect("Failed to solve linear system")
 }
 
 #[derive(Debug, Clone)]
@@ -254,7 +254,7 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
     let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
         step: tstep,
-        tstop: tstop,
+        tstop,
         t: 0.0,
         use_device_ic: cmd.uic,
     };

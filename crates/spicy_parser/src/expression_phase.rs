@@ -10,10 +10,10 @@ pub fn substitute_expressions(
 ) -> Result<PlaceholderMap, SpicyError> {
     let mut placeholders = PlaceholderMap::default();
 
-    let mut iterator = statements.statements.iter_mut();
-    while let Some(mut stmt) = iterator.next() {
+    let iterator = statements.statements.iter_mut();
+    for stmt in iterator {
         // Replace { … } with placeholders in this statement
-        brace_to_placeholders(&mut stmt, input, &mut placeholders)?;
+        brace_to_placeholders(stmt, input, &mut placeholders)?;
     }
 
     Ok(placeholders)
@@ -40,7 +40,7 @@ fn brace_to_placeholders(
                     right_brace = Some(tok);
                     break;
                 }
-                expression_tokens.push(tok.clone());
+                expression_tokens.push(*tok);
             }
 
             let Some(right_brace) = right_brace else {
@@ -53,7 +53,7 @@ fn brace_to_placeholders(
                     .all(|t| t.kind == TokenKind::WhiteSpace)
             {
                 // we found a {} with nothing inside
-                return Err(ParserError::EmptyExpressionInsideBraces {
+                Err(ParserError::EmptyExpressionInsideBraces {
                     span: Span::new(tok.span.start, right_brace.span.end, tok.span.source_index),
                 })?;
             }
@@ -78,7 +78,7 @@ fn brace_to_placeholders(
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
-    use serde_json;
+    
 
     use super::*;
     use crate::SourceMap;

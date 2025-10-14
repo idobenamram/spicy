@@ -212,20 +212,20 @@ fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>)
         match device {
             Device::Resistor(dev) => {
                 // purely real conductance -> stamp into ar using existing DC helper
-                stamp_resistor(&mut ar, &dev, &nodes);
+                stamp_resistor(&mut ar, dev, &nodes);
             }
             Device::Capacitor(dev) => {
-                stamp_capacitor_ac(&mut ai, &dev, &nodes, w);
+                stamp_capacitor_ac(&mut ai, dev, &nodes, w);
             }
             Device::Inductor(dev) => {
-                stamp_inductor_ac_mna(&mut ar, &mut ai, &dev, &nodes, w);
+                stamp_inductor_ac_mna(&mut ar, &mut ai, dev, &nodes, w);
             }
             Device::VoltageSource(dev) => {
-                stamp_voltage_source_incidence_real(&mut ar, &dev, &nodes);
-                stamp_voltage_source_phasor_ac(&mut br, &mut bi, &dev, &nodes);
+                stamp_voltage_source_incidence_real(&mut ar, dev, &nodes);
+                stamp_voltage_source_phasor_ac(&mut br, &mut bi, dev, &nodes);
             }
             Device::CurrentSource(dev) => {
-                stamp_current_source_phasor_ac(&mut br, &mut bi, &dev, &nodes);
+                stamp_current_source_phasor_ac(&mut br, &mut bi, dev, &nodes);
             }
         }
     }

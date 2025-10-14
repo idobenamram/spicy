@@ -2,14 +2,14 @@ use crate::SourceMap;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
-use crate::netlist_models::{DeviceModel, ModelTable};
+use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
     AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
     IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
-    parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize, parse_value,
+    parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize,
 };
 use crate::statement_phase::StmtCursor;
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
@@ -136,8 +136,8 @@ impl<'s> InstanceParser<'s> {
         let input = self
             .source_map
             .get_content(statement.stmt.span.source_index);
-        let comment = input[statement.stmt.span.start..=statement.stmt.span.end].to_string();
-        comment
+        
+        input[statement.stmt.span.start..=statement.stmt.span.end].to_string()
     }
 
     fn parse_value(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Value, SpicyError> {
@@ -176,7 +176,7 @@ impl<'s> InstanceParser<'s> {
                 "SIN" => {
                     let values = self.parse_in_parentheses(cursor, scope)?;
                     WaveForm::Sinusoidal {
-                        offset: values.get(0).cloned().ok_or_else(|| {
+                        offset: values.first().cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected offset value for SIN waveform",
                                 span: cursor.peek_span(),
@@ -197,7 +197,7 @@ impl<'s> InstanceParser<'s> {
                 "EXP" => {
                     let values = self.parse_in_parentheses(cursor, scope)?;
                     WaveForm::Exponential {
-                        initial_value: values.get(0).cloned().ok_or_else(|| {
+                        initial_value: values.first().cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected initial value for EXP waveform",
                                 span: cursor.peek_span(),
@@ -220,7 +220,7 @@ impl<'s> InstanceParser<'s> {
                     // with ParamParser, then we don't need to cast the number of pulses to a u64
                     let values = self.parse_in_parentheses(cursor, scope)?;
                     WaveForm::Pulse {
-                        voltage1: values.get(0).cloned().ok_or_else(|| {
+                        voltage1: values.first().cloned().ok_or_else(|| {
                             ParserError::MissingToken {
                                 message: "expected voltage1 value for PULSE waveform",
                                 span: cursor.peek_span(),
@@ -249,7 +249,7 @@ impl<'s> InstanceParser<'s> {
                 }
             };
 
-        return Ok(waveform);
+        Ok(waveform)
     }
 
     fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Node, SpicyError> {
@@ -278,7 +278,7 @@ impl<'s> InstanceParser<'s> {
             return Err(ParserError::ExpectedBoolZeroOrOne { span: token.span }.into());
         }
         let input = self.source_map.get_content(cursor.span.source_index);
-        Ok(parse_bool(cursor, input)?)
+        parse_bool(cursor, input)
     }
 
     fn parse_usize(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<usize, SpicyError> {
@@ -310,7 +310,7 @@ impl<'s> InstanceParser<'s> {
             }
         }
         let input = self.source_map.get_content(cursor.span.source_index);
-        Ok(parse_usize(cursor, input)?)
+        parse_usize(cursor, input)
     }
 
     // RXXXXXXX n+ n- <resistance|r=>value <ac=val> <m=val>
@@ -353,7 +353,7 @@ impl<'s> InstanceParser<'s> {
                     let model = self
                         .expanded_deck
                         .model_table
-                        .get(&model_name.text.to_string())
+                        .get(model_name.text)
                         .ok_or_else(|| ParserError::MissingModel {
                             model: model_name.text.to_string(),
                             span: model_name.span,
@@ -452,7 +452,7 @@ impl<'s> InstanceParser<'s> {
                     let model = self
                         .expanded_deck
                         .model_table
-                        .get(&model_name.text.to_string())
+                        .get(model_name.text)
                         .ok_or_else(|| ParserError::MissingModel {
                             model: model_name.text.to_string(),
                             span: model_name.span,
@@ -549,7 +549,7 @@ impl<'s> InstanceParser<'s> {
                     let model = self
                         .expanded_deck
                         .model_table
-                        .get(&model_name.text.to_string())
+                        .get(model_name.text)
                         .ok_or_else(|| ParserError::MissingModel {
                             model: model_name.text.to_string(),
                             span: model_name.span,
@@ -628,14 +628,14 @@ impl<'s> InstanceParser<'s> {
                 "AC" => {
                     let mag = self.parse_value(cursor, scope)?;
                     let mut phasor = Phasor::new(mag);
-                    if let Some(_) = cursor.peek_non_whitespace() {
+                    if cursor.peek_non_whitespace().is_some() {
                         let phase = self.parse_value(cursor, scope)?;
                         phasor.set_phase(phase);
                     }
 
                     independent_source.set_ac(phasor);
                 }
-                _ => independent_source.set_dc(self.parse_waveform(&token, cursor, scope)?),
+                _ => independent_source.set_dc(self.parse_waveform(token, cursor, scope)?),
             };
         } else {
             independent_source.set_dc(WaveForm::Constant(self.parse_value(cursor, scope)?))
@@ -720,10 +720,10 @@ impl<'s> InstanceParser<'s> {
                 scope,
             )?)),
             _ => {
-                return Err(ParserError::InvalidDeviceType {
+                Err(ParserError::InvalidDeviceType {
                     s: element_type.to_char().to_string(),
                 }
-                .into());
+                .into())
             }
         }
     }
@@ -823,7 +823,7 @@ impl<'s> InstanceParser<'s> {
         let ident = cursor.expect(TokenKind::Ident)?;
         let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident);
-        let command_type = CommandType::from_str(&ident_string).ok_or_else(|| {
+        let command_type = CommandType::from_str(ident_string).ok_or_else(|| {
             ParserError::InvalidCommandType {
                 s: ident_string.to_string(),
                 span: cursor.span,
@@ -857,16 +857,16 @@ impl<'s> InstanceParser<'s> {
         let title = self.parse_title(
             &statements_iter
                 .next()
-                .ok_or_else(|| ParserError::MissingTitle)?,
+                .ok_or(ParserError::MissingTitle)?,
         );
 
         let mut commands = vec![];
         let mut devices = vec![];
 
-        while let Some(statement) = statements_iter.next() {
+        for statement in statements_iter {
             let cursor = statement.stmt.into_cursor();
 
-            let first_token = cursor.peek().ok_or_else(|| ParserError::MissingToken {
+            let first_token = cursor.peek().ok_or(ParserError::MissingToken {
                 message: "token",
                 span: Some(cursor.span),
             })?;

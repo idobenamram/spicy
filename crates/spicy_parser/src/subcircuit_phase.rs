@@ -19,6 +19,7 @@ use crate::{lexer::TokenKind, statement_phase::Statement};
 #[cfg(test)]
 use crate::test_utils::serialize_sorted_map;
 
+#[derive(Debug)]
 pub(crate) struct UnexpandedDeck {
     pub scope_arena: ScopeArena,
     pub global_params: ScopeId,
@@ -384,5 +385,71 @@ mod tests {
 
         let json = serde_json::to_string_pretty(&model_table).expect("serialize to json");
         insta::assert_snapshot!(name, json);
+    }
+
+    #[test]
+    fn test_duplicate_model_name_error() {
+        use crate::libs_phase::SourceMap;
+        use crate::error::{SpicyError, SubcircuitError};
+
+        let input_content = "\
+* duplicate models\n
+.model R1 R resistance=10\n
+.model R1 R resistance=20\n
+";
+        let source_map = SourceMap::new(PathBuf::from("inline"), input_content.to_string());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+
+        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+            .expect("statements");
+        let _ = substitute_expressions(&mut statements, &input_options)
+            .expect("substitute expressions");
+
+        let err = collect_subckts(statements, &input_options.source_map)
+            .expect_err("expected duplicate model error");
+
+        match err {
+            SpicyError::Subcircuit(SubcircuitError::ModelAlreadyExists { name, .. }) => {
+                assert_eq!(name, "R1");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_invalid_model_type_error() {
+        use crate::libs_phase::SourceMap;
+        use crate::error::{SpicyError, SubcircuitError};
+
+        let input_content = "\
+* invalid model type\n
+.model M1 X foo=1\n
+";
+        let source_map = SourceMap::new(PathBuf::from("inline"), input_content.to_string());
+        let input_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            max_include_depth: 10,
+        };
+
+        let mut statements = Statements::new(&input_content, input_options.source_map.main_index())
+            .expect("statements");
+        let _ = substitute_expressions(&mut statements, &input_options)
+            .expect("substitute expressions");
+        let err = collect_subckts(statements, &input_options.source_map)
+            .expect_err("expected invalid model type error");
+
+        match err {
+            SpicyError::Subcircuit(SubcircuitError::InvalidDeviceModelType { s, .. }) => {
+                assert_eq!(s, "X");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
     }
 }

@@ -21,22 +21,51 @@ pub struct Deck {
     pub devices: Vec<Device>,
 }
 
+#[derive(Debug)]
+pub(crate) struct ParamSlot<'s> {
+    pub canonical: &'s str,
+    // pub aliases: Vec<&'s str>,
+    pub is_ident: bool,
+}
+
+impl<'s> ParamSlot<'s> {
+    pub fn ident(canonical: &'s str) -> Self {
+        Self {
+            canonical,
+            is_ident: true,
+        }
+    }
+
+    pub fn other(canonical: &'s str) -> Self {
+        Self {
+            canonical,
+            is_ident: false,
+        }
+    }
+}
+
 pub(crate) struct ParamParser<'s> {
     input: &'s str,
-    params_order: Vec<&'s str>,
+    params_order: Vec<ParamSlot<'s>>,
     param_cursors: Vec<StmtCursor<'s>>,
+    current_cursor: usize,
     current_param: usize,
     named_mode: bool,
 }
 
 impl<'s> ParamParser<'s> {
-    pub(crate) fn new(input: &'s str, params_order: Vec<&'s str>, cursor: &StmtCursor<'s>) -> Self {
+    pub(crate) fn new(
+        input: &'s str,
+        params_order: Vec<ParamSlot<'s>>,
+        cursor: &StmtCursor<'s>,
+    ) -> Self {
         ParamParser {
             input,
             params_order,
             param_cursors: cursor.split_on_whitespace(),
             named_mode: false,
             current_param: 0,
+            current_cursor: 0,
         }
     }
 
@@ -50,13 +79,13 @@ impl<'s> ParamParser<'s> {
         };
         let ident_str = token_text(self.input, ident);
 
-        if !self.params_order.contains(&ident_str) {
+        if !self.params_order.iter().any(|p| p.canonical == ident_str) {
             return Err(ParserError::InvalidParam {
                 param: ident_str.to_string(),
                 span: cursor.span,
             }
             .into());
-        }
+        };
 
         let Ok(_equal_sign) = cursor.expect(TokenKind::Equal) else {
             return Err(ParserError::MissingToken {
@@ -73,10 +102,10 @@ impl<'s> Iterator for ParamParser<'s> {
     type Item = Result<(&'s str, StmtCursor<'s>), SpicyError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_param >= self.param_cursors.len() {
+        if self.current_cursor >= self.param_cursors.len() {
             None
         } else {
-            let mut cursor = self.param_cursors[self.current_param].clone();
+            let mut cursor = self.param_cursors[self.current_cursor].clone();
             let item = if !self.named_mode {
                 if cursor.contains(TokenKind::Equal) {
                     self.named_mode = true;
@@ -85,8 +114,35 @@ impl<'s> Iterator for ParamParser<'s> {
                         Err(e) => Some(Err(e)),
                     }
                 } else {
+                    let is_ident = cursor
+                        .peek_non_whitespace()
+                        .map(|t| t.kind == TokenKind::Ident)
+                        .unwrap_or(false);
+
                     match self.params_order.get(self.current_param) {
-                        Some(p) => Some(Ok((*p, cursor))),
+                        Some(p) => {
+                            if is_ident != p.is_ident {
+                                println!("current param: {:?}, {:?}", self.current_param, p);
+                                self.current_param += 1;
+                                match self.params_order.get(self.current_param) {
+                                    Some(p) => {
+                                        println!(
+                                            "inside current param: {:?}, {:?}",
+                                            self.current_param, p
+                                        );
+                                        Some(Ok((p.canonical, cursor)))
+                                    }
+                                    None => Some(Err(ParserError::TooManyParameters {
+                                        index: self.current_param,
+                                        span: cursor.span,
+                                    }
+                                    .into())),
+                                }
+                            } else {
+                                println!("else current param: {:?}, {:?}", self.current_param, p);
+                                Some(Ok((p.canonical, cursor)))
+                            }
+                        }
                         None => Some(Err(ParserError::TooManyParameters {
                             index: self.current_param,
                             span: cursor.span,
@@ -101,6 +157,7 @@ impl<'s> Iterator for ParamParser<'s> {
                 }
             };
             self.current_param += 1;
+            self.current_cursor += 1;
             item
         }
     }
@@ -136,7 +193,7 @@ impl<'s> InstanceParser<'s> {
         let input = self
             .source_map
             .get_content(statement.stmt.span.source_index);
-        
+
         input[statement.stmt.span.start..=statement.stmt.span.end].to_string()
     }
 
@@ -325,19 +382,20 @@ impl<'s> InstanceParser<'s> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
+        println!("parse_resistor {:?}", name);
         let mut resistor = Resistor::new(name, cursor.span, positive, negative);
 
         let params_order = vec![
-            "resistance",
-            "model",
-            "ac",
-            "m",
-            "scale",
-            "temp",
-            "dtemp",
-            "tc1",
-            "tc2",
-            "noisy",
+            ParamSlot::other("resistance"),
+            ParamSlot::ident("mname"),
+            ParamSlot::other("ac"),
+            ParamSlot::other("m"),
+            ParamSlot::other("scale"),
+            ParamSlot::other("temp"),
+            ParamSlot::other("dtemp"),
+            ParamSlot::other("tc1"),
+            ParamSlot::other("tc2"),
+            ParamSlot::other("noisy"),
         ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
@@ -348,7 +406,7 @@ impl<'s> InstanceParser<'s> {
                     let value = self.parse_value(&mut cursor, scope)?;
                     resistor.set_resistance(value);
                 }
-                "model" => {
+                "mname" => {
                     let model_name = parse_ident(&mut cursor, input)?;
                     let model = self
                         .expanded_deck
@@ -374,6 +432,7 @@ impl<'s> InstanceParser<'s> {
                 }
                 "m" => {
                     let value = self.parse_value(&mut cursor, scope)?;
+                    println!("setting m to {:?}", value);
                     resistor.set_m(value);
                 }
                 "scale" => {
@@ -427,15 +486,15 @@ impl<'s> InstanceParser<'s> {
         let mut capacitor = Capacitor::new(name, cursor.span, positive, negative);
 
         let params_order = vec![
-            "capacitance",
-            "model",
-            "m",
-            "scale",
-            "temp",
-            "dtemp",
-            "tc1",
-            "tc2",
-            "ic",
+            ParamSlot::other("capacitance"),
+            ParamSlot::ident("mname"),
+            ParamSlot::other("m"),
+            ParamSlot::other("scale"),
+            ParamSlot::other("temp"),
+            ParamSlot::other("dtemp"),
+            ParamSlot::other("tc1"),
+            ParamSlot::other("tc2"),
+            ParamSlot::other("ic"),
         ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
@@ -447,7 +506,7 @@ impl<'s> InstanceParser<'s> {
                     let value = self.parse_value(&mut cursor, scope)?;
                     capacitor.set_capacitance(value);
                 }
-                "model" => {
+                "mname" => {
                     let model_name = parse_ident(&mut cursor, input)?;
                     let model = self
                         .expanded_deck
@@ -523,16 +582,16 @@ impl<'s> InstanceParser<'s> {
         let mut inductor = Inductor::new(name, cursor.span, positive, negative);
 
         let params_order = vec![
-            "inductance",
-            "model",
-            "nt",
-            "m",
-            "scale",
-            "temp",
-            "dtemp",
-            "tc1",
-            "tc2",
-            "ic",
+            ParamSlot::other("inductance"),
+            ParamSlot::ident("mname"),
+            ParamSlot::other("nt"),
+            ParamSlot::other("m"),
+            ParamSlot::other("scale"),
+            ParamSlot::other("temp"),
+            ParamSlot::other("dtemp"),
+            ParamSlot::other("tc1"),
+            ParamSlot::other("tc2"),
+            ParamSlot::other("ic"),
         ];
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
@@ -544,7 +603,7 @@ impl<'s> InstanceParser<'s> {
                     let value = self.parse_value(&mut cursor, scope)?;
                     inductor.set_inductance(value);
                 }
-                "model" => {
+                "mname" => {
                     let model_name = parse_ident(&mut cursor, input)?;
                     let model = self
                         .expanded_deck
@@ -719,12 +778,10 @@ impl<'s> InstanceParser<'s> {
                 &mut cursor,
                 scope,
             )?)),
-            _ => {
-                Err(ParserError::InvalidDeviceType {
-                    s: element_type.to_char().to_string(),
-                }
-                .into())
+            _ => Err(ParserError::InvalidDeviceType {
+                s: element_type.to_char().to_string(),
             }
+            .into()),
         }
     }
 
@@ -823,12 +880,11 @@ impl<'s> InstanceParser<'s> {
         let ident = cursor.expect(TokenKind::Ident)?;
         let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident);
-        let command_type = CommandType::from_str(ident_string).ok_or_else(|| {
-            ParserError::InvalidCommandType {
+        let command_type =
+            CommandType::from_str(ident_string).ok_or_else(|| ParserError::InvalidCommandType {
                 s: ident_string.to_string(),
                 span: cursor.span,
-            }
-        })?;
+            })?;
 
         let scope = self.expanded_deck.scope_arena.get(statement.scope);
 
@@ -854,11 +910,7 @@ impl<'s> InstanceParser<'s> {
         // TODO: clone is sadge
         let mut statements_iter = self.expanded_deck.statements.clone().into_iter();
         // first line should be a title
-        let title = self.parse_title(
-            &statements_iter
-                .next()
-                .ok_or(ParserError::MissingTitle)?,
-        );
+        let title = self.parse_title(&statements_iter.next().ok_or(ParserError::MissingTitle)?);
 
         let mut commands = vec![];
         let mut devices = vec![];

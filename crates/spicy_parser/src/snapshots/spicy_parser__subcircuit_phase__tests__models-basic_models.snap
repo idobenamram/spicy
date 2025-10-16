@@ -70,6 +70,71 @@ expression: json
           "suffix": null
         }
       }
+    },
+    "mymodel1": {
+      "Resistor": {
+        "resistance": {
+          "value": 1.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": null,
+        "tc2": null,
+        "w": null,
+        "l": null
+      }
+    },
+    "mymodel2": {
+      "Resistor": {
+        "resistance": {
+          "value": 2.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": null,
+        "tc2": null,
+        "w": null,
+        "l": null
+      }
+    },
+    "mymodel3": {
+      "Resistor": {
+        "resistance": {
+          "value": 3.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": null,
+        "tc2": null,
+        "w": null,
+        "l": null
+      }
+    },
+    "mymodel4": {
+      "Resistor": {
+        "resistance": {
+          "value": 4.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": null,
+        "tc2": null,
+        "w": null,
+        "l": null
+      }
+    },
+    "mymodel5": {
+      "Resistor": {
+        "resistance": {
+          "value": 5.0,
+          "exponent": null,
+          "suffix": null
+        },
+        "tc1": null,
+        "tc2": null,
+        "w": null,
+        "l": null
+      }
     }
   }
 }

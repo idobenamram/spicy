@@ -5,3 +5,8 @@
 .model R1 R resistance={rbase*scale} tc1=1e-3 tc2=2e-3 w=2 l=3
 .model Cfast C cap=1e-6 tc1=5e-4 tc2=1e-4
 .model Lslow L ind={lbase*2} tc1=1e-5 tc2=2e-5
+.model mymodel1 R (resistance=1)
+.model mymodel2 R(resistance=2)
+.model mymodel3 R( resistance=3 )
+.model mymodel4 R( resistance=4)
+.model mymodel5 R(resistance=5 )

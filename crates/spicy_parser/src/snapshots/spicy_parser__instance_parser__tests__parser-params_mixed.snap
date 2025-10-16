@@ -8,8 +8,8 @@ Deck {
         Op(
             OpCommand {
                 span: Span {
-                    start: 314,
-                    end: 316,
+                    start: 432,
+                    end: 434,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -22,8 +22,8 @@ Deck {
             Resistor {
                 name: "R1",
                 span: Span {
-                    start: 14,
-                    end: 84,
+                    start: 40,
+                    end: 110,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -34,13 +34,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                resistance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: Some(
                     Value {
                         value: 2.0,
@@ -99,8 +102,8 @@ Deck {
             Resistor {
                 name: "R2",
                 span: Span {
-                    start: 86,
-                    end: 117,
+                    start: 158,
+                    end: 189,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -111,13 +114,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                resistance: Value {
-                    value: 2.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: Some(
                     Value {
                         value: 1.0,
@@ -141,7 +147,7 @@ Deck {
                 ),
                 temp: Some(
                     Value {
-                        value: 5.0,
+                        value: 6.0,
                         exponent: None,
                         suffix: None,
                     },
@@ -174,8 +180,8 @@ Deck {
             Resistor {
                 name: "R3",
                 span: Span {
-                    start: 119,
-                    end: 150,
+                    start: 191,
+                    end: 222,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -186,13 +192,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                resistance: Value {
-                    value: 3.0,
-                    exponent: None,
-                    suffix: Some(
-                        Kilo,
-                    ),
-                },
+                resistance: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
                 ac: Some(
                     Value {
                         value: 7.0,
@@ -223,12 +232,128 @@ Deck {
                 ),
             },
         ),
+        Resistor(
+            Resistor {
+                name: "R3",
+                span: Span {
+                    start: 224,
+                    end: 247,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: Node {
+                    name: "n1",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                resistance: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: Some(
+                    ResistorModel {
+                        resistance: None,
+                        tc1: Some(
+                            Value {
+                                value: 345.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                        tc2: None,
+                        w: None,
+                        l: None,
+                    },
+                ),
+                ac: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
+        Resistor(
+            Resistor {
+                name: "R4",
+                span: Span {
+                    start: 249,
+                    end: 268,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: Node {
+                    name: "n1",
+                },
+                negative: Node {
+                    name: "n0",
+                },
+                resistance: None,
+                model: Some(
+                    ResistorModel {
+                        resistance: None,
+                        tc1: Some(
+                            Value {
+                                value: 345.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                        tc2: None,
+                        w: None,
+                        l: None,
+                    },
+                ),
+                ac: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ),
         Capacitor(
             Capacitor {
                 name: "C1",
                 span: Span {
-                    start: 152,
-                    end: 215,
+                    start: 270,
+                    end: 333,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -239,13 +364,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                capacitance: Value {
-                    value: 1.0,
-                    exponent: None,
-                    suffix: Some(
-                        Micro,
-                    ),
-                },
+                capacitance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                    },
+                ),
+                model: None,
                 mname: None,
                 m: Some(
                     Value {
@@ -302,8 +430,8 @@ Deck {
             Capacitor {
                 name: "C2",
                 span: Span {
-                    start: 217,
-                    end: 250,
+                    start: 335,
+                    end: 368,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -314,13 +442,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                capacitance: Value {
-                    value: 2.0,
-                    exponent: None,
-                    suffix: Some(
-                        Micro,
-                    ),
-                },
+                capacitance: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                    },
+                ),
+                model: None,
                 mname: None,
                 m: Some(
                     Value {
@@ -377,8 +508,8 @@ Deck {
             Capacitor {
                 name: "C3",
                 span: Span {
-                    start: 252,
-                    end: 282,
+                    start: 370,
+                    end: 400,
                     source_index: SourceFileId(
                         0,
                     ),
@@ -389,13 +520,16 @@ Deck {
                 negative: Node {
                     name: "n0",
                 },
-                capacitance: Value {
-                    value: 3.0,
-                    exponent: None,
-                    suffix: Some(
-                        Micro,
-                    ),
-                },
+                capacitance: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                    },
+                ),
+                model: None,
                 mname: None,
                 m: Some(
                     Value {

@@ -1,0 +1,47 @@
+name: Fuzz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0' # weekly (Sun) at 03:00 UTC
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Show versions
+        run: |
+          rustc -Vv
+          cargo -V
+
+      - name: Build fuzz targets
+        working-directory: fuzz
+        run: |
+          cargo +nightly fuzz list
+          cargo +nightly fuzz build
+
+      - name: Run fuzzers briefly
+        working-directory: fuzz
+        run: |
+          # Run each target for a short, bounded time to catch obvious crashes
+          for target in $(cargo +nightly fuzz list); do
+            echo "Running $target for 60 seconds"
+            cargo +nightly fuzz run "$target" -- -max_total_time=60 || exit 1
+          done
+
+

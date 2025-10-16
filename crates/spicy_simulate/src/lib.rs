@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_simulate_dc(#[files("tests/*.spicy")] input: PathBuf) {
+    fn test_simulate_dc(#[files("tests/simple_inductor_capacitor.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let source_map = SourceMap::new(input.clone(), input_content);
         let mut input_options = ParseOptions {

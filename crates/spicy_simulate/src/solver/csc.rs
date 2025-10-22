@@ -49,6 +49,12 @@ impl CscMatrix {
                 actual: *self.column_pointers.last().unwrap(),
             });
         }
+        if self.row_indices.len() != *self.column_pointers.last().unwrap() {
+            return Err(CscError::RowIndicesValuesLengthMismatch {
+                values: *self.column_pointers.last().unwrap(),
+                row_indices: self.row_indices.len(),
+            });
+        }
         if self.row_indices.len() != self.values.len() {
             return Err(CscError::RowIndicesValuesLengthMismatch {
                 values: self.values.len(),
@@ -92,6 +98,14 @@ impl CscMatrix {
     pub fn col(&self, j: usize) -> (&[usize], &[f64]) {
         let (s, e) = (self.column_pointers[j], self.column_pointers[j + 1]);
         (&self.row_indices[s..e], &self.values[s..e])
+    }
+
+    pub fn col_start(&self, j: usize) -> usize {
+        self.column_pointers[j]
+    }
+
+    pub fn row_index(&self, i: usize) -> usize {
+        self.row_indices[i]
     }
 
     /// y[rows] += alpha * x (in-place axpy into sparse positions).
@@ -275,6 +289,8 @@ impl CscBuilder {
             row_indices,
             values,
         };
+        let baba = a.check_invariants();
+        println!("a: {:?}", baba);
         debug_assert!(a.check_invariants().is_ok());
         Ok(a)
     }

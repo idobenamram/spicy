@@ -1,4 +1,4 @@
-/// Block Triangular Form (BTF) with Maximal Transversal (MAXTRAN)
+/// Block Triangular Form (BTF), Maximal Transversal (MAXTRAN)
 /// the algorithm is described in the paper:
 /// On Algorithms for Obtaining a Maximum Transversal by I. S. Duff
 /// but to be honest, the paper was very hard to understand.
@@ -19,7 +19,7 @@ fn try_augmenting_path(
     column_permutations: &mut [isize],
     cheap: &mut [usize], // for each column, holds the current row pointer 
                          // for the next non-zero entry to try to use the cheap test with
-    visted: &mut [usize], // use the current column as an index into visted to track loops
+    visited: &mut [usize], // use the current column as an index into visted to track loops
     row_stack: &mut [usize],
     column_stack: &mut [usize],
     position_stack: &mut [usize],
@@ -27,14 +27,14 @@ fn try_augmenting_path(
     let mut found = false;
     let mut head: i64 = 0;
     column_stack[head as usize] = current_column;
-    assert!(visted[current_column] != current_column); // make sure we haven't visited this column yet
+    assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
 
     while head >= 0 {
         let col = column_stack[head as usize];
         let end_of_column = m.col_start(col + 1);
 
-        if visted[col] != current_column {
-            visted[col] = current_column;
+        if visited[col] != current_column {
+            visited[col] = current_column;
 
             // start from the a non-zero entry that hasn't already been tried for cheap
             let mut current_row_ptr = cheap[col];
@@ -64,7 +64,7 @@ fn try_augmenting_path(
             // get the first non-zero entry for this column which should have a matching
             // because the "cheap" option failed
             let col = column_permutations[row];
-            if visted[col as usize] != current_column {
+            if visited[col as usize] != current_column {
                 position_stack[head as usize] = row_ptr + 1;
                 row_stack[head as usize] = row;
                 head += 1;
@@ -98,7 +98,7 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
     let mut column_permutations: Vec<isize> = vec![-1; n];
     let mut cheap: Vec<usize> = vec![0; n];
     // flag in davis's code
-    let mut visted: Vec<usize> = vec![out_of_bounds; n];
+    let mut visited: Vec<usize> = vec![out_of_bounds; n];
 
     // istack
     let mut row_stack: Vec<usize> = vec![out_of_bounds; m.dim.nrows];
@@ -106,18 +106,18 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
     let mut column_stack: Vec<usize> = vec![out_of_bounds; n];
     let mut position_stack: Vec<usize> = vec![out_of_bounds; n];
 
-    for col in 0..m.dim.ncols {
+    for col in 0..n {
         cheap[col] = m.col_start(col);
     }
 
     let mut number_of_matches = 0;
-    for col in 0..m.dim.ncols {
+    for col in 0..n {
         let found = try_augmenting_path(
             m,
             col,
             &mut column_permutations,
             &mut cheap,
-            &mut visted,
+            &mut visited,
             &mut row_stack,
             &mut column_stack,
             &mut position_stack,

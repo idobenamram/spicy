@@ -5,7 +5,7 @@
 /// the easier thing is to read the implementation of Timothy A. Davis.
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/BTF/Include/btf.h
 /// the code is pretty well documented and much easier to understand.
-use crate::solver::csc::CscMatrix;
+use crate::solver::matrix::csc::CscMatrix;
 
 /// for the given column, try to find a column permutation that will match this row and 
 /// there are 2 main parts to the algorithm:
@@ -88,7 +88,7 @@ fn try_augmenting_path(
         }
     }
 
-    return found;
+    found
 }
 
 pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
@@ -106,8 +106,8 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
     let mut column_stack: Vec<usize> = vec![out_of_bounds; n];
     let mut position_stack: Vec<usize> = vec![out_of_bounds; n];
 
-    for col in 0..n {
-        cheap[col] = m.col_start(col);
+    for (col, c) in cheap.iter_mut().enumerate() {
+        *c = m.col_start(col);
     }
 
     let mut number_of_matches = 0;
@@ -128,20 +128,20 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
         }
     }
 
-    return (number_of_matches, column_permutations);
+    (number_of_matches, column_permutations)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::solver::csc::CscBuilder;
+    use crate::solver::matrix::builder::MatrixBuilder;
 
     fn build_5x5(triplets: &[(usize, usize)]) -> CscMatrix {
-        let mut b = CscBuilder::new(5, 5);
+        let mut b = MatrixBuilder::new(5, 5);
         for &(c, r) in triplets {
             b.push(c, r, 1.0).unwrap();
         }
-        b.build().unwrap()
+        b.build_csc().unwrap()
     }
 
     #[test]
@@ -222,7 +222,7 @@ mod tests {
         // where c4 exposes the free row r6 and the augmenting path succeeds.
         // Final expected matching after augmentation:
         // r0->c0, r1->c1, r2->c6, r3->c2, r4->c3, r5->c5, r6->c4
-        let mut b = CscBuilder::new(7, 7);
+        let mut b = MatrixBuilder::new(7, 7);
         // c0
         b.push(0, 0, 1.0).unwrap();
         // c1
@@ -244,7 +244,7 @@ mod tests {
         b.push(6, 0, 1.0).unwrap();
         b.push(6, 2, 1.0).unwrap();
 
-        let a = b.build().unwrap();
+        let a = b.build_csc().unwrap();
         let (k, q) = btf_max_transversal(&a);
         assert_eq!(k, 7);
         assert_eq!(q, vec![0, 1, 6, 2, 3, 5, 4]);

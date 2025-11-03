@@ -1,11 +1,6 @@
-use crate::solver::error::CscError;
-
-/// Compressed Sparse Column
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Dim {
-    pub nrows: usize,
-    pub ncols: usize,
-}
+use crate::solver::matrix::Dim;
+use crate::solver::matrix::error::CscError;
+use crate::solver::matrix::csr::CsrMatrix;
 
 /// Compressed Sparse Column matrix
 /// - column pointers are the indices of the start and end of each column
@@ -28,6 +23,7 @@ impl CscMatrix {
         self.row_indices.len()
     }
 
+    #[allow(clippy::collapsible_if)]
     pub fn check_invariants(&self) -> Result<(), CscError> {
         if self.column_pointers.len() != self.dim.ncols + 1 {
             return Err(CscError::InvalidColumnPointersLength {
@@ -149,9 +145,9 @@ impl CscMatrix {
         }
     }
 
-    /// Transpose into CSR (useful for building elimination trees or symbolic steps).
+    /// Transpose into CSR (current matrix doesn't have duplicates)
     /// This is O(n + nnz) with counting sort by row.
-    pub fn transpose_to_csr(&self) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
+    pub fn transpose_to_csr(&self) -> CsrMatrix {
         let m = self.dim.nrows;
         let n = self.dim.ncols;
         let nnz = self.nnz();
@@ -179,133 +175,20 @@ impl CscMatrix {
                 next[r] += 1;
             }
         }
-        (rp, ci, cx)
-    }
-}
-
-/// Builder from triplets (COO → canonical CSC).
-///
-/// Usage:
-///   let mut b = CscBuilder::new(nrows, ncols);
-///   b.reserve(nnz_guess);
-///   b.push(i, j, v); ...
-///   let a = b.build();  // sorted rows per col, duplicates summed, zeros dropped
-#[derive(Debug)]
-pub struct CscBuilder {
-    dim: Dim,
-    /// Sorted triplets (column, row, value)
-    entries: Vec<(usize, usize, f64)>,
-}
-
-impl CscBuilder {
-    pub fn new(nrows: usize, ncols: usize) -> Self {
-        Self {
-            dim: Dim { nrows, ncols },
-            entries: Vec::new(),
-        }
-    }
-
-    pub fn reserve(&mut self, nnz: usize) {
-        self.entries.reserve(nnz);
-    }
-
-    /// push a COO (column, row, value) tuple
-    pub fn push(&mut self, column: usize, row: usize, value: f64) -> Result<(), CscError> {
-        if column >= self.dim.ncols {
-            return Err(CscError::OutOfBoundsIndex {
-                index: column,
-                max: self.dim.ncols,
-            });
-        }
-        if row >= self.dim.nrows {
-            return Err(CscError::OutOfBoundsIndex {
-                index: row,
-                max: self.dim.nrows,
-            });
-        }
-
-        if value != 0.0 {
-            // keep entries sorted by (column, row) on insertion
-            let key = (column, row);
-            let idx = match self
-                .entries
-                .binary_search_by(|(c, r, _)| (*c, *r).cmp(&key))
-            {
-                Ok(pos) | Err(pos) => pos,
-            };
-            self.entries.insert(idx, (column, row, value));
-        }
-
-        Ok(())
-    }
-
-    pub fn build(self) -> Result<CscMatrix, CscError> {
-        let n = self.dim.ncols;
-
-        // Combine duplicates and drop zeros; entries are already sorted by (col,row)
-        let mut combined: Vec<(usize, usize, f64)> = Vec::with_capacity(self.entries.len());
-        let mut last_col = usize::MAX;
-        let mut last_row = usize::MAX;
-        let mut acc = 0.0f64;
-        for &(c, r, v) in &self.entries {
-            if c == last_col && r == last_row {
-                acc += v;
-            } else {
-                if last_col != usize::MAX && acc != 0.0 {
-                    combined.push((last_col, last_row, acc));
-                }
-                last_col = c;
-                last_row = r;
-                acc = v;
-            }
-        }
-        if last_col != usize::MAX && acc != 0.0 {
-            combined.push((last_col, last_row, acc));
-        }
-
-        // Build CSC arrays with a counting pass then placement pass
-        let mut column_pointers = vec![0usize; n + 1];
-        for &(c, _r, _v) in &combined {
-            column_pointers[c + 1] += 1;
-        }
-        for j in 0..n {
-            column_pointers[j + 1] += column_pointers[j];
-        }
-
-        let nnz = combined.len();
-        let mut row_indices = vec![0usize; nnz];
-        let mut values = vec![0f64; nnz];
-        let mut next = column_pointers.clone();
-        for (c, r, v) in combined {
-            let p = next[c];
-            row_indices[p] = r;
-            values[p] = v;
-            next[c] += 1;
-        }
-
-        let a = CscMatrix {
-            dim: self.dim,
-            column_pointers,
-            row_indices,
-            values,
-        };
-        let baba = a.check_invariants();
-        println!("a: {:?}", baba);
-        debug_assert!(a.check_invariants().is_ok());
-        Ok(a)
+        CsrMatrix { dim: self.dim.clone(), row_pointers: rp, column_indices: ci, values: cx }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::solver::matrix::builder::MatrixBuilder;
 
     #[test]
     fn build_and_access() {
         // A = [ 10  0  3
         //       0 20  0
         //       2  0 30 ]
-        let mut b = CscBuilder::new(3, 3);
+        let mut b = MatrixBuilder::new(3, 3);
         b.push(0, 0, 10.0).unwrap();
         b.push(2, 0, 3.0).unwrap();
         b.push(1, 1, 20.0).unwrap();
@@ -314,7 +197,7 @@ mod tests {
         // also push a duplicate to test combine
         b.push(2, 2, 5.0).unwrap();
 
-        let a = b.build().unwrap();
+        let a = b.build_csc().unwrap();
         assert_eq!(a.nnz(), 6 - 1); // 5 unique nonzeros after combine
 
         // Column 0 -> rows [0,2] vals [10,2]
@@ -332,20 +215,42 @@ mod tests {
 
     #[test]
     fn transpose_roundtrip_shape() {
-        let mut b = CscBuilder::new(3, 3);
+        let mut b = MatrixBuilder::new(3, 3);
         // A = [ 1  2  0
         //       0  0  0 
         //       0  3  0 ]
         b.push(0, 0, 1.0).unwrap();
         b.push(1, 0, 2.0).unwrap();
         b.push(1, 2, 3.0).unwrap();
-        let a = b.build().unwrap();
-        let (rp, ci, _cx) = a.transpose_to_csr();
+        let a = b.build_csc().unwrap();
+        let csr = a.transpose_to_csr();
         // CSR rows = 3; rp len = 4
-        assert_eq!(rp.len(), 4);
+        assert_eq!(csr.row_pointers.len(), 4);
         // nnz preserved
-        assert_eq!(*rp.last().unwrap(), a.nnz());
+        assert_eq!(*csr.row_pointers.last().unwrap(), a.nnz());
         // some sanity on column indices
-        assert!(ci.iter().all(|&j| j < a.dim.ncols));
+        assert!(csr.column_indices.iter().all(|&j| j < a.dim.ncols));
+    }
+
+    #[test]
+    fn transpose_matches_builder_csr() {
+        let mut b1 = MatrixBuilder::new(3, 3);
+        let mut b2 = MatrixBuilder::new(3, 3);
+        let entries = vec![
+            (0, 0, 1.0),
+            (1, 0, 2.0),
+            (1, 2, 3.0),
+        ];
+        for (c, r, v) in &entries {
+            b1.push(*c, *r, *v).unwrap();
+            b2.push(*c, *r, *v).unwrap();
+        }
+        let csc = b1.build_csc().unwrap();
+        let csr_from_transpose = csc.transpose_to_csr();
+        let csr_direct = b2.build_csr().unwrap();
+
+        assert_eq!(csr_from_transpose.row_pointers, csr_direct.row_pointers);
+        assert_eq!(csr_from_transpose.column_indices, csr_direct.column_indices);
+        assert_eq!(csr_from_transpose.values, csr_direct.values);
     }
 }

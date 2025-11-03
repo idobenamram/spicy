@@ -18,7 +18,7 @@ use std::cmp::min;
 /// which are the non zero rows in the column. now the matrix is symmetric by definition of MNA
 /// meaning that the non-zero row (j) is an edge from the column i -> column j (by row j).
 /// it was a little confusing for me at first, so i wanted to write it down.
-use crate::solver::csc::CscMatrix;
+use crate::solver::matrix::csc::CscMatrix;
 
 
 

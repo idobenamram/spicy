@@ -1,6 +1,6 @@
 use crate::solver::matrix::Dim;
-use crate::solver::matrix::error::CscError;
 use crate::solver::matrix::csr::CsrMatrix;
+use crate::solver::matrix::error::CscError;
 
 /// Compressed Sparse Column matrix
 /// - column pointers are the indices of the start and end of each column
@@ -100,6 +100,11 @@ impl CscMatrix {
         self.column_pointers[j]
     }
 
+    // the start of the next column is the end of the current column
+    pub fn col_end(&self, j: usize) -> usize {
+        self.column_pointers[j + 1]
+    }
+
     pub fn row_index(&self, i: usize) -> usize {
         self.row_indices[i]
     }
@@ -175,7 +180,12 @@ impl CscMatrix {
                 next[r] += 1;
             }
         }
-        CsrMatrix { dim: self.dim.clone(), row_pointers: rp, column_indices: ci, values: cx }
+        CsrMatrix {
+            dim: self.dim.clone(),
+            row_pointers: rp,
+            column_indices: ci,
+            values: cx,
+        }
     }
 }
 
@@ -217,7 +227,7 @@ mod tests {
     fn transpose_roundtrip_shape() {
         let mut b = MatrixBuilder::new(3, 3);
         // A = [ 1  2  0
-        //       0  0  0 
+        //       0  0  0
         //       0  3  0 ]
         b.push(0, 0, 1.0).unwrap();
         b.push(1, 0, 2.0).unwrap();
@@ -236,11 +246,7 @@ mod tests {
     fn transpose_matches_builder_csr() {
         let mut b1 = MatrixBuilder::new(3, 3);
         let mut b2 = MatrixBuilder::new(3, 3);
-        let entries = vec![
-            (0, 0, 1.0),
-            (1, 0, 2.0),
-            (1, 2, 3.0),
-        ];
+        let entries = vec![(0, 0, 1.0), (1, 0, 2.0), (1, 2, 3.0)];
         for (c, r, v) in &entries {
             b1.push(*c, *r, *v).unwrap();
             b2.push(*c, *r, *v).unwrap();

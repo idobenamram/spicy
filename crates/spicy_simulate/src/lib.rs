@@ -7,6 +7,7 @@ use crate::{
     trans::simulate_trans,
 };
 
+pub mod solver;
 pub mod ac;
 pub mod dc;
 mod nodes;

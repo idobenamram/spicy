@@ -35,3 +35,7 @@ These rules guide all visualizations under `visualizations/`. The goal is to bui
 - **Motion**: smooth, eased transitions (e.g., ease in-out cubic), short but readable durations. Avoid abrupt jumps where possible.
 - **Composition**: emphasize relationships with brackets, arrows, and subtle highlights; de-emphasize background with low-contrast fills.
 - **Palette**: dark background, high-contrast white for key elements, accent colors for highlights; use alpha for depth, avoid visual noise.
+
+
+### Make sure the code compiles
+- run the command `cargo build --bin btf_viz`

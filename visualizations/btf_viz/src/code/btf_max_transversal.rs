@@ -1,4 +1,4 @@
-use spicy_simulate::solver::csc::CscMatrix;
+use spicy_simulate::solver::matrix::csc::CscMatrix;
 use crate::code::recorder::Recorder;
 
 
@@ -101,17 +101,17 @@ pub fn btf_max_transversal(m: &CscMatrix, recorder: &mut Recorder) -> (usize, Ve
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
 
-    // Record matrix structure
+    // Record matrix numeric entries (col, row, value)
     recorder.set_initial("matrix_rows", &m.dim.nrows);
     recorder.set_initial("matrix_cols", &m.dim.ncols);
-    let nonzeros: Vec<(usize, usize)> = (0..m.dim.ncols)
+    let entries: Vec<(usize, usize, f64)> = (0..m.dim.ncols)
         .flat_map(|col| {
             let start = m.col_start(col);
             let end = m.col_start(col + 1);
-            (start..end).map(move |idx| (col, m.row_index(idx)))
+            (start..end).map(move |idx| (col, m.row_index(idx), m.values[idx]))
         })
         .collect();
-    recorder.set_initial("matrix_nonzeros", &nonzeros);
+    recorder.set_initial("matrix_entries", &entries);
 
     let mut column_permutations: Vec<isize> = vec![-1; n];
     recorder.set_initial("column_permutations", &column_permutations);

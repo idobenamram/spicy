@@ -32,11 +32,11 @@ fn load_trace(
             if let Ok(tf) = serde_json::from_str::<TraceFile>(&trace_json) {
                 *trace = Trace::load_from(tf, code_text.to_string());
                 
-                // Initialize grid from trace
-                let (rows, cols, nonzeros) = trace.extract_matrix_info();
+                // Initialize grid from trace (numeric values)
+                let (rows, cols, values) = trace.extract_matrix_data();
                 grid.rows = rows;
                 grid.cols = cols;
-                grid.nonzeros = nonzeros;
+                grid.values = values;
                 grid.matching = trace.get_matching();
             } else {
                 error!("Failed to parse trace file: {}", trace_path);

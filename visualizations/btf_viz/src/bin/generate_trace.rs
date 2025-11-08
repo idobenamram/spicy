@@ -1,4 +1,4 @@
-use spicy_simulate::solver::csc::CscBuilder;
+use spicy_simulate::solver::matrix::builder::MatrixBuilder;
 use std::path::PathBuf;
 
 // Bring in the `code` module tree so paths like `crate::code::...` resolve
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // c2: r1, r2
     // c3: r2, r3
     // c4: r3, r4
-    let mut builder = CscBuilder::new(5, 5);
+    let mut builder = MatrixBuilder::new(5, 5);
     builder.push(0, 0, 1.0)?;
     builder.push(1, 0, 1.0)?;
     builder.push(1, 1, 1.0)?;
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     builder.push(4, 3, 1.0)?;
     builder.push(4, 4, 1.0)?;
     
-    let matrix = builder.build()?;
+    let matrix = builder.build_csc()?;
     
     // Create recorder
     let trace_path = PathBuf::from("assets/traces/sample_5x5.json");

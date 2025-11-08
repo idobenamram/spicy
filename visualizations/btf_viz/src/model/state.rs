@@ -20,13 +20,13 @@ impl Default for Player {
 pub struct Grid {
     pub rows: usize,
     pub cols: usize,
-    pub nonzeros: Vec<bool>,
+    pub values: Vec<Option<f64>>,
     pub matching: Vec<isize>,
 }
 
 impl Default for Grid {
     fn default() -> Self {
-        Self { rows: 5, cols: 5, nonzeros: vec![false; 25], matching: vec![-1; 5] }
+        Self { rows: 5, cols: 5, values: vec![None; 25], matching: vec![-1; 5] }
     }
 }
 
@@ -281,33 +281,34 @@ impl Trace {
         self.apply_steps_to(new_idx);
     }
     
-    pub fn extract_matrix_info(&self) -> (usize, usize, Vec<bool>) {
+
+    pub fn extract_matrix_data(&self) -> (usize, usize, Vec<Option<f64>>) {
         let rows = self.initial
             .get("matrix_rows")
             .and_then(|v| serde_json::from_value::<usize>(v.clone()).ok())
             .unwrap_or(5);
-        
+
         let cols = self.initial
             .get("matrix_cols")
             .and_then(|v| serde_json::from_value::<usize>(v.clone()).ok())
             .unwrap_or(5);
-        
-        let nonzeros_vec: Vec<(usize, usize)> = self.initial
-            .get("matrix_nonzeros")
-            .and_then(|v| serde_json::from_value::<Vec<(usize, usize)>>(v.clone()).ok())
+
+        let entries: Vec<(usize, usize, f64)> = self.initial
+            .get("matrix_entries")
+            .and_then(|v| serde_json::from_value::<Vec<(usize, usize, f64)>>(v.clone()).ok())
             .unwrap_or_default();
-        
-        let mut nonzeros = vec![false; rows * cols];
-        for (col, row) in nonzeros_vec {
+
+        let mut values = vec![None; rows * cols];
+        for (col, row, val) in entries {
             if row < rows && col < cols {
                 let idx = row * cols + col;
-                if idx < nonzeros.len() {
-                    nonzeros[idx] = true;
+                if idx < values.len() {
+                    values[idx] = Some(val);
                 }
             }
         }
-        
-        (rows, cols, nonzeros)
+
+        (rows, cols, values)
     }
     
     pub fn get_matching(&self) -> Vec<isize> {

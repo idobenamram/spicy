@@ -1,5 +1,5 @@
-pub mod matrix;
-mod error;
+mod aat;
 mod btf_max_transversal;
 mod btf_scc;
-mod aat;
+mod error;
+pub mod matrix;

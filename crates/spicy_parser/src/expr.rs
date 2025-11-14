@@ -320,11 +320,15 @@ impl ScopeArena {
     }
 
     pub fn get(&self, id: ScopeId) -> &Scope {
-        self.nodes.get(id.0).expect("scopeId only created by this arena")
+        self.nodes
+            .get(id.0)
+            .expect("scopeId only created by this arena")
     }
 
     pub fn get_mut(&mut self, id: ScopeId) -> &mut Scope {
-        self.nodes.get_mut(id.0).expect("scopeId only created by this arena")
+        self.nodes
+            .get_mut(id.0)
+            .expect("scopeId only created by this arena")
     }
 
     /// Get by key, walking up parents until found (rootward)

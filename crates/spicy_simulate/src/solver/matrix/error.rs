@@ -17,13 +17,21 @@ pub enum CscError {
     InvalidColumnPointersLength { expected: usize, actual: usize },
 
     #[error("invalid column pointers: {index} (expected: {expected}, actual: {actual})")]
-    InvalidColumnPointers { index: usize, expected: usize, actual: usize },
+    InvalidColumnPointers {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
 
     #[error("row indices values length mismatch: {values} (actual: {row_indices})")]
     RowIndicesValuesLengthMismatch { values: usize, row_indices: usize },
 
     #[error("rows not strictly increasing: {index} (expected: {expected}, actual: {actual})")]
-    RowsNotStrictlyIncreasing { index: usize, expected: usize, actual: usize },
+    RowsNotStrictlyIncreasing {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -35,11 +43,22 @@ pub enum CsrError {
     InvalidRowPointersLength { expected: usize, actual: usize },
 
     #[error("invalid row pointers: {index} (expected: {expected}, actual: {actual})")]
-    InvalidRowPointers { index: usize, expected: usize, actual: usize },
+    InvalidRowPointers {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
 
     #[error("column indices values length mismatch: {values} (actual: {column_indices})")]
-    ColumnIndicesValuesLengthMismatch { values: usize, column_indices: usize },
+    ColumnIndicesValuesLengthMismatch {
+        values: usize,
+        column_indices: usize,
+    },
 
     #[error("columns not strictly increasing: {index} (expected: {expected}, actual: {actual})")]
-    ColumnsNotStrictlyIncreasing { index: usize, expected: usize, actual: usize },
+    ColumnsNotStrictlyIncreasing {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
 }

@@ -155,28 +155,34 @@ impl<'a> StmtCursor<'a> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if self.consume(TokenKind::Dot).is_some()
-            && let Some(kind) = self.consume(TokenKind::Ident) {
-                let found_command = CommandType::from_str(token_text(input, kind)) == Some(command);
-                if found_command {
-                    return true;
-                }
+            && let Some(kind) = self.consume(TokenKind::Ident)
+        {
+            let found_command = CommandType::from_str(token_text(input, kind)) == Some(command);
+            if found_command {
+                return true;
             }
+        }
         self.rewind(checkpoint);
         false
     }
-    
-    pub(crate) fn consume_if_commands(&mut self, input: &str, commands: &[CommandType]) -> Option<CommandType> {
+
+    pub(crate) fn consume_if_commands(
+        &mut self,
+        input: &str,
+        commands: &[CommandType],
+    ) -> Option<CommandType> {
         let checkpoint = self.checkpoint();
         self.skip_ws();
         if self.consume(TokenKind::Dot).is_some()
-            && let Some(kind) = self.consume(TokenKind::Ident) {
-                let command_type = CommandType::from_str(token_text(input, kind));
-                for command in commands {
-                    if command_type == Some(*command) {
-                        return Some(*command);
-                    }
+            && let Some(kind) = self.consume(TokenKind::Ident)
+        {
+            let command_type = CommandType::from_str(token_text(input, kind));
+            for command in commands {
+                if command_type == Some(*command) {
+                    return Some(*command);
                 }
             }
+        }
         self.rewind(checkpoint);
         None
     }
@@ -336,9 +342,9 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use std::path::PathBuf;
     use crate::lexer::{TokenKind, token_text};
     use crate::libs_phase::SourceFileId;
+    use std::path::PathBuf;
 
     #[rstest]
     fn test_statement_stream(#[files("tests/statement_inputs/*.spicy")] input: PathBuf) {

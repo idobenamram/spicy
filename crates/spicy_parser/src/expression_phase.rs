@@ -78,7 +78,6 @@ fn brace_to_placeholders(
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
-    
 
     use super::*;
     use crate::SourceMap;
@@ -133,7 +132,11 @@ mod tests {
             err,
             ParserError::EmptyExpressionInsideBraces {
                 // make sure we include the entire `{ }` in the span
-                span: Span { start: 13, end: 15, source_index }
+                span: Span {
+                    start: 13,
+                    end: 15,
+                    source_index
+                }
             }
         ));
     }

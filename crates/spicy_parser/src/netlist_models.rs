@@ -85,13 +85,11 @@ impl DeviceModelType {
             "R" => Ok(DeviceModelType::Resistor),
             "C" => Ok(DeviceModelType::Capacitor),
             "L" => Ok(DeviceModelType::Inductor),
-            _ => {
-                Err(SubcircuitError::InvalidDeviceModelType {
-                    s: s.to_string(),
-                    span,
-                }
-                .into())
+            _ => Err(SubcircuitError::InvalidDeviceModelType {
+                s: s.to_string(),
+                span,
             }
+            .into()),
         }
     }
 }

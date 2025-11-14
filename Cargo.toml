@@ -6,5 +6,4 @@ members = [
     "crates/spicy_simulate",
     "crates/spicy_cli",
     "fuzz",
-    "visualizations/btf_viz"
 ]

@@ -4,8 +4,8 @@ use ndarray::{Array1, Array2};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
     Value,
-    netlist_types::{Capacitor, Device, IndependentSource, TranCommand},
     instance_parser::Deck,
+    netlist_types::{Capacitor, Device, IndependentSource, TranCommand},
 };
 
 use crate::{
@@ -25,8 +25,6 @@ fn get_previous_voltage(
     ic: &Option<Value>,
     use_device_ic: bool,
 ) -> f64 {
-    
-
     if use_device_ic {
         // if we set the uic flag we should just take the initial condition from the device
         ic.clone().unwrap_or(Value::zero()).get_value()
@@ -213,7 +211,9 @@ fn simulation_step<'a>(
                 integrator.save_capcitor_current(device, i);
             }
             // TODO: we don't support functions on the sources yet
-            Device::VoltageSource(device) => stamp_voltage_source_trans(&mut m, &mut s, device, nodes, config),
+            Device::VoltageSource(device) => {
+                stamp_voltage_source_trans(&mut m, &mut s, device, nodes, config)
+            }
             _ => {
                 unimplemented!("Unsupported device type: {:?}", device)
             }
@@ -221,7 +221,6 @@ fn simulation_step<'a>(
     }
 
     let lu = m.factorize_into().expect("Failed to factorize matrix");
-    
 
     lu.solve(&s).expect("Failed to solve linear system")
 }

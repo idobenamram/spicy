@@ -1,5 +1,5 @@
-pub mod csc;
 pub mod builder;
+pub mod csc;
 pub mod csr;
 pub mod error;
 

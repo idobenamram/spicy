@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-mod plugins;
-mod model;
 mod code;
+mod model;
+mod plugins;
 
 fn main() {
     App::new()
@@ -22,4 +22,3 @@ fn main() {
         ))
         .run();
 }
-

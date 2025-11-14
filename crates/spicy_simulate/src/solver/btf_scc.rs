@@ -8,7 +8,7 @@ use std::cmp::min;
 /// the easier thing is to read the implementation of Timothy A. Davis.
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/BTF/Include/btf.h
 /// the code is extensively documented and much easier to understand.
-/// 
+///
 /// one thing that i kinda struggled with was how we take the definitions from Tarjan's paper
 /// on graphs and apply them to the matrix here. In the paper the algorithm works
 /// on a directed graph G(V, E) where V is the set of vertices and E is the set of edges.
@@ -20,12 +20,10 @@ use std::cmp::min;
 /// it was a little confusing for me at first, so i wanted to write it down.
 use crate::solver::matrix::csc::CscMatrix;
 
-
-
 const UNVISITED: usize = usize::MAX; // visited[j] = UNVISITED means node j has not been visited yet
 const UNASSIGNED: usize = usize::MAX - 1; // visited[j] = UNASSIGNED means node j has been visited 
-                                          // but not assigned to a strongly connected component yet (or block)
-                                          // if visted[j] = k, the node j is assigned to the k-th SCC block
+// but not assigned to a strongly connected component yet (or block)
+// if visted[j] = k, the node j is assigned to the k-th SCC block
 
 fn dfs(
     // inputs
@@ -81,25 +79,23 @@ fn dfs(
             // examine edge from node "col" to node "row"
             let row = m.row_index(row_ptr);
             if visited[row] == UNVISITED {
-
                 position_stack[column_head as usize] = row_ptr + 1;
                 column_head += 1;
                 column_stack[column_head as usize] = row;
                 assert!(graph_indices[row] == -1);
                 assert!(low[row] == -1);
                 break;
-
             } else if visited[row] == UNASSIGNED {
                 // node "row" has been visited, but not assigned to a component block
                 // update the low value of the current node
                 assert!(graph_indices[row] > 0);
                 assert!(low[row] > 0);
                 low[col] = min(low[col], low[row]);
-            } 
+            }
 
             if row_ptr == end_of_column {
                 // all edges from node "col" have been examined
-                // pop from the column stack 
+                // pop from the column stack
                 column_head -= 1;
 
                 // found a SCC block
@@ -128,7 +124,6 @@ fn dfs(
                     let parent = column_stack[column_head as usize];
                     low[parent] = min(low[parent], low[col]);
                 }
-
             }
         }
     }
@@ -152,9 +147,7 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
     let mut number_of_scc_blocks = 0;
 
     for col in 0..n {
-        assert!(
-            visited[col] == UNVISITED || (visited[col] < number_of_scc_blocks)
-        );
+        assert!(visited[col] == UNVISITED || (visited[col] < number_of_scc_blocks));
         if visited[col] == UNVISITED {
             dfs(
                 m,
@@ -162,11 +155,9 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
                 col,
                 &mut node_graph_index,
                 &mut number_of_scc_blocks,
-
                 &mut visited,
                 &mut graph_indices,
                 &mut low,
-
                 // stacks outside of function for allocation efficiency
                 &mut component_stack,
                 &mut column_stack,
@@ -193,7 +184,7 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
         // increment the boundary array to get the number of nodes in the current block
         boundary_array[visited[col]] += 1;
     }
-    
+
     // boundary_array[b] is now the number of nodes in SCC block b
     // compute cumulative sum of boundary_array, using graph_indices[0..nblocks-1] as workspace
 
@@ -206,7 +197,6 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
         boundary_array[b] = graph_indices[b] as isize;
     }
     boundary_array[number_of_scc_blocks] = n as isize;
-
 
     // construct the permutation, perserving the natural order
 
@@ -225,7 +215,6 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
         // sanity check that the permutation was constructed correctly
         assert!(btf_permutation[col] >= 0);
     }
-
 
     // lets call orignal matrix = A
     // column permutation = Q

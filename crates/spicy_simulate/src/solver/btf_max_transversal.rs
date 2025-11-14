@@ -7,18 +7,18 @@
 /// the code is pretty well documented and much easier to understand.
 use crate::solver::matrix::csc::CscMatrix;
 
-/// for the given column, try to find a column permutation that will match this row and 
+/// for the given column, try to find a column permutation that will match this row and
 /// there are 2 main parts to the algorithm:
-/// 1. the "cheap test" which is a way to greedily try to match a 
+/// 1. the "cheap test" which is a way to greedily try to match a
 ///    column's nonzero to a row, creating a permutation
-/// 2. the "augmenting path" which happens if there are no cheap options, 
+/// 2. the "augmenting path" which happens if there are no cheap options,
 ///    try to backtrack ("depth first") the current matches so the matches work with the non-zeroes in the current column
 fn try_augmenting_path(
     m: &CscMatrix,
     current_column: usize, // the column we are currently looking at
     column_permutations: &mut [isize],
-    cheap: &mut [usize], // for each column, holds the current row pointer 
-                         // for the next non-zero entry to try to use the cheap test with
+    cheap: &mut [usize], // for each column, holds the current row pointer
+    // for the next non-zero entry to try to use the cheap test with
     visited: &mut [usize], // use the current column as an index into visted to track loops
     row_stack: &mut [usize],
     column_stack: &mut [usize],
@@ -180,7 +180,17 @@ mod tests {
         // c3: r2, r3
         // c4: r3, r4
         // Unique full matching exists: row j -> col j
-        let a = build_5x5(&[(0, 0), (1, 0), (1, 1), (2, 1), (2, 2), (3, 2), (3, 3), (4, 3), (4, 4)]);
+        let a = build_5x5(&[
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (2, 1),
+            (2, 2),
+            (3, 2),
+            (3, 3),
+            (4, 3),
+            (4, 4),
+        ]);
         let (k, q) = btf_max_transversal(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![0, 1, 2, 3, 4]);
@@ -200,10 +210,14 @@ mod tests {
         // c3: r3, r4
         // c4: r0
         let a = build_5x5(&[
-            (0, 0), (0, 1),
-            (1, 1), (1, 2),
-            (2, 2), (2, 3),
-            (3, 3), (3, 4),
+            (0, 0),
+            (0, 1),
+            (1, 1),
+            (1, 2),
+            (2, 2),
+            (2, 3),
+            (3, 3),
+            (3, 4),
             (4, 0),
         ]);
         let (k, q) = btf_max_transversal(&a);

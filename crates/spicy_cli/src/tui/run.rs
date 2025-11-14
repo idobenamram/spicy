@@ -32,9 +32,10 @@ pub fn run_tui(path: &str) -> Result<()> {
         // non-blocking input
         if event::poll(Duration::from_millis(16))?
             && let CEvent::Key(k) = event::read()?
-                && handle_key(k, &mut app, &tx_cmd)? {
-                    break;
-                }
+            && handle_key(k, &mut app, &tx_cmd)?
+        {
+            break;
+        }
 
         // handle simulator messages
         while let Ok(msg) = rx_msg.try_recv() {

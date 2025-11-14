@@ -7,7 +7,6 @@ use spicy_parser::instance_parser::Deck;
 
 use crate::{DcSweepResult, OperatingPointResult, TransientResult};
 
-
 // TODO: kinda vibe coded this so it can definitly be improved
 
 fn sanitize_filename(input: &str) -> String {
@@ -147,7 +146,14 @@ pub(crate) fn write_operating_point_raw(
     let nvars = variables.len();
 
     // Preamble: OP has no forward flag
-    write_header(&mut writer, &deck.title, "Operation Point", "real", nvars, 1)?;
+    write_header(
+        &mut writer,
+        &deck.title,
+        "Operation Point",
+        "real",
+        nvars,
+        1,
+    )?;
     write_variables_with_offset(&mut writer, &variables, 0)?;
     writeln!(&mut writer, "Binary:")?;
     // Single point: write f32 for each variable in order

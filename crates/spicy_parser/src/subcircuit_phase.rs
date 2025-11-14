@@ -6,8 +6,8 @@ use crate::SourceMap;
 use crate::error::{SpicyError, SubcircuitError};
 use crate::expr::{Params, Scope, ScopeId};
 use crate::expr::{PlaceholderMap, ScopeArena};
-use crate::netlist_models::{ModelStatementTable, ModelTable};
 use crate::netlist_models::partial_parse_model_command;
+use crate::netlist_models::{ModelStatementTable, ModelTable};
 use crate::netlist_types::Node;
 use crate::netlist_types::{CommandType, DeviceType};
 use crate::parser_utils::{
@@ -161,7 +161,6 @@ fn parse_x_device(
         let mark = cursor.checkpoint();
         cursor.skip_ws();
         let is_param_start = if cursor.consume(TokenKind::Ident).is_some() {
-            
             cursor.consume(TokenKind::Equal).is_some()
         } else {
             false
@@ -285,7 +284,7 @@ pub(crate) fn expand_subckts(
         placeholder_map,
         unexpanded_deck
             .scope_arena
-            .get(unexpanded_deck.global_params)
+            .get(unexpanded_deck.global_params),
     )?;
 
     Ok(ExpandedDeck {
@@ -367,11 +366,7 @@ mod tests {
 
         let model_table = unexpanded_deck
             .model_table
-            .into_model_table(
-                &input_options.source_map,
-                &placeholders_map,
-                global_scope,
-            )
+            .into_model_table(&input_options.source_map, &placeholders_map, global_scope)
             .expect("build model table");
 
         let name = format!(
@@ -388,8 +383,8 @@ mod tests {
 
     #[test]
     fn test_duplicate_model_name_error() {
-        use crate::libs_phase::SourceMap;
         use crate::error::{SpicyError, SubcircuitError};
+        use crate::libs_phase::SourceMap;
 
         let input_content = "\
 * duplicate models\n
@@ -422,8 +417,8 @@ mod tests {
 
     #[test]
     fn test_invalid_model_type_error() {
-        use crate::libs_phase::SourceMap;
         use crate::error::{SpicyError, SubcircuitError};
+        use crate::libs_phase::SourceMap;
 
         let input_content = "\
 * invalid model type\n

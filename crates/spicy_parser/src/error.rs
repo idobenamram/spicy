@@ -256,5 +256,9 @@ pub enum IncludeError {
     CycleDetected { span: Span, path: PathBuf },
 
     #[error("library section '{lib}' not found in: {path}")]
-    LibSectionNotFound { span: Span, lib: String, path: PathBuf },
+    LibSectionNotFound {
+        span: Span,
+        lib: String,
+        path: PathBuf,
+    },
 }

@@ -1,3 +1,2 @@
-pub mod trace;
 pub mod state;
-
+pub mod trace;

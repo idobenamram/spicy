@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use spicy_parser::netlist_types::Device;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct Nodes {
@@ -68,14 +68,15 @@ impl Nodes {
     }
 
     pub(crate) fn get_voltage_source_index(&self, name: &str) -> Option<usize> {
-        self.voltage_sources.get(name).copied().map(|index| self.node_len() + index)
+        self.voltage_sources
+            .get(name)
+            .copied()
+            .map(|index| self.node_len() + index)
     }
 
     // TODO: save this?
     pub(crate) fn node_len(&self) -> usize {
-        self.nodes.values().copied()
-            .max()
-            .expect("no nodes found")
+        self.nodes.values().copied().max().expect("no nodes found")
     }
 
     pub(crate) fn source_len(&self) -> usize {

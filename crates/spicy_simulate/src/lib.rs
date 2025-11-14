@@ -7,11 +7,11 @@ use crate::{
     trans::simulate_trans,
 };
 
-pub mod solver;
 pub mod ac;
 pub mod dc;
 mod nodes;
 pub(crate) mod raw_writer;
+pub mod solver;
 pub mod trans;
 pub use dc::{DcSweepResult, OperatingPointResult};
 pub use trans::TransientResult;

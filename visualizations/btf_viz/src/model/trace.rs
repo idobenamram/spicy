@@ -24,9 +24,5 @@ pub enum Step {
         value: Value,
     },
     #[serde(rename = "step")]
-    Step {
-        line: u32,
-    },
+    Step { line: u32 },
 }
-
-

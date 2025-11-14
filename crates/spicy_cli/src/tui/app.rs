@@ -1,4 +1,4 @@
-use spicy_parser::{error::SpicyError};
+use spicy_parser::error::SpicyError;
 use spicy_simulate::{DcSweepResult, OperatingPointResult, TransientResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,7 +23,6 @@ impl Tab {
         TABS[prev_idx]
     }
 }
-
 
 #[derive(Debug)]
 pub struct App {
@@ -67,4 +66,3 @@ impl App {
         }
     }
 }
-

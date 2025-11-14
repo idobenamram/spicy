@@ -143,7 +143,7 @@ impl WaveForm {
                 }
 
                 let input = (2.0 * PI * f * (t - td) + ph).rem_euclid(2.0 * PI);
-                
+
                 v0 + va * f64::exp(-(t - td) * theta) * f64::sin(input)
             }
             WaveForm::Exponential {
@@ -182,14 +182,11 @@ impl WaveForm {
                 if td1 <= t && t < td2 {
                     return v1 + v21 * (1. - f64::exp(-(t - td1) / tau1));
                 }
-                
-                v1
-                    + v21 * (1. - f64::exp(-(t - td1) / tau1))
+
+                v1 + v21 * (1. - f64::exp(-(t - td1) / tau1))
                     + v12 * (1. - f64::exp(-(t - td2) / tau2))
             }
-            WaveForm::Constant(value) => {
-                value.get_value()
-            }
+            WaveForm::Constant(value) => value.get_value(),
         }
     }
 }

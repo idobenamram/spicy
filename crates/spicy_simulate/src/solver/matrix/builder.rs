@@ -1,9 +1,8 @@
 use crate::solver::matrix::Dim;
-use crate::solver::matrix::error::CscError;
-use crate::solver::matrix::error::CsrError;
 use crate::solver::matrix::csc::CscMatrix;
 use crate::solver::matrix::csr::CsrMatrix;
-
+use crate::solver::matrix::error::CscError;
+use crate::solver::matrix::error::CsrError;
 
 /// Builder from triplets (COO → canonical CSC).
 ///

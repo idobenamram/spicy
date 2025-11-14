@@ -101,7 +101,9 @@ fn parse_include<'a>(
     let cursors = cursor.split_on_whitespace();
     let path_cursor = cursors
         .first()
-        .ok_or(SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
+        .ok_or(SpicyError::Include(IncludeError::ExpectedPath {
+            span: cursor.span,
+        }))?;
 
     let path = span_text(
         options
@@ -122,7 +124,9 @@ fn parse_lib_command<'a>(
     let cursors = cursor.split_on_whitespace();
     let path_cursor = cursors
         .first()
-        .ok_or(SpicyError::Include(IncludeError::ExpectedPath { span: cursor.span }))?;
+        .ok_or(SpicyError::Include(IncludeError::ExpectedPath {
+            span: cursor.span,
+        }))?;
     let lib_cursor_opt = cursors.get(1);
     let path = span_text(
         options
@@ -495,10 +499,10 @@ mod tests {
                         .and_then(|pp| pp.file_name())
                         .and_then(|s| s.to_str())
                         == Some("alt")
-                    {
-                        found_alt = true;
-                        break;
-                    }
+                {
+                    found_alt = true;
+                    break;
+                }
             }
         }
         assert!(found_alt, "expected lib_a resolved from work_dir alt");
@@ -528,10 +532,10 @@ mod tests {
                         .and_then(|pp| pp.file_name())
                         .and_then(|s| s.to_str())
                         == Some("include_inputs")
-                    {
-                        found_parent = true;
-                        break;
-                    }
+                {
+                    found_parent = true;
+                    break;
+                }
             }
         }
         assert!(

@@ -2,7 +2,10 @@ use crate::nodes::Nodes;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
-    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor}, netlist_waveform::WaveForm, instance_parser::Deck, Value
+    Value,
+    instance_parser::Deck,
+    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor},
+    netlist_waveform::WaveForm,
 };
 
 #[derive(Debug)]
@@ -52,7 +55,11 @@ fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: 
     }
 }
 
-pub(crate) fn stamp_voltage_source_incidence(m: &mut Array2<f64>, device: &IndependentSource, nodes: &Nodes) {
+pub(crate) fn stamp_voltage_source_incidence(
+    m: &mut Array2<f64>,
+    device: &IndependentSource,
+    nodes: &Nodes,
+) {
     let node1 = nodes.get_node_index(&device.positive.name);
     let node2 = nodes.get_node_index(&device.negative.name);
     let src_index = nodes
@@ -153,7 +160,6 @@ pub(crate) fn simulate_op_inner(nodes: &Nodes, devices: &Vec<Device>) -> Array1<
     let lu = m.factorize_into().expect("Failed to factorize matrix");
     // [V] node voltages
     // [I] branch currents for voltage sources (also inductors)
-    
 
     lu.solve(&s).expect("Failed to solve linear system")
 }

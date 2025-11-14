@@ -1,7 +1,7 @@
 use crate::Span;
 use crate::error::{ParserError, SpicyError};
-use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::expr::{Expr, Params};
+use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{TokenKind, token_text};
 use crate::netlist_types::Node;
 use crate::netlist_types::ValueSuffix;
@@ -61,23 +61,23 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
             number_str.push_str(token_text(src, t));
             // Optional fractional part if next immediate token is a dot
             if let Some(peek) = cursor.peek()
-                && matches!(peek.kind, TokenKind::Dot) {
-                    cursor.next().expect("just check for dot");
-                    number_str.push('.');
+                && matches!(peek.kind, TokenKind::Dot)
+            {
+                cursor.next().expect("just check for dot");
+                number_str.push('.');
 
-                    let frac =
-                        cursor
-                            .next_non_whitespace()
-                            .ok_or(ParserError::MissingToken {
-                                message: "Expected token after '.'",
-                                span: Some(peek.span),
-                            })?;
+                let frac = cursor
+                    .next_non_whitespace()
+                    .ok_or(ParserError::MissingToken {
+                        message: "Expected token after '.'",
+                        span: Some(peek.span),
+                    })?;
 
-                    if !matches!(frac.kind, TokenKind::Number) {
-                        return Err(ParserError::ExpectedDigitsAfterDot { span: peek.span }.into());
-                    }
-                    number_str.push_str(token_text(src, frac));
+                if !matches!(frac.kind, TokenKind::Number) {
+                    return Err(ParserError::ExpectedDigitsAfterDot { span: peek.span }.into());
                 }
+                number_str.push_str(token_text(src, frac));
+            }
         }
         TokenKind::Dot => {
             number_str.push('.');
@@ -101,74 +101,79 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     // TODO: also this can definitly use a cleanup
     // Optional exponent: e|E [+-]? digits (no whitespace inside the literal)
     if let Some(peek) = cursor.peek()
-        && matches!(peek.kind, TokenKind::Ident) {
-            let ident_text = token_text(src, peek);
-            if ident_text == "e" || ident_text == "E" {
-                cursor.next().expect("just peeked");
+        && matches!(peek.kind, TokenKind::Ident)
+    {
+        let ident_text = token_text(src, peek);
+        if ident_text == "e" || ident_text == "E" {
+            cursor.next().expect("just peeked");
 
-                let mut exp_str = String::new();
-                // optional sign
-                if let Some(sign_peek) = cursor.peek() {
-                    match sign_peek.kind {
-                        TokenKind::Plus => {
-                            let _ = cursor.next().expect("just peeked");
-                            exp_str.push('+');
-                        }
-                        TokenKind::Minus => {
-                            let _ = cursor.next().expect("just peeked");
-                            exp_str.push('-');
-                        }
-                        _ => {}
+            let mut exp_str = String::new();
+            // optional sign
+            if let Some(sign_peek) = cursor.peek() {
+                match sign_peek.kind {
+                    TokenKind::Plus => {
+                        let _ = cursor.next().expect("just peeked");
+                        exp_str.push('+');
                     }
+                    TokenKind::Minus => {
+                        let _ = cursor.next().expect("just peeked");
+                        exp_str.push('-');
+                    }
+                    _ => {}
                 }
-                let exp_digits = cursor.next().ok_or(ParserError::MissingToken {
+            }
+            let exp_digits = cursor.next().ok_or(ParserError::MissingToken {
+                message: "Expected digits after exponent",
+                span: Some(peek.span),
+            })?;
+
+            let exp_digits_str = token_text(src, exp_digits).to_string();
+            if !matches!(exp_digits.kind, TokenKind::Number) {
+                return Err(ParserError::InvalidExponentDigits {
+                    span: exp_digits.span,
+                    lexeme: exp_digits_str,
+                }
+                .into());
+            }
+            exp_str.push_str(&exp_digits_str);
+
+            exponent =
+                Some(
+                    exp_str
+                        .parse::<f64>()
+                        .map_err(|_| ParserError::InvalidExponentDigits {
+                            span: exp_digits.span,
+                            lexeme: exp_digits_str,
+                        })?,
+                );
+        } else if ident_text.starts_with("e") || ident_text.starts_with("E") {
+            cursor.next().expect("just peeked");
+            // Split ident after 'e' or 'E' and assume it is the exponent digits
+            let (_e_char, exp_digits_str) = ident_text.split_at(1);
+            if exp_digits_str.is_empty() {
+                return Err(ParserError::MissingToken {
                     message: "Expected digits after exponent",
                     span: Some(peek.span),
-                })?;
-
-                let exp_digits_str = token_text(src, exp_digits).to_string();
-                if !matches!(exp_digits.kind, TokenKind::Number) {
-                    return Err(ParserError::InvalidExponentDigits {
-                        span: exp_digits.span,
-                        lexeme: exp_digits_str,
-                    }
-                    .into());
                 }
-                exp_str.push_str(&exp_digits_str);
-
-                exponent = Some(exp_str.parse::<f64>().map_err(|_| {
-                    ParserError::InvalidExponentDigits {
-                        span: exp_digits.span,
-                        lexeme: exp_digits_str,
-                    }
-                })?);
-            } else if ident_text.starts_with("e") || ident_text.starts_with("E") {
-                cursor.next().expect("just peeked");
-                // Split ident after 'e' or 'E' and assume it is the exponent digits
-                let (_e_char, exp_digits_str) = ident_text.split_at(1);
-                if exp_digits_str.is_empty() {
-                    return Err(ParserError::MissingToken {
-                        message: "Expected digits after exponent",
-                        span: Some(peek.span),
-                    }
-                    .into());
-                }
-                exponent = Some(exp_digits_str.parse::<f64>().map_err(|_| {
-                    ParserError::InvalidExponentDigits {
-                        span: peek.span,
-                        lexeme: exp_digits_str.to_string(),
-                    }
-                })?);
+                .into());
             }
+            exponent = Some(exp_digits_str.parse::<f64>().map_err(|_| {
+                ParserError::InvalidExponentDigits {
+                    span: peek.span,
+                    lexeme: exp_digits_str.to_string(),
+                }
+            })?);
         }
+    }
 
     // Optional suffix as trailing identifier without whitespace
     if let Some(peek) = cursor.peek()
-        && matches!(peek.kind, TokenKind::Ident) {
-            let ident = cursor.next().expect("just peeked");
-            let ident_text = token_text(src, ident);
-            suffix = ValueSuffix::from_str(ident_text);
-        }
+        && matches!(peek.kind, TokenKind::Ident)
+    {
+        let ident = cursor.next().expect("just peeked");
+        let ident_text = token_text(src, ident);
+        suffix = ValueSuffix::from_str(ident_text);
+    }
 
     let value: f64 = number_str
         .parse()

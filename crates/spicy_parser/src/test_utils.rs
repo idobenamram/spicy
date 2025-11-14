@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde::Serialize;
 use crate::netlist_types::Node;
+use serde::Serialize;
 use serde::ser::SerializeMap;
+use std::collections::HashMap;
 
 #[cfg(test)]
 pub(crate) fn serialize_sorted_map<S, K, V>(
@@ -13,7 +13,6 @@ where
     K: Ord + Serialize,
     V: Serialize,
 {
-
     let mut items: Vec<_> = m.iter().collect();
     items.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
@@ -24,7 +23,7 @@ where
     map.end()
 }
 
-// TODO: could probably be generalized 
+// TODO: could probably be generalized
 #[cfg(test)]
 pub(crate) fn serialize_node_map<S>(
     m: &HashMap<Node, Node>,

@@ -5,8 +5,8 @@ use std::path::PathBuf;
 #[path = "../code/mod.rs"]
 mod code;
 
-use crate::code::recorder::Recorder;
 use crate::code::btf_max_transversal::btf_max_transversal;
+use crate::code::recorder::Recorder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a test matrix - using the chain example from tests
@@ -26,20 +26,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     builder.push(3, 3, 1.0)?;
     builder.push(4, 3, 1.0)?;
     builder.push(4, 4, 1.0)?;
-    
+
     let matrix = builder.build_csc()?;
-    
+
     // Create recorder
     let trace_path = PathBuf::from("assets/traces/sample_5x5.json");
     let mut recorder = Recorder::new(&trace_path);
-    
+
     // Run algorithm with recorder
     let (_matches, _permutations) = btf_max_transversal(&matrix, &mut recorder);
-    
+
     // Write trace file
     recorder.flush()?;
-    
+
     println!("Trace written to: {}", trace_path.display());
-    
+
     Ok(())
 }

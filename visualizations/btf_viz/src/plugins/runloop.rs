@@ -19,19 +19,16 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d::default());
 }
 
-fn load_trace(
-    mut grid: ResMut<Grid>,
-    mut trace: ResMut<Trace>,
-) {
+fn load_trace(mut grid: ResMut<Grid>, mut trace: ResMut<Trace>) {
     // Try to load trace from file, or use default empty trace
     let trace_path = "assets/traces/sample_5x5.json";
     let code_text = include_str!("../code/btf_max_transversal.rs");
-    
+
     match std::fs::read_to_string(trace_path) {
         Ok(trace_json) => {
             if let Ok(tf) = serde_json::from_str::<TraceFile>(&trace_json) {
                 *trace = Trace::load_from(tf, code_text.to_string());
-                
+
                 // Initialize grid from trace (numeric values)
                 let (rows, cols, values) = trace.extract_matrix_data();
                 grid.rows = rows;
@@ -43,36 +40,35 @@ fn load_trace(
             }
         }
         Err(e) => {
-            warn!("Could not load trace file {}: {}. Run 'cargo run --bin generate_trace' to generate it.", trace_path, e);
+            warn!(
+                "Could not load trace file {}: {}. Run 'cargo run --bin generate_trace' to generate it.",
+                trace_path, e
+            );
         }
     }
 }
 
-fn hotkeys(
-    kb: Res<ButtonInput<KeyCode>>,
-    mut trace: ResMut<Trace>,
-    mut player: ResMut<Player>,
-) {
+fn hotkeys(kb: Res<ButtonInput<KeyCode>>, mut trace: ResMut<Trace>, mut player: ResMut<Player>) {
     // Space: play/pause
     if kb.just_pressed(KeyCode::Space) {
         player.paused = !player.paused;
     }
-    
+
     // Right Arrow: next step
     if kb.just_pressed(KeyCode::ArrowRight) {
         trace.next();
     }
-    
+
     // Left Arrow: previous step
     if kb.just_pressed(KeyCode::ArrowLeft) {
         trace.prev();
     }
-    
+
     // Up Arrow: increase speed
     if kb.just_pressed(KeyCode::ArrowUp) {
         player.speed = (player.speed * 1.5).min(8.0);
     }
-    
+
     // Down Arrow: decrease speed
     if kb.just_pressed(KeyCode::ArrowDown) {
         player.speed = (player.speed / 1.5).max(0.25);
@@ -91,15 +87,11 @@ fn tick_player(time: Res<Time>, mut player: ResMut<Player>, mut trace: ResMut<Tr
     }
 }
 
-fn sync_grid_from_trace(
-    trace: Res<Trace>,
-    mut grid: ResMut<Grid>,
-) {
+fn sync_grid_from_trace(trace: Res<Trace>, mut grid: ResMut<Grid>) {
     if !trace.is_changed() {
         return;
     }
-    
+
     // Update matching from trace
     grid.matching = trace.get_matching();
 }
-

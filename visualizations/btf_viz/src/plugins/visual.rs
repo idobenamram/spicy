@@ -37,18 +37,39 @@ pub struct VisualPlugin;
 
 impl Plugin for VisualPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Layout>()
-            .add_systems(Update, (ensure_grid_spawned, refresh_grid, refresh_arrays, animate_highlights));
+        app.init_resource::<Layout>().add_systems(
+            Update,
+            (
+                ensure_grid_spawned,
+                refresh_grid,
+                refresh_arrays,
+                animate_highlights,
+            ),
+        );
     }
 }
 
-fn spawn_cell_with_text(commands: &mut Commands, pos: Vec3, size: Vec2, idx: usize, value: Option<f64>) {
-    let bg_color = if value.is_some() { Color::WHITE } else { Color::srgba(1.0, 1.0, 1.0, 0.08) };
+fn spawn_cell_with_text(
+    commands: &mut Commands,
+    pos: Vec3,
+    size: Vec2,
+    idx: usize,
+    value: Option<f64>,
+) {
+    let bg_color = if value.is_some() {
+        Color::WHITE
+    } else {
+        Color::srgba(1.0, 1.0, 1.0, 0.08)
+    };
     let text_string = value.map(|v| format!("{}", v)).unwrap_or_else(String::new);
 
     commands
         .spawn((
-            Sprite { color: bg_color, custom_size: Some(Vec2::new(size.x - 6.0, size.y - 6.0)), ..default() },
+            Sprite {
+                color: bg_color,
+                custom_size: Some(Vec2::new(size.x - 6.0, size.y - 6.0)),
+                ..default()
+            },
             Transform::from_translation(pos),
             Visibility::default(),
             MatrixCell { idx },
@@ -65,14 +86,27 @@ fn spawn_cell_with_text(commands: &mut Commands, pos: Vec3, size: Vec2, idx: usi
 }
 
 #[derive(Component)]
-struct ArrayCell { name: &'static str, idx: usize }
+struct ArrayCell {
+    name: &'static str,
+    idx: usize,
+}
 
 #[derive(Component)]
-struct ArrayRoot { name: &'static str }
+struct ArrayRoot {
+    name: &'static str,
+}
 
-fn spawn_array_view(commands: &mut Commands, center: Vec3, cell: Vec2, name: &'static str, values: &[String]) {
+fn spawn_array_view(
+    commands: &mut Commands,
+    center: Vec3,
+    cell: Vec2,
+    name: &'static str,
+    values: &[String],
+) {
     let len = values.len();
-    if len == 0 { return; }
+    if len == 0 {
+        return;
+    }
     let total_w = len as f32 * cell.x;
     let left_x = center.x - total_w / 2.0 + cell.x / 2.0;
 
@@ -90,7 +124,11 @@ fn spawn_array_view(commands: &mut Commands, center: Vec3, cell: Vec2, name: &'s
         let value = values[i].clone();
         commands
             .spawn((
-                Sprite { color: Color::srgba(1.0, 1.0, 1.0, 0.12), custom_size: Some(Vec2::new(cell.x - 6.0, cell.y - 6.0)), ..default() },
+                Sprite {
+                    color: Color::srgba(1.0, 1.0, 1.0, 0.12),
+                    custom_size: Some(Vec2::new(cell.x - 6.0, cell.y - 6.0)),
+                    ..default()
+                },
                 Transform::from_translation(Vec3::new(x, center.y, center.z)),
                 Visibility::default(),
                 ArrayCell { name, idx: i },
@@ -113,7 +151,9 @@ fn ensure_grid_spawned(
     layout: Res<Layout>,
     trace: Res<Trace>,
 ) {
-    if !existing.is_empty() || grid.rows == 0 || grid.cols == 0 { return; }
+    if !existing.is_empty() || grid.rows == 0 || grid.cols == 0 {
+        return;
+    }
     let cell_w = layout.matrix_cell.x;
     let cell_h = layout.matrix_cell.y;
     let w = grid.cols as f32 * cell_w;
@@ -130,7 +170,13 @@ fn ensure_grid_spawned(
             let x = origin.x + c as f32 * cell_w;
             let y = origin.y - r as f32 * cell_h;
             let value = grid.values.get(idx).and_then(|v| *v);
-            spawn_cell_with_text(&mut commands, Vec3::new(x, y, 0.0), Vec2::new(cell_w, cell_h), idx, value);
+            spawn_cell_with_text(
+                &mut commands,
+                Vec3::new(x, y, 0.0),
+                Vec2::new(cell_w, cell_h),
+                idx,
+                value,
+            );
         }
     }
 
@@ -142,41 +188,81 @@ fn ensure_grid_spawned(
     let z = -0.1;
     // Left vertical
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(thick, h + cap * 2.0)), ..default() },
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(thick, h + cap * 2.0)),
+            ..default()
+        },
         Transform::from_translation(Vec3::new(left_x, layout.matrix_origin.y, z)),
         Visibility::default(),
         BracketEntity,
     ));
     // Right vertical
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(thick, h + cap * 2.0)), ..default() },
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(thick, h + cap * 2.0)),
+            ..default()
+        },
         Transform::from_translation(Vec3::new(right_x, layout.matrix_origin.y, z)),
         Visibility::default(),
         BracketEntity,
     ));
     // Top caps
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(cap, thick)), ..default() },
-        Transform::from_translation(Vec3::new(left_x + cap / 2.0, layout.matrix_origin.y + h / 2.0 + cap, z)),
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(cap, thick)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(
+            left_x + cap / 2.0,
+            layout.matrix_origin.y + h / 2.0 + cap,
+            z,
+        )),
         Visibility::default(),
         BracketEntity,
     ));
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(cap, thick)), ..default() },
-        Transform::from_translation(Vec3::new(right_x - cap / 2.0, layout.matrix_origin.y + h / 2.0 + cap, z)),
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(cap, thick)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(
+            right_x - cap / 2.0,
+            layout.matrix_origin.y + h / 2.0 + cap,
+            z,
+        )),
         Visibility::default(),
         BracketEntity,
     ));
     // Bottom caps
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(cap, thick)), ..default() },
-        Transform::from_translation(Vec3::new(left_x + cap / 2.0, layout.matrix_origin.y - h / 2.0 - cap, z)),
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(cap, thick)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(
+            left_x + cap / 2.0,
+            layout.matrix_origin.y - h / 2.0 - cap,
+            z,
+        )),
         Visibility::default(),
         BracketEntity,
     ));
     commands.spawn((
-        Sprite { color: Color::WHITE, custom_size: Some(Vec2::new(cap, thick)), ..default() },
-        Transform::from_translation(Vec3::new(right_x - cap / 2.0, layout.matrix_origin.y - h / 2.0 - cap, z)),
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(cap, thick)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(
+            right_x - cap / 2.0,
+            layout.matrix_origin.y - h / 2.0 - cap,
+            z,
+        )),
         Visibility::default(),
         BracketEntity,
     ));
@@ -184,33 +270,85 @@ fn ensure_grid_spawned(
     // Arrays
     let arr_cell = layout.arrays_cell;
     // column_permutations above matrix
-    let colperm: Vec<String> = trace.column_permutations.iter().map(|v| format!("{}", v)).collect();
-    let cp_center = Vec3::new(layout.matrix_origin.x, layout.matrix_origin.y + h / 2.0 + layout.gap + arr_cell.y, 0.0);
-    spawn_array_view(&mut commands, cp_center, arr_cell, "column_permutations", &colperm);
+    let colperm: Vec<String> = trace
+        .column_permutations
+        .iter()
+        .map(|v| format!("{}", v))
+        .collect();
+    let cp_center = Vec3::new(
+        layout.matrix_origin.x,
+        layout.matrix_origin.y + h / 2.0 + layout.gap + arr_cell.y,
+        0.0,
+    );
+    spawn_array_view(
+        &mut commands,
+        cp_center,
+        arr_cell,
+        "column_permutations",
+        &colperm,
+    );
 
     // Right-hand arrays stacked
     let right_x_center = layout.matrix_origin.x + w / 2.0 + layout.gap + (arr_cell.x * 3.0);
     let mut y = layout.matrix_origin.y + h / 2.0 - arr_cell.y * 0.5;
     let vspace = arr_cell.y + layout.gap * 0.75;
 
-    let column_stack_vals: Vec<String> = trace.column_stack.iter().map(|v| format!("{}", v)).collect();
-    spawn_array_view(&mut commands, Vec3::new(right_x_center, y, 0.0), arr_cell, "column_stack", &column_stack_vals);
+    let column_stack_vals: Vec<String> = trace
+        .column_stack
+        .iter()
+        .map(|v| format!("{}", v))
+        .collect();
+    spawn_array_view(
+        &mut commands,
+        Vec3::new(right_x_center, y, 0.0),
+        arr_cell,
+        "column_stack",
+        &column_stack_vals,
+    );
     y -= vspace;
 
     let row_stack_vals: Vec<String> = trace.row_stack.iter().map(|v| format!("{}", v)).collect();
-    spawn_array_view(&mut commands, Vec3::new(right_x_center, y, 0.0), arr_cell, "row_stack", &row_stack_vals);
+    spawn_array_view(
+        &mut commands,
+        Vec3::new(right_x_center, y, 0.0),
+        arr_cell,
+        "row_stack",
+        &row_stack_vals,
+    );
     y -= vspace;
 
-    let pstack_vals: Vec<String> = trace.position_stack.iter().map(|v| format!("{}", v)).collect();
-    spawn_array_view(&mut commands, Vec3::new(right_x_center, y, 0.0), arr_cell, "position_stack", &pstack_vals);
+    let pstack_vals: Vec<String> = trace
+        .position_stack
+        .iter()
+        .map(|v| format!("{}", v))
+        .collect();
+    spawn_array_view(
+        &mut commands,
+        Vec3::new(right_x_center, y, 0.0),
+        arr_cell,
+        "position_stack",
+        &pstack_vals,
+    );
     y -= vspace;
 
     let visited_vals: Vec<String> = trace.visited.iter().map(|v| format!("{}", v)).collect();
-    spawn_array_view(&mut commands, Vec3::new(right_x_center, y, 0.0), arr_cell, "visited", &visited_vals);
+    spawn_array_view(
+        &mut commands,
+        Vec3::new(right_x_center, y, 0.0),
+        arr_cell,
+        "visited",
+        &visited_vals,
+    );
     y -= vspace;
 
     let cheap_vals: Vec<String> = trace.cheap.iter().map(|v| format!("{}", v)).collect();
-    spawn_array_view(&mut commands, Vec3::new(right_x_center, y, 0.0), arr_cell, "cheap", &cheap_vals);
+    spawn_array_view(
+        &mut commands,
+        Vec3::new(right_x_center, y, 0.0),
+        arr_cell,
+        "cheap",
+        &cheap_vals,
+    );
 }
 
 fn refresh_grid(
@@ -225,7 +363,11 @@ fn refresh_grid(
     for (ce, mut sprite, children) in q_cells.iter_mut() {
         let idx = ce.idx;
         let value = grid.values.get(idx).and_then(|v| *v);
-        sprite.color = if value.is_some() { Color::WHITE } else { Color::srgba(1.0, 1.0, 1.0, 0.08) };
+        sprite.color = if value.is_some() {
+            Color::WHITE
+        } else {
+            Color::srgba(1.0, 1.0, 1.0, 0.08)
+        };
 
         let new_value = value.map(|v| format!("{}", v)).unwrap_or_else(String::new);
         for i in 0..children.len() {
@@ -246,11 +388,16 @@ fn refresh_arrays(
     mut q_cells: Query<(&ArrayCell, &Children)>,
     mut q_text: Query<&mut Text2d, With<CellText>>,
 ) {
-    if !trace.is_changed() { return; }
+    if !trace.is_changed() {
+        return;
+    }
 
     for (cell, children) in q_cells.iter_mut() {
         let value_opt = match cell.name {
-            "column_permutations" => trace.column_permutations.get(cell.idx).map(|v| format!("{}", v)),
+            "column_permutations" => trace
+                .column_permutations
+                .get(cell.idx)
+                .map(|v| format!("{}", v)),
             "column_stack" => trace.column_stack.get(cell.idx).map(|v| format!("{}", v)),
             "row_stack" => trace.row_stack.get(cell.idx).map(|v| format!("{}", v)),
             "position_stack" => trace.position_stack.get(cell.idx).map(|v| format!("{}", v)),
@@ -268,5 +415,3 @@ fn refresh_arrays(
         }
     }
 }
-
-

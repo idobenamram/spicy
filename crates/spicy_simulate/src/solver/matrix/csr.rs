@@ -69,7 +69,10 @@ impl CsrMatrix {
             let mut prev = None;
             for &c in &self.column_indices[start..end] {
                 if c >= self.dim.ncols {
-                    return Err(CsrError::OutOfBoundsIndex { index: c, max: self.dim.ncols });
+                    return Err(CsrError::OutOfBoundsIndex {
+                        index: c,
+                        max: self.dim.ncols,
+                    });
                 }
                 if let Some(p) = prev {
                     if c <= p {
@@ -138,4 +141,3 @@ mod tests {
         assert!(a.check_invariants().is_ok());
     }
 }
-

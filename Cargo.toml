@@ -5,6 +5,5 @@ members = [
     "crates/spicy_parser",
     "crates/spicy_simulate",
     "crates/spicy_cli",
-    "crates/spicy_macros",
     "fuzz",
 ]

@@ -1468,6 +1468,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spicy_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "spicy_parser"
 version = "0.1.0"
 dependencies = [

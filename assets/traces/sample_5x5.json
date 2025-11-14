@@ -22,45 +22,57 @@
       6
     ],
     "matrix_cols": 5,
-    "matrix_nonzeros": [
+    "matrix_entries": [
       [
         0,
-        0
+        0,
+        1.0
       ],
       [
         1,
-        0
+        0,
+        1.0
       ],
       [
         1,
-        1
+        1,
+        1.0
       ],
       [
         2,
-        1
+        1,
+        1.0
       ],
       [
         2,
-        2
+        2,
+        1.0
       ],
       [
         3,
-        2
+        2,
+        1.0
       ],
       [
         3,
-        3
+        3,
+        1.0
       ],
       [
         4,
-        3
+        3,
+        1.0
       ],
       [
         4,
-        4
+        4,
+        1.0
       ]
     ],
     "matrix_rows": 5,
+    "n": 5,
+    "number_of_matches": 0,
+    "out_of_bounds": 6,
     "position_stack": [
       6,
       6,
@@ -85,48 +97,112 @@
   },
   "steps": [
     {
+      "line": 141,
+      "type": "step"
+    },
+    {
+      "line": 141,
+      "type": "step"
+    },
+    {
+      "line": 156,
+      "type": "step"
+    },
+    {
+      "line": 157,
+      "type": "step"
+    },
+    {
+      "line": 158,
+      "type": "step"
+    },
+    {
       "index": 0,
-      "line": 130,
+      "line": 158,
       "name": "cheap",
       "type": "array",
       "value": 0
     },
     {
+      "line": 157,
+      "type": "step"
+    },
+    {
+      "line": 158,
+      "type": "step"
+    },
+    {
       "index": 1,
-      "line": 130,
+      "line": 158,
       "name": "cheap",
       "type": "array",
       "value": 1
     },
     {
+      "line": 157,
+      "type": "step"
+    },
+    {
+      "line": 158,
+      "type": "step"
+    },
+    {
       "index": 2,
-      "line": 130,
+      "line": 158,
       "name": "cheap",
       "type": "array",
       "value": 3
     },
     {
+      "line": 157,
+      "type": "step"
+    },
+    {
+      "line": 158,
+      "type": "step"
+    },
+    {
       "index": 3,
-      "line": 130,
+      "line": 158,
       "name": "cheap",
       "type": "array",
       "value": 5
     },
     {
+      "line": 157,
+      "type": "step"
+    },
+    {
+      "line": 158,
+      "type": "step"
+    },
+    {
       "index": 4,
-      "line": 130,
+      "line": 158,
       "name": "cheap",
       "type": "array",
       "value": 7
     },
     {
-      "line": 135,
+      "line": 162,
+      "type": "step"
+    },
+    {
+      "line": 163,
+      "type": "step"
+    },
+    {
+      "line": 163,
       "name": "col",
       "type": "number",
       "value": 0
     },
     {
-      "line": 17,
+      "line": 164,
+      "type": "step"
+    },
+    {
+      "line": 16,
       "name": "head",
       "type": "number",
       "value": 0
@@ -139,73 +215,85 @@
       "value": 0
     },
     {
-      "line": 23,
+      "line": 27,
       "type": "step"
     },
     {
-      "line": 25,
+      "line": 29,
       "name": "col",
       "type": "number",
       "value": 0
     },
     {
-      "line": 29,
+      "line": 33,
       "type": "step"
     },
     {
       "index": 0,
-      "line": 31,
+      "line": 35,
       "name": "visited",
       "type": "array",
       "value": 0
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
       "index": 0,
-      "line": 42,
+      "line": 46,
       "name": "cheap",
       "type": "array",
       "value": 1
     },
     {
       "index": 0,
-      "line": 46,
+      "line": 51,
       "name": "row_stack",
       "type": "array",
       "value": 0
     },
     {
-      "line": 84,
+      "line": 113,
       "type": "step"
     },
     {
-      "line": 86,
+      "line": 115,
       "type": "step"
     },
     {
       "index": 0,
-      "line": 90,
+      "line": 120,
       "name": "column_permutations",
       "type": "array",
       "value": 0
     },
     {
-      "line": 92,
+      "line": 126,
       "name": "head",
       "type": "number",
       "value": -1
     },
     {
-      "line": 135,
+      "line": 176,
+      "type": "step"
+    },
+    {
+      "line": 163,
+      "type": "step"
+    },
+    {
+      "line": 163,
       "name": "col",
       "type": "number",
       "value": 1
     },
     {
-      "line": 17,
+      "line": 164,
+      "type": "step"
+    },
+    {
+      "line": 16,
       "name": "head",
       "type": "number",
       "value": 0
@@ -218,77 +306,89 @@
       "value": 1
     },
     {
-      "line": 23,
+      "line": 27,
       "type": "step"
     },
     {
-      "line": 25,
+      "line": 29,
       "name": "col",
       "type": "number",
       "value": 1
     },
     {
-      "line": 29,
+      "line": 33,
       "type": "step"
     },
     {
       "index": 1,
-      "line": 31,
+      "line": 35,
       "name": "visited",
       "type": "array",
       "value": 1
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
       "index": 1,
-      "line": 42,
+      "line": 46,
       "name": "cheap",
       "type": "array",
       "value": 3
     },
     {
       "index": 0,
-      "line": 46,
+      "line": 51,
       "name": "row_stack",
       "type": "array",
       "value": 1
     },
     {
-      "line": 84,
+      "line": 113,
       "type": "step"
     },
     {
-      "line": 86,
+      "line": 115,
       "type": "step"
     },
     {
       "index": 1,
-      "line": 90,
+      "line": 120,
       "name": "column_permutations",
       "type": "array",
       "value": 1
     },
     {
-      "line": 92,
+      "line": 126,
       "name": "head",
       "type": "number",
       "value": -1
     },
     {
-      "line": 135,
+      "line": 176,
+      "type": "step"
+    },
+    {
+      "line": 163,
+      "type": "step"
+    },
+    {
+      "line": 163,
       "name": "col",
       "type": "number",
       "value": 2
     },
     {
-      "line": 17,
+      "line": 164,
+      "type": "step"
+    },
+    {
+      "line": 16,
       "name": "head",
       "type": "number",
       "value": 0
@@ -301,77 +401,89 @@
       "value": 2
     },
     {
-      "line": 23,
+      "line": 27,
       "type": "step"
     },
     {
-      "line": 25,
+      "line": 29,
       "name": "col",
       "type": "number",
       "value": 2
     },
     {
-      "line": 29,
+      "line": 33,
       "type": "step"
     },
     {
       "index": 2,
-      "line": 31,
+      "line": 35,
       "name": "visited",
       "type": "array",
       "value": 2
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
       "index": 2,
-      "line": 42,
+      "line": 46,
       "name": "cheap",
       "type": "array",
       "value": 5
     },
     {
       "index": 0,
-      "line": 46,
+      "line": 51,
       "name": "row_stack",
       "type": "array",
       "value": 2
     },
     {
-      "line": 84,
+      "line": 113,
       "type": "step"
     },
     {
-      "line": 86,
+      "line": 115,
       "type": "step"
     },
     {
       "index": 2,
-      "line": 90,
+      "line": 120,
       "name": "column_permutations",
       "type": "array",
       "value": 2
     },
     {
-      "line": 92,
+      "line": 126,
       "name": "head",
       "type": "number",
       "value": -1
     },
     {
-      "line": 135,
+      "line": 176,
+      "type": "step"
+    },
+    {
+      "line": 163,
+      "type": "step"
+    },
+    {
+      "line": 163,
       "name": "col",
       "type": "number",
       "value": 3
     },
     {
-      "line": 17,
+      "line": 164,
+      "type": "step"
+    },
+    {
+      "line": 16,
       "name": "head",
       "type": "number",
       "value": 0
@@ -384,77 +496,89 @@
       "value": 3
     },
     {
-      "line": 23,
+      "line": 27,
       "type": "step"
     },
     {
-      "line": 25,
+      "line": 29,
       "name": "col",
       "type": "number",
       "value": 3
     },
     {
-      "line": 29,
+      "line": 33,
       "type": "step"
     },
     {
       "index": 3,
-      "line": 31,
+      "line": 35,
       "name": "visited",
       "type": "array",
       "value": 3
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
       "index": 3,
-      "line": 42,
+      "line": 46,
       "name": "cheap",
       "type": "array",
       "value": 7
     },
     {
       "index": 0,
-      "line": 46,
+      "line": 51,
       "name": "row_stack",
       "type": "array",
       "value": 3
     },
     {
-      "line": 84,
+      "line": 113,
       "type": "step"
     },
     {
-      "line": 86,
+      "line": 115,
       "type": "step"
     },
     {
       "index": 3,
-      "line": 90,
+      "line": 120,
       "name": "column_permutations",
       "type": "array",
       "value": 3
     },
     {
-      "line": 92,
+      "line": 126,
       "name": "head",
       "type": "number",
       "value": -1
     },
     {
-      "line": 135,
+      "line": 176,
+      "type": "step"
+    },
+    {
+      "line": 163,
+      "type": "step"
+    },
+    {
+      "line": 163,
       "name": "col",
       "type": "number",
       "value": 4
     },
     {
-      "line": 17,
+      "line": 164,
+      "type": "step"
+    },
+    {
+      "line": 16,
       "name": "head",
       "type": "number",
       "value": 0
@@ -467,68 +591,72 @@
       "value": 4
     },
     {
-      "line": 23,
+      "line": 27,
       "type": "step"
     },
     {
-      "line": 25,
+      "line": 29,
       "name": "col",
       "type": "number",
       "value": 4
     },
     {
-      "line": 29,
+      "line": 33,
       "type": "step"
     },
     {
       "index": 4,
-      "line": 31,
+      "line": 35,
       "name": "visited",
       "type": "array",
       "value": 4
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
-      "line": 36,
+      "line": 40,
       "type": "step"
     },
     {
       "index": 4,
-      "line": 42,
+      "line": 46,
       "name": "cheap",
       "type": "array",
       "value": 9
     },
     {
       "index": 0,
-      "line": 46,
+      "line": 51,
       "name": "row_stack",
       "type": "array",
       "value": 4
     },
     {
-      "line": 84,
+      "line": 113,
       "type": "step"
     },
     {
-      "line": 86,
+      "line": 115,
       "type": "step"
     },
     {
       "index": 4,
-      "line": 90,
+      "line": 120,
       "name": "column_permutations",
       "type": "array",
       "value": 4
     },
     {
-      "line": 92,
+      "line": 126,
       "name": "head",
       "type": "number",
       "value": -1
+    },
+    {
+      "line": 176,
+      "type": "step"
     }
   ]
 }

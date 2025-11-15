@@ -8,6 +8,3 @@ members = [
     "crates/spicy_macros",
     "fuzz",
 ]
-
-[profile.release]
-debug = true

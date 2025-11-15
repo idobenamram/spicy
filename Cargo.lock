@@ -1505,6 +1505,9 @@ dependencies = [
  "ndarray",
  "ndarray-linalg",
  "rstest",
+ "serde",
+ "serde_json",
+ "spicy_macros",
  "spicy_parser",
  "thiserror",
 ]

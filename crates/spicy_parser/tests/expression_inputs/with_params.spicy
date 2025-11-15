@@ -1,1 +1,6 @@
-V1 in 0 10k
+This is  a nice title
+* this is a bad comment
+R1 in out {check} ac={just}
+R2 in out {nice + check * just}
+R3 in out {nice + 1k}
+.end

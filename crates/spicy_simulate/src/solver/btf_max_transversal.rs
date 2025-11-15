@@ -17,7 +17,7 @@ use spicy_macros::recorded;
 ///    try to backtrack ("depth first") the current matches so the matches work with the non-zeroes in the current column
 fn try_augmenting_path(
     m: &CscMatrix,
-    current_column: usize,
+    current_column: usize, // the column we are currently looking at
     column_permutations: &mut [isize],
     cheap: &mut [usize], // for each column, holds the current row pointer
     // for the next non-zero entry to try to use the cheap test with
@@ -54,12 +54,17 @@ fn try_augmenting_path(
                 row_stack[head as usize] = row;
                 break;
             }
+            // if we didn't find a match, meaning no non-zero entries in the column were an option
+            // we need to move the backtrack algorithm for this column
+            // set the position stack to the start of the column
             position_stack[head as usize] = m.col_start(col);
         }
 
         let mut row_ptr = position_stack[head as usize];
         while row_ptr < end_of_column {
             let row = m.row_index(row_ptr);
+            // get the first non-zero entry for this column which should have a matching
+            // because the "cheap" option failed
             let col = column_permutations[row];
             if visited[col as usize] != current_column {
                 position_stack[head as usize] = row_ptr + 1;
@@ -85,7 +90,7 @@ fn try_augmenting_path(
         }
     }
 
-    return found;
+    found
 }
 
 /// for the given column, try to find a column permutation that will match this row and

@@ -7,7 +7,7 @@ use crate::netlist_types::Node;
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;
 
-pub(crate) struct Ident<'a> {
+pub struct Ident<'a> {
     pub text: &'a str,
     pub span: Span,
 }

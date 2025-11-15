@@ -5,7 +5,9 @@
 /// the easier thing is to read the implementation of Timothy A. Davis.
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/BTF/Include/btf.h
 /// the code is pretty well documented and much easier to understand.
+use super::recorder::Recorder;
 use crate::solver::matrix::csc::CscMatrix;
+use spicy_macros::recorded;
 
 /// for the given column, try to find a column permutation that will match this row and
 /// there are 2 main parts to the algorithm:
@@ -91,7 +93,14 @@ fn try_augmenting_path(
     found
 }
 
-pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
+/// for the given column, try to find a column permutation that will match this row and
+/// there are 2 main parts to the algorithm:
+/// 1. the "cheap test" which is a way to greedily try to match a
+///    column's nonzero to a row, creating a permutation
+/// 2. the "augmenting path" which happens if there are no cheap options,
+///    try to backtrack ("depth first") the current matches so the matches work with the non-zeroes in the current column
+#[recorded]
+pub(crate) fn btf_max_transversal(m: &CscMatrix, recorder: &mut Recorder) -> (usize, Vec<isize>) {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
     // match in davis's code
@@ -133,6 +142,7 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::recorder::Recorder;
     use super::*;
     use crate::solver::matrix::builder::MatrixBuilder;
 
@@ -144,11 +154,18 @@ mod tests {
         b.build_csc().unwrap()
     }
 
+    fn run_btf(matrix: &CscMatrix) -> (usize, Vec<isize>) {
+        let mut recorder = Recorder::new("/tmp/btf_max_transversal_test.json");
+        let result = btf_max_transversal(matrix, &mut recorder);
+        recorder.flush().unwrap();
+        result
+    }
+
     #[test]
     fn identity_pattern_has_full_matching() {
         // Nonzeros on the diagonal: unique perfect matching
         let a = build_5x5(&[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![0, 1, 2, 3, 4]);
     }
@@ -157,7 +174,7 @@ mod tests {
     fn permuted_diagonal_is_found() {
         // Unique permutation mapping row -> column = [2,0,4,1,3]
         let a = build_5x5(&[(2, 0), (0, 1), (4, 2), (1, 3), (3, 4)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![2, 0, 4, 1, 3]);
     }
@@ -166,7 +183,7 @@ mod tests {
     fn rank_deficient_has_four_matchings() {
         // Column 4 is empty; rows 0..3 match uniquely to cols 0..3
         let a = build_5x5(&[(0, 0), (1, 1), (2, 2), (3, 3)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 4);
         assert_eq!(q, vec![0, 1, 2, 3, -1]);
     }
@@ -191,7 +208,7 @@ mod tests {
             (4, 3),
             (4, 4),
         ]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![0, 1, 2, 3, 4]);
     }
@@ -220,7 +237,7 @@ mod tests {
             (3, 4),
             (4, 0),
         ]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![4, 0, 1, 2, 3]);
     }
@@ -259,7 +276,7 @@ mod tests {
         b.push(6, 2, 1.0).unwrap();
 
         let a = b.build_csc().unwrap();
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf(&a);
         assert_eq!(k, 7);
         assert_eq!(q, vec![0, 1, 6, 2, 3, 5, 4]);
     }

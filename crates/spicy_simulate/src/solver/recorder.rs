@@ -59,6 +59,17 @@ impl Recorder {
         }
     }
 
+    pub fn push_bool_step(&mut self, line: u32, name: &str, value: &bool) {
+        if let Ok(v) = serde_json::to_value(value) {
+            self.steps.push(json!({
+                "line": line,
+                "type": "bool",
+                "name": name,
+                "value": v
+            }));
+        }
+    }
+
     pub fn push_step(&mut self, line: u32) {
         self.steps.push(json!({
             "line": line,

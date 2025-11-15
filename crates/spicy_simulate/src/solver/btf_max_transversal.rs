@@ -9,90 +9,142 @@ use super::recorder::Recorder;
 use crate::solver::matrix::csc::CscMatrix;
 use spicy_macros::recorded;
 
+fn try_augmenting_path(
+    m: &CscMatrix,
+    current_column: usize,
+    column_permutations: &mut [isize],
+    cheap: &mut [usize],
+    visited: &mut [usize],
+    row_stack: &mut [usize],
+    column_stack: &mut [usize],
+    position_stack: &mut [usize],
+    recorder: &mut Recorder,
+) -> bool {
+    let mut found = false;
+    let mut head: i64 = 0;
+    recorder.push_number_step(line!() - 1, "head", &head);
+    column_stack[head as usize] = current_column;
+    recorder.push_array_step(
+        line!() - 1,
+        "column_stack",
+        head as usize,
+        &column_stack[head as usize],
+    );
+    assert!(visited[current_column] != current_column);
+
+    while head >= 0 {
+        recorder.push_step(line!() - 1);
+        let col = column_stack[head as usize];
+        recorder.push_number_step(line!() - 1, "col", &col);
+        let end_of_column = m.col_start(col + 1);
+
+        if visited[col] != current_column {
+            recorder.push_step(line!() - 1);
+            visited[col] = current_column;
+            recorder.push_array_step(line!() - 1, "visited", col, &visited[col]);
+
+            let mut current_row_ptr = cheap[col];
+            let mut row = 0;
+            while current_row_ptr < end_of_column && !found {
+                recorder.push_step(line!() - 1);
+                row = m.row_index(current_row_ptr);
+                found = column_permutations[row] == -1;
+                current_row_ptr += 1;
+            }
+            cheap[col] = current_row_ptr;
+            recorder.push_array_step(line!() - 1, "cheap", col, &cheap[col]);
+
+            if found {
+                row_stack[head as usize] = row;
+                recorder.push_array_step(
+                    line!() - 1,
+                    "row_stack",
+                    head as usize,
+                    &row_stack[head as usize],
+                );
+                break;
+            }
+            position_stack[head as usize] = m.col_start(col);
+            recorder.push_array_step(
+                line!() - 1,
+                "position_stack",
+                head as usize,
+                &position_stack[head as usize],
+            );
+        }
+
+        let mut row_ptr = position_stack[head as usize];
+        recorder.push_number_step(line!() - 1, "row_ptr", &row_ptr);
+        while row_ptr < end_of_column {
+            recorder.push_step(line!() - 1);
+            let row = m.row_index(row_ptr);
+            recorder.push_number_step(line!() - 1, "row", &row);
+            let col = column_permutations[row];
+            recorder.push_number_step(line!() - 1, "col", &col);
+            if visited[col as usize] != current_column {
+                recorder.push_step(line!() - 1);
+                position_stack[head as usize] = row_ptr + 1;
+                recorder.push_array_step(
+                    line!() - 1,
+                    "position_stack",
+                    head as usize,
+                    &position_stack[head as usize],
+                );
+                row_stack[head as usize] = row;
+                recorder.push_array_step(
+                    line!() - 1,
+                    "row_stack",
+                    head as usize,
+                    &row_stack[head as usize],
+                );
+                head += 1;
+                recorder.push_number_step(line!() - 1, "head", &head);
+                column_stack[head as usize] = col as usize;
+                recorder.push_array_step(
+                    line!() - 1,
+                    "column_stack",
+                    head as usize,
+                    &column_stack[head as usize],
+                );
+                break;
+            }
+            row_ptr += 1;
+            recorder.push_number_step(line!() - 1, "row_ptr", &row_ptr);
+        }
+
+        if row_ptr == end_of_column {
+            head -= 1;
+            recorder.push_number_step(line!() - 1, "head", &head);
+        }
+    }
+
+    if found {
+        recorder.push_step(line!() - 1);
+        while head >= 0 {
+            recorder.push_step(line!() - 1);
+            let col = column_stack[head as usize];
+            let row = row_stack[head as usize];
+            column_permutations[row] = col as isize;
+            recorder.push_array_step(
+                line!() - 1,
+                "column_permutations",
+                row,
+                &column_permutations[row],
+            );
+            head -= 1;
+            recorder.push_number_step(line!() - 1, "head", &head);
+        }
+    }
+
+    return found;
+}
+
 /// for the given column, try to find a column permutation that will match this row and
 /// there are 2 main parts to the algorithm:
 /// 1. the "cheap test" which is a way to greedily try to match a
 ///    column's nonzero to a row, creating a permutation
 /// 2. the "augmenting path" which happens if there are no cheap options,
 ///    try to backtrack ("depth first") the current matches so the matches work with the non-zeroes in the current column
-fn try_augmenting_path(
-    m: &CscMatrix,
-    current_column: usize, // the column we are currently looking at
-    column_permutations: &mut [isize],
-    cheap: &mut [usize], // for each column, holds the current row pointer
-    // for the next non-zero entry to try to use the cheap test with
-    visited: &mut [usize], // use the current column as an index into visted to track loops
-    row_stack: &mut [usize],
-    column_stack: &mut [usize],
-    position_stack: &mut [usize],
-) -> bool {
-    let mut found = false;
-    let mut head: i64 = 0;
-    column_stack[head as usize] = current_column;
-    assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
-
-    while head >= 0 {
-        let col = column_stack[head as usize];
-        let end_of_column = m.col_start(col + 1);
-
-        if visited[col] != current_column {
-            visited[col] = current_column;
-
-            // start from the a non-zero entry that hasn't already been tried for cheap
-            let mut current_row_ptr = cheap[col];
-            let mut row = 0;
-            while current_row_ptr < end_of_column && !found {
-                row = m.row_index(current_row_ptr);
-                // this is the meaning of "greedy" here - take the first match you find
-                found = column_permutations[row] == -1;
-                current_row_ptr += 1;
-            }
-            cheap[col] = current_row_ptr;
-
-            if found {
-                // set the stack so we can add it to permutations
-                row_stack[head as usize] = row;
-                break;
-            }
-            // if we didn't find a match, meaning no non-zero entries in the column were an option
-            // we need to move the backtrack algorithm for this column
-            // set the position stack to the start of the column
-            position_stack[head as usize] = m.col_start(col);
-        }
-
-        let mut row_ptr = position_stack[head as usize];
-        while row_ptr < end_of_column {
-            let row = m.row_index(row_ptr);
-            // get the first non-zero entry for this column which should have a matching
-            // because the "cheap" option failed
-            let col = column_permutations[row];
-            if visited[col as usize] != current_column {
-                position_stack[head as usize] = row_ptr + 1;
-                row_stack[head as usize] = row;
-                head += 1;
-                column_stack[head as usize] = col as usize;
-                break;
-            }
-            row_ptr += 1;
-        }
-
-        if row_ptr == end_of_column {
-            head -= 1;
-        }
-    }
-
-    if found {
-        while head >= 0 {
-            let col = column_stack[head as usize];
-            let row = row_stack[head as usize];
-            column_permutations[row] = col as isize;
-            head -= 1;
-        }
-    }
-
-    found
-}
-
 #[recorded]
 pub(crate) fn btf_max_transversal(m: &CscMatrix, recorder: &mut Recorder) -> (usize, Vec<isize>) {
     let n = m.dim.ncols;
@@ -124,6 +176,7 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix, recorder: &mut Recorder) -> (us
             &mut row_stack,
             &mut column_stack,
             &mut position_stack,
+            recorder,
         );
 
         if found {

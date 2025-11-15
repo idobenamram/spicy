@@ -845,7 +845,7 @@ impl<'s> InstanceParser<'s> {
         let tstep = self.parse_value(cursor, scope)?;
         let tstop = self.parse_value(cursor, scope)?;
 
-        let mut uic = false;
+        let uic;
         match cursor.peek_non_whitespace() {
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);

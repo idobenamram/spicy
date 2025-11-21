@@ -303,19 +303,19 @@ fn add_neighboring_supervariables_to_pivot(
 
                 let mut psrc = 0;
                 let mut pdst = 0;
-                let mut pend = *pme1 - 1;
+                let pend = (*pme1 as isize) - 1;
 
                 while psrc <= pend {
-                    let j = flip(iw[psrc]);
+                    let j = flip(iw[psrc as usize]);
                     psrc += 1;
                     if j >= 0 {
                         iw[pdst] = pe[j as usize];
                         pe[j as usize] = pdst as isize;
                         pdst += 1;
-                        let lenj = len[j as usize];
+                        let lenj = len[j as usize] as isize;
                         // copy from source to destination
                         for _ in 0..=(lenj - 2) {
-                            iw[pdst] = iw[psrc];
+                            iw[pdst] = iw[psrc as usize];
                             psrc += 1;
                             pdst += 1;
                         }
@@ -379,12 +379,12 @@ fn construct_new_element(
     nv[me] = -(nvpiv as isize);
     assert!(pe[me] >= 0 && pe[me] < iwlen as isize);
     let mut pme1: usize = 0;
-    let mut pme2: usize = 0;
+    let mut pme2 = 0;
 
     if elenme == 0 {
         // construct the new element in place
         pme1 = pe[me] as usize;
-        pme2 = pme1 - 1;
+        pme2 = (pme1 as isize) - 1;
         for p in pme1..=(pme1 + len[me] - 1) {
             assert!(iw[p] >= 0 && iw[p] < n as isize);
             let i = iw[p] as usize;
@@ -396,7 +396,7 @@ fn construct_new_element(
                 // flag i as being in Lme by negating Nv [i]
                 nv[i] = -nvi;
                 pme2 += 1;
-                iw[pme2] = i as isize;
+                iw[pme2 as usize] = i as isize;
 
                 let deg = degree[i] as usize;
                 remove_from_degree_list(i, n, deg, head, last, next);
@@ -446,19 +446,19 @@ fn construct_new_element(
                 w[e] = 0;
             }
         }
-        pme2 = *pfree - 1;
+        pme2 = (*pfree - 1) as isize;
     }
 
     degree[me] = *degme as isize;
     assert!(pme1 < iwlen);
     pe[me] = pme1 as isize;
-    len[me] = pme2 - pme1 + 1;
+    len[me] = (pme2 - pme1 as isize + 1) as usize;
 
     // flip(elen[me]) is now the degree of pivot (including
     // diagonal part).
     elen[me] = flip((nvpiv + *degme) as isize);
 
-    (pme1, pme2, nvpiv, elenme)
+    (pme1, pme2 as usize, nvpiv, elenme)
 }
 
 // this is the "algorithm 2" from the paper.
@@ -719,7 +719,7 @@ fn supervairable_detection(
                 last[j as usize] = EMPTY;
             }
 
-            let mut jlast = i;
+            let mut jlast;
             assert!(i >= EMPTY && i < n as isize);
             while i != EMPTY && next[i as usize] != EMPTY {
                 let ln = len[i as usize];
@@ -727,12 +727,12 @@ fn supervairable_detection(
                 let eln = elen[i as usize];
                 assert!(pe[i as usize] >= 0 && pe[i as usize] < iwlen as isize);
                 let p1 = pe[i as usize] as usize;
-                let p2 = p1 + eln as usize - 1;
+                let p2 = (p1 + ln as usize - 1) as isize;
 
                 // skip the first element in the list (me)
-                for p in (p1 + 1)..=p2 {
-                    assert!(iw[p] >= 0 && iw[p] < n as isize);
-                    w[iw[p] as usize] = *wflg;
+                for p in (p1 + 1) as isize..=p2 {
+                    assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                    w[iw[p as usize] as usize] = *wflg;
                 }
 
                 jlast = i;
@@ -746,12 +746,12 @@ fn supervairable_detection(
                     assert!(pe[j as usize] >= 0 && pe[j as usize] < iwlen as isize);
                     let mut ok = (len[j as usize] == ln) && (elen[j as usize] == eln);
                     let p1 = pe[j as usize] as usize;
-                    let p2 = p1 + eln as usize - 1;
+                    let p2 = (p1 + ln as usize - 1) as isize;
 
                     // skip the first element in the list (me)
-                    for p in (p1 + 1)..=p2 {
-                        assert!(iw[p] >= 0 && iw[p] < n as isize);
-                        if w[iw[p] as usize] != *wflg {
+                    for p in (p1 + 1) as isize..=p2 {
+                        assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                        if w[iw[p as usize] as usize] != *wflg {
                             ok = false;
                             break;
                         }

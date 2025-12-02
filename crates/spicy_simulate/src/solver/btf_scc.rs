@@ -18,7 +18,7 @@ use std::cmp::min;
 /// which are the non zero rows in the column. now the matrix is symmetric by definition of MNA
 /// meaning that the non-zero row (j) is an edge from the column i -> column j (by row j).
 /// it was a little confusing for me at first, so i wanted to write it down.
-use crate::solver::matrix::csc::CscMatrix;
+use crate::solver::{matrix::csc::CscMatrix, utils::unflip};
 
 const UNVISITED: usize = usize::MAX; // visited[j] = UNVISITED means node j has not been visited yet
 const UNASSIGNED: usize = usize::MAX - 1; // visited[j] = UNASSIGNED means node j has been visited 
@@ -58,8 +58,7 @@ fn dfs(
 
     while column_head >= 0 {
         let col = column_stack[column_head as usize];
-        // TODO: support BTF_UNFLIP
-        let column_after_permutation = column_permutations[col] as usize;
+        let column_after_permutation = unflip(column_permutations[col]) as usize;
         let end_of_column = m.col_start(column_after_permutation + 1);
 
         if visited[col] == UNVISITED {
@@ -129,16 +128,24 @@ fn dfs(
     }
 }
 
-pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usize, Vec<isize>) {
+pub(crate) fn btf_scc(
+    m: &CscMatrix,
+    column_permutations: &mut [isize],
+    row_permutations: &mut [isize],
+    // n+1 size
+    boundary_array: &mut [isize],
+) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
 
     let mut graph_indices: Vec<isize> = vec![-1; n];
+    // TODO: in davis's code he uses row_permutations for low
     let mut low: Vec<isize> = vec![-1; n];
     // called flag in davis's code
     let mut visited: Vec<usize> = vec![UNVISITED; n];
 
     let mut component_stack: Vec<usize> = vec![out_of_bounds; n];
+    // TODO: in davis's code he uses blocks for column_stack
     let mut column_stack: Vec<usize> = vec![out_of_bounds; n];
     let mut position_stack: Vec<usize> = vec![out_of_bounds; n];
 
@@ -171,9 +178,10 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
     // block info is stored in the visted array, visited[j] = k means node j is in the k-th SCC block
     // from here we want to create a symmetric permutation to move to block triangular form
 
-    // first we will computre the "boundary array" which will tell us the start and end of each SCC block
-
-    let mut boundary_array = vec![0; number_of_scc_blocks];
+    // first we will compute the "boundary array" which will tell us the start and end of each SCC block
+    for b in 0..number_of_scc_blocks {
+        boundary_array[b] = 0;
+    }
 
     for col in 0..n {
         // sanity checks that the blocks were generated correctly
@@ -200,36 +208,35 @@ pub(crate) fn btf_scc(m: &CscMatrix, column_permutations: &mut [isize]) -> (usiz
 
     // construct the permutation, perserving the natural order
 
-    let mut btf_permutation = vec![-1; n];
-
     for col in 0..n {
         // visited[col] is the SCC block index of col
         let block = visited[col];
         // graph_indices[block] is the index to the new node(column) in the current SCC block for col
-        btf_permutation[graph_indices[block] as usize] = col as isize;
+        row_permutations[graph_indices[block] as usize] = col as isize;
         // increment the index in graph_indices for the block
         graph_indices[block] += 1;
     }
 
     for col in 0..n {
         // sanity check that the permutation was constructed correctly
-        assert!(btf_permutation[col] >= 0);
+        assert!(row_permutations[col] >= 0);
     }
 
     // lets call orignal matrix = A
     // column permutation = Q
-    // btf_permutation = P
-    // the btf_permutation was done on A*Q
+    // row permutation = P (symmetric permutation) 
+    // the row permutation was done on A*Q
     // so the full permutation then is P*(A*Q)*P^T, instead we will return
     // Q = Q*P^T to make it simpler to apply the permutation to the matrix
+    // so the final permutation is P*A*Q
     for k in 0..n {
-        // btf_permutation[k] is the new column index for the k-th column after the column permutation
-        graph_indices[k] = column_permutations[btf_permutation[k] as usize] as isize;
+        // row_permutations[k] is the new column index for the k-th column after the column permutation
+        graph_indices[k] = column_permutations[row_permutations[k] as usize] as isize;
     }
     // overwrite the column permutation with the (Q*P^T) permutation
     for col in 0..n {
         column_permutations[col] = graph_indices[col];
     }
 
-    todo!()
+    return number_of_scc_blocks
 }

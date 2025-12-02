@@ -18,6 +18,11 @@ pub struct CscMatrix {
 }
 
 impl CscMatrix {
+
+    pub fn is_square(&self) -> bool {
+        self.dim.nrows == self.dim.ncols
+    }
+
     /// number of non zero values
     pub fn nnz(&self) -> usize {
         self.row_indices.len()
@@ -186,6 +191,34 @@ impl CscMatrix {
             column_indices: ci,
             values: cx,
         }
+    }
+}
+
+
+pub struct CscPointers<'a> {
+    pub column_pointers: &'a [usize],
+    pub row_indices: &'a [usize],
+}
+
+impl<'a> CscPointers<'a> {
+    pub fn new(column_pointers: &'a [usize], row_indices: &'a [usize]) -> Self {
+        Self { column_pointers, row_indices }
+    }
+
+    pub fn col_start(&self, j: usize) -> usize {
+        self.column_pointers[j]
+    }
+
+    pub fn col_end(&self, j: usize) -> usize {
+        self.column_pointers[j + 1]
+    }
+
+    pub fn row_index(&self, i: usize) -> usize {
+        self.row_indices[i]
+    }
+
+    pub fn nnz(&self) -> usize {
+        self.row_indices.len()
     }
 }
 

@@ -115,7 +115,7 @@ fn aat_first_phase(
 
     // compute the symmetry of the non-zero pattern of A
 
-    let mut sym = 0.0;
+    let sym;
     // only diagonal has non zeros
     if nz == nz_diagonal {
         sym = 1.0;

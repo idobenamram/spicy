@@ -6,6 +6,8 @@
 /// Timothy A. Davis implements the algorithm
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
+/// 
+use crate::solver::utils::{flip, unflip};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -34,11 +36,6 @@ impl AmdControl {
 }
 
 const EMPTY: isize = -1;
-
-/// negation about -1, used to mark an integer i that is normally non-negative.
-fn flip(x: isize) -> isize {
-    -(x) - 2
-}
 
 fn clear_flag(mut wflg: isize, wbig: isize, w: &mut [isize], n: usize) -> isize {
     if wflg < 2 || wflg >= wbig {

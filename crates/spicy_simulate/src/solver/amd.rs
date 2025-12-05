@@ -35,6 +35,39 @@ impl AmdControl {
     }
 }
 
+pub struct AmdInfo {
+    // number of non-zero entries in L (excluding the diagonal)
+    pub lnz: f64,
+    // number of divide operations for LDL' and for LU
+    pub ndiv: f64,
+    // number of multiply-subtract pairs for LDL'
+    pub nms_ldl: f64,
+    // number of multiply-subtract pairs for LU
+    pub nms_lu: f64,
+    // number of "dense" rows/columns
+    pub ndense: usize,
+    // largest front is dmax-by-dmax
+    pub dmax: f64,
+    // number of garbage collections in AMD
+    // TODO: support this
+    pub ncmpa: usize,
+}
+
+
+impl AmdInfo {
+    pub fn new() -> Self {
+        Self {
+            lnz: 0.0,
+            ndiv: 0.0,
+            nms_ldl: 0.0,
+            nms_lu: 0.0,
+            ndense: 0,
+            dmax: 1.0,
+            ncmpa: 0,
+        }
+    }
+}
+
 const EMPTY: isize = -1;
 
 fn clear_flag(mut wflg: isize, wbig: isize, w: &mut [isize], n: usize) -> isize {
@@ -555,7 +588,7 @@ fn update_degrees(
         let p1 = pe[i] as usize;
         // notice p2 can be negative if elen[i]=0
         let p2 = p1 as isize + elen[i] - 1;
-        assert!(p2 >= -1 && p2 < iwlen as isize);
+        assert!(p2 >= EMPTY && p2 < iwlen as isize);
         let mut pn = p1;
         let mut hash = 0;
         let mut deg = 0;
@@ -845,6 +878,7 @@ fn finalize_new_element(
     pe: &mut [isize],
     w: &mut [isize],
     elenme: isize,
+    info: &mut AmdInfo,
 ) {
     nv[me] = nvpiv as isize;
     len[me] = p - pme1;
@@ -1186,16 +1220,19 @@ pub fn amd(
     w: &mut [isize],
 
     control: AmdControl,
-) {
+) -> AmdInfo {
     /* Note that this restriction on iwlen is slightly more restrictive than
      * what is actually required in AMD_2.  AMD_2 can operate with no elbow
      * room at all, but it will be slow.  For better performance, at least
      * size-n elbow room is enforced. */
     assert!(iwlen >= pfree + n);
     assert!(n > 0);
+    let mut info = AmdInfo::new();
 
     let (mut nel, ndense) =
         initialize_amd(n, &control, last, head, next, nv, w, elen, degree, len, pe);
+    info.ndense = ndense;
+
     let wbig = isize::MAX - n as isize;
     let mut wflg = clear_flag(0, wbig, w, n);
     // largest |Le| seen so far
@@ -1264,10 +1301,36 @@ pub fn amd(
             control.aggressive,
             &mut mindeg,
         );
-        finalize_new_element(me, nvpiv, pme1, p, &mut pfree, nv, len, pe, w, elenme);
+        finalize_new_element(me, nvpiv, pme1, p, &mut pfree, nv, len, pe, w, elenme, &mut info);
+
+        let f = nvpiv as f64;
+        let r = degme as f64 + info.ndense as f64;
+        info.dmax = f64::max(info.dmax, f + r);
+
+        let lnzme = f * r + (f - 1.) * f / 2.;
+        // number of nonzeros in L (excluding the diagonal)
+        info.lnz += lnzme;
+        // number of divide operations for LDL' and for LU
+        info.ndiv += lnzme;
+        // number of multiply-subtract pairs for LU
+        let s = f*r*r + r * (f - 1.) * f + (f - 1.) * f * (2. * f - 1.) / 6.;
+        info.nms_lu += s;
+        // number of multiply-subtract pairs for LDL'
+        info.nms_ldl += (s + lnzme) / 2.;
     }
+
+    let f = info.ndense as f64;
+    info.dmax = f64::max(info.dmax, f);
+    let lnzme = (f - 1.) * f / 2.;
+    info.lnz += lnzme;
+    info.ndiv += lnzme;
+    let s = (f - 1.) * f * (2. * f - 1.) / 6.;
+    info.nms_lu += s;
+    info.nms_ldl += (s + lnzme) / 2.;
 
     compress_paths(n, pe, elen, nv);
     postorder_assembly_tree(n, pe, nv, elen, w, head, next, last);
     compute_output_permutation(n, ndense, nv, pe, head, next, last, w);
+
+    info 
 }

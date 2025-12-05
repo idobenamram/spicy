@@ -18,7 +18,6 @@ pub struct CscMatrix {
 }
 
 impl CscMatrix {
-
     pub fn is_square(&self) -> bool {
         self.dim.nrows == self.dim.ncols
     }
@@ -192,17 +191,25 @@ impl CscMatrix {
             values: cx,
         }
     }
+
+    pub fn as_pointers(&self) -> CscPointers {
+        CscPointers::new(self.dim, &self.column_pointers, &self.row_indices)
+    }
 }
 
-
 pub struct CscPointers<'a> {
+    pub dim: Dim,
     pub column_pointers: &'a [usize],
     pub row_indices: &'a [usize],
 }
 
 impl<'a> CscPointers<'a> {
-    pub fn new(column_pointers: &'a [usize], row_indices: &'a [usize]) -> Self {
-        Self { column_pointers, row_indices }
+    pub fn new(dim: Dim, column_pointers: &'a [usize], row_indices: &'a [usize]) -> Self {
+        Self {
+            dim,
+            column_pointers,
+            row_indices,
+        }
     }
 
     pub fn col_start(&self, j: usize) -> usize {
@@ -219,6 +226,69 @@ impl<'a> CscPointers<'a> {
 
     pub fn nnz(&self) -> usize {
         self.row_indices.len()
+    }
+
+    // TODO: merge this with the CscMatrix check_invariants
+    #[allow(clippy::collapsible_if)]
+    pub fn check_invariants(&self) -> Result<(), CscError> {
+        if self.column_pointers.len() != self.dim.ncols + 1 {
+            return Err(CscError::InvalidColumnPointersLength {
+                expected: self.dim.ncols + 1,
+                actual: self.column_pointers.len(),
+            });
+        }
+        if *self.column_pointers.first().unwrap_or(&1) != 0 {
+            return Err(CscError::InvalidColumnPointers {
+                index: 0,
+                expected: 0,
+                actual: *self.column_pointers.first().unwrap_or(&1),
+            });
+        }
+        if *self.column_pointers.last().unwrap() != self.nnz() {
+            return Err(CscError::InvalidColumnPointers {
+                index: self.dim.ncols,
+                expected: self.nnz(),
+                actual: *self.column_pointers.last().unwrap(),
+            });
+        }
+        if self.row_indices.len() != *self.column_pointers.last().unwrap() {
+            return Err(CscError::RowIndicesValuesLengthMismatch {
+                values: *self.column_pointers.last().unwrap(),
+                row_indices: self.row_indices.len(),
+            });
+        }
+       
+        // per-column sorted & in-range
+        for j in 0..self.dim.ncols {
+            let (start, end) = (self.column_pointers[j], self.column_pointers[j + 1]);
+            if start > end || end > self.nnz() {
+                return Err(CscError::InvalidColumnPointers {
+                    index: j,
+                    expected: start,
+                    actual: end,
+                });
+            }
+            let mut prev = None;
+            for &r in &self.row_indices[start..end] {
+                if r >= self.dim.nrows {
+                    return Err(CscError::OutOfBoundsIndex {
+                        index: r,
+                        max: self.dim.nrows,
+                    });
+                }
+                if let Some(p) = prev {
+                    if r <= p {
+                        return Err(CscError::RowsNotStrictlyIncreasing {
+                            index: j,
+                            expected: p,
+                            actual: r,
+                        });
+                    }
+                }
+                prev = Some(r);
+            }
+        }
+        Ok(())
     }
 }
 

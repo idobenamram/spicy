@@ -1,5 +1,6 @@
 mod analyze;
 mod btf;
+mod amd;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -58,13 +59,18 @@ struct KluSymbolic {
     row_scaling: Vec<isize>,
 }
 
+struct KluNumeric {
+    n: usize,
+    nblocks: usize,
+    lnz: usize,
+    unz: usize
+
+}
+
 pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usize]) -> bool {
     if n == 0 {
         return false;
     }
-
-
-    let nz = column_pointers[n];
 
     // column pointers must start at column_pointers[0] = 0, and column_pointers[n] must be >= 0
     if column_pointers[0] != 0 {
@@ -247,4 +253,45 @@ typedef struct klu_common_struct
     size_t mempeak ;    /* peak memory usage, in bytes */
 
 } klu_common ;
+ 
+typedef struct
+{
+    /* LU factors of each block, the pivot row permutation, and the
+     * entries in the off-diagonal blocks */
+
+    int32_t n ;             /* A is n-by-n */
+    int32_t nblocks ;       /* number of diagonal blocks */
+    int32_t lnz ;           /* actual nz in L, including diagonal */
+    int32_t unz ;           /* actual nz in U, including diagonal */
+    int32_t max_lnz_block ; /* max actual nz in L in any one block, incl. diag */
+    int32_t max_unz_block ; /* max actual nz in U in any one block, incl. diag */
+    int32_t *Pnum ;         /* size n. final pivot permutation */
+    int32_t *Pinv ;         /* size n. inverse of final pivot permutation */
+
+    /* LU factors of each block */
+    int32_t *Lip ;          /* size n. pointers into LUbx[block] for L */
+    int32_t *Uip ;          /* size n. pointers into LUbx[block] for U */
+    int32_t *Llen ;         /* size n. Llen [k] = # of entries in kth column of L */
+    int32_t *Ulen ;         /* size n. Ulen [k] = # of entries in kth column of U */
+    void **LUbx ;       /* L and U indices and entries (excl. diagonal of U) */
+    size_t *LUsize ;    /* size of each LUbx [block], in sizeof (Unit) */
+    void *Udiag ;       /* diagonal of U */
+
+    /* scale factors; can be NULL if no scaling */
+    double *Rs ;        /* size n. Rs [i] is scale factor for row i */
+
+    /* permanent workspace for factorization and solve */
+    size_t worksize ;   /* size (in bytes) of Work */
+    void *Work ;        /* workspace */
+    void *Xwork ;       /* alias into Numeric->Work */
+    int32_t *Iwork ;        /* alias into Numeric->Work */
+
+    /* off-diagonal entries in a conventional compressed-column sparse matrix */
+    int32_t *Offp ;         /* size n+1, column pointers */
+    int32_t *Offi ;         /* size nzoff, row indices */
+    void *Offx ;        /* size nzoff, numerical values */
+    int32_t nzoff ;
+
+} klu_numeric ;
+
 */

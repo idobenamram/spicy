@@ -1,36 +1,29 @@
-use crate::solver::matrix::csc::CscMatrix;
+use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
 
 /// calculating the symmetric pattern of A (A + A^T)
 
-/// Assumes A is square with sorted columns and no duplicates
-pub fn aat(a: &CscMatrix) {
-    let n = a.dim.ncols;
-    let mut last_columns_positions = vec![-1; n];
-    // column_lengths[i] is the number of non-zero entries in column i excluding diagonals
-    let mut column_lengths = vec![0; n];
 
-    assert!(a.check_invariants().is_ok());
 
-    let aat_info = aat_first_phase(a, &mut last_columns_positions, &mut column_lengths);
-
-    // TODO: allocate space for matrix, extra space, 6 n sized vectors
-
-    aat_second_phase(a, &column_lengths, &mut last_columns_positions, &aat_info);
+pub struct AatInfo {
+    // symmetry pattern of A
+    pub sym: f64,
+    // non zeros on the diagonal of A
+    pub nz_diagonal: usize,
+    // symmetric non zeros in original A
+    pub nz_both: usize,
+    // non zeros in the symmetric pattern of A
+    pub nz_aat: usize,
 }
 
-struct AatInfo {
-    sym: f64,
-    nz_diagonal: usize,
-    nz_both: usize,
-    nz_aat: usize,
-}
-
-fn aat_first_phase(
-    a: &CscMatrix,
-    last_columns_positions: &mut [isize],
+pub fn aat_first_phase(
+    a: &CscPointers,
+    // len n
     column_lengths: &mut [usize],
+    // len n, as the scan continues, the last_columns_positions[i] will be the position of the last entry in the column of i
+    // that has been scanned
+    last_columns_positions: &mut [isize],
 ) -> AatInfo {
-    last_columns_positions.fill(-1);
+    last_columns_positions.fill(EMPTY);
     column_lengths.fill(0);
 
     let mut nz_diagonal = 0;
@@ -61,7 +54,7 @@ fn aat_first_phase(
             }
 
             // scan lower triangular part of A from column "row" until row "col"
-            assert!(last_columns_positions[row] != -1);
+            assert!(last_columns_positions[row] != EMPTY);
             let mut row_column_position = last_columns_positions[row] as usize;
             // A is square, so this is always valid
             let column_row_start = a.col_start(row);
@@ -136,26 +129,20 @@ fn aat_first_phase(
 
 /// second phase is actually constructing the AAT matrix based on phase 2
 /// structurally very similar to phase 1
-fn aat_second_phase(
-    a: &CscMatrix,
-    column_lengths: &[usize],
+pub fn aat_second_phase(
+    a: &CscPointers,
+    free_position: usize,
+    // will be filled with the AAT matrix
+    aat_rows: &mut [usize],
+    // the current position in the AAT matrix for row/col
+    // on input, contains the start position of the column in the AAT matrix
+    current_pos: &mut [usize],
+    // on input, contains the end position of the column in the AAT matrix
+    pe: &[usize],
+    // for each column/row, the position of the last scanned entry in the column
     last_columns_positions: &mut [isize],
-    aat_info: &AatInfo,
 ) {
-    last_columns_positions.fill(-1);
     let n = a.dim.ncols;
-
-    // extra space for AAT matrix
-    let mut aat_rows = vec![0; aat_info.nz_aat + (0.2 * aat_info.nz_aat as f64) as usize];
-    let mut sp = vec![0; n];
-    let mut pe = vec![0; n];
-    let mut free_position = 0;
-
-    for col in 0..n {
-        sp[col] = free_position;
-        pe[col] = free_position;
-        free_position += column_lengths[col];
-    }
 
     for col in 0..a.dim.ncols {
         let mut column_position = a.col_start(col);
@@ -167,7 +154,7 @@ fn aat_second_phase(
                 // in the upper triangular part of A,
                 // add both A[col, row] and A[row, col] to the column lengths
                 assert!(
-                    sp[row]
+                    current_pos[row]
                         < if row == n - 1 {
                             free_position
                         } else {
@@ -175,17 +162,17 @@ fn aat_second_phase(
                         }
                 );
                 assert!(
-                    sp[col]
+                    current_pos[col]
                         < if col == n - 1 {
                             free_position
                         } else {
                             pe[col + 1]
                         }
                 );
-                aat_rows[sp[row]] = col;
-                aat_rows[sp[col]] = row;
-                sp[row] += 1;
-                sp[col] += 1;
+                aat_rows[current_pos[row]] = col;
+                aat_rows[current_pos[col]] = row;
+                current_pos[row] += 1;
+                current_pos[col] += 1;
                 column_position += 1;
             } else if row == col {
                 column_position += 1;
@@ -211,10 +198,10 @@ fn aat_second_phase(
                     // A (row, row_row) is **only** in the lower part of A.
                     // so add both A[row, row_row] and A[row_row, row] to the column lengths
                     // row_row is always less than col
-                    aat_rows[sp[row_row]] = row;
-                    aat_rows[sp[row]] = row_row;
-                    sp[row_row] += 1;
-                    sp[row] += 1;
+                    aat_rows[current_pos[row_row]] = row;
+                    aat_rows[current_pos[row]] = row_row;
+                    current_pos[row_row] += 1;
+                    current_pos[row] += 1;
                     row_column_position += 1;
                 } else if row_row == col {
                     // both in upper and lower triangular part of A
@@ -242,11 +229,16 @@ fn aat_second_phase(
             // A[col, row] is in the lower triangular part of A
             // and we have not seen it yet, so add both A[col, row]
             // and A[row, col] to the column lengths
-            aat_rows[sp[row]] = col;
-            aat_rows[sp[col]] = row;
-            sp[row] += 1;
-            sp[col] += 1;
+            aat_rows[current_pos[row]] = col;
+            aat_rows[current_pos[col]] = row;
+            current_pos[row] += 1;
+            current_pos[col] += 1;
             column_position += 1;
         }
     }
+
+    for j in 0..n - 1 {
+        assert!(current_pos[j] == pe[j + 1]);
+    }
+    assert!(current_pos[n - 1] == free_position);
 }

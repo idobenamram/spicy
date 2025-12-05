@@ -1,7 +1,7 @@
 use std::{cmp::max, iter::Empty};
 
 use crate::solver::{
-    klu::{KluConfig, KluOrdering, KluSymbolic, btf::btf, klu_valid},
+    klu::{KluConfig, KluOrdering, KluSymbolic, amd::amd, btf::btf, klu_valid},
     matrix::csc::CscMatrix,
     utils::{EMPTY, unflip},
 };
@@ -44,14 +44,15 @@ fn analyze_worker(
     a: &CscMatrix,
     config: &KluConfig,
     symbolic: &mut KluSymbolic,
-    btf_row_permutation: &[isize],
-    btf_column_permutation: &[isize],
+    btf_row_permutation: Vec<isize>,
+    btf_column_permutation: Vec<isize>,
 
-    block_row_permutation: &mut [isize],
-    block_col_pointers: &mut [usize],
-    block_row_pointers: &mut [usize],
+    // for each scc block
+    mut block_row_permutation: Vec<isize>,
+    mut block_col_pointers: Vec<usize>,
+    mut block_row_pointers: Vec<usize>,
     ci_len: usize,
-    row_inv_permutations: &mut [isize],
+    mut row_inv_permutations: Vec<isize>,
 ) {
     let n = symbolic.n;
 
@@ -67,7 +68,7 @@ fn analyze_worker(
     }
 
     let mut nzoff = 0;
-    let mut lnz = 0;
+    let mut lnz = 0.;
     let mut max_nz = 0;
     symbolic.symmetry = -1.0;
 
@@ -104,29 +105,43 @@ fn analyze_worker(
         }
         block_col_pointers[size] = pc;
         max_nz = std::cmp::max(max_nz, pc);
-        assert!(klu_valid(size, block_col_pointers, block_row_pointers));
+        assert!(klu_valid(size, &block_col_pointers, &block_row_pointers));
 
-        let mut lnz1 = 0;
-        let ok = true;
+        let lnz1;
         if size <= 3 {
             for k in 0..size {
                 block_row_permutation[k] = k as isize;
             }
-            lnz = size * (size + 1) / 2;
+            lnz1 = size as f64 * (size as f64 + 1.) / 2.;
         } else if symbolic.ordering == KluOrdering::Amd {
-
-            amd()
-
-
+            let info = amd(a.as_pointers(), &mut block_row_permutation);
+            lnz1 = info.lnz + size as f64;
         } else {
             todo!()
         }
 
+        symbolic.lower_nz[block] = lnz1;
+        lnz += lnz1;
+
+        // combine the preordering with the btf ordering
+        for k in 0..size {
+            assert!(k + k1 < n);
+            assert!(block_row_permutation[k] as usize + k1 < n);
+            symbolic.column_permutation[k + k1] =
+                btf_column_permutation[block_row_permutation[k] as usize + k1] as isize;
+            symbolic.row_permutation[k + k1] =
+                btf_row_permutation[block_row_permutation[k] as usize + k1] as isize;
+        }
     }
+
+    assert!(nzoff <= a.nnz());
+    symbolic.lnz = lnz;
+    symbolic.unz = lnz;
+    symbolic.nzoff = nzoff;
 }
 
 // a was already is validated by the caller to be a valid CSC matrix
-pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<(), String> {
+pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<KluSymbolic, String> {
     let mut symbolic = allocate_symbolic(a);
     symbolic.ordering = config.ordering;
 
@@ -178,10 +193,10 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<(), String> {
     symbolic.nblocks = number_of_scc_blocks;
     symbolic.maxblock = maxblock;
 
-    let mut pblk = vec![0; maxblock];
-    let mut cp = vec![0; maxblock + 1];
-    let mut ci = vec![0; max(ci_len, symbolic.nz + 1)];
-    let mut pinv = vec![EMPTY; symbolic.n];
+    let pblk = vec![0; maxblock];
+    let cp = vec![0; maxblock + 1];
+    let ci = vec![0; max(ci_len, symbolic.nz + 1)];
+    let pinv = vec![EMPTY; symbolic.n];
 
     analyze_worker(
         a,
@@ -195,5 +210,6 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<(), String> {
         ci_len,
         pinv,
     );
-    todo!()
+
+    Ok(symbolic)
 }

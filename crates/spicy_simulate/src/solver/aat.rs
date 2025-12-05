@@ -54,12 +54,12 @@ pub fn aat_first_phase(
             }
 
             // scan lower triangular part of A from column "row" until row "col"
-            assert!(last_columns_positions[row] != EMPTY);
+            debug_assert!(last_columns_positions[row] != EMPTY);
             let mut row_column_position = last_columns_positions[row] as usize;
             // A is square, so this is always valid
             let column_row_start = a.col_start(row);
             let column_row_end = a.col_end(row);
-            assert!(
+            debug_assert!(
                 column_row_start <= row_column_position && row_column_position <= column_row_end
             );
             while row_column_position < column_row_end {
@@ -153,7 +153,7 @@ pub fn aat_second_phase(
             if row < col {
                 // in the upper triangular part of A,
                 // add both A[col, row] and A[row, col] to the column lengths
-                assert!(
+                debug_assert!(
                     current_pos[row]
                         < if row == n - 1 {
                             free_position
@@ -161,7 +161,7 @@ pub fn aat_second_phase(
                             pe[row + 1]
                         }
                 );
-                assert!(
+                debug_assert!(
                     current_pos[col]
                         < if col == n - 1 {
                             free_position
@@ -183,12 +183,12 @@ pub fn aat_second_phase(
             }
 
             // scan lower triangular part of A from column "row" until row "col"
-            assert!(last_columns_positions[row] != -1);
+            debug_assert!(last_columns_positions[row] != -1);
             let mut row_column_position = last_columns_positions[row] as usize;
             // A is square, so this is always valid
             let column_row_start = a.col_start(row);
             let column_row_end = a.col_end(row);
-            assert!(
+            debug_assert!(
                 column_row_start <= row_column_position && row_column_position <= column_row_end
             );
             while row_column_position < column_row_end {
@@ -238,7 +238,7 @@ pub fn aat_second_phase(
     }
 
     for j in 0..n - 1 {
-        assert!(current_pos[j] == pe[j + 1]);
+        debug_assert!(current_pos[j] == pe[j + 1]);
     }
-    assert!(current_pos[n - 1] == free_position);
+    debug_assert!(current_pos[n - 1] == free_position);
 }

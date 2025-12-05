@@ -139,7 +139,7 @@ pub fn factor(
                     numeric.offx[poff] = val;
                     poff += 1;
                 } else {
-                    assert!(newrow == k1);
+                    debug_assert!(newrow == k1);
                     let val = match &numeric.rs {
                         None => a.value(p),
                         Some(rs) => a.value(p) / rs[oldrow],

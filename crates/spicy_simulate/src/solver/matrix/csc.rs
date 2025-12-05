@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(r2, &[0, 2]);
         assert_eq!(v2, &[3.0, 35.0]);
 
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod tests {
         // nnz preserved
         assert_eq!(*csr.row_pointers.last().unwrap(), a.nnz());
         // some sanity on column indices
-        assert!(csr.column_indices.iter().all(|&j| j < a.dim.ncols));
+        debug_assert!(csr.column_indices.iter().all(|&j| j < a.dim.ncols));
     }
 
     #[test]

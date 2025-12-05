@@ -15,7 +15,7 @@ pub fn scale(
         Some(scale) => scale,
     };
 
-    assert!(a.check_invariants().is_ok());
+    debug_assert!(a.check_invariants().is_ok());
 
     rs.fill(0.0);
 
@@ -29,7 +29,7 @@ pub fn scale(
         let end = a.col_end(col);
         for p in start..end {
             let row = a.row_index(p);
-            assert!(row < n);
+            debug_assert!(row < n);
 
             if let Some(w) = w.as_deref_mut() {
                 if w[row] == col as isize {

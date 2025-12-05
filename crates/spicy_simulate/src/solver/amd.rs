@@ -92,7 +92,7 @@ fn add_to_degree_list(
     next: &mut [isize],
 ) {
     let inext = head[deg];
-    assert!(inext >= EMPTY && inext < n as isize);
+    debug_assert!(inext >= EMPTY && inext < n as isize);
     if inext != EMPTY {
         last[inext as usize] = i as isize;
     }
@@ -110,7 +110,7 @@ fn remove_head_from_degree_list(
     next: &mut [isize],
 ) {
     let inext = next[i];
-    assert!(inext >= EMPTY && inext < n as isize);
+    debug_assert!(inext >= EMPTY && inext < n as isize);
     if inext != EMPTY {
         last[inext as usize] = EMPTY;
     }
@@ -127,8 +127,8 @@ fn remove_from_degree_list(
 ) {
     let inext = next[i];
     let ilast = last[i];
-    assert!(inext >= EMPTY && inext < n as isize);
-    assert!(ilast >= EMPTY && ilast < n as isize);
+    debug_assert!(inext >= EMPTY && inext < n as isize);
+    debug_assert!(ilast >= EMPTY && ilast < n as isize);
     if inext != EMPTY {
         last[inext as usize] = ilast;
     }
@@ -136,7 +136,7 @@ fn remove_from_degree_list(
         next[ilast as usize] = inext;
     } else {
         // i is at the head of the degree list
-        assert!(deg < n);
+        debug_assert!(deg < n);
         head[deg] = inext;
     }
 }
@@ -211,7 +211,7 @@ fn initialize_amd(
     */
     for i in 0..n {
         degree[i] = len[i] as isize;
-        assert!(degree[i] >= 0 && degree[i] < n as isize);
+        debug_assert!(degree[i] >= 0 && degree[i] < n as isize);
         let deg = degree[i] as usize;
         if deg == 0 {
             // we have a variable that can be eliminated at once because
@@ -246,7 +246,7 @@ fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &[isize]) -> 
 
     let mut me = EMPTY;
 
-    assert!(*mindeg < n);
+    debug_assert!(*mindeg < n);
 
     let mut deg = *mindeg;
     while deg < n {
@@ -257,7 +257,7 @@ fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &[isize]) -> 
         deg += 1;
     }
     *mindeg = deg;
-    assert!(me >= 0 && me < n as isize);
+    debug_assert!(me >= 0 && me < n as isize);
     me as usize
 }
 
@@ -296,10 +296,10 @@ fn add_neighboring_supervariables_to_pivot(
     degree: &mut [isize],
 ) {
     for knt2 in 1..=ln {
-        assert!(iw[*pj] >= 0 && iw[*pj] < n as isize);
+        debug_assert!(iw[*pj] >= 0 && iw[*pj] < n as isize);
         let i = iw[*pj] as usize;
         *pj += 1;
-        assert!(i == me || elen[i] >= EMPTY);
+        debug_assert!(i == me || elen[i] >= EMPTY);
         let nvi = nv[i];
         // if we have already seen this supervariable
         // or it is not a principal variable, skip it
@@ -325,7 +325,7 @@ fn add_neighboring_supervariables_to_pivot(
                 for j in 0..n {
                     let pn = pe[j];
                     if pn >= 0 {
-                        assert!(pn >= 0 && pn < iwlen as isize);
+                        debug_assert!(pn >= 0 && pn < iwlen as isize);
                         pe[j] = iw[pn as usize];
                         iw[pn as usize] = flip(j as isize);
                     }
@@ -401,13 +401,13 @@ fn construct_new_element(
     next: &mut [isize],
 ) -> (usize, usize, usize, isize) {
     let elenme = elen[me];
-    assert!(nv[me] > 0);
+    debug_assert!(nv[me] > 0);
     let mut nvpiv = nv[me] as usize;
     *nel += nvpiv;
 
     // flag the variable "me" as being in Lme by negating Nv [me]
     nv[me] = -(nvpiv as isize);
-    assert!(pe[me] >= 0 && pe[me] < iwlen as isize);
+    debug_assert!(pe[me] >= 0 && pe[me] < iwlen as isize);
     let mut pme1: usize = 0;
     let mut pme2 = 0;
 
@@ -416,7 +416,7 @@ fn construct_new_element(
         pme1 = pe[me] as usize;
         pme2 = (pme1 as isize) - 1;
         for p in pme1..=(pme1 + len[me] - 1) {
-            assert!(iw[p] >= 0 && iw[p] < n as isize);
+            debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
             let i = iw[p] as usize;
             let nvi = nv[i];
 
@@ -451,16 +451,16 @@ fn construct_new_element(
                 ln = slenme;
             } else {
                 // search the elements in me.
-                assert!(iw[p] >= 0 && iw[p] < n as isize);
+                debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
                 e = iw[p] as usize;
                 p += 1;
-                assert!(pe[e] >= 0);
+                debug_assert!(pe[e] >= 0);
                 pj = pe[e] as usize;
-                assert!(len[e] >= 0);
+                debug_assert!(len[e] >= 0);
                 ln = len[e];
-                assert!(elen[e] < EMPTY && w[e] > 0);
+                debug_assert!(elen[e] < EMPTY && w[e] > 0);
             }
-            assert!(ln == 0 || (pj < iwlen));
+            debug_assert!(ln == 0 || (pj < iwlen));
 
             add_neighboring_supervariables_to_pivot(
                 e, &mut pme1, knt1 as usize, ln, &mut p, &mut pj, degme, pfree, n, me, iwlen, elen, nv, pe, len, iw,
@@ -480,7 +480,7 @@ fn construct_new_element(
     }
 
     degree[me] = *degme as isize;
-    assert!(pme1 < iwlen);
+    debug_assert!(pme1 < iwlen);
     pe[me] = pme1 as isize;
     len[me] = (pme2 - pme1 as isize + 1) as usize;
 
@@ -519,22 +519,22 @@ fn compute_outside_degrees(
 ) {
     for pme in pme1..=pme2 {
         // index of the supervariable in Lme
-        assert!(iw[pme] >= 0 && iw[pme] < n as isize);
+        debug_assert!(iw[pme] >= 0 && iw[pme] < n as isize);
         let i = iw[pme] as usize;
 
         // if the supervariable has elements in E_i
         if elen[i] > 0 {
             let eln = elen[i] as usize;
             // note that nv[i] has been negated to denote i in Lme
-            assert!(-nv[i] > 0);
+            debug_assert!(-nv[i] > 0);
             let nvi = -nv[i];
-            assert!(pe[i] >= 0 && pe[i] < iwlen as isize);
+            debug_assert!(pe[i] >= 0 && pe[i] < iwlen as isize);
 
             let wnvi = wflg - nvi;
 
             // loop through the elements in E_i
             for p in pe[i] as usize..=(pe[i] as usize + eln - 1) {
-                assert!(iw[p] >= 0 && iw[p] < n as isize);
+                debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
                 let e = iw[p] as usize;
                 let mut we = w[e];
                 // we is 0 for absorbed elements
@@ -580,15 +580,15 @@ fn update_degrees(
     aggressive: bool,
 ) {
     for pme in pme1..=pme2 {
-        assert!(iw[pme] >= 0 && iw[pme] < n as isize);
+        debug_assert!(iw[pme] >= 0 && iw[pme] < n as isize);
         let i = iw[pme] as usize;
         // i is in Lme and has an element list associated with it
-        assert!(nv[i] < 0 && elen[i] >= 0);
-        assert!(pe[i] >= 0 && pe[i] < iwlen as isize);
+        debug_assert!(nv[i] < 0 && elen[i] >= 0);
+        debug_assert!(pe[i] >= 0 && pe[i] < iwlen as isize);
         let p1 = pe[i] as usize;
         // notice p2 can be negative if elen[i]=0
         let p2 = p1 as isize + elen[i] - 1;
-        assert!(p2 >= EMPTY && p2 < iwlen as isize);
+        debug_assert!(p2 >= EMPTY && p2 < iwlen as isize);
         let mut pn = p1;
         let mut hash = 0;
         let mut deg = 0;
@@ -596,7 +596,7 @@ fn update_degrees(
         // go over all elements in i and update the degree of i (absorbing when possible)
         if aggressive {
             for p in (p1 as isize)..=p2 {
-                assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
                 let e = iw[p as usize] as usize;
                 let we = w[e];
                 if we != 0 {
@@ -621,13 +621,13 @@ fn update_degrees(
             }
         } else {
             for p in (p1 as isize)..=p2 {
-                assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
                 let e = iw[p as usize] as usize;
                 let we = w[e];
                 if we != 0 {
                     // e is an unabsorbed element
                     let dext = we - wflg;
-                    assert!(dext >= 0);
+                    debug_assert!(dext >= 0);
                     deg += dext as usize;
                     // this will essentially remove absorbed elements from
                     // the element list of i
@@ -644,7 +644,7 @@ fn update_degrees(
         let p3 = pn;
         let p4 = p1 + len[i];
         for p in p2 + 1..(p4 as isize) {
-            assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+            debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
             let j = iw[p as usize] as usize;
             let nvj = nv[j];
 
@@ -659,7 +659,7 @@ fn update_degrees(
         }
 
         // update the degree and check for mass elimination
-        assert!(!aggressive || ((deg == 0) == (elen[i] == 1 && p3 == pn)));
+        debug_assert!(!aggressive || ((deg == 0) == (elen[i] == 1 && p3 == pn)));
 
         if elen[i] == 1 && p3 == pn {
             // mass elimination
@@ -696,7 +696,7 @@ fn update_degrees(
             // place in hash bucket.  Save hash key of i in Last [i].
 
             hash = hash % n;
-            assert!((hash as isize) >= 0 && (hash as isize) < n as isize);
+            debug_assert!((hash as isize) >= 0 && (hash as isize) < n as isize);
 
             add_hash_to_degree_list(i, hash, head, last, next);
         }
@@ -722,7 +722,7 @@ fn supervairable_detection(
     wflg: &mut isize,
 ) {
     for pme in pme1..=pme2 {
-        assert!(iw[pme] >= 0 && iw[pme] < n as isize);
+        debug_assert!(iw[pme] >= 0 && iw[pme] < n as isize);
         let mut i = iw[pme];
 
         // we set all supervariables to negative in nv
@@ -732,7 +732,7 @@ fn supervairable_detection(
 
             // examine all hash buckets with 2 or more variables.
 
-            assert!(last[i as usize] >= 0 && last[i as usize] < n as isize);
+            debug_assert!(last[i as usize] >= 0 && last[i as usize] < n as isize);
             // the hash key for i is stored in Last[i]
             let hash = last[i as usize] as usize;
 
@@ -750,37 +750,37 @@ fn supervairable_detection(
             }
 
             let mut jlast;
-            assert!(i >= EMPTY && i < n as isize);
+            debug_assert!(i >= EMPTY && i < n as isize);
             while i != EMPTY && next[i as usize] != EMPTY {
                 let ln = len[i as usize];
-                assert!(elen[i as usize] >= 0);
+                debug_assert!(elen[i as usize] >= 0);
                 let eln = elen[i as usize];
-                assert!(pe[i as usize] >= 0 && pe[i as usize] < iwlen as isize);
+                debug_assert!(pe[i as usize] >= 0 && pe[i as usize] < iwlen as isize);
                 let p1 = pe[i as usize] as usize;
                 let p2 = (p1 + ln as usize - 1) as isize;
 
                 // skip the first element in the list (me)
                 for p in (p1 + 1) as isize..=p2 {
-                    assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                    debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
                     w[iw[p as usize] as usize] = *wflg;
                 }
 
                 jlast = i;
                 j = next[i as usize];
-                assert!(j >= EMPTY && j < n as isize);
+                debug_assert!(j >= EMPTY && j < n as isize);
 
                 while j != EMPTY {
                     // check if j and i have identical nonzero pattern
 
-                    assert!(elen[j as usize] >= 0);
-                    assert!(pe[j as usize] >= 0 && pe[j as usize] < iwlen as isize);
+                    debug_assert!(elen[j as usize] >= 0);
+                    debug_assert!(pe[j as usize] >= 0 && pe[j as usize] < iwlen as isize);
                     let mut ok = (len[j as usize] == ln) && (elen[j as usize] == eln);
                     let p1 = pe[j as usize] as usize;
                     let p2 = (p1 + ln as usize - 1) as isize;
 
                     // skip the first element in the list (me)
                     for p in (p1 + 1) as isize..=p2 {
-                        assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
+                        debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
                         if w[iw[p as usize] as usize] != *wflg {
                             ok = false;
                             break;
@@ -797,15 +797,15 @@ fn supervairable_detection(
                         nv[j as usize] = 0;
                         elen[j as usize] = EMPTY;
                         // delete j from hash bucket
-                        assert!(j != next[j as usize]);
+                        debug_assert!(j != next[j as usize]);
                         j = next[j as usize];
                         next[jlast as usize] = j;
                     } else {
                         jlast = j;
-                        assert!(j != next[j as usize]);
+                        debug_assert!(j != next[j as usize]);
                         j = next[j as usize];
                     }
-                    assert!(j >= EMPTY && j < n as isize);
+                    debug_assert!(j >= EMPTY && j < n as isize);
                 }
 
                 // no more variables can be absorbed into i
@@ -813,7 +813,7 @@ fn supervairable_detection(
 
                 *wflg += 1;
                 i = next[i as usize];
-                assert!(i >= EMPTY && i < n as isize);
+                debug_assert!(i >= EMPTY && i < n as isize);
             }
         }
     }
@@ -837,7 +837,7 @@ fn restore_degree_list(
     let mut p = pme1;
     let nleft = n - nel;
     for pme in pme1..=pme2 {
-        assert!(iw[pme] >= 0 && iw[pme] < n as isize);
+        debug_assert!(iw[pme] >= 0 && iw[pme] < n as isize);
         let i = iw[pme] as usize;
 
         let nvi = -nv[i];
@@ -849,7 +849,7 @@ fn restore_degree_list(
             // compute the external degree (ass the size of current element)
             let mut deg = degree[i] + degme as isize - nvi;
             deg = isize::min(deg, nleft as isize - nvi);
-            assert!((!aggressive || (deg > 0)) && deg >= 0 && deg < n as isize);
+            debug_assert!((!aggressive || (deg > 0)) && deg >= 0 && deg < n as isize);
             let deg = deg as usize;
 
             // place the supervariable at the head of the degree list
@@ -937,7 +937,7 @@ fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) 
             // was selected as pivot.
 
             let mut j = pe[i];
-            assert!(j >= EMPTY && j < n as isize);
+            debug_assert!(j >= EMPTY && j < n as isize);
             if j == EMPTY {
                 // i is a dense variable. It has no parent.
                 continue;
@@ -946,7 +946,7 @@ fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) 
             // while j is a variable
             while nv[j as usize] == 0 {
                 j = pe[j as usize];
-                assert!(j >= 0 && j < n as isize);
+                debug_assert!(j >= 0 && j < n as isize);
             }
 
             // got to an element e
@@ -962,7 +962,7 @@ fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) 
                 let jnext = pe[j as usize];
                 pe[j as usize] = e as isize;
                 j = jnext;
-                assert!(j >= 0 && j < n as isize);
+                debug_assert!(j >= 0 && j < n as isize);
             }
         }
     }
@@ -988,8 +988,8 @@ fn post_tree(
     stack[head] = root as isize;
 
     while head >= 0 {
-        assert!(head < n);
-        assert!(stack[head] >= 0 && stack[head] < n as isize);
+        debug_assert!(head < n);
+        debug_assert!(stack[head] >= 0 && stack[head] < n as isize);
         let i = stack[head] as usize;
 
         if child[i] != EMPTY {
@@ -1000,23 +1000,23 @@ fn post_tree(
             let mut f = child[i];
             while f != EMPTY {
                 head += 1;
-                assert!(head < n);
-                assert!(f >= 0 && f < n as isize);
+                debug_assert!(head < n);
+                debug_assert!(f >= 0 && f < n as isize);
                 f = sibling[f as usize];
             }
 
             let mut h = head;
-            assert!(head < n);
+            debug_assert!(head < n);
             f = child[i];
             while f != EMPTY {
-                assert!(h > 0);
+                debug_assert!(h > 0);
                 stack[h] = f;
                 h -= 1;
-                assert!(f >= 0 && f < n as isize);
+                debug_assert!(f >= 0 && f < n as isize);
                 f = sibling[f as usize];
             }
 
-            assert!(stack[h] == i as isize);
+            debug_assert!(stack[h] == i as isize);
 
             // delete child list so that i gets ordered next time we see it
             child[i] = EMPTY;
@@ -1026,7 +1026,7 @@ fn post_tree(
             head -= 1;
             order[i] = k as isize;
             k += 1;
-            assert!(k <= n);
+            debug_assert!(k <= n);
 
         }
     }
@@ -1083,7 +1083,7 @@ fn postorder_assembly_tree(
 
             let mut f = child[i];
             while f != EMPTY {
-                assert!(f >= 0 && f < n as isize);
+                debug_assert!(f >= 0 && f < n as isize);
                 let frsize = fsize[f as usize];
 
                 if frsize >= maxfrsize {
@@ -1095,7 +1095,7 @@ fn postorder_assembly_tree(
                 fprev = f;
                 f = sibling[f as usize];
             }
-            assert!(bigf != EMPTY);
+            debug_assert!(bigf != EMPTY);
 
             let fnext = sibling[bigf as usize];
 
@@ -1113,9 +1113,9 @@ fn postorder_assembly_tree(
 
                 // put bigf at the end of the list
                 sibling[bigf as usize] = EMPTY;
-                assert!(child[i] != EMPTY);
-                assert!(fprev != bigf);
-                assert!(fprev != EMPTY);
+                debug_assert!(child[i] != EMPTY);
+                debug_assert!(fprev != bigf);
+                debug_assert!(fprev != EMPTY);
                 sibling[fprev as usize] = bigf;
             }
         }
@@ -1151,9 +1151,9 @@ fn compute_output_permutation(
 
     for e in 0..n {
         let k = w[e];
-        assert!((k == EMPTY) == (nv[e] == 0));
+        debug_assert!((k == EMPTY) == (nv[e] == 0));
         if k != EMPTY {
-            assert!(k >= 0 && k < n as isize);
+            debug_assert!(k >= 0 && k < n as isize);
             head[k as usize] = e as isize;
         }
     }
@@ -1166,23 +1166,23 @@ fn compute_output_permutation(
         if e == EMPTY {
             break;
         }
-        assert!(e >= 0 && e < n as isize && nv[e as usize] > 0);
+        debug_assert!(e >= 0 && e < n as isize && nv[e as usize] > 0);
         next[e as usize] = nel as isize;
         nel += nv[e as usize] as usize;
     }
-    assert!(nel == n - ndense);
+    debug_assert!(nel == n - ndense);
 
     // order non-principal variables (dense, & those merged into supervar's)
     for i in 0..n {
         if nv[i] == 0 {
             let e = pe[i];
-            assert!(e >= EMPTY && e < n as isize);
+            debug_assert!(e >= EMPTY && e < n as isize);
             if e != EMPTY {
                 // This is an unordered variable that was merged
                 // into element e via supernode detection or mass
                 // elimination of i when e became the pivot element.
                 // Place i in order just before e.
-                assert!(next[i] == EMPTY && nv[e as usize] > 0);
+                debug_assert!(next[i] == EMPTY && nv[e as usize] > 0);
                 next[i] = next[e as usize];
                 next[e as usize] += 1;
             } else {
@@ -1193,7 +1193,7 @@ fn compute_output_permutation(
             }
         }
     }
-    assert!(nel == n);
+    debug_assert!(nel == n);
 
     inverse_permutation(n, next, last);
 }
@@ -1221,8 +1221,8 @@ pub fn amd(
      * what is actually required in AMD_2.  AMD_2 can operate with no elbow
      * room at all, but it will be slow.  For better performance, at least
      * size-n elbow room is enforced. */
-    assert!(iwlen >= pfree + n);
-    assert!(n > 0);
+    debug_assert!(iwlen >= pfree + n);
+    debug_assert!(n > 0);
     let mut info = AmdInfo::new();
 
     let (mut nel, ndense) =

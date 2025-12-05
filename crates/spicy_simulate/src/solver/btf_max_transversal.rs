@@ -27,7 +27,7 @@ fn try_augmenting_path(
     let mut found = false;
     let mut head: i64 = 0;
     column_stack[head as usize] = current_column;
-    assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
+    debug_assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
 
     while head >= 0 {
         let col = column_stack[head as usize];

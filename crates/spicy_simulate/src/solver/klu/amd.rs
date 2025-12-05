@@ -8,7 +8,7 @@ use crate::solver::{
 
 /// Assumes A is square with sorted columns and no duplicates
 pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
-    assert!(a.check_invariants().is_ok());
+    debug_assert!(a.check_invariants().is_ok());
 
     let n = a.dim.ncols;
     let nz = a.nnz();
@@ -20,7 +20,7 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
 
     let aat_info = aat_first_phase(&a, &mut column_lengths, permutation);
     let nzaat = aat_info.nz_aat;
-    assert!((std::cmp::max(nz - n, 0) <= nzaat) && (nzaat <= 2 * nz));
+    debug_assert!((std::cmp::max(nz - n, 0) <= nzaat) && (nzaat <= 2 * nz));
 
     let mut workspace_size = nzaat;
     // amd expects elbow room (1.2) to work efficiently
@@ -37,7 +37,7 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
     let (degree, workspace) = workspace.split_at_mut(n);
     let (w, workspace) = workspace.split_at_mut(n);
     let iw = workspace;
-    assert!(iw.len() == iwlen);
+    debug_assert!(iw.len() == iwlen);
 
     // pfree in timothys code
     let mut free_position: usize = 0;
@@ -52,7 +52,7 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
      * what is strictly required in amd.  amd can operate with no elbow
      * room at all, but it will be very slow.  For better performance, at
      * least size-n elbow room is enforced. */
-    assert!(iwlen >= free_position + n);
+    debug_assert!(iwlen >= free_position + n);
 
     // `iw`, `nv`, and `pe` are all slices of `isize` in the AMD workspace,
     // but `aat_second_phase` operates on `usize` indices.  Reinterpret them

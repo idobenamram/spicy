@@ -195,7 +195,7 @@ mod tests {
         assert_eq!(a.column_pointers, vec![0, 2, 3, 5]);
         assert_eq!(a.row_indices, vec![0, 2, 1, 0, 2]);
         assert_eq!(a.values, vec![10.0, 2.0, 20.0, 3.0, 35.0]);
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 
     #[test]
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(a.row_pointers, vec![0, 2, 3, 5]);
         assert_eq!(a.column_indices, vec![0, 2, 1, 0, 2]);
         assert_eq!(a.values, vec![10.0, 3.0, 20.0, 2.0, 35.0]);
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 
     #[test]

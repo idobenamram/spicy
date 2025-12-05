@@ -41,7 +41,7 @@ pub fn btf(
                 nbadcol += 1;
             }
         }
-        assert!(nbadcol + number_of_matches == n);
+        debug_assert!(nbadcol + number_of_matches == n);
 
         // assign for each unmatched row
         for col in 0..n {

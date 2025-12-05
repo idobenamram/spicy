@@ -7,7 +7,7 @@ use crate::solver::{
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
-    assert!(a.is_square(), "Klu analyze only supports square matrices");
+    debug_assert!(a.is_square(), "Klu analyze only supports square matrices");
     let n = a.dim.ncols;
     let mut row_permutation = vec![-1; n];
     for col in 0..n {
@@ -77,7 +77,7 @@ fn analyze_worker(
             let newcol = k - k1;
             block_col_pointers[newcol] = pc;
             let old_col = btf_column_permutation[k];
-            assert!(old_col >= 0 && old_col < n as isize);
+            debug_assert!(old_col >= 0 && old_col < n as isize);
             let start = a.col_start(old_col as usize);
             let end = a.col_end(old_col as usize);
 
@@ -89,7 +89,7 @@ fn analyze_worker(
                     // ignore entries outside the square block
                     nzoff += 1;
                 } else {
-                    assert!(new_row < k2);
+                    debug_assert!(new_row < k2);
                     new_row = new_row - k1;
                     block_row_pointers[pc] = new_row;
                     pc += 1;
@@ -98,7 +98,7 @@ fn analyze_worker(
         }
         block_col_pointers[size] = pc;
         max_nz = std::cmp::max(max_nz, pc);
-        assert!(klu_valid(size, &block_col_pointers, &block_row_pointers));
+        debug_assert!(klu_valid(size, &block_col_pointers, &block_row_pointers));
 
         let lnz1;
         if size <= 3 {
@@ -118,8 +118,8 @@ fn analyze_worker(
 
         // combine the preordering with the btf ordering
         for k in 0..size {
-            assert!(k + k1 < n);
-            assert!(block_row_permutation[k] as usize + k1 < n);
+            debug_assert!(k + k1 < n);
+            debug_assert!(block_row_permutation[k] as usize + k1 < n);
             symbolic.column_permutation[k + k1] =
                 btf_column_permutation[block_row_permutation[k] as usize + k1] as isize;
             symbolic.row_permutation[k + k1] =
@@ -127,7 +127,7 @@ fn analyze_worker(
         }
     }
 
-    assert!(nzoff <= a.nnz());
+    debug_assert!(nzoff <= a.nnz());
     symbolic.lnz = lnz;
     symbolic.unz = lnz;
     symbolic.nzoff = nzoff;

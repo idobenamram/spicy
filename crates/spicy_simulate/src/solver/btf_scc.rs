@@ -54,7 +54,7 @@ fn dfs(
     let mut component_head = 0;
     let mut column_head: i64 = 0;
     column_stack[column_head as usize] = current_column;
-    assert!(visited[current_column] == UNVISITED);
+    debug_assert!(visited[current_column] == UNVISITED);
 
     while column_head >= 0 {
         let col = column_stack[column_head as usize];
@@ -81,14 +81,14 @@ fn dfs(
                 position_stack[column_head as usize] = row_ptr + 1;
                 column_head += 1;
                 column_stack[column_head as usize] = row;
-                assert!(graph_indices[row] == -1);
-                assert!(low[row] == -1);
+                debug_assert!(graph_indices[row] == -1);
+                debug_assert!(low[row] == -1);
                 break;
             } else if visited[row] == UNASSIGNED {
                 // node "row" has been visited, but not assigned to a component block
                 // update the low value of the current node
-                assert!(graph_indices[row] > 0);
-                assert!(low[row] > 0);
+                debug_assert!(graph_indices[row] > 0);
+                debug_assert!(low[row] > 0);
                 low[col] = min(low[col], low[row]);
             }
 
@@ -100,14 +100,14 @@ fn dfs(
                 // found a SCC block
                 if low[col] == graph_indices[col] {
                     loop {
-                        assert!(column_head >= 0);
+                        debug_assert!(column_head >= 0);
 
                         // pop from the component stack
                         let i = component_stack[column_head as usize];
                         column_head -= 1;
-                        // assert!(i >= 0);
+                        // debug_assert!(i >= 0);
                         // we didn't somehow assign this already
-                        assert!(visited[i] == UNASSIGNED);
+                        debug_assert!(visited[i] == UNASSIGNED);
                         // add to the SCC block
                         visited[i] = *number_of_scc_blocks;
                         // if we've popped the root of the SCC block, we're done
@@ -154,7 +154,7 @@ pub(crate) fn btf_scc(
     let mut number_of_scc_blocks = 0;
 
     for col in 0..n {
-        assert!(visited[col] == UNVISITED || (visited[col] < number_of_scc_blocks));
+        debug_assert!(visited[col] == UNVISITED || (visited[col] < number_of_scc_blocks));
         if visited[col] == UNVISITED {
             dfs(
                 m,
@@ -173,7 +173,7 @@ pub(crate) fn btf_scc(
         }
     }
 
-    assert!(node_graph_index == n);
+    debug_assert!(node_graph_index == n);
 
     // block info is stored in the visted array, visited[j] = k means node j is in the k-th SCC block
     // from here we want to create a symmetric permutation to move to block triangular form
@@ -185,9 +185,9 @@ pub(crate) fn btf_scc(
 
     for col in 0..n {
         // sanity checks that the blocks were generated correctly
-        assert!(graph_indices[col] > 0 && graph_indices[col] <= n as isize);
-        assert!(low[col] > 0 && low[col] <= n as isize);
-        assert!(visited[col] < number_of_scc_blocks);
+        debug_assert!(graph_indices[col] > 0 && graph_indices[col] <= n as isize);
+        debug_assert!(low[col] > 0 && low[col] <= n as isize);
+        debug_assert!(visited[col] < number_of_scc_blocks);
         // visited[col] is the SCC block index of the current column
         // increment the boundary array to get the number of nodes in the current block
         boundary_array[visited[col]] += 1;
@@ -219,7 +219,7 @@ pub(crate) fn btf_scc(
 
     for col in 0..n {
         // sanity check that the permutation was constructed correctly
-        assert!(row_permutations[col] >= 0);
+        debug_assert!(row_permutations[col] >= 0);
     }
 
     // lets call orignal matrix = A

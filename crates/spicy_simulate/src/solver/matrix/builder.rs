@@ -112,8 +112,6 @@ impl MatrixBuilder {
             row_indices,
             values,
         };
-        let baba = a.check_invariants();
-        println!("a: {:?}", baba);
         debug_assert!(a.check_invariants().is_ok());
         Ok(a)
     }

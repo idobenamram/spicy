@@ -6,8 +6,8 @@
 /// Timothy A. Davis implements the algorithm
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
-/// 
-use crate::solver::utils::{flip, unflip};
+///
+use crate::solver::utils::{flip, unflip, inverse_permutation};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -1195,11 +1195,7 @@ fn compute_output_permutation(
     }
     assert!(nel == n);
 
-    for i in 0..n {
-        let k = next[i];
-        assert!(k >= 0 && k < n as isize);
-        last[k as usize] = i as isize;
-    }
+    inverse_permutation(n, next, last);
 }
 
 pub fn amd(

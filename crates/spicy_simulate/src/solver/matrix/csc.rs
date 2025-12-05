@@ -113,6 +113,10 @@ impl CscMatrix {
         self.row_indices[i]
     }
 
+    pub fn value(&self, i: usize) -> f64 {
+        self.values[i]
+    }
+
     /// y[rows] += alpha * x (in-place axpy into sparse positions).
     pub fn axpy_into_dense_col(&self, j: usize, x: f64, y: &mut [f64]) {
         let (rows, vals) = self.col(j);

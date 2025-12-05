@@ -74,8 +74,8 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
         iwlen,
         free_position,
         nv,
-        permutation,
-        &mut inverse_permutation,
+        &mut inverse_permutation, // inverse permutation workspace
+        permutation,              // output permutation
         head,
         elen,
         degree,

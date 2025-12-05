@@ -3,7 +3,7 @@ use std::{cmp::max, iter::Empty};
 use crate::solver::{
     klu::{KluConfig, KluOrdering, KluSymbolic, amd::amd, btf::btf, klu_valid},
     matrix::csc::CscMatrix,
-    utils::{EMPTY, unflip},
+    utils::{EMPTY, unflip, inverse_permutation},
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
@@ -58,14 +58,7 @@ fn analyze_worker(
 
     // TODO: this doesn't have to happen in this funciton tbh
     // compute row permutation inverse
-    for k in 0..n {
-        assert!(btf_row_permutation[k] >= 0 && btf_row_permutation[k] < n as isize);
-        row_inv_permutations[btf_row_permutation[k] as usize] = k as isize;
-    }
-
-    for k in 0..n {
-        assert!(row_inv_permutations[k] != EMPTY);
-    }
+    inverse_permutation(n, &btf_row_permutation, &mut row_inv_permutations);
 
     let mut nzoff = 0;
     let mut lnz = 0.;

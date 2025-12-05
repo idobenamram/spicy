@@ -1,10 +1,11 @@
+mod amd;
 mod analyze;
 mod btf;
-mod amd;
+mod factor;
+mod scale;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
-    None,
     Sum,
     Max,
 }
@@ -27,7 +28,7 @@ struct KluConfig {
     /* use BTF pre-ordering, or not */
     btf: bool,
     ordering: KluOrdering,
-    scale: KluScale,
+    scale: Option<KluScale>,
     // how to handle a singular matrix:
     // FALSE: keep going.  Return a Numeric object with a zero U(k,k).  A
     //   divide-by-zero may occur when computing L(:,k).  The Numeric object
@@ -37,6 +38,33 @@ struct KluConfig {
     //   Numeric object.  klu_refactor will not free it, but will leave the
     //   numerical values only partially defined.  This is the default.
     halt_if_singular: bool,
+}
+
+impl Default for KluConfig {
+    fn default() -> Self {
+        Self {
+            tol: 0.001,
+            memgrow: 1.2,
+            initmem_amd: 1.2,
+            initmem: 10.0,
+            btf: true,
+            ordering: KluOrdering::Amd,
+            scale: Some(KluScale::Max),
+            halt_if_singular: true,
+        }
+    }
+}
+
+impl KluConfig {
+    fn validate(&mut self) -> Result<(), String> {
+        self.initmem_amd = self.initmem_amd.max(1.);
+        self.initmem = self.initmem.max(10.);
+        self.tol = self.tol.min(1.);
+        self.tol = self.tol.max(0.);
+        self.memgrow = self.memgrow.max(1.);
+
+        Ok(())
+    }
 }
 
 struct KluSymbolic {
@@ -56,15 +84,105 @@ struct KluSymbolic {
     row_permutation: Vec<isize>,
     column_permutation: Vec<isize>,
     // used in btf to hold block boundaries
+    // TODO:  this should just be block boundaries
     row_scaling: Vec<isize>,
 }
+/*
+typedef struct
+{
+    /* LU factors of each block, the pivot row permutation, and the
+     * entries in the off-diagonal blocks */
 
-struct KluNumeric {
-    n: usize,
-    nblocks: usize,
-    lnz: usize,
-    unz: usize
+    int32_t n ;             /* A is n-by-n */
+    int32_t nblocks ;       /* number of diagonal blocks */
+    int32_t lnz ;           /* actual nz in L, including diagonal */
+    int32_t unz ;           /* actual nz in U, including diagonal */
+    int32_t max_lnz_block ; /* max actual nz in L in any one block, incl. diag */
+    int32_t max_unz_block ; /* max actual nz in U in any one block, incl. diag */
+    int32_t *Pnum ;         /* size n. final pivot permutation */
+    int32_t *Pinv ;         /* size n. inverse of final pivot permutation */
 
+    /* LU factors of each block */
+    int32_t *Lip ;          /* size n. pointers into LUbx[block] for L */
+    int32_t *Uip ;          /* size n. pointers into LUbx[block] for U */
+    int32_t *Llen ;         /* size n. Llen [k] = # of entries in kth column of L */
+    int32_t *Ulen ;         /* size n. Ulen [k] = # of entries in kth column of U */
+    void **LUbx ;       /* L and U indices and entries (excl. diagonal of U) */
+    size_t *LUsize ;    /* size of each LUbx [block], in sizeof (Unit) */
+    void *Udiag ;       /* diagonal of U */
+
+    /* scale factors; can be NULL if no scaling */
+    double *Rs ;        /* size n. Rs [i] is scale factor for row i */
+
+    /* permanent workspace for factorization and solve */
+    size_t worksize ;   /* size (in bytes) of Work */
+    void *Work ;        /* workspace */
+    void *Xwork ;       /* alias into Numeric->Work */
+    int32_t *Iwork ;        /* alias into Numeric->Work */
+
+    /* off-diagonal entries in a conventional compressed-column sparse matrix */
+    int32_t *Offp ;         /* size n+1, column pointers */
+    int32_t *Offi ;         /* size nzoff, row indices */
+    void *Offx ;        /* size nzoff, numerical values */
+    int32_t nzoff ;
+
+} klu_numeric ;
+*/
+
+pub struct KluNumeric {
+    // A is n-by-n
+    pub n: usize,
+    // number of diagonal blocks
+    pub nblocks: usize,
+    // actual nz in L, including diagonal
+    pub lnz: usize,
+    // actual nz in U, including diagonal
+    pub unz: usize,
+    // max actual nz in L in any one block, incl. diag
+    pub max_lnz_block: usize,
+    // max actual nz in U in any one block, incl. diag
+    pub max_unz_block: usize,
+    // size n. final pivot permutation
+    pub pnum: Vec<isize>,
+    // size n. inverse of final pivot permutation
+    pub pinv: Vec<isize>,
+
+    // size n. pointers into LUbx[block] for L
+    pub lip: Vec<usize>,
+    // size n. pointers into LUbx[block] for U
+    pub uip: Vec<usize>,
+    // size n. Llen [k] = # of entries in kth column of L
+    pub llen: Vec<usize>,
+    // size n. Ulen [k] = # of entries in kth column of U
+    pub ulen: Vec<usize>,
+    // L and U indices and entries (excl. diagonal of U)
+    pub lu_bx: Vec<usize>,
+    // size of each LUbx [block], in sizeof (Unit)
+    pub lu_size: Vec<usize>,
+    // diagonal of U
+    pub u_diag: Vec<f64>,
+
+    // scale factors; can be NULL if no scaling
+    // size n. Rs [i] is scale factor for row i
+    pub rs: Option<Vec<f64>>,
+
+    // permanent workspace for factorization and solve
+    pub worksize: usize,
+    // workspace
+    pub work: Vec<f64>,
+    // alias into Numeric->Work
+    pub xwork: Vec<f64>,
+    // alias into Numeric->Work
+    pub iwork: Vec<isize>,
+
+    // column pointers for off-diagonal entries
+    pub offp: Vec<usize>,
+    // row indices for off-diagonal entries
+    pub offi: Vec<usize>,
+    // numerical values for off-diagonal entries
+    pub offx: Vec<f64>,
+    // number of off-diagonal entries
+    pub nzoff: usize,
 }
 
 pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usize]) -> bool {
@@ -98,88 +216,6 @@ pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usiz
 }
 
 /*
-Int KLU_valid (Int n, Int Ap [ ], Int Ai [ ], Entry Ax [ ])
-{
-    Int nz, j, p1, p2, i, p ;
-    PRINTF (("\ncolumn oriented matrix, n = %d\n", n)) ;
-    if (n <= 0)
-    {
-        PRINTF (("n must be >= 0: %d\n", n)) ;
-        return (FALSE) ;
-    }
-    nz = Ap [n] ;
-    if (Ap [0] != 0 || nz < 0)
-    {
-        /* column pointers must start at Ap [0] = 0, and Ap [n] must be >= 0 */
-        PRINTF (("column 0 pointer bad or nz < 0\n")) ;
-        return (FALSE) ;
-    }
-    for (j = 0 ; j < n ; j++)
-    {
-        p1 = Ap [j] ;
-        p2 = Ap [j+1] ;
-        PRINTF (("\nColumn: %d p1: %d p2: %d\n", j, p1, p2)) ;
-        if (p1 > p2)
-        {
-            /* column pointers must be ascending */
-            PRINTF (("column %d pointer bad\n", j)) ;
-            return (FALSE) ;
-        }
-        for (p = p1 ; p < p2 ; p++)
-        {
-            i = Ai [p] ;
-            PRINTF (("row: %d", i)) ;
-            if (i < 0 || i >= n)
-            {
-                /* row index out of range */
-                PRINTF (("index out of range, col %d row %d\n", j, i)) ;
-                return (FALSE) ;
-            }
-            if (Ax != (Entry *) NULL)
-            {
-                PRINT_ENTRY (Ax [p]) ;
-            }
-            PRINTF (("\n")) ;
-        }
-    }
-    return (TRUE) ;
-}
- */
-
-/*
-typedef struct
-{
-    /* A (P,Q) is in upper block triangular form.  The kth block goes from
-     * row/col index R [k] to R [k+1]-1.  The estimated number of nonzeros
-     * in the L factor of the kth block is Lnz [k].
-     */
-
-    /* only computed if the AMD ordering is chosen: */
-    double symmetry ;   /* symmetry of largest block */
-    double est_flops ;  /* est. factorization flop count */
-    double lnz, unz ;   /* estimated nz in L and U, including diagonals */
-    double *Lnz ;       /* size n, but only Lnz [0..nblocks-1] is used */
-
-    /* computed for all orderings: */
-    int32_t
-        n,              /* input matrix A is n-by-n */
-        nz,             /* # entries in input matrix */
-        *P,             /* size n */
-        *Q,             /* size n */
-        *R,             /* size n+1, but only R [0..nblocks] is used */
-        nzoff,          /* nz in off-diagonal blocks */
-        nblocks,        /* number of blocks */
-        maxblock,       /* size of largest block */
-        ordering,       /* ordering used (0:AMD, 1:COLAMD, 2:given, ... */
-        do_btf ;        /* whether or not BTF preordering was requested */
-
-    /* only computed if BTF preordering requested */
-    int32_t structural_rank ;   /* 0 to n-1 if the matrix is structurally rank
-                        * deficient.  -1 if not computed.  n if the matrix has
-                        * full structural rank */
-
-} klu_symbolic ;
-
 
 typedef struct klu_common_struct
 {
@@ -253,45 +289,7 @@ typedef struct klu_common_struct
     size_t mempeak ;    /* peak memory usage, in bytes */
 
 } klu_common ;
- 
-typedef struct
-{
-    /* LU factors of each block, the pivot row permutation, and the
-     * entries in the off-diagonal blocks */
 
-    int32_t n ;             /* A is n-by-n */
-    int32_t nblocks ;       /* number of diagonal blocks */
-    int32_t lnz ;           /* actual nz in L, including diagonal */
-    int32_t unz ;           /* actual nz in U, including diagonal */
-    int32_t max_lnz_block ; /* max actual nz in L in any one block, incl. diag */
-    int32_t max_unz_block ; /* max actual nz in U in any one block, incl. diag */
-    int32_t *Pnum ;         /* size n. final pivot permutation */
-    int32_t *Pinv ;         /* size n. inverse of final pivot permutation */
 
-    /* LU factors of each block */
-    int32_t *Lip ;          /* size n. pointers into LUbx[block] for L */
-    int32_t *Uip ;          /* size n. pointers into LUbx[block] for U */
-    int32_t *Llen ;         /* size n. Llen [k] = # of entries in kth column of L */
-    int32_t *Ulen ;         /* size n. Ulen [k] = # of entries in kth column of U */
-    void **LUbx ;       /* L and U indices and entries (excl. diagonal of U) */
-    size_t *LUsize ;    /* size of each LUbx [block], in sizeof (Unit) */
-    void *Udiag ;       /* diagonal of U */
-
-    /* scale factors; can be NULL if no scaling */
-    double *Rs ;        /* size n. Rs [i] is scale factor for row i */
-
-    /* permanent workspace for factorization and solve */
-    size_t worksize ;   /* size (in bytes) of Work */
-    void *Work ;        /* workspace */
-    void *Xwork ;       /* alias into Numeric->Work */
-    int32_t *Iwork ;        /* alias into Numeric->Work */
-
-    /* off-diagonal entries in a conventional compressed-column sparse matrix */
-    int32_t *Offp ;         /* size n+1, column pointers */
-    int32_t *Offi ;         /* size nzoff, row indices */
-    void *Offx ;        /* size nzoff, numerical values */
-    int32_t nzoff ;
-
-} klu_numeric ;
 
 */

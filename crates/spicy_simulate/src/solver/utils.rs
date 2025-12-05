@@ -41,3 +41,25 @@ pub(crate) unsafe fn as_usize_slice(s: &[isize]) -> &[usize] {
     // SAFETY: caller upholds that the memory really contains `usize`-compatible values
     unsafe { slice::from_raw_parts(ptr, len) }
 }
+
+pub(crate) fn inverse_permutation(n: usize, permutation: &[isize], inverse: &mut [isize]) {
+
+    #[cfg(debug_assertions)]
+    {
+        for k in 0..n {
+            inverse[k] = EMPTY;
+        }
+    }
+
+    for k in 0..n {
+        debug_assert!(permutation[k] >= 0 && permutation[k] < n as isize);
+        inverse[permutation[k] as usize] = k as isize;
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        for k in 0..n {
+            debug_assert!(inverse[k] != EMPTY);
+        }
+    }
+}

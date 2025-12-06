@@ -111,9 +111,9 @@ pub fn factor(
     for block in 0..symbolic.nblocks {
         let k1 = symbolic.row_scaling[block] as usize;
         let k2 = symbolic.row_scaling[block + 1] as usize;
-        let size = k2 - k1;
+        let block_size = k2 - k1;
 
-        if size == 1 {
+        if block_size == 1 {
             // singleton case
             let mut poff = numeric.offp[k1];
             let oldcol = symbolic.column_permutation[k1] as usize;
@@ -160,6 +160,19 @@ pub fn factor(
             lnz += 1;
             unz += 1;
         } else {
+
+            let lsize;
+            if symbolic.lower_nz[block] < 0. {
+                // TODO: we only use amd so this is not really possible
+               lsize = -(config.initmem) 
+
+            } else {
+                lsize = config.initmem_amd * symbolic.lower_nz[block] + block_size as f64;
+            }
+
+            
+
+
             todo!()
         }
     }

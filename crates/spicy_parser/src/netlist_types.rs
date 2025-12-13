@@ -130,16 +130,28 @@ pub enum DeviceType {
 }
 
 impl DeviceType {
-    pub fn from_str(s: &str) -> Result<DeviceType, SpicyError> {
-        match s.to_uppercase().to_string().as_str() {
-            "R" => Ok(DeviceType::Resistor),
-            "C" => Ok(DeviceType::Capacitor),
-            "L" => Ok(DeviceType::Inductor),
-            "V" => Ok(DeviceType::VoltageSource),
-            "I" => Ok(DeviceType::CurrentSource),
-            "X" => Ok(DeviceType::Subcircuit),
-            _ => Err(ParserError::InvalidDeviceType { s: s.to_string() }.into()),
+    pub fn from_char(c: char) -> Result<DeviceType, SpicyError> {
+        match c.to_ascii_uppercase() {
+            'R' => Ok(DeviceType::Resistor),
+            'C' => Ok(DeviceType::Capacitor),
+            'L' => Ok(DeviceType::Inductor),
+            'V' => Ok(DeviceType::VoltageSource),
+            'I' => Ok(DeviceType::CurrentSource),
+            'X' => Ok(DeviceType::Subcircuit),
+            _ => Err(ParserError::InvalidDeviceType { s: c.to_string() }.into()),
         }
+    }
+
+    pub fn from_str(s: &str) -> Result<DeviceType, SpicyError> {
+        let mut chars = s.chars();
+        let Some(first) = chars.next() else {
+            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
+        };
+        // Device types are a single letter; reject multi-character strings.
+        if chars.next().is_some() {
+            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
+        }
+        Self::from_char(first)
     }
 
     pub fn to_char(&self) -> char {

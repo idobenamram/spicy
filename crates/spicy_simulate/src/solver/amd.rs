@@ -1,3 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// This file is a Rust port / adaptation based on the SuiteSparse AMD sources by
+// Timothy A. Davis and collaborators.
+//
+// AMD, Copyright (c) 1996-2022, Timothy A. Davis, Patrick R. Amestoy, and
+// Iain S. Duff.  All Rights Reserved.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 /// Approximate Minimum Degree (AMD)
 /// the algorithm is described in the paper:
 /// An Approximate Minimum Degree Ordering Algorithm
@@ -984,13 +995,13 @@ fn post_tree(
     n: usize,
 ) -> usize {
 
-    let mut head = 0;
-    stack[head] = root as isize;
+    let mut head: isize = 0;
+    stack[head as usize] = root as isize;
 
     while head >= 0 {
-        debug_assert!(head < n);
-        debug_assert!(stack[head] >= 0 && stack[head] < n as isize);
-        let i = stack[head] as usize;
+        debug_assert!(head >= 0 && head < n as isize);
+        debug_assert!(stack[head as usize] >= 0 && stack[head as usize] < n as isize);
+        let i = stack[head as usize] as usize;
 
         if child[i] != EMPTY {
             // the children of i are not yet ordered
@@ -1000,23 +1011,23 @@ fn post_tree(
             let mut f = child[i];
             while f != EMPTY {
                 head += 1;
-                debug_assert!(head < n);
+                debug_assert!((head as usize) < n);
                 debug_assert!(f >= 0 && f < n as isize);
                 f = sibling[f as usize];
             }
 
             let mut h = head;
-            debug_assert!(head < n);
+            debug_assert!((head as usize) < n);
             f = child[i];
             while f != EMPTY {
                 debug_assert!(h > 0);
-                stack[h] = f;
+                stack[h as usize] = f;
                 h -= 1;
                 debug_assert!(f >= 0 && f < n as isize);
                 f = sibling[f as usize];
             }
 
-            debug_assert!(stack[h] == i as isize);
+            debug_assert!(stack[h as usize] == i as isize);
 
             // delete child list so that i gets ordered next time we see it
             child[i] = EMPTY;

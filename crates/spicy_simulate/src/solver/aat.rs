@@ -1,3 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// This file is based on the SuiteSparse AMD implementation (amd_aat) by
+// Timothy A. Davis and collaborators.
+//
+// AMD, Copyright (c) 1996-2022, Timothy A. Davis, Patrick R. Amestoy, and
+// Iain S. Duff.  All Rights Reserved.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
 
 /// calculating the symmetric pattern of A (A + A^T)
@@ -47,6 +58,9 @@ pub fn aat_first_phase(
                 // for diagonals only move the column position forward
                 nz_diagonal += 1;
                 column_position += 1;
+                // the rest of the column is strictly below the diagonal (sorted indices),
+                // so stop scanning the upper triangular part.
+                break;
             } else {
                 // row > col, we are in the lower triangular part of A
                 // this is handled elsewhere
@@ -77,6 +91,8 @@ pub fn aat_first_phase(
                     // no need to add again as we already added when scanning the upper triangular part of A
                     row_column_position += 1;
                     nz_both += 1;
+                    // Next entries (if any) are > col (sorted indices) and will be handled later.
+                    break;
                 } else {
                     // will be handled later, when col > row_row
                     break;
@@ -176,6 +192,8 @@ pub fn aat_second_phase(
                 column_position += 1;
             } else if row == col {
                 column_position += 1;
+                // entries (if any) are below the diagonal (sorted indices).
+                break;
             } else {
                 // row > col, we are in the lower triangular part of A
                 // this is handled elsewhere
@@ -183,7 +201,7 @@ pub fn aat_second_phase(
             }
 
             // scan lower triangular part of A from column "row" until row "col"
-            debug_assert!(last_columns_positions[row] != -1);
+            debug_assert!(last_columns_positions[row] != EMPTY);
             let mut row_column_position = last_columns_positions[row] as usize;
             // A is square, so this is always valid
             let column_row_start = a.col_start(row);
@@ -207,6 +225,8 @@ pub fn aat_second_phase(
                     // both in upper and lower triangular part of A
                     // no need to add again as we already added when scanning the upper triangular part of A
                     row_column_position += 1;
+                    // Next entries (if any) are > col (sorted indices) and will be handled later.
+                    break;
                 } else {
                     // will be handled later, when col > row_row
                     break;

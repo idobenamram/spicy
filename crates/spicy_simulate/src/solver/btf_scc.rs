@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// This file is based on the SuiteSparse BTF implementation by Timothy A. Davis.
+//
+// BTF, Copyright (c) 2004-2024, University of Florida.  All Rights Reserved.
+// Author: Timothy A. Davis.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 use std::cmp::min;
 
 /// Block Triangular Form (BTF), Strongly Connected Components (SCC)

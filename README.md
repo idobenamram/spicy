@@ -46,8 +46,11 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 
 ** Simulation **
-- [ ] simple implementation of KLU
+- [x] implementation of KLU
 
 ## License
 
-MIT
+MIT (see `LICENSE`).
+
+This repository also includes solver code derived from SuiteSparse (AMD/BTF/KLU)
+under BSD-3-Clause and LGPL-2.1-or-later; see `THIRD_PARTY_NOTICES.md`.

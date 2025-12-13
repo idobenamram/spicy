@@ -2,6 +2,7 @@ pub mod builder;
 pub mod csc;
 pub mod csr;
 pub mod error;
+pub mod mtx;
 
 /// Compressed Sparse Column
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

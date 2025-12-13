@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// This file is based on the SuiteSparse BTF/KLU preprocessing used by KLU.
+//
+// BTF, Copyright (c) 2004-2024, University of Florida.  All Rights Reserved.
+// Author: Timothy A. Davis.
+// KLU, Copyright (c) 2004-2024, University of Florida.  All Rights Reserved.
+// Authors: Timothy A. Davis and Ekanathan Palamadai.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 use crate::solver::{
     btf_max_transversal::btf_max_transversal, btf_scc::btf_scc, matrix::csc::CscMatrix, utils::flip,
 };

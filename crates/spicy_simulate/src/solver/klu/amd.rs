@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// This file is based on the SuiteSparse AMD implementation used by KLU.
+//
+// AMD, Copyright (c) 1996-2022, Timothy A. Davis, Patrick R. Amestoy, and
+// Iain S. Duff.  All Rights Reserved.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 use crate::solver;
 use crate::solver::amd::AmdControl;
 use crate::solver::utils::{as_usize_slice, as_usize_slice_mut};
@@ -82,4 +92,46 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
         w,
         AmdControl::default(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::amd;
+    use crate::solver::matrix::csc::CscPointers;
+    use crate::solver::matrix::Dim;
+
+    #[test]
+    fn amd_regression_matrix_5x5_ap_ai() {
+        // Matrix in CSC form (n=5) taken from a minimal AMD regression case.
+        //
+        // int32_t n = 5 ;
+        // int32_t Ap [ ] = { 0,   2,       6,       10,  12, 14} ;
+        // int32_t Ai [ ] = { 0,1, 0,1,2,4, 1,2,3,4, 2,3, 1,4   } ;
+        let n = 5usize;
+        let ap: [usize; 6] = [0, 2, 6, 10, 12, 14];
+        let ai: [usize; 14] = [0, 1, 0, 1, 2, 4, 1, 2, 3, 4, 2, 3, 1, 4];
+
+        let a = CscPointers::new(Dim { nrows: n, ncols: n }, &ap, &ai);
+        a.check_invariants().unwrap();
+
+        let mut p = vec![0isize; n];
+        let info = amd(a, &mut p);
+
+        // For such a small n, the "dense" threshold (>=16) should not trigger.
+        assert_eq!(info.ndense, 0);
+
+        // Expected output permutation for this regression case.
+        assert_eq!(p, vec![0, 3, 2, 4, 1]);
+
+        // Output must be a valid permutation of 0..n-1.
+        let mut seen = vec![false; n];
+        for &v in &p {
+            assert!(v >= 0);
+            let u = v as usize;
+            assert!(u < n);
+            assert!(!seen[u], "duplicate index {u} in permutation {p:?}");
+            seen[u] = true;
+        }
+        assert!(seen.into_iter().all(|x| x), "missing entries in permutation {p:?}");
+    }
 }

@@ -36,4 +36,10 @@ Run tests:
 cargo test -p spicy_simulate
 ```
 
+## License
+
+The overall project is MIT (see the repository `LICENSE`), but this crate includes
+solver code derived from SuiteSparse (AMD/BTF/KLU) under BSD-3-Clause and
+LGPL-2.1-or-later. See the repository `THIRD_PARTY_NOTICES.md`.
+
 

@@ -246,45 +246,43 @@ pub(crate) fn solve(
 
         // scale and permute the right hand side
         match rs {
-            Some(rs) => {
-                match nr {
-                    1 => {
-                        for k in 0..n {
-                            let i = pnum[k] as usize;
-                            let rs = rs[k];
-                            x[k] = b[base + i] / rs;
-                        }
+            Some(rs) => match nr {
+                1 => {
+                    for k in 0..n {
+                        let i = pnum[k] as usize;
+                        let rs = rs[k];
+                        x[k] = b[base + i] / rs;
                     }
-                    2 => {
-                        for k in 0..n {
-                            let i = pnum[k] as usize;
-                            let rs = rs[k];
-                            x[2 * k] = b[base + i] / rs;
-                            x[2 * k + 1] = b[base + i + d] / rs;
-                        }
-                    }
-                    3 => {
-                        for k in 0..n {
-                            let i = pnum[k] as usize;
-                            let rs = rs[k];
-                            x[3 * k] = b[base + i] / rs;
-                            x[3 * k + 1] = b[base + i + d] / rs;
-                            x[3 * k + 2] = b[base + i + 2 * d] / rs;
-                        }
-                    }
-                    4 => {
-                        for k in 0..n {
-                            let i = pnum[k] as usize;
-                            let rs = rs[k];
-                            x[4 * k] = b[base + i] / rs;
-                            x[4 * k + 1] = b[base + i + d] / rs;
-                            x[4 * k + 2] = b[base + i + 2 * d] / rs;
-                            x[4 * k + 3] = b[base + i + 3 * d] / rs;
-                        }
-                    }
-                    _ => unreachable!("nr = {}", nr),
                 }
-            }
+                2 => {
+                    for k in 0..n {
+                        let i = pnum[k] as usize;
+                        let rs = rs[k];
+                        x[2 * k] = b[base + i] / rs;
+                        x[2 * k + 1] = b[base + i + d] / rs;
+                    }
+                }
+                3 => {
+                    for k in 0..n {
+                        let i = pnum[k] as usize;
+                        let rs = rs[k];
+                        x[3 * k] = b[base + i] / rs;
+                        x[3 * k + 1] = b[base + i + d] / rs;
+                        x[3 * k + 2] = b[base + i + 2 * d] / rs;
+                    }
+                }
+                4 => {
+                    for k in 0..n {
+                        let i = pnum[k] as usize;
+                        let rs = rs[k];
+                        x[4 * k] = b[base + i] / rs;
+                        x[4 * k + 1] = b[base + i + d] / rs;
+                        x[4 * k + 2] = b[base + i + 2 * d] / rs;
+                        x[4 * k + 3] = b[base + i + 3 * d] / rs;
+                    }
+                }
+                _ => unreachable!("nr = {}", nr),
+            },
             None => match nr {
                 1 => {
                     for k in 0..n {

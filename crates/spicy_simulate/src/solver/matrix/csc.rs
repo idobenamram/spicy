@@ -261,7 +261,7 @@ impl<'a> CscPointers<'a> {
                 row_indices: self.row_indices.len(),
             });
         }
-       
+
         // per-column sorted & in-range
         for j in 0..self.dim.ncols {
             let (start, end) = (self.column_pointers[j], self.column_pointers[j + 1]);

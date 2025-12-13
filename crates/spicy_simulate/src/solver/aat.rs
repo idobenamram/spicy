@@ -13,8 +13,6 @@ use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
 
 /// calculating the symmetric pattern of A (A + A^T)
 
-
-
 pub struct AatInfo {
     // symmetry pattern of A
     pub sym: f64,

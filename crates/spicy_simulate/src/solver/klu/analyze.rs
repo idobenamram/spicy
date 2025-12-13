@@ -14,7 +14,7 @@ use std::{cmp::max, iter::Empty};
 use crate::solver::{
     klu::{KluConfig, KluOrdering, KluSymbolic, amd::amd, btf::btf, klu_valid},
     matrix::csc::CscMatrix,
-    utils::{EMPTY, unflip, inverse_permutation},
+    utils::{EMPTY, inverse_permutation, unflip},
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {

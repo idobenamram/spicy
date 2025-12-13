@@ -18,7 +18,7 @@
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
 ///
-use crate::solver::utils::{flip, unflip, inverse_permutation};
+use crate::solver::utils::{flip, inverse_permutation, unflip};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -63,7 +63,6 @@ pub struct AmdInfo {
     // TODO: support this
     pub ncmpa: usize,
 }
-
 
 impl AmdInfo {
     pub fn new() -> Self {
@@ -254,7 +253,6 @@ fn initialize_amd(
 
 // find next supervariable for elimination
 fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &[isize]) -> usize {
-
     let mut me = EMPTY;
 
     debug_assert!(*mindeg < n);
@@ -474,8 +472,26 @@ fn construct_new_element(
             debug_assert!(ln == 0 || (pj < iwlen));
 
             add_neighboring_supervariables_to_pivot(
-                e, &mut pme1, knt1 as usize, ln, &mut p, &mut pj, degme, pfree, n, me, iwlen, elen, nv, pe, len, iw,
-                head, last, next, degree,
+                e,
+                &mut pme1,
+                knt1 as usize,
+                ln,
+                &mut p,
+                &mut pj,
+                degme,
+                pfree,
+                n,
+                me,
+                iwlen,
+                elen,
+                nv,
+                pe,
+                len,
+                iw,
+                head,
+                last,
+                next,
+                degree,
             );
 
             if e != me {
@@ -994,7 +1010,6 @@ fn post_tree(
     stack: &mut [isize],
     n: usize,
 ) -> usize {
-
     let mut head: isize = 0;
     stack[head as usize] = root as isize;
 
@@ -1038,7 +1053,6 @@ fn post_tree(
             order[i] = k as isize;
             k += 1;
             debug_assert!(k <= n);
-
         }
     }
 
@@ -1060,14 +1074,11 @@ fn postorder_assembly_tree(
     child: &mut [isize],
     sibling: &mut [isize],
     stack: &mut [isize],
-
 ) {
-
     for j in 0..n {
         child[j] = EMPTY;
         sibling[j] = EMPTY;
     }
-
 
     // place the children in link lists - bigger elements tend to be last
 
@@ -1116,8 +1127,7 @@ fn postorder_assembly_tree(
                 if bigfprev == EMPTY {
                     // delete bigf from the element of the list
                     child[i] = fnext;
-                }
-                else {
+                } else {
                     // delete bigf from the middle of the list
                     sibling[bigfprev as usize] = fnext;
                 }
@@ -1142,7 +1152,6 @@ fn postorder_assembly_tree(
             k = post_tree(i, k, child, sibling, order, stack, n);
         }
     }
-
 }
 
 fn compute_output_permutation(
@@ -1308,7 +1317,9 @@ pub fn amd(
             control.aggressive,
             &mut mindeg,
         );
-        finalize_new_element(me, nvpiv, pme1, p, &mut pfree, nv, len, pe, w, elenme, &mut info);
+        finalize_new_element(
+            me, nvpiv, pme1, p, &mut pfree, nv, len, pe, w, elenme, &mut info,
+        );
 
         let f = nvpiv as f64;
         let r = degme as f64 + info.ndense as f64;
@@ -1320,7 +1331,7 @@ pub fn amd(
         // number of divide operations for LDL' and for LU
         info.ndiv += lnzme;
         // number of multiply-subtract pairs for LU
-        let s = f*r*r + r * (f - 1.) * f + (f - 1.) * f * (2. * f - 1.) / 6.;
+        let s = f * r * r + r * (f - 1.) * f + (f - 1.) * f * (2. * f - 1.) / 6.;
         info.nms_lu += s;
         // number of multiply-subtract pairs for LDL'
         info.nms_ldl += (s + lnzme) / 2.;
@@ -1339,5 +1350,5 @@ pub fn amd(
     postorder_assembly_tree(n, pe, nv, elen, w, head, next, last);
     compute_output_permutation(n, ndense, nv, pe, head, next, last, w);
 
-    info 
+    info
 }

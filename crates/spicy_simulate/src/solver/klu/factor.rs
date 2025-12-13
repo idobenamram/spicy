@@ -9,10 +9,12 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
+use crate::solver::klu::{KluConfig, KluNumeric, KluSymbolic, scale::scale};
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
-use crate::solver::klu::{scale::scale, KluConfig, KluNumeric, KluSymbolic};
 use crate::solver::matrix::csc::CscMatrix;
-use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
+use crate::solver::utils::{
+    as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation,
+};
 
 pub fn allocate_klu_numeric(
     symbolic: &KluSymbolic,
@@ -155,7 +157,6 @@ pub fn kernel_factor(
         lusize,
         pinv,
         p,
-
         lu_block,
         u_diag,
         llen,
@@ -164,19 +165,14 @@ pub fn kernel_factor(
         uip,
         lnz,
         unz,
-
         x,
-
         stack,
         flag,
         ap_pos,
-
         lpend,
-
         k1,
         ps_inv,
         row_scaling,
-
         offp,
         offi,
         offx,
@@ -200,7 +196,7 @@ pub fn factor(
     let mut unz = 0;
 
     let (x, work) = numeric.work.split_at_mut(n);
-    let (work, pblock) = work.split_at_mut(5*symbolic.maxblock);
+    let (work, pblock) = work.split_at_mut(5 * symbolic.maxblock);
     let pblock = unsafe { f64_as_isize_slice_mut(pblock) };
 
     /* compute the inverse of P from symbolic analysis.  Will be updated to
@@ -286,9 +282,8 @@ pub fn factor(
                 k1,
                 &numeric.pinv,
                 numeric.rs.as_deref(),
-
                 &mut numeric.lu_bx[block],
-                &mut numeric.u_diag[k1..],     
+                &mut numeric.u_diag[k1..],
                 &mut numeric.llen[k1..],
                 &mut numeric.ulen[k1..],
                 &mut numeric.lip[k1..],
@@ -296,11 +291,9 @@ pub fn factor(
                 pblock,
                 &mut lnz_block,
                 &mut unz_block,
-
                 &mut numeric.offp,
                 &mut numeric.offi,
                 &mut numeric.offx,
-
                 x,
                 work,
                 config,

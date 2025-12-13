@@ -97,8 +97,8 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
 #[cfg(test)]
 mod tests {
     use super::amd;
-    use crate::solver::matrix::csc::CscPointers;
     use crate::solver::matrix::Dim;
+    use crate::solver::matrix::csc::CscPointers;
 
     #[test]
     fn amd_regression_matrix_5x5_ap_ai() {
@@ -132,6 +132,9 @@ mod tests {
             assert!(!seen[u], "duplicate index {u} in permutation {p:?}");
             seen[u] = true;
         }
-        assert!(seen.into_iter().all(|x| x), "missing entries in permutation {p:?}");
+        assert!(
+            seen.into_iter().all(|x| x),
+            "missing entries in permutation {p:?}"
+        );
     }
 }

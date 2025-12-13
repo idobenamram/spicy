@@ -234,7 +234,7 @@ pub(crate) fn btf_scc(
 
     // lets call orignal matrix = A
     // column permutation = Q
-    // row permutation = P (symmetric permutation) 
+    // row permutation = P (symmetric permutation)
     // the row permutation was done on A*Q
     // so the full permutation then is P*(A*Q)*P^T, instead we will return
     // Q = Q*P^T to make it simpler to apply the permutation to the matrix
@@ -248,5 +248,5 @@ pub(crate) fn btf_scc(
         column_permutations[col] = graph_indices[col];
     }
 
-    return number_of_scc_blocks
+    return number_of_scc_blocks;
 }

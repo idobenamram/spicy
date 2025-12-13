@@ -29,11 +29,7 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
     // Header (first non-empty line)
     let (header_line_no, header) = loop {
         match lines.next() {
-            None => {
-                return Err(
-                    MatrixMarketError::InvalidBanner("empty input".to_string()).into(),
-                )
-            }
+            None => return Err(MatrixMarketError::InvalidBanner("empty input".to_string()).into()),
             Some((i, line)) => {
                 let line = line.map_err(MatrixMarketError::from)?;
                 let t = line.trim();
@@ -94,7 +90,7 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
                 "only 'integer' and 'real' fields are supported, got '{}' (line {}): {}",
                 other, header_line_no, header
             ))
-            .into())
+            .into());
         }
     };
 
@@ -104,7 +100,7 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
             None => {
                 return Err(
                     MatrixMarketError::InvalidSizeLine("missing size line".to_string()).into(),
-                )
+                );
             }
             Some((i, line)) => {
                 let line = line.map_err(MatrixMarketError::from)?;
@@ -172,14 +168,18 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
             .into());
         }
 
-        let row_1: usize = parts[0].parse().map_err(|e| MatrixMarketError::InvalidEntry {
-            line: line_no,
-            msg: format!("bad row index '{}': {}", parts[0], e),
-        })?;
-        let col_1: usize = parts[1].parse().map_err(|e| MatrixMarketError::InvalidEntry {
-            line: line_no,
-            msg: format!("bad col index '{}': {}", parts[1], e),
-        })?;
+        let row_1: usize = parts[0]
+            .parse()
+            .map_err(|e| MatrixMarketError::InvalidEntry {
+                line: line_no,
+                msg: format!("bad row index '{}': {}", parts[0], e),
+            })?;
+        let col_1: usize = parts[1]
+            .parse()
+            .map_err(|e| MatrixMarketError::InvalidEntry {
+                line: line_no,
+                msg: format!("bad col index '{}': {}", parts[1], e),
+            })?;
 
         if row_1 == 0 || col_1 == 0 {
             return Err(MatrixMarketError::InvalidEntry {
@@ -194,17 +194,21 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
 
         let val = match field {
             MmField::Integer => {
-                let v: i64 = parts[2].parse().map_err(|e| MatrixMarketError::InvalidEntry {
-                    line: line_no,
-                    msg: format!("bad integer value '{}': {}", parts[2], e),
-                })?;
+                let v: i64 = parts[2]
+                    .parse()
+                    .map_err(|e| MatrixMarketError::InvalidEntry {
+                        line: line_no,
+                        msg: format!("bad integer value '{}': {}", parts[2], e),
+                    })?;
                 v as f64
             }
             MmField::Real => {
-                let v: f64 = parts[2].parse().map_err(|e| MatrixMarketError::InvalidEntry {
-                    line: line_no,
-                    msg: format!("bad real value '{}': {}", parts[2], e),
-                })?;
+                let v: f64 = parts[2]
+                    .parse()
+                    .map_err(|e| MatrixMarketError::InvalidEntry {
+                        line: line_no,
+                        msg: format!("bad real value '{}': {}", parts[2], e),
+                    })?;
                 v
             }
         };
@@ -273,5 +277,3 @@ mod tests {
         assert!(s.contains("only 'general' symmetry is supported"));
     }
 }
-
-

@@ -14,8 +14,6 @@ use crate::solver::{
     btf_max_transversal::btf_max_transversal, btf_scc::btf_scc, matrix::csc::CscMatrix, utils::flip,
 };
 
-
-
 pub fn btf(
     a: &CscMatrix,
     row_permutations: &mut [isize],

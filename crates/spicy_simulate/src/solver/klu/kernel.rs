@@ -10,15 +10,10 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::{
-    klu::{get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig},
+    klu::{KluConfig, get_pointers_to_lu, get_pointers_to_lu_mut},
     matrix::csc::CscMatrix,
-    utils::{
-        EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip,
-        unflip,
-    },
+    utils::{EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
-
-
 
 fn get_free_pointer(lu: &mut Vec<f64>, lup: usize) -> (&mut [f64], &mut [usize]) {
     let (before, xp) = lu.split_at_mut(lup);
@@ -707,7 +702,6 @@ pub fn kernel(
             li[i] = inverse_row_permutation[li[i]] as usize;
         }
     }
-
 
     // shrink the LU factors to just the required size
     let new_lusize = lup;

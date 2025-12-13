@@ -111,7 +111,6 @@ pub(crate) fn dunits<T>(n: usize) -> Result<usize, String> {
 }
 
 pub(crate) fn inverse_permutation(n: usize, permutation: &[isize], inverse: &mut [isize]) {
-
     #[cfg(debug_assertions)]
     {
         for k in 0..n {

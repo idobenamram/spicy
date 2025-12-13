@@ -189,11 +189,24 @@ pub(crate) fn solve(
             d, symbolic.n
         ));
     }
+    // B is column-oriented with leading dimension d, so it must have at least d*nrhs entries.
+    let b_required = d
+        .checked_mul(nrhs)
+        .ok_or_else(|| "overflow computing required B length".to_string())?;
+    if b.len() < b_required {
+        return Err(format!(
+            "B too small: need at least d*nrhs = {} entries (d={}, nrhs={}), got {}",
+            b_required,
+            d,
+            nrhs,
+            b.len()
+        ));
+    }
 
     let n = symbolic.n;
     let nblocks = symbolic.nblocks;
     let q = &symbolic.column_permutation;
-    let r = &symbolic.row_permutation;
+    let r = &symbolic.row_scaling;
 
     debug_assert!(nblocks == numeric.nblocks);
     let pnum = &numeric.pnum;
@@ -214,85 +227,82 @@ pub(crate) fn solve(
 
     debug_assert!(klu_valid(n, offp, offi));
 
-    let mut bz = b;
-
     // solve in chunks of 4 columns at a time
 
     for chunk in (0..nrhs).step_by(4) {
         let nr = std::cmp::min(nrhs - chunk, 4);
+        let base = chunk * d;
 
         // scale and permute the right hand side
         match rs {
             Some(rs) => {
-                for k in 0..n {
-                    match nr {
-                        1 => {
-                            for k in 0..n {
-                                let i = pnum[k] as usize;
-                                let rs = rs[k];
-                                x[k] = bz[i] / rs;
-                            }
+                match nr {
+                    1 => {
+                        for k in 0..n {
+                            let i = pnum[k] as usize;
+                            let rs = rs[k];
+                            x[k] = b[base + i] / rs;
                         }
-                        2 => {
-                            for k in 0..n {
-                                let i = pnum[k] as usize;
-                                let rs = rs[k];
-                                x[2 * k] = bz[i] / rs;
-                                x[2 * k + 1] = bz[i + d] / rs;
-                            }
-                        }
-                        3 => {
-                            for k in 0..n {
-                                let i = pnum[k] as usize;
-                                let rs = rs[k];
-                                x[3 * k] = bz[i] / rs;
-                                x[3 * k + 1] = bz[i + d] / rs;
-                                x[3 * k + 2] = bz[i + 2 * d] / rs;
-                            }
-                        }
-                        4 => {
-                            for k in 0..n {
-                                let i = pnum[k] as usize;
-                                let rs = rs[k];
-                                x[4 * k] = bz[i] / rs;
-                                x[4 * k + 1] = bz[i + d] / rs;
-                                x[4 * k + 2] = bz[i + 2 * d] / rs;
-                                x[4 * k + 3] = bz[i + 3 * d] / rs;
-                            }
-                        }
-                        _ => unreachable!("nr = {}", nr),
                     }
+                    2 => {
+                        for k in 0..n {
+                            let i = pnum[k] as usize;
+                            let rs = rs[k];
+                            x[2 * k] = b[base + i] / rs;
+                            x[2 * k + 1] = b[base + i + d] / rs;
+                        }
+                    }
+                    3 => {
+                        for k in 0..n {
+                            let i = pnum[k] as usize;
+                            let rs = rs[k];
+                            x[3 * k] = b[base + i] / rs;
+                            x[3 * k + 1] = b[base + i + d] / rs;
+                            x[3 * k + 2] = b[base + i + 2 * d] / rs;
+                        }
+                    }
+                    4 => {
+                        for k in 0..n {
+                            let i = pnum[k] as usize;
+                            let rs = rs[k];
+                            x[4 * k] = b[base + i] / rs;
+                            x[4 * k + 1] = b[base + i + d] / rs;
+                            x[4 * k + 2] = b[base + i + 2 * d] / rs;
+                            x[4 * k + 3] = b[base + i + 3 * d] / rs;
+                        }
+                    }
+                    _ => unreachable!("nr = {}", nr),
                 }
             }
             None => match nr {
                 1 => {
                     for k in 0..n {
                         let i = pnum[k] as usize;
-                        x[k] = bz[i];
+                        x[k] = b[base + i];
                     }
                 }
                 2 => {
                     for k in 0..n {
                         let i = pnum[k] as usize;
-                        x[2 * k] = bz[i];
-                        x[2 * k + 1] = bz[i + d];
+                        x[2 * k] = b[base + i];
+                        x[2 * k + 1] = b[base + i + d];
                     }
                 }
                 3 => {
                     for k in 0..n {
                         let i = pnum[k] as usize;
-                        x[3 * k] = bz[i];
-                        x[3 * k + 1] = bz[i + d];
-                        x[3 * k + 2] = bz[i + 2 * d];
+                        x[3 * k] = b[base + i];
+                        x[3 * k + 1] = b[base + i + d];
+                        x[3 * k + 2] = b[base + i + 2 * d];
                     }
                 }
                 4 => {
                     for k in 0..n {
                         let i = pnum[k] as usize;
-                        x[4 * k] = bz[i];
-                        x[4 * k + 1] = bz[i + d];
-                        x[4 * k + 2] = bz[i + 2 * d];
-                        x[4 * k + 3] = bz[i + 3 * d];
+                        x[4 * k] = b[base + i];
+                        x[4 * k + 1] = b[base + i + d];
+                        x[4 * k + 2] = b[base + i + 2 * d];
+                        x[4 * k + 3] = b[base + i + 3 * d];
                     }
                 }
                 _ => unreachable!("nr = {}", nr),
@@ -341,8 +351,8 @@ pub(crate) fn solve(
                 let lu = lu_bx[block].as_slice();
                 let (_, x_after) = x.split_at_mut(k1 * nr);
 
-                klu_lsolve(nk, lip_after, llen_after, lu, nr, x_after);
-                klu_usolve(nk, uip_after, ulen_after, lu, u_diag_after, nr, x_after);
+                klu_lsolve(nk, lip_after, llen_after, lu, nr, x_after)?;
+                klu_usolve(nk, uip_after, ulen_after, lu, u_diag_after, nr, x_after)?;
             }
 
             // block back-substitution for the off-diagonal-block entries
@@ -414,38 +424,35 @@ pub(crate) fn solve(
             1 => {
                 for k in 0..n {
                     let i = q[k] as usize;
-                    bz[i] = x[k];
+                    b[base + i] = x[k];
                 }
             }
             2 => {
                 for k in 0..n {
                     let i = q[k] as usize;
-                    bz[i] = x[2 * k];
-                    bz[i + d] = x[2 * k + 1];
+                    b[base + i] = x[2 * k];
+                    b[base + i + d] = x[2 * k + 1];
                 }
             }
             3 => {
                 for k in 0..n {
                     let i = q[k] as usize;
-                    bz[i] = x[3 * k];
-                    bz[i + d] = x[3 * k + 1];
-                    bz[i + 2 * d] = x[3 * k + 2];
+                    b[base + i] = x[3 * k];
+                    b[base + i + d] = x[3 * k + 1];
+                    b[base + i + 2 * d] = x[3 * k + 2];
                 }
             }
             4 => {
                 for k in 0..n {
                     let i = q[k] as usize;
-                    bz[i] = x[4 * k];
-                    bz[i + d] = x[4 * k + 1];
-                    bz[i + 2 * d] = x[4 * k + 2];
-                    bz[i + 3 * d] = x[4 * k + 3];
+                    b[base + i] = x[4 * k];
+                    b[base + i + d] = x[4 * k + 1];
+                    b[base + i + 2 * d] = x[4 * k + 2];
+                    b[base + i + 3 * d] = x[4 * k + 3];
                 }
             }
             _ => unreachable!("nr = {}", nr),
         }
-
-        // go to the next chunk of B
-        bz = &mut bz[d * 4..];
     }
     Ok(())
 }

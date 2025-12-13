@@ -7,8 +7,8 @@ pub fn scale(
     mut w: Option<&mut Vec<isize>>,
     scale: Option<KluScale>,
 ) -> Result<(), String> {
-    
     let n = a.dim.nrows;
+    let ncols = a.dim.ncols;
 
     let scale = match scale {
         None => return Ok(()),
@@ -24,7 +24,7 @@ pub fn scale(
         w.fill(EMPTY);
     }
 
-    for col in 0..n {
+    for col in 0..ncols {
         let start = a.col_start(col);
         let end = a.col_end(col);
         for p in start..end {
@@ -40,8 +40,8 @@ pub fn scale(
 
             let val = a.value(p).abs();
             match scale {
-                KluScale::Sum => rs[col] += val,
-                KluScale::Max => rs[col] = val.max(rs[col]),
+                KluScale::Sum => rs[row] += val,
+                KluScale::Max => rs[row] = val.max(rs[row]),
             }
         }
     }

@@ -40,12 +40,12 @@ fn dfs(
     ap_pos: &mut [isize],
 ) -> usize {
     let mut l_length = *plength;
-    let mut head = 0;
-    stack[head] = j;
+    let mut head: isize = 0;
+    stack[0] = j;
     debug_assert!(flag[j] != k as isize);
 
     while head >= 0 {
-        j = stack[head];
+        j = stack[head as usize];
         // j is pivotal
         debug_assert!(inverse_row_permutation[j] >= 0 && inverse_row_permutation[j] < k as isize);
         let jnew = inverse_row_permutation[j] as usize;
@@ -56,9 +56,9 @@ fn dfs(
 
             // set ap_pos[head] to one past the last entry in col j to scan
             if lpend[jnew] == EMPTY {
-                ap_pos[head] = llen[jnew] as isize;
+                ap_pos[head as usize] = llen[jnew] as isize;
             } else {
-                ap_pos[head] = lpend[jnew];
+                ap_pos[head as usize] = lpend[jnew];
             }
         }
 
@@ -66,7 +66,7 @@ fn dfs(
         // until finding another non-visited pivotal node
         let (_, li) = get_column_pointer(lu_before, lip[jnew]);
 
-        let mut pos = ap_pos[head];
+        let mut pos = ap_pos[head as usize];
         while pos >= 0 {
             let i = li[pos as usize];
             if flag[i] != k as isize {
@@ -75,12 +75,12 @@ fn dfs(
                     // keep track of where we left off in the scan of the
                     // adjacency list of node j so we can restart j where we
                     // left off.
-                    ap_pos[head] = pos;
+                    ap_pos[head as usize] = pos;
 
                     // node i is pivotal; push it onto the recursive stack
                     // and immediately break so we can recurse on node i.
                     head += 1;
-                    stack[head] = i;
+                    stack[head as usize] = i;
                     break;
                 } else {
                     // node i is not pivotal (no outgoing edges).
@@ -251,7 +251,7 @@ fn lsolve_numeric(
         debug_assert!(lip[jnew] <= lip[jnew + 1]);
         for p in 0..len {
             //X [Li [p]] -= Lx [p] * xj ; */
-            x[li[p]] = lx[p] * xj;
+            x[li[p]] -= lx[p] * xj;
         }
     }
 

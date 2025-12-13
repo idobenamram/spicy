@@ -1,5 +1,5 @@
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
-use crate::solver::klu::{KluConfig, KluNumeric, KluScale, KluSymbolic, scale::scale};
+use crate::solver::klu::{scale::scale, KluConfig, KluNumeric, KluSymbolic};
 use crate::solver::matrix::csc::CscMatrix;
 use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
 
@@ -14,7 +14,7 @@ pub fn allocate_klu_numeric(
     let n1 = n + 1;
     let nzoff1 = nzoff + 1;
 
-    let mut lu_bx = vec![Vec::new(); nblocks];
+    let lu_bx = vec![Vec::new(); nblocks];
 
     let rs = match config.scale {
         None => None,
@@ -37,7 +37,7 @@ pub fn allocate_klu_numeric(
     let b6 = maxblock
         .checked_mul(6 * std::mem::size_of::<isize>())
         .ok_or("overflow")?;
-    let worksize = s + std::cmp::max(n3, b6);
+    let worksize = s.checked_add(std::cmp::max(n3, b6)).ok_or("overflow")?;
     let worksize_f64 = (worksize + std::mem::size_of::<f64>() - 1) / std::mem::size_of::<f64>();
     // allocate with f64 for alignment
     let work = vec![0.0; worksize_f64];
@@ -78,7 +78,7 @@ pub fn kernel_factor(
     n: usize,
     a: &CscMatrix,
     col_permutation: &[isize],
-    lsize: f64,
+    mut lsize: f64,
     k1: usize,
     // inverse of P from symbolic factorization
     ps_inv: &[isize],
@@ -108,12 +108,16 @@ pub fn kernel_factor(
     debug_assert!(n > 0);
 
     if lsize <= 0. {
-        // i don't think this is possible
-        todo!()
+        let anz = a.col_start(k1 + n) - a.col_start(k1);
+        lsize = -lsize;
+        lsize = lsize.max(1.0);
+        lsize = lsize * (anz as f64) + (n as f64);
     }
 
     // TODO: overflow
-    let max_lnz = (n as f64) * (n as f64) + (n as f64) / 2.;
+    // In KLU this is (n*n + n)/2, the number of entries in a full lower/upper
+    // triangle including diagonal.
+    let max_lnz = ((n as f64) * (n as f64) + (n as f64)) / 2.;
 
     let l_size = (lsize as usize).max(n + 1).min(max_lnz as usize);
     let u_size = (lsize as usize).max(n + 1).min(max_lnz as usize);
@@ -123,7 +127,7 @@ pub fn kernel_factor(
     let (stack, work) = work.split_at_mut(n);
     let (flag, work) = work.split_at_mut(n);
     let (lpend, work) = work.split_at_mut(n);
-    let (ap_pos, work) = work.split_at_mut(n);
+    let (ap_pos, _) = work.split_at_mut(n);
 
     let stack = unsafe { as_usize_slice_mut(stack) };
     let lusize = dunits::<isize>(l_size)?
@@ -171,7 +175,7 @@ pub fn kernel_factor(
 
 pub fn factor(
     a: &CscMatrix,
-    symbolic: &KluSymbolic,
+    symbolic: &mut KluSymbolic,
     config: &mut KluConfig,
 ) -> Result<KluNumeric, String> {
     config.validate()?;
@@ -256,7 +260,6 @@ pub fn factor(
         } else {
             let lsize;
             if symbolic.lower_nz[block] < 0. {
-                // TODO: we only use amd so this is not really possible
                 lsize = -(config.initmem)
             } else {
                 lsize = config.initmem_amd * symbolic.lower_nz[block] + block_size as f64;
@@ -318,9 +321,9 @@ pub fn factor(
             max_lnz_block = max_lnz_block.max(lnz_block);
             max_unz_block = max_unz_block.max(unz_block);
 
-            if numeric.lu_size[block] == 0 {
+            if symbolic.lower_nz[block] < 0. {
                 // revise estimate for subsequent factorization
-                numeric.lu_size[block] = lnz_block.max(unz_block);
+                symbolic.lower_nz[block] = lnz_block.max(unz_block) as f64;
             }
 
             // combine the klu row ordering with the symbolic pre-ordering
@@ -359,7 +362,7 @@ pub fn factor(
     }
 
     for p in 0..nzoff {
-        debug_assert!(numeric.offi[p] >= 0 && numeric.offi[p] < n);
+        debug_assert!(numeric.offi[p] < n);
         numeric.offi[p] = numeric.pinv[numeric.offi[p]] as usize;
     }
 

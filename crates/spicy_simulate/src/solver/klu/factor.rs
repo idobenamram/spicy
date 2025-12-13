@@ -1,7 +1,7 @@
-use crate::solver::klu::klu_valid;
+use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
 use crate::solver::klu::{KluConfig, KluNumeric, KluScale, KluSymbolic, scale::scale};
 use crate::solver::matrix::csc::CscMatrix;
-use crate::solver::utils::inverse_permutation;
+use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
 
 pub fn allocate_klu_numeric(
     symbolic: &KluSymbolic,
@@ -14,8 +14,7 @@ pub fn allocate_klu_numeric(
     let n1 = n + 1;
     let nzoff1 = nzoff + 1;
 
-    // TODO: figure thisout
-    let mut lu_bx = Vec::with_capacity(nblocks);
+    let mut lu_bx = vec![Vec::new(); nblocks];
 
     let rs = match config.scale {
         None => None,
@@ -39,10 +38,9 @@ pub fn allocate_klu_numeric(
         .checked_mul(6 * std::mem::size_of::<isize>())
         .ok_or("overflow")?;
     let worksize = s + std::cmp::max(n3, b6);
-    // TODO: figure this out
-    let work = vec![0.0; worksize];
-    let xwork = vec![0.0; n];
-    let iwork = vec![0; 6 * n];
+    let worksize_f64 = (worksize + std::mem::size_of::<f64>() - 1) / std::mem::size_of::<f64>();
+    // allocate with f64 for alignment
+    let work = vec![0.0; worksize_f64];
 
     let numeric = KluNumeric {
         n,
@@ -71,11 +69,104 @@ pub fn allocate_klu_numeric(
 
         worksize,
         work,
-        xwork,
-        iwork,
     };
 
     Ok(numeric)
+}
+
+pub fn kernel_factor(
+    n: usize,
+    a: &CscMatrix,
+    col_permutation: &[isize],
+    lsize: f64,
+    k1: usize,
+    // inverse of P from symbolic factorization
+    ps_inv: &[isize],
+    row_scaling: Option<&[f64]>,
+
+    // outputs
+    lu_block: &mut Vec<f64>,
+    u_diag: &mut [f64],
+    llen: &mut [usize],
+    ulen: &mut [usize],
+    lip: &mut [usize],
+    uip: &mut [usize],
+    p: &mut [isize],
+    lnz: &mut usize,
+    unz: &mut usize,
+
+    // inputs, modified on output
+    offp: &mut [usize],
+    offi: &mut [usize],
+    offx: &mut [f64],
+
+    // workspace
+    x: &mut [f64],
+    work: &mut [f64],
+    config: &KluConfig,
+) -> Result<usize, String> {
+    debug_assert!(n > 0);
+
+    if lsize <= 0. {
+        // i don't think this is possible
+        todo!()
+    }
+
+    // TODO: overflow
+    let max_lnz = (n as f64) * (n as f64) + (n as f64) / 2.;
+
+    let l_size = (lsize as usize).max(n + 1).min(max_lnz as usize);
+    let u_size = (lsize as usize).max(n + 1).min(max_lnz as usize);
+
+    let work = unsafe { f64_as_isize_slice_mut(work) };
+    let (pinv, work) = work.split_at_mut(n);
+    let (stack, work) = work.split_at_mut(n);
+    let (flag, work) = work.split_at_mut(n);
+    let (lpend, work) = work.split_at_mut(n);
+    let (ap_pos, work) = work.split_at_mut(n);
+
+    let stack = unsafe { as_usize_slice_mut(stack) };
+    let lusize = dunits::<isize>(l_size)?
+        + dunits::<f64>(l_size)?
+        + dunits::<isize>(u_size)?
+        + dunits::<f64>(u_size)?;
+
+    lu_block.resize(lusize as usize, 0.0);
+
+    return kernel::kernel(
+        n,
+        a,
+        col_permutation,
+        lusize,
+        pinv,
+        p,
+
+        lu_block,
+        u_diag,
+        llen,
+        ulen,
+        lip,
+        uip,
+        lnz,
+        unz,
+
+        x,
+
+        stack,
+        flag,
+        ap_pos,
+
+        lpend,
+
+        k1,
+        ps_inv,
+        row_scaling,
+
+        offp,
+        offi,
+        offx,
+        &config,
+    );
 }
 
 pub fn factor(
@@ -92,7 +183,10 @@ pub fn factor(
     let mut max_unz_block = 1;
     let mut lnz = 0;
     let mut unz = 0;
-    let mut noffdiag = 0;
+
+    let (x, work) = numeric.work.split_at_mut(n);
+    let (work, pblock) = work.split_at_mut(5*symbolic.maxblock);
+    let pblock = unsafe { f64_as_isize_slice_mut(pblock) };
 
     /* compute the inverse of P from symbolic analysis.  Will be updated to
      * become the inverse of the numerical factorization when the factorization
@@ -160,22 +254,86 @@ pub fn factor(
             lnz += 1;
             unz += 1;
         } else {
-
             let lsize;
             if symbolic.lower_nz[block] < 0. {
                 // TODO: we only use amd so this is not really possible
-               lsize = -(config.initmem) 
-
+                lsize = -(config.initmem)
             } else {
                 lsize = config.initmem_amd * symbolic.lower_nz[block] + block_size as f64;
             }
+            let mut lnz_block = 0;
+            let mut unz_block = 0;
 
-            
+            numeric.lu_size[block] = kernel_factor(
+                block_size,
+                a,
+                &symbolic.column_permutation,
+                lsize,
+                k1,
+                &numeric.pinv,
+                numeric.rs.as_deref(),
 
+                &mut numeric.lu_bx[block],
+                &mut numeric.u_diag[k1..],     
+                &mut numeric.llen[k1..],
+                &mut numeric.ulen[k1..],
+                &mut numeric.lip[k1..],
+                &mut numeric.uip[k1..],
+                pblock,
+                &mut lnz_block,
+                &mut unz_block,
 
-            todo!()
+                &mut numeric.offp,
+                &mut numeric.offi,
+                &mut numeric.offx,
+
+                x,
+                work,
+                config,
+            )?;
+
+            debug_assert!(matches!(
+                klu_valid_lu(
+                    block_size,
+                    true,
+                    &numeric.lip[k1..],
+                    &numeric.llen[k1..],
+                    &numeric.lu_bx[block],
+                ),
+                Ok(true)
+            ));
+            debug_assert!(matches!(
+                klu_valid_lu(
+                    block_size,
+                    false,
+                    &numeric.uip[k1..],
+                    &numeric.ulen[k1..],
+                    &numeric.lu_bx[block],
+                ),
+                Ok(true)
+            ));
+
+            lnz += lnz_block;
+            unz += unz_block;
+            max_lnz_block = max_lnz_block.max(lnz_block);
+            max_unz_block = max_unz_block.max(unz_block);
+
+            if numeric.lu_size[block] == 0 {
+                // revise estimate for subsequent factorization
+                numeric.lu_size[block] = lnz_block.max(unz_block);
+            }
+
+            // combine the klu row ordering with the symbolic pre-ordering
+            for k in 0..block_size {
+                debug_assert!(k + k1 < n);
+                debug_assert!(pblock[k] as usize + k1 < n);
+                numeric.pnum[k + k1] = symbolic.row_permutation[pblock[k] as usize + k1] as isize;
+            }
+
+            // the local pivot row permutation Pblock is no longer needed
         }
     }
+
     debug_assert!(nzoff == numeric.offp[n]);
     debug_assert!(klu_valid(n, &numeric.offp, &numeric.offi));
 
@@ -192,14 +350,13 @@ pub fn factor(
         None => {}
         Some(rs) => {
             for k in 0..n {
-                numeric.xwork[k] = rs[numeric.pnum[k] as usize];
+                x[k] = rs[numeric.pnum[k] as usize];
             }
             for k in 0..n {
-                rs[k] = numeric.xwork[k];
+                rs[k] = x[k];
             }
         }
     }
-
 
     for p in 0..nzoff {
         debug_assert!(numeric.offi[p] >= 0 && numeric.offi[p] < n);

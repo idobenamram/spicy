@@ -2,7 +2,13 @@ mod amd;
 mod analyze;
 mod btf;
 mod factor;
+mod kernel;
 mod scale;
+mod solve;
+
+use std::{mem, slice};
+
+use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -156,8 +162,8 @@ pub struct KluNumeric {
     // size n. Ulen [k] = # of entries in kth column of U
     pub ulen: Vec<usize>,
     // L and U indices and entries (excl. diagonal of U)
-    pub lu_bx: Vec<usize>,
-    // size of each LUbx [block], in sizeof (Unit)
+    pub lu_bx: Vec<Vec<f64>>,
+    // size of each LUbx [block], in sizeof (f64)
     pub lu_size: Vec<usize>,
     // diagonal of U
     pub u_diag: Vec<f64>,
@@ -166,14 +172,10 @@ pub struct KluNumeric {
     // size n. Rs [i] is scale factor for row i
     pub rs: Option<Vec<f64>>,
 
-    // permanent workspace for factorization and solve
+    // permanent workspace for factorization and solve (size in bytes, as in C)
     pub worksize: usize,
-    // workspace
+    // single contiguous workspace buffer backing both Xwork and Iwork in C
     pub work: Vec<f64>,
-    // alias into Numeric->Work
-    pub xwork: Vec<f64>,
-    // alias into Numeric->Work
-    pub iwork: Vec<isize>,
 
     // column pointers for off-diagonal entries
     pub offp: Vec<usize>,
@@ -183,6 +185,25 @@ pub struct KluNumeric {
     pub offx: Vec<f64>,
     // number of off-diagonal entries
     pub nzoff: usize,
+}
+
+impl KluNumeric {
+    /// Returns a temporary slice of length `n` into the workspace, interpreted as `f64`.
+    /// This mirrors how Xwork is used in the C implementation for simple scratch space.
+    /// NOTE: we can't use &mut self here because this will keep a mutable ref to the entire KluNumeric
+    /// because rust is dumb
+    pub(crate) fn x_scratch(work: &mut [f64], worksize: usize, n: usize) -> &mut [f64] {
+        let bytes_needed = n
+            .checked_mul(mem::size_of::<f64>())
+            .expect("overflow computing workspace size");
+
+        debug_assert!(
+            worksize >= bytes_needed,
+            "workspace too small for requested scratch slice"
+        );
+        let ptr = work.as_mut_ptr() as *mut f64;
+        unsafe { slice::from_raw_parts_mut(ptr, n) }
+    }
 }
 
 pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usize]) -> bool {
@@ -213,6 +234,72 @@ pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usiz
     }
 
     true
+}
+
+pub(crate) fn get_pointers_to_lu_mut<'a>(
+    lu: &'a mut Vec<f64>,
+    xip: &[usize],
+    xlen: &[usize],
+    k: usize,
+) -> Result<(&'a mut [usize], &'a mut [f64], usize), String> {
+    let (_, xp) = lu.split_at_mut(xip[k]);
+    let len = dunits::<usize>(xlen[k])?;
+    let (xi, xx) = xp.split_at_mut(len);
+
+    Ok((unsafe { f64_as_usize_slice_mut(xi) }, xx, len))
+}
+
+pub(crate) fn get_pointers_to_lu<'a>(
+    lu: &'a [f64],
+    xip: &[usize],
+    xlen: &[usize],
+    k: usize,
+) -> Result<(&'a [usize], &'a [f64], usize), String> {
+    let (_, xp) = lu.split_at(xip[k]);
+    let len = dunits::<usize>(xlen[k])?;
+    let (xi, xx) = xp.split_at(len);
+
+    Ok((unsafe { f64_as_usize_slice(xi) }, xx, len))
+}
+
+pub(crate) fn klu_valid_lu(
+    n: usize,
+    flag_test_start_ptr: bool,
+    xip: &[usize],
+    xlen: &[usize],
+    lu: &[f64],
+) -> Result<bool, String> {
+    if n == 0 {
+        return Ok(false);
+    }
+
+    // column pointers must start at xip[0] = 0 when requested
+    if flag_test_start_ptr && xip[0] != 0 {
+        return Ok(false);
+    }
+
+    for j in 0..n {
+        let p1 = xip[j];
+
+        // column pointers must be ascending, if we can compare to the next one
+        if j < n - 1 {
+            let p2 = xip[j + 1];
+            if p1 > p2 {
+                return Ok(false);
+            }
+        }
+
+        let (xi, _, len) = get_pointers_to_lu(lu, xip, xlen, j)?;
+        for p in 0..len {
+            let i = xi[p];
+            if i >= n {
+                // row index out of range
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
 }
 
 /*

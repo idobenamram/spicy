@@ -47,10 +47,11 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 ** Simulation **
 - [x] implementation of KLU
+- [ ] refactor errors and metrics in klu
 - [ ] test KLU implementation
 - [ ] hook up to simulation code
-- [ ] refactor errors and metrics in klu
 - [ ] make sure singular matricies work (when not using halt_if_singular)
+- [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
 - [ ] support KLU complex?
 
 

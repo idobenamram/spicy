@@ -29,6 +29,10 @@ pub fn refactor(
     let maxblock = symbolic.maxblock;
     let nzoff = symbolic.nzoff;
 
+    // Refactorization can change numerical singularity; reset the singular metrics.
+    numeric.metrics.numerical_rank = None;
+    numeric.metrics.singular_col = None;
+
     // Mirror SuiteSparse KLU behavior: refactorization may enable/disable scaling
     // relative to the initial factorization.
     match config.scale {
@@ -96,6 +100,10 @@ pub fn refactor(
                 }
             }
             numeric.u_diag[k1] = s;
+            if s == 0.0 && numeric.metrics.numerical_rank.is_none() {
+                numeric.metrics.numerical_rank = Some(k1);
+                numeric.metrics.singular_col = Some(oldcol);
+            }
         } else {
             // construct and factor the kth block
 
@@ -170,6 +178,10 @@ pub fn refactor(
                 x[k] = 0.0;
                 if ukk == 0.0 {
                     // matrix is numerically singular
+                    if numeric.metrics.numerical_rank.is_none() {
+                        numeric.metrics.numerical_rank = Some(k + k1);
+                        numeric.metrics.singular_col = Some(oldcol);
+                    }
                     if config.halt_if_singular {
                         return Err(KluError::SingularAtBlock { block });
                     }

@@ -9,7 +9,9 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use crate::solver::klu::{scale::scale, KluConfig, KluError, KluNumeric, KluResult, KluSymbolic};
+use crate::solver::klu::{
+    scale::scale, KluConfig, KluError, KluNumeric, KluNumericMetrics, KluResult, KluSymbolic,
+};
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
 use crate::solver::matrix::csc::CscMatrix;
 use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
@@ -82,6 +84,8 @@ pub fn allocate_klu_numeric(
 
         worksize,
         work,
+
+        metrics: KluNumericMetrics::default(),
     };
 
     Ok(numeric)
@@ -116,6 +120,7 @@ pub fn kernel_factor(
     // workspace
     x: &mut [f64],
     work: &mut [f64],
+    metrics: &mut KluNumericMetrics,
     config: &KluConfig,
 ) -> KluResult<usize> {
     debug_assert!(n > 0);
@@ -176,6 +181,7 @@ pub fn kernel_factor(
         offp,
         offi,
         offx,
+        metrics,
         &config,
     );
 }
@@ -255,6 +261,10 @@ pub fn factor(
 
             numeric.u_diag[k1] = diag_val;
             if diag_val == 0. {
+                if numeric.metrics.numerical_rank.is_none() {
+                    numeric.metrics.numerical_rank = Some(k1);
+                    numeric.metrics.singular_col = Some(oldcol);
+                }
                 if config.halt_if_singular {
                     return Err(KluError::SingularAtBlock { block });
                 }
@@ -296,6 +306,7 @@ pub fn factor(
                 &mut numeric.offx,
                 x,
                 work,
+                &mut numeric.metrics,
                 config,
             )?;
 

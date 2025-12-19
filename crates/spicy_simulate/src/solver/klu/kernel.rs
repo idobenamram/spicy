@@ -10,7 +10,10 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::{
-    klu::{get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig, KluError, KluResult},
+    klu::{
+        get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig, KluError, KluNumericMetrics,
+        KluResult,
+    },
     matrix::csc::CscMatrix,
     utils::{dunits, EMPTY, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
@@ -496,6 +499,7 @@ pub fn kernel(
     offp: &mut [usize],
     offi: &mut [usize],
     offx: &mut [f64],
+    metrics: &mut KluNumericMetrics,
     config: &KluConfig,
 ) -> KluResult<usize> {
     *lnz = 0;
@@ -545,7 +549,7 @@ pub fn kernel(
             }
             let new_lusize = config.memgrow * (lusize as f64) + (2 * n + 1) as f64;
             lu_block.resize(new_lusize as usize, 0.);
-            // TODO: add realloc metric
+            metrics.nrealloc += 1;
             lusize = new_lusize as usize;
         }
 
@@ -618,8 +622,14 @@ pub fn kernel(
             &mut first_row,
             config,
         )? {
-            // TODO: set metrics
-            todo!()
+            // Matrix is structurally (or numerically) singular, but we keep going.
+            // Record the first column where a zero pivot was encountered.
+            if metrics.numerical_rank.is_none() {
+                metrics.numerical_rank = Some(k + k1);
+                let oldcol = col_permutation[k + k1];
+                debug_assert!(oldcol >= 0);
+                metrics.singular_col = Some(oldcol as usize);
+            }
         }
 
         debug_assert!(piv_row >= 0 && piv_row < n);
@@ -664,8 +674,7 @@ pub fn kernel(
 
         if piv_row != diag_row {
             // an off-diagonal pivot has been chosen
-            // TODO: add noffdiag metric
-            // config.noffdiag += 1;
+            metrics.noffdiag += 1;
 
             if inverse_row_permutation[diag_row as usize] < 0 {
                 // the former diagonal row index, diagrow, has not yet been

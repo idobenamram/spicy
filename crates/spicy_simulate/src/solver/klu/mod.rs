@@ -109,6 +109,23 @@ pub(crate) struct KluSymbolic {
     row_scaling: Vec<isize>,
 }
 
+/// Statistics produced by numeric factorization/refactorization.
+///
+/// In the original SuiteSparse KLU implementation these live in `KLU_common`.
+/// For this Rust port we keep them on the `KluNumeric` object itself.
+#[derive(Debug, Clone, Default)]
+pub struct KluNumericMetrics {
+    /// Number of LU workspace growth reallocations performed during factorization.
+    pub nrealloc: usize,
+    /// Number of off-diagonal pivots selected during factorization.
+    pub noffdiag: usize,
+    /// First \(k\) for which a zero pivot `U(k,k)` was encountered (0-based, in the
+    /// permuted system), if detected.
+    pub numerical_rank: Option<usize>,
+    /// Original column index in the input matrix `A` that corresponds to `numerical_rank`, if any.
+    pub singular_col: Option<usize>,
+}
+
 pub struct KluNumeric {
     // A is n-by-n
     pub n: usize,
@@ -159,6 +176,8 @@ pub struct KluNumeric {
     pub offx: Vec<f64>,
     // number of off-diagonal entries
     pub nzoff: usize,
+
+    pub metrics: KluNumericMetrics,
 }
 
 impl std::fmt::Debug for KluNumeric {

@@ -56,8 +56,8 @@ pub fn btf(
         // assign for each unmatched row
         for col in 0..n {
             if column_permutations[col] == -1 && nbadcol > 0 {
-                let j = unmatched[nbadcol];
                 nbadcol -= 1;
+                let j = unmatched[nbadcol];
                 column_permutations[col] = flip(j as isize);
             }
         }

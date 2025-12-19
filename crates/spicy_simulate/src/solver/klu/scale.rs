@@ -9,7 +9,11 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use crate::solver::{klu::KluScale, matrix::csc::CscMatrix, utils::EMPTY};
+use crate::solver::{
+    klu::{KluError, KluResult, KluScale},
+    matrix::csc::CscMatrix,
+    utils::EMPTY,
+};
 
 /// A must be a valid CSC matrix.
 pub fn scale(
@@ -17,7 +21,7 @@ pub fn scale(
     rs: &mut Vec<f64>,
     mut w: Option<&mut Vec<isize>>,
     scale: Option<KluScale>,
-) -> Result<(), String> {
+) -> KluResult<()> {
     let n = a.dim.nrows;
     let ncols = a.dim.ncols;
 
@@ -44,7 +48,7 @@ pub fn scale(
 
             if let Some(w) = w.as_deref_mut() {
                 if w[row] == col as isize {
-                    return Err(format!("duplicate entry in column {} and row {}", col, row));
+                    return Err(KluError::DuplicateEntry { col, row });
                 }
                 w[row] = col as isize;
             }

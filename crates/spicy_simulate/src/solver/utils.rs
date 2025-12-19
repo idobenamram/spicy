@@ -1,4 +1,5 @@
 use std::{mem, slice};
+use thiserror::Error;
 
 pub const EMPTY: isize = -1;
 
@@ -92,20 +93,27 @@ pub(crate) unsafe fn as_usize_slice(s: &[isize]) -> &[usize] {
 /// Here `Unit` is `f64` (the numeric storage type for LU data).  This helper
 /// returns how many `Unit`-sized slots are required to store `n` values of
 /// type `T`, rounding up, and checks for overflow.
-pub(crate) fn dunits<T>(n: usize) -> Result<usize, String> {
+#[derive(Debug, Error)]
+pub(crate) enum SolverOverflowError {
+    #[error("overflow computing {context}")]
+    Overflow { context: &'static str },
+}
+
+pub(crate) fn dunits<T>(n: usize) -> Result<usize, SolverOverflowError> {
     let type_bytes = mem::size_of::<T>();
     let unit_bytes = mem::size_of::<f64>();
 
     // bytes = sizeof(T) * n  (checked to avoid overflow)
-    let bytes = type_bytes
-        .checked_mul(n)
-        .ok_or_else(|| "overflow computing DUNITS byte count".to_string())?;
+    let bytes = type_bytes.checked_mul(n).ok_or(SolverOverflowError::Overflow {
+        context: "DUNITS byte count",
+    })?;
 
     // ceil(bytes / unit_bytes)
     let units = bytes
         .checked_add(unit_bytes - 1)
-        .ok_or_else(|| "overflow computing DUNITS units".to_string())?
-        / unit_bytes;
+        .ok_or(SolverOverflowError::Overflow {
+            context: "DUNITS units",
+        })? / unit_bytes;
 
     Ok(units)
 }

@@ -109,6 +109,7 @@ pub(crate) fn btf_max_transversal(
 ) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
+    column_permutations.fill(-1);
 
     let mut cheap: Vec<usize> = vec![0; n];
     // flag in davis's code

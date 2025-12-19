@@ -10,9 +10,9 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::{
-    klu::{KluConfig, get_pointers_to_lu, get_pointers_to_lu_mut},
+    klu::{get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig, KluError, KluResult},
     matrix::csc::CscMatrix,
-    utils::{EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
+    utils::{dunits, EMPTY, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
 
 fn get_free_pointer(lu: &mut Vec<f64>, lup: usize) -> (&mut [f64], &mut [usize]) {
@@ -72,7 +72,7 @@ fn dfs(
         // until finding another non-visited pivotal node
         let (_, li) = get_column_pointer(lu_before, lip[jnew]);
 
-        let mut pos = ap_pos[head as usize];
+        let mut pos = ap_pos[head as usize] - 1;
         while pos >= 0 {
             let i = li[pos as usize];
             if flag[i] != k as isize {
@@ -132,7 +132,7 @@ fn lsolve_symbolic(
 
     k1: usize,
     psinv: &[isize], // inverse of P from symbolic factorization
-) -> Result<usize, String> {
+) -> KluResult<usize> {
     let n = a.dim.ncols;
     let mut top = n;
     let mut l_length = 0;
@@ -246,7 +246,7 @@ fn lsolve_numeric(
 
     // on output X [Ui [up1..up-1]] and X [Li [lp1..lp-1]]
     x: &mut [f64],
-) -> Result<(), String> {
+) -> KluResult<()> {
     // solve Lx=b
     for s in top..n {
         let j = stack[s];
@@ -281,11 +281,11 @@ fn lpivot(
 
     p_firstrow: &mut usize,
     config: &KluConfig,
-) -> Result<bool, String> {
+) -> KluResult<bool> {
     let mut piv_row = EMPTY;
     if llen[k] == 0 {
         if config.halt_if_singular {
-            return Err(format!("matrix is structurally singular"));
+            return Err(KluError::StructurallySingular);
         }
         let mut firstrow = *p_firstrow;
         while firstrow < n {
@@ -377,7 +377,7 @@ fn lpivot(
     *p_abs_pivot = abs_pivot;
 
     if pivot == 0.0 && config.halt_if_singular {
-        return Err(format!("matrix is structurally singular"));
+        return Err(KluError::StructurallySingular);
     }
 
     // divide L by the pivot value
@@ -402,7 +402,7 @@ fn prune(
     llen: &[usize],
     uip: &[usize],
     ulen: &[usize],
-) -> Result<(), String> {
+) -> KluResult<()> {
     // check if any column of L can be pruned
     // NOTE: we intentionally avoid holding a long-lived immutable borrow of
     // `lu` (for Ui) at the same time as a mutable borrow (for Li) to satisfy
@@ -497,7 +497,7 @@ pub fn kernel(
     offi: &mut [usize],
     offx: &mut [f64],
     config: &KluConfig,
-) -> Result<usize, String> {
+) -> KluResult<usize> {
     *lnz = 0;
     *unz = 0;
 
@@ -539,7 +539,9 @@ pub fn kernel(
             // how much to grow
             let max_size = config.memgrow * (lusize as f64) + (4 * n + 1) as f64;
             if max_size.is_infinite() {
-                return Err(format!("too large"));
+                return Err(KluError::TooLarge {
+                    context: "kernel LU workspace",
+                });
             }
             let new_lusize = config.memgrow * (lusize as f64) + (2 * n + 1) as f64;
             lu_block.resize(new_lusize as usize, 0.);

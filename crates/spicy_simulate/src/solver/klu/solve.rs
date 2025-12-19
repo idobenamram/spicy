@@ -9,7 +9,9 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use crate::solver::klu::{KluConfig, KluNumeric, KluSymbolic, get_pointers_to_lu, klu_valid};
+use crate::solver::klu::{
+    get_pointers_to_lu, klu_valid, KluConfig, KluError, KluNumeric, KluResult, KluSymbolic,
+};
 
 /// solve Lx = b, Assumes L is unit lower triangular and where the unit diagonal
 /// entry is NOT stored.
@@ -23,7 +25,7 @@ fn klu_lsolve(
     nrhs: usize,
     // right-hand-side on input, solution to Lx=b on output
     x: &mut [f64],
-) -> Result<(), String> {
+) -> KluResult<()> {
     let mut temp = [0.0; 4];
 
     match nrhs {
@@ -103,7 +105,7 @@ fn klu_usolve(
     nrhs: usize,
     // right-hand-side on input, solution to Ux=b on output
     x: &mut [f64],
-) -> Result<(), String> {
+) -> KluResult<()> {
     let mut temp = [0.0; 4];
 
     match nrhs {
@@ -193,25 +195,24 @@ pub(crate) fn solve(
     // right-hand-side on input, overwritten with solution to Ax=b on output
     b: &mut [f64],
     config: &KluConfig,
-) -> Result<(), String> {
+) -> KluResult<()> {
     if d < symbolic.n {
-        return Err(format!(
-            "leading dimension of B must be >= n: d = {}, n = {}",
-            d, symbolic.n
-        ));
+        return Err(KluError::InvalidLeadingDimension {
+            d,
+            n: symbolic.n,
+        });
     }
     // B is column-oriented with leading dimension d, so it must have at least d*nrhs entries.
     let b_required = d
         .checked_mul(nrhs)
-        .ok_or_else(|| "overflow computing required B length".to_string())?;
+        .ok_or(KluError::overflow("required B length d*nrhs"))?;
     if b.len() < b_required {
-        return Err(format!(
-            "B too small: need at least d*nrhs = {} entries (d={}, nrhs={}), got {}",
-            b_required,
+        return Err(KluError::RhsTooSmall {
+            required: b_required,
             d,
             nrhs,
-            b.len()
-        ));
+            actual: b.len(),
+        });
     }
 
     let n = symbolic.n;

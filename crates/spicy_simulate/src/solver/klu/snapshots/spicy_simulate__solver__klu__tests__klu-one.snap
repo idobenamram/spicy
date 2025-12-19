@@ -1,0 +1,50 @@
+---
+source: crates/spicy_simulate/src/solver/klu/mod.rs
+expression: "(n, nnz, is_square, seed, run, x_preview)"
+---
+(
+    2,
+    0,
+    true,
+    1875936278307560623,
+    FactorError {
+        symbolic: KluSymbolic {
+            ordering: Amd,
+            n: 2,
+            nz: 0,
+            nzoff: 0,
+            nblocks: 1,
+            maxblock: 2,
+            structural_rank: 0,
+            symmetry: -1.0,
+            lnz: 3.0,
+            unz: 3.0,
+            lower_nz: [
+                3.0,
+                0.0,
+            ],
+            row_permutation: [
+                0,
+                1,
+            ],
+            column_permutation: [
+                0,
+                1,
+            ],
+            row_scaling: [
+                0,
+                2,
+                0,
+            ],
+        },
+        error: StructurallySingular,
+    },
+    VecPreview {
+        len: 2,
+        head: [
+            4.0,
+            -9.0,
+        ],
+        tail: [],
+    },
+)

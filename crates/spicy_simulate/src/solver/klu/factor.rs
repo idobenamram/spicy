@@ -9,17 +9,15 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use crate::solver::klu::{KluConfig, KluNumeric, KluSymbolic, scale::scale};
+use crate::solver::klu::{scale::scale, KluConfig, KluError, KluNumeric, KluResult, KluSymbolic};
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
 use crate::solver::matrix::csc::CscMatrix;
-use crate::solver::utils::{
-    as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation,
-};
+use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
 
 pub fn allocate_klu_numeric(
     symbolic: &KluSymbolic,
     config: &KluConfig,
-) -> Result<KluNumeric, String> {
+) -> KluResult<KluNumeric> {
     let n = symbolic.n;
     let nzoff = symbolic.nzoff;
     let nblocks = symbolic.nblocks;
@@ -43,14 +41,16 @@ pub fn allocate_klu_numeric(
      */
     let s = n
         .checked_mul(std::mem::size_of::<f64>())
-        .ok_or("overflow")?;
+        .ok_or(KluError::overflow("n * sizeof(f64) for workspace"))?;
     let n3 = n
         .checked_mul(3 * std::mem::size_of::<f64>())
-        .ok_or("overflow")?;
+        .ok_or(KluError::overflow("3 * n * sizeof(f64) for workspace"))?;
     let b6 = maxblock
         .checked_mul(6 * std::mem::size_of::<isize>())
-        .ok_or("overflow")?;
-    let worksize = s.checked_add(std::cmp::max(n3, b6)).ok_or("overflow")?;
+        .ok_or(KluError::overflow("6 * maxblock * sizeof(isize) for workspace"))?;
+    let worksize = s
+        .checked_add(std::cmp::max(n3, b6))
+        .ok_or(KluError::overflow("total workspace size"))?;
     let worksize_f64 = (worksize + std::mem::size_of::<f64>() - 1) / std::mem::size_of::<f64>();
     // allocate with f64 for alignment
     let work = vec![0.0; worksize_f64];
@@ -117,7 +117,7 @@ pub fn kernel_factor(
     x: &mut [f64],
     work: &mut [f64],
     config: &KluConfig,
-) -> Result<usize, String> {
+) -> KluResult<usize> {
     debug_assert!(n > 0);
 
     if lsize <= 0. {
@@ -184,7 +184,7 @@ pub fn factor(
     a: &CscMatrix,
     symbolic: &mut KluSymbolic,
     config: &mut KluConfig,
-) -> Result<KluNumeric, String> {
+) -> KluResult<KluNumeric> {
     config.validate()?;
     let mut numeric = allocate_klu_numeric(symbolic, config)?;
 
@@ -256,7 +256,7 @@ pub fn factor(
             numeric.u_diag[k1] = diag_val;
             if diag_val == 0. {
                 if config.halt_if_singular {
-                    return Err(format!("singular matrix at block {}", block));
+                    return Err(KluError::SingularAtBlock { block });
                 }
             }
 

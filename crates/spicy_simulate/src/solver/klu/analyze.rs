@@ -9,23 +9,26 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use std::{cmp::max, iter::Empty};
+use std::cmp::max;
 
 use crate::solver::{
-    klu::{KluConfig, KluOrdering, KluSymbolic, amd::amd, btf::btf, klu_valid},
+    klu::{amd::amd, btf::btf, klu_valid, KluConfig, KluOrdering, KluResult, KluSymbolic},
     matrix::csc::CscMatrix,
     utils::{EMPTY, inverse_permutation, unflip},
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
     debug_assert!(a.is_square(), "Klu analyze only supports square matrices");
+    debug_assert!(a.check_invariants().is_ok(), "Klu analyze only supports valid CSC matrices");
     let n = a.dim.ncols;
     let mut row_permutation = vec![-1; n];
     for col in 0..n {
         let start = a.col_start(col);
         let end = a.col_end(col);
-        for i in start..end {
-            row_permutation[i] = col as isize;
+        for p in start..end {
+            let row = a.row_index(p);
+            debug_assert!(row < n);
+            row_permutation[row] = col as isize;
         }
     }
 
@@ -145,7 +148,7 @@ fn analyze_worker(
 }
 
 // a was already is validated by the caller to be a valid CSC matrix
-pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<KluSymbolic, String> {
+pub fn analyze(a: &CscMatrix, config: &KluConfig) -> KluResult<KluSymbolic> {
     let mut symbolic = allocate_symbolic(a);
     symbolic.ordering = config.ordering;
 
@@ -155,7 +158,8 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> Result<KluSymbolic, String>
 
     // allocate memory for btf
     let mut btf_row_permutation = vec![0; symbolic.n];
-    let mut btf_column_permutation = vec![0; symbolic.n];
+    // btf_max_transversal expects the match array to start at -1 (unmatched).
+    let mut btf_column_permutation = vec![-1; symbolic.n];
     let number_of_scc_blocks;
     let mut maxblock;
 

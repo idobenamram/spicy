@@ -12,14 +12,17 @@
 mod amd;
 mod analyze;
 mod btf;
+mod error;
 mod factor;
 mod kernel;
 mod scale;
 mod solve;
+mod refactor;
 
 use std::{mem, slice};
 
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
+pub(crate) use error::{KluError, KluResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -73,7 +76,7 @@ impl Default for KluConfig {
 }
 
 impl KluConfig {
-    fn validate(&mut self) -> Result<(), String> {
+    fn validate(&mut self) -> KluResult<()> {
         self.initmem_amd = self.initmem_amd.max(1.);
         self.initmem = self.initmem.max(10.);
         self.tol = self.tol.min(1.);
@@ -84,7 +87,8 @@ impl KluConfig {
     }
 }
 
-struct KluSymbolic {
+#[derive(Debug, Clone)]
+pub(crate) struct KluSymbolic {
     ordering: KluOrdering,
 
     n: usize,
@@ -104,47 +108,6 @@ struct KluSymbolic {
     // TODO:  this should just be block boundaries
     row_scaling: Vec<isize>,
 }
-/*
-typedef struct
-{
-    /* LU factors of each block, the pivot row permutation, and the
-     * entries in the off-diagonal blocks */
-
-    int32_t n ;             /* A is n-by-n */
-    int32_t nblocks ;       /* number of diagonal blocks */
-    int32_t lnz ;           /* actual nz in L, including diagonal */
-    int32_t unz ;           /* actual nz in U, including diagonal */
-    int32_t max_lnz_block ; /* max actual nz in L in any one block, incl. diag */
-    int32_t max_unz_block ; /* max actual nz in U in any one block, incl. diag */
-    int32_t *Pnum ;         /* size n. final pivot permutation */
-    int32_t *Pinv ;         /* size n. inverse of final pivot permutation */
-
-    /* LU factors of each block */
-    int32_t *Lip ;          /* size n. pointers into LUbx[block] for L */
-    int32_t *Uip ;          /* size n. pointers into LUbx[block] for U */
-    int32_t *Llen ;         /* size n. Llen [k] = # of entries in kth column of L */
-    int32_t *Ulen ;         /* size n. Ulen [k] = # of entries in kth column of U */
-    void **LUbx ;       /* L and U indices and entries (excl. diagonal of U) */
-    size_t *LUsize ;    /* size of each LUbx [block], in sizeof (Unit) */
-    void *Udiag ;       /* diagonal of U */
-
-    /* scale factors; can be NULL if no scaling */
-    double *Rs ;        /* size n. Rs [i] is scale factor for row i */
-
-    /* permanent workspace for factorization and solve */
-    size_t worksize ;   /* size (in bytes) of Work */
-    void *Work ;        /* workspace */
-    void *Xwork ;       /* alias into Numeric->Work */
-    int32_t *Iwork ;        /* alias into Numeric->Work */
-
-    /* off-diagonal entries in a conventional compressed-column sparse matrix */
-    int32_t *Offp ;         /* size n+1, column pointers */
-    int32_t *Offi ;         /* size nzoff, row indices */
-    void *Offx ;        /* size nzoff, numerical values */
-    int32_t nzoff ;
-
-} klu_numeric ;
-*/
 
 pub struct KluNumeric {
     // A is n-by-n
@@ -196,6 +159,53 @@ pub struct KluNumeric {
     pub offx: Vec<f64>,
     // number of off-diagonal entries
     pub nzoff: usize,
+}
+
+impl std::fmt::Debug for KluNumeric {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // NOTE: `lu_bx` and `work` are packed buffers (indices stored inside `Vec<f64>`),
+        // and dumping them would be both huge and misleading.
+        //
+        // For snapshot tests we keep this intentionally minimal and stable:
+        // - permutations / scaling (`pnum`, `rs`)
+        // - structural metrics (`lnz`, `unz`, `max_*`, `lu_size`)
+
+        struct Preview<'a, T> {
+            v: &'a [T],
+            max: usize,
+        }
+        impl<T: std::fmt::Debug> std::fmt::Debug for Preview<'_, T> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let n = self.v.len();
+                let max = self.max.max(1);
+                if n <= max {
+                    return f.debug_list().entries(self.v.iter()).finish();
+                }
+                let head = max / 2;
+                let tail = max - head;
+                let mut list = f.debug_list();
+                list.entries(self.v.iter().take(head));
+                list.entry(&format_args!(".. (len={}) ..", n));
+                list.entries(self.v.iter().skip(n - tail));
+                list.finish()
+            }
+        }
+        fn pv<'a, T: std::fmt::Debug>(v: &'a [T]) -> Preview<'a, T> {
+            // big enough to show full vectors for small/medium fixtures (like n=100),
+            // but still bounded for very large cases.
+            Preview { v, max: 512 }
+        }
+
+        let mut s = f.debug_struct("KluNumeric");
+        s.field("pnum", &pv(&self.pnum))
+            .field("rs", &self.rs)
+            .field("lnz", &self.lnz)
+            .field("unz", &self.unz)
+            .field("max_lnz_block", &self.max_lnz_block)
+            .field("max_unz_block", &self.max_unz_block)
+            .field("lu_size", &pv(&self.lu_size));
+        s.finish()
+    }
 }
 
 impl KluNumeric {
@@ -252,7 +262,7 @@ pub(crate) fn get_pointers_to_lu_mut<'a>(
     xip: &[usize],
     xlen: &[usize],
     k: usize,
-) -> Result<(&'a mut [usize], &'a mut [f64], usize), String> {
+) -> KluResult<(&'a mut [usize], &'a mut [f64], usize)> {
     let (_, xp) = lu.split_at_mut(xip[k]);
     let len = dunits::<usize>(xlen[k])?;
     let (xi, xx) = xp.split_at_mut(len);
@@ -265,7 +275,7 @@ pub(crate) fn get_pointers_to_lu<'a>(
     xip: &[usize],
     xlen: &[usize],
     k: usize,
-) -> Result<(&'a [usize], &'a [f64], usize), String> {
+) -> KluResult<(&'a [usize], &'a [f64], usize)> {
     let (_, xp) = lu.split_at(xip[k]);
     let len = dunits::<usize>(xlen[k])?;
     let (xi, xx) = xp.split_at(len);
@@ -279,7 +289,7 @@ pub(crate) fn klu_valid_lu(
     xip: &[usize],
     xlen: &[usize],
     lu: &[f64],
-) -> Result<bool, String> {
+) -> KluResult<bool> {
     if n == 0 {
         return Ok(false);
     }
@@ -313,81 +323,180 @@ pub(crate) fn klu_valid_lu(
     Ok(true)
 }
 
-/*
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::solver::matrix::{csc::CscMatrix, mtx::load_matrix_market_csc_file};
+    use rstest::rstest;
+    use std::path::PathBuf;
 
-typedef struct klu_common_struct
-{
+    #[derive(Debug)]
+    enum KluRunSnapshot {
+        Skipped { reason: String },
+        AnalyzeError { error: KluError },
+        FactorError { symbolic: KluSymbolic, error: KluError },
+        SolveError {
+            symbolic: KluSymbolic,
+            numeric: KluNumeric,
+            error: KluError,
+        },
+        Solved {
+            symbolic: KluSymbolic,
+            numeric: KluNumeric,
+            max_abs_residual: f64,
+        },
+    }
 
-    /* ---------------------------------------------------------------------- */
-    /* parameters */
-    /* ---------------------------------------------------------------------- */
+    #[derive(Debug)]
+    struct VecPreview {
+        len: usize,
+        head: Vec<f64>,
+        tail: Vec<f64>,
+    }
 
-    double tol ;            /* pivot tolerance for diagonal preference */
-    double memgrow ;        /* realloc memory growth size for LU factors */
-    double initmem_amd ;    /* init. memory size with AMD: c*nnz(L) + n */
-    double initmem ;        /* init. memory size: c*nnz(A) + n */
-    double maxwork ;        /* maxwork for BTF, <= 0 if no limit */
+    fn preview_vec(v: &[f64]) -> VecPreview {
+        let len = v.len();
+        if len <= 32 {
+            return VecPreview {
+                len,
+                head: v.to_vec(),
+                tail: vec![],
+            };
+        }
+        let head = v.iter().copied().take(16).collect::<Vec<_>>();
+        let tail = v.iter().copied().skip(len - 16).collect::<Vec<_>>();
+        VecPreview { len, head, tail }
+    }
 
-    int btf ;               /* use BTF pre-ordering, or not */
-    int ordering ;          /* 0: AMD, 1: COLAMD, 2: user P and Q,
-                             * 3: user function */
-    int scale ;             /* row scaling: -1: none (and no error check),
-                             * 0: none, 1: sum, 2: max */
+    fn csc_matvec(a: &CscMatrix, x: &[f64]) -> Vec<f64> {
+        debug_assert_eq!(a.dim.ncols, x.len());
+        let mut y = vec![0.0; a.dim.nrows];
+        for j in 0..a.dim.ncols {
+            a.axpy_into_dense_col(j, x[j], &mut y);
+        }
+        y
+    }
 
-    /* pointer to user ordering function */
-    int32_t (*user_order) (int32_t, int32_t *, int32_t *, int32_t *,
-        struct klu_common_struct *) ;
+    fn fnv1a64(s: &str) -> u64 {
+        let mut h: u64 = 0xcbf29ce484222325;
+        for &b in s.as_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        h
+    }
 
-    /* pointer to user data, passed unchanged as the last parameter to the
-     * user ordering function (optional, the user function need not use this
-     * information). */
-    void *user_data ;
+    struct XorShift64 {
+        state: u64,
+    }
 
-    int halt_if_singular ;      /* how to handle a singular matrix:
-        * FALSE: keep going.  Return a Numeric object with a zero U(k,k).  A
-        *   divide-by-zero may occur when computing L(:,k).  The Numeric object
-        *   can be passed to klu_solve (a divide-by-zero will occur).  It can
-        *   also be safely passed to klu_refactor.
-        * TRUE: stop quickly.  klu_factor will free the partially-constructed
-        *   Numeric object.  klu_refactor will not free it, but will leave the
-        *   numerical values only partially defined.  This is the default. */
+    impl XorShift64 {
+        fn new(seed: u64) -> Self {
+            Self {
+                state: if seed == 0 { 0x9e3779b97f4a7c15 } else { seed },
+            }
+        }
 
-    /* ---------------------------------------------------------------------- */
-    /* statistics */
-    /* ---------------------------------------------------------------------- */
+        fn next_u64(&mut self) -> u64 {
+            // xorshift64*
+            let mut x = self.state;
+            x ^= x >> 12;
+            x ^= x << 25;
+            x ^= x >> 27;
+            self.state = x;
+            x.wrapping_mul(0x2545f4914f6cdd1d)
+        }
+    }
 
-    int status ;                /* KLU_OK if OK, < 0 if error */
-    int nrealloc ;              /* # of reallocations of L and U */
+    fn seeded_random_b(n: usize, seed: u64) -> Vec<f64> {
+        let mut rng = XorShift64::new(seed);
+        let mut b = Vec::with_capacity(n);
+        for _ in 0..n {
+            // integer-valued RHS is deterministic and stable in debug output
+            let v = (rng.next_u64() % 21) as i64 - 10; // [-10, 10]
+            b.push(v as f64);
+        }
+        if b.iter().all(|&x| x == 0.0) && n > 0 {
+            b[0] = 1.0;
+        }
+        b
+    }
 
-    int32_t structural_rank ;       /* 0 to n-1 if the matrix is structurally rank
-        * deficient (as determined by maxtrans).  -1 if not computed.  n if the
-        * matrix has full structural rank.  This is computed by klu_analyze
-        * if a BTF preordering is requested. */
+    #[rstest]
+    fn snapshot_klu_fixtures(#[files("src/solver/tests/klu/*.mtx")] input: PathBuf) {
+        let a = load_matrix_market_csc_file(&input).expect("load matrix market");
+        a.check_invariants().expect("csc invariants");
 
-    int32_t numerical_rank ;        /* First k for which a zero U(k,k) was found,
-        * if the matrix was singular (in the range 0 to n-1).  n if the matrix
-        * has full rank. This is not a true rank-estimation.  It just reports
-        * where the first zero pivot was found.  -1 if not computed.
-        * Computed by klu_factor and klu_refactor. */
+        let n = a.dim.ncols;
+        let nnz = a.nnz();
+        let is_square = a.is_square();
 
-    int32_t singular_col ;          /* n if the matrix is not singular.  If in the
-        * range 0 to n-1, this is the column index of the original matrix A that
-        * corresponds to the column of U that contains a zero diagonal entry.
-        * -1 if not computed.  Computed by klu_factor and klu_refactor. */
+        let fixture = input
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let seed = fnv1a64(&fixture) ^ ((n as u64) << 32) ^ (nnz as u64);
 
-    int32_t noffdiag ;      /* # of off-diagonal pivots, -1 if not computed */
+        let mut x = if is_square {
+            seeded_random_b(n, seed)
+        } else {
+            vec![]
+        };
+        let b_original = x.clone();
 
-    double flops ;      /* actual factorization flop count, from klu_flops */
-    double rcond ;      /* crude reciprocal condition est., from klu_rcond */
-    double condest ;    /* accurate condition est., from klu_condest */
-    double rgrowth ;    /* reciprocal pivot rgrowth, from klu_rgrowth */
-    double work ;       /* actual work done in BTF, in klu_analyze */
+        let run = if !is_square {
+            KluRunSnapshot::Skipped {
+                reason: "KLU only supports square matrices".to_string(),
+            }
+        } else {
+            // deterministic config for snapshots
+            let mut config = KluConfig::default();
+            config.btf = false;
+            config.scale = None;
 
-    size_t memusage ;   /* current memory usage, in bytes */
-    size_t mempeak ;    /* peak memory usage, in bytes */
+            match analyze::analyze(&a, &config) {
+                Err(error) => KluRunSnapshot::AnalyzeError { error },
+                Ok(symbolic) => {
+                    let mut symbolic = symbolic;
+                    match factor::factor(&a, &mut symbolic, &mut config) {
+                        Err(error) => KluRunSnapshot::FactorError { symbolic, error },
+                        Ok(mut numeric) => match solve::solve(
+                            &symbolic,
+                            &mut numeric,
+                            symbolic.n,
+                            1,
+                            &mut x,
+                            &config,
+                        ) {
+                            Err(error) => KluRunSnapshot::SolveError {
+                                symbolic,
+                                numeric,
+                                error,
+                            },
+                            Ok(()) => {
+                                let ax = csc_matvec(&a, &x);
+                                let max_abs_residual = ax
+                                    .iter()
+                                    .zip(b_original.iter())
+                                    .map(|(ai, bi)| (ai - bi).abs())
+                                    .fold(0.0, f64::max);
+                                KluRunSnapshot::Solved {
+                                    symbolic,
+                                    numeric,
+                                    max_abs_residual,
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        };
 
-} klu_common ;
+        let name = format!("klu-{fixture}");
+        // Keep a stable, bounded view of the output vector; it's the "x" result (or original b if failed).
+        let x_preview = preview_vec(&x);
 
+        insta::assert_debug_snapshot!(name, (n, nnz, is_square, seed, run, x_preview));
+    }
+}
 
-
-*/

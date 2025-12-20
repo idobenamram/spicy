@@ -22,8 +22,32 @@ pub fn load_matrix_market_csc_file(path: impl AsRef<Path>) -> Result<CscMatrix, 
     load_matrix_market_csc_from_reader(reader)
 }
 
+/// Load a sparse matrix from a MatrixMarket `.mtx` file (coordinate format) into CSC,
+/// **preserving explicit zero entries** from the file (i.e., they are kept as stored entries).
+pub fn load_matrix_market_csc_file_keep_zeros(
+    path: impl AsRef<Path>,
+) -> Result<CscMatrix, MatrixError> {
+    let f = File::open(path.as_ref()).map_err(MatrixMarketError::from)?;
+    let reader = BufReader::new(f);
+    load_matrix_market_csc_from_reader_keep_zeros(reader)
+}
+
 /// Same as [`load_matrix_market_csc_file`], but reads from any buffered reader (useful for tests).
 pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMatrix, MatrixError> {
+    load_matrix_market_csc_from_reader_impl(reader, false)
+}
+
+/// Same as [`load_matrix_market_csc_file_keep_zeros`], but reads from any buffered reader.
+pub fn load_matrix_market_csc_from_reader_keep_zeros<R: BufRead>(
+    reader: R,
+) -> Result<CscMatrix, MatrixError> {
+    load_matrix_market_csc_from_reader_impl(reader, true)
+}
+
+fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
+    reader: R,
+    keep_zeros: bool,
+) -> Result<CscMatrix, MatrixError> {
     let mut lines = reader.lines().enumerate();
 
     // Header (first non-empty line)
@@ -140,10 +164,16 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
         ))
     })?;
 
-    let mut b = MatrixBuilder::new(nrows, ncols);
+    let mut b = if keep_zeros {
+        MatrixBuilder::new_keep_zeros(nrows, ncols)
+    } else {
+        MatrixBuilder::new(nrows, ncols)
+    };
     b.reserve(nnz);
 
     let mut read_entries = 0usize;
+    let mut file_zero_values = 0usize;
+    let mut file_nonzero_values = 0usize;
     for (i, line) in lines {
         let line_no = i + 1;
         let line = line.map_err(MatrixMarketError::from)?;
@@ -212,6 +242,12 @@ pub fn load_matrix_market_csc_from_reader<R: BufRead>(reader: R) -> Result<CscMa
                 v
             }
         };
+
+        if val == 0.0 {
+            file_zero_values += 1;
+        } else {
+            file_nonzero_values += 1;
+        }
 
         // MatrixBuilder expects (column, row, value)
         b.push(col, row, val)?;

@@ -7,3 +7,6 @@ members = [
     "crates/spicy_cli",
     "fuzz",
 ]
+
+[profile.release]
+debug = 2

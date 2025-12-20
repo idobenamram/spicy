@@ -22,7 +22,10 @@ mod refactor;
 use std::{mem, slice};
 
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
-pub(crate) use error::{KluError, KluResult};
+pub use error::{KluError, KluResult};
+pub use analyze::analyze;
+pub use factor::factor;
+pub use solve::solve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -36,7 +39,7 @@ enum KluOrdering {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct KluConfig {
+pub struct KluConfig {
     /* pivot tolerance for diagonal preference */
     tol: f64,
     /* realloc memory growth size for LU factors */
@@ -88,7 +91,7 @@ impl KluConfig {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct KluSymbolic {
+pub struct KluSymbolic {
     ordering: KluOrdering,
 
     n: usize,

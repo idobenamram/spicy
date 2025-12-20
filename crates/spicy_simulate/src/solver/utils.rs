@@ -94,7 +94,7 @@ pub(crate) unsafe fn as_usize_slice(s: &[isize]) -> &[usize] {
 /// returns how many `Unit`-sized slots are required to store `n` values of
 /// type `T`, rounding up, and checks for overflow.
 #[derive(Debug, Error)]
-pub(crate) enum SolverOverflowError {
+pub enum SolverOverflowError {
     #[error("overflow computing {context}")]
     Overflow { context: &'static str },
 }

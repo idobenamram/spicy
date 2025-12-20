@@ -10,6 +10,7 @@
 
 use std::cmp::min;
 
+use crate::solver::utils::EMPTY;
 /// Block Triangular Form (BTF), Strongly Connected Components (SCC)
 /// the algorithm is described in the paper:
 /// "An implementation of Tarjan's algorithm for the Block Triangularization of a Matrix"
@@ -83,7 +84,7 @@ fn dfs(
             position_stack[column_head as usize] = m.col_start(column_after_permutation);
         }
 
-        let row_ptr = position_stack[column_head as usize];
+        let mut row_ptr = position_stack[column_head as usize];
         while row_ptr < end_of_column {
             // examine edge from node "col" to node "row"
             let row = m.row_index(row_ptr);
@@ -91,48 +92,52 @@ fn dfs(
                 position_stack[column_head as usize] = row_ptr + 1;
                 column_head += 1;
                 column_stack[column_head as usize] = row;
-                debug_assert!(graph_indices[row] == -1);
-                debug_assert!(low[row] == -1);
+                debug_assert!(graph_indices[row] == EMPTY);
+                debug_assert!(low[row] == EMPTY);
                 break;
             } else if visited[row] == UNASSIGNED {
                 // node "row" has been visited, but not assigned to a component block
                 // update the low value of the current node
                 debug_assert!(graph_indices[row] > 0);
                 debug_assert!(low[row] > 0);
-                low[col] = min(low[col], low[row]);
+                // Tarjan lowlink update for a back/cross edge to a node still on the stack:
+                // use the discovery time (graph_indices[row])
+                low[col] = min(low[col], graph_indices[row]);
             }
 
-            if row_ptr == end_of_column {
-                // all edges from node "col" have been examined
-                // pop from the column stack
-                column_head -= 1;
+            row_ptr += 1;
+            position_stack[column_head as usize] = row_ptr;
+        }
 
-                // found a SCC block
-                if low[col] == graph_indices[col] {
-                    loop {
-                        debug_assert!(column_head >= 0);
+        if row_ptr == end_of_column {
+            // all edges from node "col" have been examined
+            // pop from the column stack
+            column_head -= 1;
 
-                        // pop from the component stack
-                        let i = component_stack[column_head as usize];
-                        column_head -= 1;
-                        // debug_assert!(i >= 0);
-                        // we didn't somehow assign this already
-                        debug_assert!(visited[i] == UNASSIGNED);
-                        // add to the SCC block
-                        visited[i] = *number_of_scc_blocks;
-                        // if we've popped the root of the SCC block, we're done
-                        if i == col {
-                            break;
-                        }
+            // found a SCC block
+            if low[col] == graph_indices[col] {
+                loop {
+                    debug_assert!(component_head > 0);
+
+                    // pop from the component stack
+                    let i = component_stack[component_head];
+                    component_head -= 1;
+                    // we didn't somehow assign this already
+                    debug_assert!(visited[i] == UNASSIGNED);
+                    // add to the SCC block
+                    visited[i] = *number_of_scc_blocks;
+                    // if we've popped the root of the SCC block, we're done
+                    if i == col {
+                        break;
                     }
-                    *number_of_scc_blocks += 1;
                 }
+                *number_of_scc_blocks += 1;
+            }
 
-                // if parent exists update it
-                if column_head >= 0 {
-                    let parent = column_stack[column_head as usize];
-                    low[parent] = min(low[parent], low[col]);
-                }
+            // if parent exists update it
+            if column_head >= 0 {
+                let parent = column_stack[column_head as usize];
+                low[parent] = min(low[parent], low[col]);
             }
         }
     }
@@ -208,6 +213,12 @@ pub(crate) fn btf_scc(
 
     // we can merge the two loops,
     // but we are going to continue using the graph_indices array as a workspace
+    //
+    // IMPORTANT: `graph_indices` currently contains Tarjan DFS discovery indices (1..=n) for nodes,
+    // so we must reset the prefix-sum workspace before using it for block boundaries.
+    if number_of_scc_blocks > 0 {
+        graph_indices[0] = 0;
+    }
     for b in 1..number_of_scc_blocks {
         graph_indices[b] = graph_indices[b - 1] + boundary_array[b - 1];
     }

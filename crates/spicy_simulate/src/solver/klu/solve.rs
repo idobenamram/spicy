@@ -183,7 +183,7 @@ fn klu_usolve(
 
 // solve Ax =b using the symbolic and numeric objects from analyze
 // and factor.
-pub(crate) fn solve(
+pub fn solve(
     symbolic: &KluSymbolic,
     numeric: &mut KluNumeric,
 

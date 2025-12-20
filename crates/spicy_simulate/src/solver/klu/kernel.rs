@@ -117,6 +117,7 @@ fn dfs(
 }
 
 fn lsolve_symbolic(
+    n: usize,
     k: usize,
     a: &CscMatrix,
     col_permutation: &[isize],
@@ -136,7 +137,6 @@ fn lsolve_symbolic(
     k1: usize,
     psinv: &[isize], // inverse of P from symbolic factorization
 ) -> KluResult<usize> {
-    let n = a.dim.ncols;
     let mut top = n;
     let mut l_length = 0;
     let (lu_before, lik) = get_free_pointer(lu, lup);
@@ -186,6 +186,7 @@ fn lsolve_symbolic(
     Ok(top)
 }
 
+#[inline(never)]
 fn construct_column(
     k: usize,
     a: &CscMatrix,
@@ -256,11 +257,23 @@ fn lsolve_numeric(
         debug_assert!(inverse_row_permutation[j] >= 0);
         let jnew = inverse_row_permutation[j] as usize;
         let xj = x[j];
+        // Common in practice due to structural pattern being a superset and/or cancellation.
+        // Skipping saves a full scatter update (memory-bound).
+        if xj == 0.0 {
+            continue;
+        }
         let (li, lx, len) = get_pointers_to_lu(lu, lip, llen, jnew)?;
         debug_assert!(lip[jnew] <= lip[jnew + 1]);
         for p in 0..len {
-            //X [Li [p]] -= Lx [p] * xj ; */
-            x[li[p]] -= lx[p] * xj;
+            //x[li[p]] -= lx[p] * xj ; */
+            // SAFETY: The pointers li, lx, and x are only accessed at index 'p', 'p', and '*li_p', respectively.
+            // 'p' is in 0..len, where 'len' is obtained from get_pointers_to_lu and guaranteed by the implementation to
+            // not exceed the actual lengths of li and lx slices, making li.get_unchecked(p) and lx.get_unchecked(p) safe.
+            // The index '*li_p' refers to a valid row index in x, as per the LU decomposition structure, making x.get_unchecked_mut(*li_p) safe.
+            let li_p = unsafe { li.get_unchecked(p) };
+            let lx_p = unsafe { lx.get_unchecked(p) };
+            let value = unsafe { x.get_unchecked_mut(*li_p) };
+            *value -= *lx_p * xj;
         }
     }
 
@@ -558,6 +571,7 @@ pub fn kernel(
 
         // compute the nonzero patter of the kth column and L and U
         let top = lsolve_symbolic(
+            n,
             k,
             a,
             col_permutation,

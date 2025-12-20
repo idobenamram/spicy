@@ -13,7 +13,7 @@ use std::cmp::max;
 
 use crate::solver::{
     klu::{amd::amd, btf::btf, klu_valid, KluConfig, KluOrdering, KluResult, KluSymbolic},
-    matrix::csc::CscMatrix,
+    matrix::{csc::{CscMatrix, CscPointers}, Dim},
     utils::{EMPTY, inverse_permutation, unflip},
 };
 
@@ -121,7 +121,16 @@ fn analyze_worker(
             }
             lnz1 = size as f64 * (size as f64 + 1.) / 2.;
         } else if symbolic.ordering == KluOrdering::Amd {
-            let info = amd(a.as_pointers(), &mut block_row_permutation);
+            let block_ptrs = CscPointers::new(
+                Dim {
+                    nrows: size,
+                    ncols: size,
+                },
+                &block_col_pointers[..(size + 1)],
+                &block_row_pointers[..pc],
+            );
+
+            let info = amd(block_ptrs, &mut block_row_permutation[..size]);
             lnz1 = info.lnz + size as f64;
         } else {
             todo!()

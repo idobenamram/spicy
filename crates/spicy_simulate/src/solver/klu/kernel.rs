@@ -264,16 +264,53 @@ fn lsolve_numeric(
         }
         let (li, lx, len) = get_pointers_to_lu(lu, lip, llen, jnew)?;
         debug_assert!(lip[jnew] <= lip[jnew + 1]);
-        for p in 0..len {
-            //x[li[p]] -= lx[p] * xj ; */
-            // SAFETY: The pointers li, lx, and x are only accessed at index 'p', 'p', and '*li_p', respectively.
-            // 'p' is in 0..len, where 'len' is obtained from get_pointers_to_lu and guaranteed by the implementation to
-            // not exceed the actual lengths of li and lx slices, making li.get_unchecked(p) and lx.get_unchecked(p) safe.
-            // The index '*li_p' refers to a valid row index in x, as per the LU decomposition structure, making x.get_unchecked_mut(*li_p) safe.
-            let li_p = unsafe { li.get_unchecked(p) };
-            let lx_p = unsafe { lx.get_unchecked(p) };
-            let value = unsafe { x.get_unchecked_mut(*li_p) };
-            *value -= *lx_p * xj;
+        // This is fundamentally a scatter RMW into `x` (typically memory-bound).
+        // We optimize by:
+        // - avoiding bounds checks (raw pointers)
+        // - unrolling to increase MLP (more outstanding cache misses)
+        // - using FMA (`mul_add`) when available
+        // SAFETY: We use raw pointers to avoid bounds checks. The safety invariants are:
+        // - `p` is in `0..len`, where `len` is guaranteed by `get_pointers_to_lu` to not exceed
+        //   the actual lengths of `li` and `lx` slices, making `li_ptr.add(p)` and `lx_ptr.add(p)` safe.
+        // - For `x_ptr.add(i)`, the index `i = li[p]` refers to a valid row index in `x` as per the
+        //   LU decomposition structure (all indices in `li` are valid row indices), making the access safe.
+        // - The unrolled loop processes `p` in chunks of 4, with `p + k < len` checked before accessing `p + k`.
+        // - The remainder loop handles `p < len`, ensuring all accesses are within bounds.
+        unsafe {
+            let x_ptr = x.as_mut_ptr();
+            let li_ptr = li.as_ptr();
+            let lx_ptr = lx.as_ptr();
+
+            let mut p = 0usize;
+            while p + 4 <= len {
+                let i0 = *li_ptr.add(p);
+                let a0 = *lx_ptr.add(p);
+                let i1 = *li_ptr.add(p + 1);
+                let a1 = *lx_ptr.add(p + 1);
+                let i2 = *li_ptr.add(p + 2);
+                let a2 = *lx_ptr.add(p + 2);
+                let i3 = *li_ptr.add(p + 3);
+                let a3 = *lx_ptr.add(p + 3);
+
+                let x0 = x_ptr.add(i0);
+                *x0 = (-a0).mul_add(xj, *x0);
+                let x1 = x_ptr.add(i1);
+                *x1 = (-a1).mul_add(xj, *x1);
+                let x2 = x_ptr.add(i2);
+                *x2 = (-a2).mul_add(xj, *x2);
+                let x3 = x_ptr.add(i3);
+                *x3 = (-a3).mul_add(xj, *x3);
+
+                p += 4;
+            }
+
+            while p < len {
+                let i = *li_ptr.add(p);
+                let a = *lx_ptr.add(p);
+                let xp = x_ptr.add(i);
+                *xp = (-a).mul_add(xj, *xp);
+                p += 1;
+            }
         }
     }
 

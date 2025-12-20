@@ -196,9 +196,15 @@ impl<'a> StmtCursor<'a> {
         self.skip_ws();
         if let Some(t) = self.consume(TokenKind::Ident) {
             let ident_string = token_text(input, t);
-            let (first, name) = ident_string.split_at(1);
+            // Identifiers can be UTF-8; don't use byte offsets.
+            let mut chars = ident_string.chars();
+            let Some(first) = chars.next() else {
+                self.rewind(checkpoint);
+                return None;
+            };
+            let name = chars.as_str();
             // TODO: not sure this is correct
-            let found_device = DeviceType::from_str(first).ok() == Some(device);
+            let found_device = DeviceType::from_char(first).ok() == Some(device);
             if found_device {
                 return Some(name);
             }

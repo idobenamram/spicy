@@ -138,6 +138,6 @@ mod tests {
         assert_eq!(c2, &[0, 2]);
         assert_eq!(v2, &[2.0, 35.0]);
 
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 }

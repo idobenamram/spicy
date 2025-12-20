@@ -1,0 +1,773 @@
+{
+  "initial": {
+    "cheap": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "column_permutations": [
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+    ],
+    "column_stack": [
+      6,
+      6,
+      6,
+      6,
+      6
+    ],
+    "matrix_cols": 5,
+    "matrix_entries": [
+      [
+        0,
+        0,
+        1.0
+      ],
+      [
+        0,
+        1,
+        1.0
+      ],
+      [
+        0,
+        4,
+        1.0
+      ],
+      [
+        1,
+        1,
+        1.0
+      ],
+      [
+        1,
+        2,
+        1.0
+      ],
+      [
+        1,
+        4,
+        1.0
+      ],
+      [
+        2,
+        0,
+        1.0
+      ],
+      [
+        2,
+        2,
+        1.0
+      ],
+      [
+        2,
+        3,
+        1.0
+      ],
+      [
+        2,
+        4,
+        1.0
+      ],
+      [
+        3,
+        2,
+        1.0
+      ],
+      [
+        3,
+        3,
+        1.0
+      ],
+      [
+        4,
+        3,
+        1.0
+      ]
+    ],
+    "matrix_rows": 5,
+    "position_stack": [
+      6,
+      6,
+      6,
+      6,
+      6
+    ],
+    "row_stack": [
+      6,
+      6,
+      6,
+      6,
+      6
+    ],
+    "visited": [
+      6,
+      6,
+      6,
+      6,
+      6
+    ]
+  },
+  "steps": [
+    {
+      "index": 0,
+      "line": 164,
+      "name": "cheap",
+      "type": "array",
+      "value": 0
+    },
+    {
+      "index": 1,
+      "line": 164,
+      "name": "cheap",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "index": 2,
+      "line": 164,
+      "name": "cheap",
+      "type": "array",
+      "value": 6
+    },
+    {
+      "index": 3,
+      "line": 164,
+      "name": "cheap",
+      "type": "array",
+      "value": 10
+    },
+    {
+      "index": 4,
+      "line": 164,
+      "name": "cheap",
+      "type": "array",
+      "value": 12
+    },
+    {
+      "line": 169,
+      "name": "col",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "line": 16,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "index": 0,
+      "line": 19,
+      "name": "column_stack",
+      "type": "array",
+      "value": 0
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 0,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 0
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 0,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 1
+    },
+    {
+      "index": 0,
+      "line": 51,
+      "name": "row_stack",
+      "type": "array",
+      "value": 0
+    },
+    {
+      "line": 113,
+      "type": "step"
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 0,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 0
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": -1
+    },
+    {
+      "line": 169,
+      "name": "col",
+      "type": "number",
+      "value": 1
+    },
+    {
+      "line": 16,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "index": 0,
+      "line": 19,
+      "name": "column_stack",
+      "type": "array",
+      "value": 1
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 1
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 1,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 1
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 1,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "index": 0,
+      "line": 51,
+      "name": "row_stack",
+      "type": "array",
+      "value": 1
+    },
+    {
+      "line": 113,
+      "type": "step"
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 1,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 1
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": -1
+    },
+    {
+      "line": 169,
+      "name": "col",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "line": 16,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "index": 0,
+      "line": 19,
+      "name": "column_stack",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 8
+    },
+    {
+      "index": 0,
+      "line": 51,
+      "name": "row_stack",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 113,
+      "type": "step"
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": -1
+    },
+    {
+      "line": 169,
+      "name": "col",
+      "type": "number",
+      "value": 3
+    },
+    {
+      "line": 16,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "index": 0,
+      "line": 19,
+      "name": "column_stack",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 3
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 3,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 3,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 12
+    },
+    {
+      "index": 0,
+      "line": 51,
+      "name": "row_stack",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 113,
+      "type": "step"
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 3,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": -1
+    },
+    {
+      "line": 169,
+      "name": "col",
+      "type": "number",
+      "value": 4
+    },
+    {
+      "line": 16,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "index": 0,
+      "line": 19,
+      "name": "column_stack",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 4
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 4,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 4,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 13
+    },
+    {
+      "index": 0,
+      "line": 60,
+      "name": "position_stack",
+      "type": "array",
+      "value": 12
+    },
+    {
+      "line": 68,
+      "name": "row_ptr",
+      "type": "number",
+      "value": 12
+    },
+    {
+      "line": 70,
+      "type": "step"
+    },
+    {
+      "line": 72,
+      "name": "row",
+      "type": "number",
+      "value": 3
+    },
+    {
+      "line": 74,
+      "name": "col",
+      "type": "number",
+      "value": 3
+    },
+    {
+      "line": 76,
+      "type": "step"
+    },
+    {
+      "index": 0,
+      "line": 79,
+      "name": "position_stack",
+      "type": "array",
+      "value": 13
+    },
+    {
+      "index": 0,
+      "line": 86,
+      "name": "row_stack",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 92,
+      "name": "head",
+      "type": "number",
+      "value": 1
+    },
+    {
+      "index": 1,
+      "line": 95,
+      "name": "column_stack",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 3
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 3,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "index": 3,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 12
+    },
+    {
+      "index": 1,
+      "line": 60,
+      "name": "position_stack",
+      "type": "array",
+      "value": 10
+    },
+    {
+      "line": 68,
+      "name": "row_ptr",
+      "type": "number",
+      "value": 10
+    },
+    {
+      "line": 70,
+      "type": "step"
+    },
+    {
+      "line": 72,
+      "name": "row",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "line": 74,
+      "name": "col",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "line": 76,
+      "type": "step"
+    },
+    {
+      "index": 1,
+      "line": 79,
+      "name": "position_stack",
+      "type": "array",
+      "value": 11
+    },
+    {
+      "index": 1,
+      "line": 86,
+      "name": "row_stack",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 92,
+      "name": "head",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "index": 2,
+      "line": 95,
+      "name": "column_stack",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 27,
+      "type": "step"
+    },
+    {
+      "line": 29,
+      "name": "col",
+      "type": "number",
+      "value": 2
+    },
+    {
+      "line": 33,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 35,
+      "name": "visited",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "line": 40,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 46,
+      "name": "cheap",
+      "type": "array",
+      "value": 10
+    },
+    {
+      "index": 2,
+      "line": 51,
+      "name": "row_stack",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "line": 113,
+      "type": "step"
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 4,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 2
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": 1
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 2,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 3
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": 0
+    },
+    {
+      "line": 115,
+      "type": "step"
+    },
+    {
+      "index": 3,
+      "line": 120,
+      "name": "column_permutations",
+      "type": "array",
+      "value": 4
+    },
+    {
+      "line": 126,
+      "name": "head",
+      "type": "number",
+      "value": -1
+    }
+  ]
+}

@@ -1,3 +1,14 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// This file is based on the SuiteSparse BTF (MAXTRANS) implementation by
+// Timothy A. Davis.
+//
+// BTF, Copyright (c) 2004-2024, University of Florida.  All Rights Reserved.
+// Author: Timothy A. Davis.
+//
+// Modifications/porting for this project:
+// Copyright (c) 2025 Ido Ben Amram
+
 /// Block Triangular Form (BTF), Maximal Transversal (MAXTRAN)
 /// the algorithm is described in the paper:
 /// On Algorithms for Obtaining a Maximum Transversal by I. S. Duff
@@ -27,7 +38,7 @@ fn try_augmenting_path(
     let mut found = false;
     let mut head: i64 = 0;
     column_stack[head as usize] = current_column;
-    assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
+    debug_assert!(visited[current_column] != current_column); // make sure we haven't visited this column yet
 
     while head >= 0 {
         let col = column_stack[head as usize];
@@ -91,11 +102,15 @@ fn try_augmenting_path(
     found
 }
 
-pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
+pub(crate) fn btf_max_transversal(
+    m: &CscMatrix,
+    // match in davis's code
+    column_permutations: &mut [isize],
+) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
-    // match in davis's code
-    let mut column_permutations: Vec<isize> = vec![-1; n];
+    column_permutations.fill(-1);
+
     let mut cheap: Vec<usize> = vec![0; n];
     // flag in davis's code
     let mut visited: Vec<usize> = vec![out_of_bounds; n];
@@ -115,7 +130,7 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
         let found = try_augmenting_path(
             m,
             col,
-            &mut column_permutations,
+            column_permutations,
             &mut cheap,
             &mut visited,
             &mut row_stack,
@@ -128,6 +143,13 @@ pub(crate) fn btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
         }
     }
 
+    number_of_matches
+}
+
+pub(crate) fn run_btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
+    let nrows = m.dim.nrows;
+    let mut column_permutations: Vec<isize> = vec![-1; nrows];
+    let number_of_matches = btf_max_transversal(m, &mut column_permutations);
     (number_of_matches, column_permutations)
 }
 
@@ -148,7 +170,7 @@ mod tests {
     fn identity_pattern_has_full_matching() {
         // Nonzeros on the diagonal: unique perfect matching
         let a = build_5x5(&[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![0, 1, 2, 3, 4]);
     }
@@ -157,7 +179,7 @@ mod tests {
     fn permuted_diagonal_is_found() {
         // Unique permutation mapping row -> column = [2,0,4,1,3]
         let a = build_5x5(&[(2, 0), (0, 1), (4, 2), (1, 3), (3, 4)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![2, 0, 4, 1, 3]);
     }
@@ -166,7 +188,7 @@ mod tests {
     fn rank_deficient_has_four_matchings() {
         // Column 4 is empty; rows 0..3 match uniquely to cols 0..3
         let a = build_5x5(&[(0, 0), (1, 1), (2, 2), (3, 3)]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 4);
         assert_eq!(q, vec![0, 1, 2, 3, -1]);
     }
@@ -191,7 +213,7 @@ mod tests {
             (4, 3),
             (4, 4),
         ]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![0, 1, 2, 3, 4]);
     }
@@ -220,7 +242,7 @@ mod tests {
             (3, 4),
             (4, 0),
         ]);
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 5);
         assert_eq!(q, vec![4, 0, 1, 2, 3]);
     }
@@ -259,7 +281,7 @@ mod tests {
         b.push(6, 2, 1.0).unwrap();
 
         let a = b.build_csc().unwrap();
-        let (k, q) = btf_max_transversal(&a);
+        let (k, q) = run_btf_max_transversal(&a);
         assert_eq!(k, 7);
         assert_eq!(q, vec![0, 1, 6, 2, 3, 5, 4]);
     }

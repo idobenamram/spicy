@@ -46,8 +46,18 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 
 ** Simulation **
-- [ ] simple implementation of KLU
+- [x] implementation of KLU
+- [ ] refactor errors and metrics in klu
+- [ ] test KLU implementation
+- [ ] hook up to simulation code
+- [ ] make sure singular matricies work (when not using halt_if_singular)
+- [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
+- [ ] support KLU complex?
+
 
 ## License
 
-MIT
+MIT (see `LICENSE`).
+
+This repository also includes solver code derived from SuiteSparse (AMD/BTF/KLU)
+under BSD-3-Clause and LGPL-2.1-or-later; see `THIRD_PARTY_NOTICES.md`.

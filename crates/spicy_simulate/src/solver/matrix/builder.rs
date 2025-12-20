@@ -18,6 +18,8 @@ pub struct MatrixBuilder {
     dim: Dim,
     /// Sorted triplets (column, row, value)
     entries: Vec<(usize, usize, f64)>,
+    /// If true, keep explicit zeros (as stored entries) instead of dropping them.
+    keep_zeros: bool,
 }
 
 impl MatrixBuilder {
@@ -25,6 +27,15 @@ impl MatrixBuilder {
         Self {
             dim: Dim { nrows, ncols },
             entries: Vec::new(),
+            keep_zeros: false,
+        }
+    }
+
+    pub fn new_keep_zeros(nrows: usize, ncols: usize) -> Self {
+        Self {
+            dim: Dim { nrows, ncols },
+            entries: Vec::new(),
+            keep_zeros: true,
         }
     }
 
@@ -47,7 +58,7 @@ impl MatrixBuilder {
             });
         }
 
-        if value != 0.0 {
+        if self.keep_zeros || value != 0.0 {
             // keep entries sorted by (column, row) on insertion
             let key = (column, row);
             let idx = match self
@@ -64,6 +75,7 @@ impl MatrixBuilder {
 
     pub fn build_csc(self) -> Result<CscMatrix, CscError> {
         let n = self.dim.ncols;
+        let keep_zeros = self.keep_zeros;
 
         // Combine duplicates and drop zeros; entries are already sorted by (col,row)
         let mut combined: Vec<(usize, usize, f64)> = Vec::with_capacity(self.entries.len());
@@ -74,7 +86,7 @@ impl MatrixBuilder {
             if c == last_col && r == last_row {
                 acc += v;
             } else {
-                if last_col != usize::MAX && acc != 0.0 {
+                if last_col != usize::MAX && (keep_zeros || acc != 0.0) {
                     combined.push((last_col, last_row, acc));
                 }
                 last_col = c;
@@ -82,7 +94,7 @@ impl MatrixBuilder {
                 acc = v;
             }
         }
-        if last_col != usize::MAX && acc != 0.0 {
+        if last_col != usize::MAX && (keep_zeros || acc != 0.0) {
             combined.push((last_col, last_row, acc));
         }
 
@@ -112,14 +124,13 @@ impl MatrixBuilder {
             row_indices,
             values,
         };
-        let baba = a.check_invariants();
-        println!("a: {:?}", baba);
         debug_assert!(a.check_invariants().is_ok());
         Ok(a)
     }
 
     pub fn build_csr(self) -> Result<CsrMatrix, CsrError> {
         let m = self.dim.nrows;
+        let keep_zeros = self.keep_zeros;
 
         // Combine duplicates and drop zeros; sort by (row,col)
         let mut entries = self.entries;
@@ -133,7 +144,7 @@ impl MatrixBuilder {
             if r == last_row && c == last_col {
                 acc += v;
             } else {
-                if last_row != usize::MAX && acc != 0.0 {
+                if last_row != usize::MAX && (keep_zeros || acc != 0.0) {
                     combined.push((last_col, last_row, acc));
                 }
                 last_row = r;
@@ -141,7 +152,7 @@ impl MatrixBuilder {
                 acc = v;
             }
         }
-        if last_row != usize::MAX && acc != 0.0 {
+        if last_row != usize::MAX && (keep_zeros || acc != 0.0) {
             combined.push((last_col, last_row, acc));
         }
 
@@ -197,7 +208,7 @@ mod tests {
         assert_eq!(a.column_pointers, vec![0, 2, 3, 5]);
         assert_eq!(a.row_indices, vec![0, 2, 1, 0, 2]);
         assert_eq!(a.values, vec![10.0, 2.0, 20.0, 3.0, 35.0]);
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 
     #[test]
@@ -215,7 +226,7 @@ mod tests {
         assert_eq!(a.row_pointers, vec![0, 2, 3, 5]);
         assert_eq!(a.column_indices, vec![0, 2, 1, 0, 2]);
         assert_eq!(a.values, vec![10.0, 3.0, 20.0, 2.0, 35.0]);
-        assert!(a.check_invariants().is_ok());
+        debug_assert!(a.check_invariants().is_ok());
     }
 
     #[test]

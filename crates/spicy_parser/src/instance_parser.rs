@@ -745,9 +745,12 @@ impl<'s> InstanceParser<'s> {
 
         let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident).to_string();
-        let (first, _) = ident_string.split_at(1);
-
-        let element_type = DeviceType::from_str(first)?;
+        // Identifiers can be UTF-8; don't use byte offsets.
+        let first = ident_string
+            .chars()
+            .next()
+            .expect("lexer produced an Ident token, so it must be non-empty");
+        let element_type = DeviceType::from_char(first)?;
         let scope = self.expanded_deck.scope_arena.get(statement.scope);
 
         let name = scope.get_device_name(&ident_string);

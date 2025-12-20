@@ -6,6 +6,29 @@ pub enum MatrixError {
     Csc(#[from] CscError),
     #[error(transparent)]
     Csr(#[from] CsrError),
+    #[error(transparent)]
+    MatrixMarket(#[from] MatrixMarketError),
+}
+
+#[derive(Debug, Error)]
+pub enum MatrixMarketError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error("invalid MatrixMarket banner: {0}")]
+    InvalidBanner(String),
+
+    #[error("unsupported MatrixMarket type: {0}")]
+    UnsupportedType(String),
+
+    #[error("invalid MatrixMarket size line: {0}")]
+    InvalidSizeLine(String),
+
+    #[error("invalid MatrixMarket entry at line {line}: {msg}")]
+    InvalidEntry { line: usize, msg: String },
+
+    #[error("expected {expected} entries but found {actual}")]
+    EntryCountMismatch { expected: usize, actual: usize },
 }
 
 #[derive(Debug, Error)]

@@ -218,7 +218,7 @@ pub fn solve(
     let n = symbolic.n;
     let nblocks = symbolic.nblocks;
     let q = &symbolic.column_permutation;
-    let r = &symbolic.row_scaling;
+    let r = &symbolic.block_boundaries;
 
     debug_assert!(nblocks == numeric.nblocks);
     let pnum = &numeric.pnum;

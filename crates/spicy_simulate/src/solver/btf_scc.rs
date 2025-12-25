@@ -148,19 +148,22 @@ pub(crate) fn btf_scc(
     column_permutations: &mut [isize],
     row_permutations: &mut [isize],
     // n+1 size
-    boundary_array: &mut [isize],
+    boundary_array: &mut [usize],
 ) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
 
-    let mut graph_indices: Vec<isize> = vec![-1; n];
-    // TODO: in davis's code he uses row_permutations for low
-    let mut low: Vec<isize> = vec![-1; n];
+    let mut graph_indices: Vec<isize> = vec![EMPTY; n];
+    // reuse row as low array
+    let mut low = row_permutations.as_mut();
+    low.fill(EMPTY);
     // called flag in davis's code
     let mut visited: Vec<usize> = vec![UNVISITED; n];
 
-    let mut component_stack: Vec<usize> = vec![out_of_bounds; n];
-    // TODO: in davis's code he uses blocks for column_stack
+    // reuse boundary array as component stack (n + 1)
+    let mut component_stack = boundary_array.as_mut();
+    component_stack.fill(out_of_bounds);
+
     let mut column_stack: Vec<usize> = vec![out_of_bounds; n];
     let mut position_stack: Vec<usize> = vec![out_of_bounds; n];
 
@@ -220,12 +223,12 @@ pub(crate) fn btf_scc(
         graph_indices[0] = 0;
     }
     for b in 1..number_of_scc_blocks {
-        graph_indices[b] = graph_indices[b - 1] + boundary_array[b - 1];
+        graph_indices[b] = graph_indices[b - 1] + boundary_array[b - 1] as isize;
     }
     for b in 0..number_of_scc_blocks {
-        boundary_array[b] = graph_indices[b] as isize;
+        boundary_array[b] = graph_indices[b] as usize;
     }
-    boundary_array[number_of_scc_blocks] = n as isize;
+    boundary_array[number_of_scc_blocks] = n;
 
     // construct the permutation, perserving the natural order
 

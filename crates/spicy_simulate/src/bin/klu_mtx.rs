@@ -1,3 +1,4 @@
+use clap::Parser;
 use spicy_simulate::solver::{
     klu,
     matrix::{
@@ -57,10 +58,28 @@ fn print_timing_breakdown(stages: &[(&str, Duration)], total_elapsed: Duration) 
     );
 }
 
-fn usage(exe: &str) -> String {
-    format!(
-        "Usage: {exe} [--keep-zeros|--drop-zeros] <path.mtx>\n\nLoads a MatrixMarket coordinate matrix (.mtx), solves Ax=b with KLU, and prints demo-style stats.\n\nNotes:\n  - By default, {exe} uses --keep-zeros to match SuiteSparse KLU demo-style nnz/nzoff counts when the file contains explicit zero entries."
-    )
+#[derive(Parser, Debug)]
+#[command(
+    about = "Loads a MatrixMarket coordinate matrix (.mtx), solves Ax=b with KLU, and prints demo-style stats.",
+    after_help = "Notes:\n  - By default, uses --keep-zeros to match SuiteSparse KLU demo-style nnz/nzoff counts when the file contains explicit zero entries.\n  - --print-both-residuals prints both the SuiteSparse demo residual accumulation order and a matvec-based variant (they may differ slightly due to floating-point rounding).",
+    version
+)]
+struct Args {
+    /// Keep explicit zeros in the MatrixMarket file (default; matches SuiteSparse demo nnz/nzoff counts).
+    #[arg(long, conflicts_with = "drop_zeros")]
+    keep_zeros: bool,
+
+    /// Drop explicit zeros while loading the MatrixMarket file.
+    #[arg(long, conflicts_with = "keep_zeros")]
+    drop_zeros: bool,
+
+    /// Print both the SuiteSparse demo residual accumulation order and a matvec-based variant.
+    #[arg(long)]
+    print_both_residuals: bool,
+
+    /// Path to MatrixMarket coordinate matrix (.mtx)
+    #[arg(value_name = "PATH")]
+    path: PathBuf,
 }
 
 fn print_matrix_stats(path: &PathBuf, a: &CscMatrix) {
@@ -78,6 +97,29 @@ fn make_demo_rhs(n: usize) -> Vec<f64> {
     (0..n)
         .map(|i| 1.0 + ((i + 1) as f64) / nf)
         .collect()
+}
+
+/// Compute the demo residual exactly like SuiteSparse `KLU/Demo/kluldemo.c`:
+/// - start with `R = B`
+/// - for each stored A(i,j): `R[i] -= A(i,j) * X[j]`
+/// - return `max_i |R[i]|`
+///
+/// Note: this differs from computing `Ax = A*X` and then `max|B-Ax|` only in
+/// floating-point rounding/accumulation order (the math is identical).
+fn residual_demo_style_max_abs(a: &CscMatrix, b: &[f64], x: &[f64]) -> f64 {
+    debug_assert_eq!(a.dim.nrows, b.len());
+    debug_assert_eq!(a.dim.ncols, x.len());
+
+    let n = a.dim.ncols;
+    let mut r = b.to_vec();
+    for j in 0..n {
+        let xj = x[j];
+        let (rows, vals) = a.col(j);
+        for (&i, &aij) in rows.iter().zip(vals.iter()) {
+            r[i] -= aij * xj;
+        }
+    }
+    r.into_iter().map(|ri| ri.abs()).fold(0.0, f64::max)
 }
 
 fn csc_matvec(a: &CscMatrix, x: &[f64]) -> Vec<f64> {
@@ -100,43 +142,21 @@ fn matrix_one_norm(a: &CscMatrix) -> f64 {
     anorm
 }
 
+fn vec_inf_norm(x: &[f64]) -> f64 {
+    x.iter().map(|v| v.abs()).fold(0.0, f64::max)
+}
+
 fn main() {
     let total_start = Instant::now();
     let mut stages: Vec<(&str, Duration)> = Vec::new();
 
-    let mut args = std::env::args();
-    let exe = args.next().unwrap_or_else(|| "klu_mtx".to_string());
-
-    // CLI:
-    // - default is --keep-zeros (to match SuiteSparse demo nnz/nzoff for UF matrices that include explicit zeros)
-    // - allow override with --drop-zeros
-    let mut keep_zeros = true;
-    let mut path_arg: Option<String> = None;
-    for arg in args {
-        match arg.as_str() {
-            "-h" | "--help" => {
-                println!("{}", usage(&exe));
-                return;
-            }
-            "--keep-zeros" => keep_zeros = true,
-            "--drop-zeros" => keep_zeros = false,
-            other => {
-                if path_arg.is_none() {
-                    path_arg = Some(other.to_string());
-                } else {
-                    eprintln!("{}", usage(&exe));
-                    std::process::exit(2);
-                }
-            }
-        }
-    }
-    let Some(arg1) = path_arg else {
-        eprintln!("{}", usage(&exe));
-        std::process::exit(2);
-    };
+    let args = Args::parse();
+    // Default behavior is keep zeros unless the user explicitly requests dropping them.
+    let keep_zeros = !args.drop_zeros;
+    let print_both_residuals = args.print_both_residuals;
 
     let t = Instant::now();
-    let path = PathBuf::from(arg1);
+    let path = args.path;
     let a = match if keep_zeros {
         load_matrix_market_csc_file_keep_zeros(&path)
     } else {
@@ -210,14 +230,20 @@ fn main() {
     }
     stages.push(("klu_solve", t.elapsed()));
 
-    // Residual: r = b - A*x, report max |r_i| (like kluldemo.c)
+    // Residual: compute exactly like kluldemo.c (in-place subtraction order).
     let t = Instant::now();
-    let ax = csc_matvec(&a, &x);
-    let rnorm = ax
-        .iter()
-        .zip(b.iter())
-        .map(|(ai, bi)| (bi - ai).abs())
-        .fold(0.0, f64::max);
+    let rnorm_demo = residual_demo_style_max_abs(&a, &b, &x);
+    let rnorm_matvec = if print_both_residuals {
+        let ax = csc_matvec(&a, &x);
+        Some(
+            ax.iter()
+                .zip(b.iter())
+                .map(|(ai, bi)| (bi - ai).abs())
+                .fold(0.0, f64::max),
+        )
+    } else {
+        None
+    };
     stages.push(("residual", t.elapsed()));
 
     let t = Instant::now();
@@ -226,6 +252,15 @@ fn main() {
 
     let lunz = numeric.lnz + numeric.unz - n + numeric.nzoff;
 
+    // A common solver-agnostic correctness measure:
+    // eta = ||b - A*x||_inf / (||A||_1 * ||x||_inf + ||b||_inf)
+    // If eta is ~1e-15..1e-12, you're typically looking at plain f64 rounding/cancellation.
+    let bnorm_inf = vec_inf_norm(&b);
+    let xnorm_inf = vec_inf_norm(&x);
+    let denom = (anorm * xnorm_inf) + bnorm_inf;
+    let eta_demo = if denom > 0.0 { rnorm_demo / denom } else { 0.0 };
+    let eta_matvec = rnorm_matvec.map(|rm| if denom > 0.0 { rm / denom } else { 0.0 });
+
     let t = Instant::now();
     println!();
     println!(
@@ -233,8 +268,22 @@ fn main() {
         n,
         a.nnz(),
         lunz,
-        rnorm
+        rnorm_demo
     );
+    if let Some(rm) = rnorm_matvec {
+        println!(
+            "resid_matvec {:.5e} (matvec then subtract; may differ due to rounding)",
+            rm
+        );
+    }
+    println!(
+        "norms: ||b||_inf {:.5e}  ||x||_inf {:.5e}  (||A||_1 {:.5e})",
+        bnorm_inf, xnorm_inf, anorm
+    );
+    println!("backward_error_eta {:.5e}", eta_demo);
+    if let Some(e) = eta_matvec {
+        println!("backward_error_eta_matvec {:.5e}", e);
+    }
     println!(
         "anorm_1 {} (note: we don't yet report rgrowth/condest/rcond/flops like SuiteSparse demo)",
         anorm

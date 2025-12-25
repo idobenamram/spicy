@@ -326,7 +326,7 @@ expression: "(n, nnz, is_square, seed, run, x_preview)"
                 1,
                 0,
             ],
-            row_scaling: [
+            block_boundaries: [
                 0,
                 100,
                 0,

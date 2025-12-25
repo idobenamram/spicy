@@ -16,10 +16,16 @@ use crate::solver::matrix::error::CsrError;
 #[derive(Debug)]
 pub struct MatrixBuilder {
     dim: Dim,
-    /// Sorted triplets (column, row, value)
+    /// Triplets (column, row, value) in insertion order.
     entries: Vec<(usize, usize, f64)>,
     /// If true, keep explicit zeros (as stored entries) instead of dropping them.
     keep_zeros: bool,
+    /// Whether `entries` is currently sorted by (column, row) in non-decreasing order.
+    ///
+    /// This lets us skip an expensive global sort when the caller is already producing
+    /// sorted input (common for some MatrixMarket generators), while still supporting
+    /// arbitrary insertion order efficiently (sort once in `build_csc`).
+    is_sorted_by_col_row: bool,
 }
 
 impl MatrixBuilder {
@@ -28,6 +34,7 @@ impl MatrixBuilder {
             dim: Dim { nrows, ncols },
             entries: Vec::new(),
             keep_zeros: false,
+            is_sorted_by_col_row: true,
         }
     }
 
@@ -36,6 +43,7 @@ impl MatrixBuilder {
             dim: Dim { nrows, ncols },
             entries: Vec::new(),
             keep_zeros: true,
+            is_sorted_by_col_row: true,
         }
     }
 
@@ -59,25 +67,32 @@ impl MatrixBuilder {
         }
 
         if self.keep_zeros || value != 0.0 {
-            // keep entries sorted by (column, row) on insertion
-            let key = (column, row);
-            let idx = match self
-                .entries
-                .binary_search_by(|(c, r, _)| (*c, *r).cmp(&key))
-            {
-                Ok(pos) | Err(pos) => pos,
-            };
-            self.entries.insert(idx, (column, row, value));
+            // Hot path for large matrices: just append.
+            //
+            // We track whether the stream stayed sorted. If not, we'll do a single global
+            // sort in `build_csc` (much cheaper than per-insert binary_search + Vec::insert).
+            if self.is_sorted_by_col_row {
+                if let Some(&(last_c, last_r, _)) = self.entries.last() {
+                    if (column, row) < (last_c, last_r) {
+                        self.is_sorted_by_col_row = false;
+                    }
+                }
+            }
+            self.entries.push((column, row, value));
         }
 
         Ok(())
     }
 
-    pub fn build_csc(self) -> Result<CscMatrix, CscError> {
+    pub fn build_csc(mut self) -> Result<CscMatrix, CscError> {
         let n = self.dim.ncols;
         let keep_zeros = self.keep_zeros;
 
-        // Combine duplicates and drop zeros; entries are already sorted by (col,row)
+        if !self.is_sorted_by_col_row {
+            self.entries.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        }
+
+        // Combine duplicates and drop zeros; entries are now sorted by (col,row)
         let mut combined: Vec<(usize, usize, f64)> = Vec::with_capacity(self.entries.len());
         let mut last_col = usize::MAX;
         let mut last_row = usize::MAX;
@@ -134,7 +149,9 @@ impl MatrixBuilder {
 
         // Combine duplicates and drop zeros; sort by (row,col)
         let mut entries = self.entries;
-        entries.sort_by(|a, b| (a.1, a.0).cmp(&(b.1, b.0)));
+        if !self.is_sorted_by_col_row {
+            entries.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        }
 
         let mut combined: Vec<(usize, usize, f64)> = Vec::with_capacity(entries.len());
         let mut last_row = usize::MAX;

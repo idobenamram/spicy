@@ -107,9 +107,8 @@ pub struct KluSymbolic {
     lower_nz: Vec<f64>,
     row_permutation: Vec<isize>,
     column_permutation: Vec<isize>,
-    // used in btf to hold block boundaries
-    // TODO:  this should just be block boundaries
-    row_scaling: Vec<isize>,
+    // used in btf to hold block boundaries (n + 1)
+    block_boundaries: Vec<usize>,
 }
 
 /// Statistics produced by numeric factorization/refactorization.

@@ -33,7 +33,7 @@ pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
     }
 
     let column_permutation = vec![0; n];
-    let row_scaling = vec![0; n + 1];
+    let block_boundaries = vec![0; n + 1];
     let lower_nz = vec![0.0; n];
 
     KluSymbolic {
@@ -50,7 +50,7 @@ pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
         lower_nz,
         row_permutation,
         column_permutation,
-        row_scaling,
+        block_boundaries,
     }
 }
 
@@ -81,8 +81,8 @@ fn analyze_worker(
 
     for block in 0..symbolic.nblocks {
         // the block is from rows/columns k1 to k2-1
-        let k1 = symbolic.row_scaling[block] as usize;
-        let k2 = symbolic.row_scaling[block + 1] as usize;
+        let k1 = symbolic.block_boundaries[block] as usize;
+        let k2 = symbolic.block_boundaries[block + 1] as usize;
         let size = k2 - k1;
 
         symbolic.lower_nz[block] = -1.0;
@@ -177,7 +177,7 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> KluResult<KluSymbolic> {
             a,
             &mut btf_row_permutation,
             &mut btf_column_permutation,
-            &mut symbolic.row_scaling,
+            &mut symbolic.block_boundaries,
         );
         number_of_scc_blocks = scc_blocks;
         symbolic.structural_rank = number_of_matches;
@@ -191,16 +191,16 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> KluResult<KluSymbolic> {
 
         maxblock = 1;
         for b in 0..number_of_scc_blocks {
-            let k1 = symbolic.row_scaling[b] as usize;
-            let k2 = symbolic.row_scaling[b + 1] as usize;
+            let k1 = symbolic.block_boundaries[b] as usize;
+            let k2 = symbolic.block_boundaries[b + 1] as usize;
             let size = k2 - k1;
             maxblock = std::cmp::max(maxblock, size);
         }
     } else {
         number_of_scc_blocks = 1;
         maxblock = symbolic.n;
-        symbolic.row_scaling[0] = 0;
-        symbolic.row_scaling[1] = symbolic.n as isize;
+        symbolic.block_boundaries[0] = 0;
+        symbolic.block_boundaries[1] = symbolic.n;
         for i in 0..symbolic.n {
             btf_row_permutation[i] = i as isize;
             btf_column_permutation[i] = i as isize;

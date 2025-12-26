@@ -12,6 +12,7 @@
 mod amd;
 mod analyze;
 mod btf;
+mod dump;
 mod error;
 mod factor;
 mod kernel;
@@ -24,6 +25,10 @@ use std::{mem, slice};
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
 pub use error::{KluError, KluResult};
 pub use analyze::analyze;
+pub use dump::{
+    KLU_PERM_DUMP_MAGIC, KLU_PERM_DUMP_VERSION, KLU_SOLVE_DUMP_MAGIC, KLU_SOLVE_DUMP_VERSION,
+    KluPermDumpStage, write_perm_dump, write_solve_dump,
+};
 pub use factor::factor;
 pub use solve::solve;
 

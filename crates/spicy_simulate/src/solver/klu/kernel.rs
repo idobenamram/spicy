@@ -11,11 +11,11 @@
 
 use crate::solver::{
     klu::{
-        get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig, KluError, KluNumericMetrics,
-        KluResult,
+        KluConfig, KluError, KluNumericMetrics, KluResult, get_pointers_to_lu,
+        get_pointers_to_lu_mut,
     },
     matrix::csc::CscMatrix,
-    utils::{dunits, EMPTY, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
+    utils::{EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
 
 fn get_free_pointer(lu: &mut Vec<f64>, lup: usize) -> (&mut [f64], &mut [usize]) {
@@ -268,7 +268,9 @@ fn lsolve_numeric(
         // We optimize by:
         // - avoiding bounds checks (raw pointers)
         // - unrolling to increase MLP (more outstanding cache misses)
-        // - using FMA (`mul_add`) when available
+        // - using FMA (`mul_add`) when available (also increases numerical stability)
+        // NOTE: its ok to unroll here because this is a scatter operations,
+        // .     so we don't break associativity for floating point operations.
         // SAFETY: We use raw pointers to avoid bounds checks. The safety invariants are:
         // - `p` is in `0..len`, where `len` is guaranteed by `get_pointers_to_lu` to not exceed
         //   the actual lengths of `li` and `lx` slices, making `li_ptr.add(p)` and `lx_ptr.add(p)` safe.
@@ -683,7 +685,7 @@ pub fn kernel(
             }
         }
 
-        debug_assert!(piv_row >= 0 && piv_row < n);
+        debug_assert!(piv_row < n);
         debug_assert!(inverse_row_permutation[piv_row] < 0);
 
         let lower_col_length = dunits::<usize>(llen[k])? + dunits::<f64>(llen[k])?;

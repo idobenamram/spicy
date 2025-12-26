@@ -6,7 +6,7 @@ use spicy_simulate::solver::{
         mtx::{load_matrix_market_csc_file, load_matrix_market_csc_file_keep_zeros},
     },
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 fn fmt_duration(d: Duration) -> String {
@@ -77,12 +77,25 @@ struct Args {
     #[arg(long)]
     print_both_residuals: bool,
 
+    /// Dump deterministic binary artifacts for comparing against SuiteSparse KLU:
+    /// - <PREFIX>.analyze_factor.bin : Symbolic P/Q/R and Numeric Pnum/Pinv
+    /// - <PREFIX>.solve.bin          : solved RHS (solution vector) as raw f64 bits
+    ///
+    #[arg(long = "dump-bin", value_name = "PREFIX")]
+    dump_bin: Option<PathBuf>,
+
     /// Path to MatrixMarket coordinate matrix (.mtx)
     #[arg(value_name = "PATH")]
     path: PathBuf,
 }
 
-fn print_matrix_stats(path: &PathBuf, a: &CscMatrix) {
+fn dump_path(prefix: &Path, suffix: &str) -> PathBuf {
+    let mut os = prefix.as_os_str().to_os_string();
+    os.push(suffix);
+    PathBuf::from(os)
+}
+
+fn print_matrix_stats(path: &Path, a: &CscMatrix) {
     println!("matrix: {}", path.display());
     println!("dim: {} x {}", a.dim.nrows, a.dim.ncols);
     println!("nnz: {}", a.nnz());
@@ -154,6 +167,7 @@ fn main() {
     // Default behavior is keep zeros unless the user explicitly requests dropping them.
     let keep_zeros = !args.drop_zeros;
     let print_both_residuals = args.print_both_residuals;
+    let dump_bin_prefix = args.dump_bin.clone();
 
     let t = Instant::now();
     let path = args.path;
@@ -221,6 +235,33 @@ fn main() {
     };
     stages.push(("klu_factor", t.elapsed()));
 
+    if let Some(prefix) = &dump_bin_prefix {
+        let t = Instant::now();
+        let out = dump_path(prefix, ".analyze_factor.bin");
+        let mut f = match std::fs::File::create(&out) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("failed to create permutation dump file {}: {e}", out.display());
+                stages.push(("dump_perms_analyze_factor", t.elapsed()));
+                print_timing_breakdown(&stages, total_start.elapsed());
+                std::process::exit(1);
+            }
+        };
+        if let Err(e) = klu::write_perm_dump(
+            &mut f,
+            klu::KluPermDumpStage::AnalyzeFactor,
+            &symbolic,
+            &numeric,
+        ) {
+            eprintln!("failed to write permutation dump file {}: {e}", out.display());
+            stages.push(("dump_perms_analyze_factor", t.elapsed()));
+            print_timing_breakdown(&stages, total_start.elapsed());
+            std::process::exit(1);
+        }
+        stages.push(("dump_perms_analyze_factor", t.elapsed()));
+        println!("wrote permutation dump: {}", out.display());
+    }
+
     let t = Instant::now();
     if let Err(e) = klu::solve(&symbolic, &mut numeric, n, 1, &mut x, &config) {
         eprintln!("klu solve failed: {e}");
@@ -229,6 +270,28 @@ fn main() {
         std::process::exit(1);
     }
     stages.push(("klu_solve", t.elapsed()));
+
+    if let Some(prefix) = &dump_bin_prefix {
+        let t = Instant::now();
+        let out = dump_path(prefix, ".solve.bin");
+        let mut f = match std::fs::File::create(&out) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("failed to create solve dump file {}: {e}", out.display());
+                stages.push(("dump_solve", t.elapsed()));
+                print_timing_breakdown(&stages, total_start.elapsed());
+                std::process::exit(1);
+            }
+        };
+        if let Err(e) = klu::write_solve_dump(&mut f, n, n, 1, &x) {
+            eprintln!("failed to write solve dump file {}: {e}", out.display());
+            stages.push(("dump_solve", t.elapsed()));
+            print_timing_breakdown(&stages, total_start.elapsed());
+            std::process::exit(1);
+        }
+        stages.push(("dump_solve", t.elapsed()));
+        println!("wrote solve dump: {}", out.display());
+    }
 
     // Residual: compute exactly like kluldemo.c (in-place subtraction order).
     let t = Instant::now();

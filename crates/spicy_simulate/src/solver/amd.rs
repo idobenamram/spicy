@@ -613,18 +613,17 @@ fn update_degrees(
         debug_assert!(nv[i] < 0 && elen[i] >= 0);
         debug_assert!(pe[i] >= 0 && pe[i] < iwlen as isize);
         let p1 = pe[i] as usize;
-        // notice p2 can be negative if elen[i]=0
-        let p2 = p1 as isize + elen[i] - 1;
-        debug_assert!(p2 >= EMPTY && p2 < iwlen as isize);
+        let p2 = p1 + elen[i] as usize;
+        debug_assert!(p2 < iwlen);
         let mut pn = p1;
         let mut hash = 0;
         let mut deg = 0;
 
         // go over all elements in i and update the degree of i (absorbing when possible)
         if aggressive {
-            for p in (p1 as isize)..=p2 {
-                debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
-                let e = iw[p as usize] as usize;
+            for p in p1..p2 {
+                debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
+                let e = iw[p] as usize;
                 let we = w[e];
                 if we != 0 {
                     // e is an unabsorbed element
@@ -634,7 +633,7 @@ fn update_degrees(
                     // some supervairables that are not in Lme
                     if dext > 0 {
                         deg += dext as usize;
-                        iw[pn as usize] = e as isize;
+                        iw[pn] = e as isize;
                         pn += 1;
                         hash += e;
                     } else {
@@ -647,9 +646,9 @@ fn update_degrees(
                 }
             }
         } else {
-            for p in (p1 as isize)..=p2 {
-                debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
-                let e = iw[p as usize] as usize;
+            for p in p1..p2 {
+                debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
+                let e = iw[p] as usize;
                 let we = w[e];
                 if we != 0 {
                     // e is an unabsorbed element
@@ -658,28 +657,29 @@ fn update_degrees(
                     deg += dext as usize;
                     // this will essentially remove absorbed elements from
                     // the element list of i
-                    iw[pn as usize] = e as isize;
+                    iw[pn] = e as isize;
                     pn += 1;
                     hash += e;
                 }
             }
         }
+
         // count the number of elements in i (including me):
         elen[i] = (pn - p1 + 1) as isize;
 
         // scan the supervariables in the list associated with i
         let p3 = pn;
         let p4 = p1 + len[i];
-        for p in p2 + 1..(p4 as isize) {
-            debug_assert!(iw[p as usize] >= 0 && iw[p as usize] < n as isize);
-            let j = iw[p as usize] as usize;
+        for p in p2..p4 {
+            debug_assert!(iw[p] >= 0 && iw[p] < n as isize);
+            let j = iw[p] as usize;
             let nvj = nv[j];
 
             if nvj > 0 {
                 // j is unabsorbed, and not in Lme.
                 // add to degree and add to new list
                 deg += nvj as usize;
-                iw[pn as usize] = j as isize;
+                iw[pn] = j as isize;
                 pn += 1;
                 hash += j;
             }
@@ -722,7 +722,7 @@ fn update_degrees(
 
             // place in hash bucket.  Save hash key of i in Last [i].
 
-            hash = hash % n;
+            hash %= n;
             debug_assert!((hash as isize) >= 0 && (hash as isize) < n as isize);
 
             add_hash_to_degree_list(i, hash, head, last, next);

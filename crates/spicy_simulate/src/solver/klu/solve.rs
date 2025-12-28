@@ -324,8 +324,8 @@ pub fn solve(
         // we use "back substitution" on the blocks to solve the system
         // look at the KLU article page 6
         for block in (0..nblocks).rev() {
-            let k1 = r[block] as usize;
-            let k2 = r[block + 1] as usize;
+            let k1 = r[block];
+            let k2 = r[block + 1];
             let nk = k2 - k1;
 
             // solve the block system

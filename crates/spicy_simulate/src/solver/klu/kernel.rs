@@ -278,6 +278,7 @@ fn lsolve_numeric(
         //   LU decomposition structure (all indices in `li` are valid row indices), making the access safe.
         // - The unrolled loop processes `p` in chunks of 4, with `p + k < len` checked before accessing `p + k`.
         // - The remainder loop handles `p < len`, ensuring all accesses are within bounds.
+        // TODO: once we use spicySlice we can maybe use chunk_exact here
         unsafe {
             let x_ptr = x.as_mut_ptr();
             let li_ptr = li.as_ptr();
@@ -729,12 +730,12 @@ pub fn kernel(
             // an off-diagonal pivot has been chosen
             metrics.noffdiag += 1;
 
-            if inverse_row_permutation[diag_row as usize] < 0 {
+            if inverse_row_permutation[diag_row] < 0 {
                 // the former diagonal row index, diagrow, has not yet been
                 // chosen as a pivot row. Log this diagrow as the "diagonal"
                 // entry in the column kbar for which the chosen pivot row,
                 // pivrow, was originally logged as the "diagonal"
-                let kbar = flip(inverse_row_permutation[piv_row as usize]);
+                let kbar = flip(inverse_row_permutation[piv_row]);
                 row_permutation[kbar as usize] = diag_row as isize;
                 inverse_row_permutation[diag_row] = flip(kbar);
             }
@@ -770,7 +771,7 @@ pub fn kernel(
     // shrink the LU factors to just the required size
     let new_lusize = lup;
     debug_assert!(new_lusize <= lusize);
-    lu_block.resize(new_lusize as usize, 0.0);
+    lu_block.resize(new_lusize, 0.0);
 
-    Ok(new_lusize as usize)
+    Ok(new_lusize)
 }

@@ -11,11 +11,11 @@
 
 use crate::solver::{
     klu::{
-        get_pointers_to_lu, get_pointers_to_lu_mut, KluConfig, KluError, KluNumericMetrics,
-        KluResult,
+        KluConfig, KluError, KluNumericMetrics, KluResult, get_pointers_to_lu,
+        get_pointers_to_lu_mut,
     },
     matrix::csc::CscMatrix,
-    utils::{dunits, EMPTY, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
+    utils::{EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
 
 fn get_free_pointer(lu: &mut Vec<f64>, lup: usize) -> (&mut [f64], &mut [usize]) {
@@ -264,16 +264,56 @@ fn lsolve_numeric(
         }
         let (li, lx, len) = get_pointers_to_lu(lu, lip, llen, jnew)?;
         debug_assert!(lip[jnew] <= lip[jnew + 1]);
-        for p in 0..len {
-            //x[li[p]] -= lx[p] * xj ; */
-            // SAFETY: The pointers li, lx, and x are only accessed at index 'p', 'p', and '*li_p', respectively.
-            // 'p' is in 0..len, where 'len' is obtained from get_pointers_to_lu and guaranteed by the implementation to
-            // not exceed the actual lengths of li and lx slices, making li.get_unchecked(p) and lx.get_unchecked(p) safe.
-            // The index '*li_p' refers to a valid row index in x, as per the LU decomposition structure, making x.get_unchecked_mut(*li_p) safe.
-            let li_p = unsafe { li.get_unchecked(p) };
-            let lx_p = unsafe { lx.get_unchecked(p) };
-            let value = unsafe { x.get_unchecked_mut(*li_p) };
-            *value -= *lx_p * xj;
+        // This is fundamentally a scatter RMW into `x` (typically memory-bound).
+        // We optimize by:
+        // - avoiding bounds checks (raw pointers)
+        // - unrolling to increase MLP (more outstanding cache misses)
+        // - using FMA (`mul_add`) when available (also increases numerical stability)
+        // NOTE: its ok to unroll here because this is a scatter operations,
+        // .     so we don't break associativity for floating point operations.
+        // SAFETY: We use raw pointers to avoid bounds checks. The safety invariants are:
+        // - `p` is in `0..len`, where `len` is guaranteed by `get_pointers_to_lu` to not exceed
+        //   the actual lengths of `li` and `lx` slices, making `li_ptr.add(p)` and `lx_ptr.add(p)` safe.
+        // - For `x_ptr.add(i)`, the index `i = li[p]` refers to a valid row index in `x` as per the
+        //   LU decomposition structure (all indices in `li` are valid row indices), making the access safe.
+        // - The unrolled loop processes `p` in chunks of 4, with `p + k < len` checked before accessing `p + k`.
+        // - The remainder loop handles `p < len`, ensuring all accesses are within bounds.
+        // TODO: once we use spicySlice we can maybe use chunk_exact here
+        unsafe {
+            let x_ptr = x.as_mut_ptr();
+            let li_ptr = li.as_ptr();
+            let lx_ptr = lx.as_ptr();
+
+            let mut p = 0usize;
+            while p + 4 <= len {
+                let i0 = *li_ptr.add(p);
+                let a0 = *lx_ptr.add(p);
+                let i1 = *li_ptr.add(p + 1);
+                let a1 = *lx_ptr.add(p + 1);
+                let i2 = *li_ptr.add(p + 2);
+                let a2 = *lx_ptr.add(p + 2);
+                let i3 = *li_ptr.add(p + 3);
+                let a3 = *lx_ptr.add(p + 3);
+
+                let x0 = x_ptr.add(i0);
+                *x0 = (-a0).mul_add(xj, *x0);
+                let x1 = x_ptr.add(i1);
+                *x1 = (-a1).mul_add(xj, *x1);
+                let x2 = x_ptr.add(i2);
+                *x2 = (-a2).mul_add(xj, *x2);
+                let x3 = x_ptr.add(i3);
+                *x3 = (-a3).mul_add(xj, *x3);
+
+                p += 4;
+            }
+
+            while p < len {
+                let i = *li_ptr.add(p);
+                let a = *lx_ptr.add(p);
+                let xp = x_ptr.add(i);
+                *xp = (-a).mul_add(xj, *xp);
+                p += 1;
+            }
         }
     }
 
@@ -646,7 +686,7 @@ pub fn kernel(
             }
         }
 
-        debug_assert!(piv_row >= 0 && piv_row < n);
+        debug_assert!(piv_row < n);
         debug_assert!(inverse_row_permutation[piv_row] < 0);
 
         let lower_col_length = dunits::<usize>(llen[k])? + dunits::<f64>(llen[k])?;
@@ -690,12 +730,12 @@ pub fn kernel(
             // an off-diagonal pivot has been chosen
             metrics.noffdiag += 1;
 
-            if inverse_row_permutation[diag_row as usize] < 0 {
+            if inverse_row_permutation[diag_row] < 0 {
                 // the former diagonal row index, diagrow, has not yet been
                 // chosen as a pivot row. Log this diagrow as the "diagonal"
                 // entry in the column kbar for which the chosen pivot row,
                 // pivrow, was originally logged as the "diagonal"
-                let kbar = flip(inverse_row_permutation[piv_row as usize]);
+                let kbar = flip(inverse_row_permutation[piv_row]);
                 row_permutation[kbar as usize] = diag_row as isize;
                 inverse_row_permutation[diag_row] = flip(kbar);
             }
@@ -731,7 +771,7 @@ pub fn kernel(
     // shrink the LU factors to just the required size
     let new_lusize = lup;
     debug_assert!(new_lusize <= lusize);
-    lu_block.resize(new_lusize as usize, 0.0);
+    lu_block.resize(new_lusize, 0.0);
 
-    Ok(new_lusize as usize)
+    Ok(new_lusize)
 }

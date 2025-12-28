@@ -34,6 +34,15 @@ cargo insta review
 
 Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
+### Vibe Coding
+A lot of the surrounding code in this project is vibe coded, like:
+1. the binaries klu_mtx.rs klu_solve_cmp, some scripts
+2. spicy_cli, visualizations
+
+Those files are not for the faint of heart, human eyes should not lay eyes on them.
+
+The parser and main simulation code are hand crafted by human intelligence,
+and only assisted by ai. Those should be readable.
 
 # TODO:
 
@@ -47,13 +56,20 @@ Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 ** Simulation **
 - [x] implementation of KLU
-- [ ] refactor errors and metrics in klu
-- [ ] test KLU implementation
+- [x] refactor errors and metrics in klu
+- [x] test KLU implementation
+      - [x] make sure the output is bit exact to c
+      - [x] make sure solve close 
+      - [x] make sure unroll optimization doesn't lose numerical stability
+- [ ] create spicyVec for boundary checks
 - [ ] hook up to simulation code
 - [ ] make sure singular matricies work (when not using halt_if_singular)
 - [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
 - [ ] support KLU complex?
 
+** visualizations **
+- [ ] merge the recorder macro
+- [ ] generate nice visualizations for btf and amd
 
 ## License
 

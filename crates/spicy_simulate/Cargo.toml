@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# TODO: can we make this only for the binary and not the lib itself?
+clap = { version = "4.5", features = ["derive"] }
 ndarray = "0.16.1"
 spicy_parser = { path = "../spicy_parser" }
 thiserror = "2.0.16"

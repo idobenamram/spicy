@@ -220,8 +220,8 @@ pub fn factor(
     }
 
     for block in 0..symbolic.nblocks {
-        let k1 = symbolic.row_scaling[block] as usize;
-        let k2 = symbolic.row_scaling[block + 1] as usize;
+        let k1 = symbolic.block_boundaries[block];
+        let k2 = symbolic.block_boundaries[block + 1];
         let block_size = k2 - k1;
 
         if block_size == 1 {

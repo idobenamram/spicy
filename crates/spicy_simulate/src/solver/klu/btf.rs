@@ -18,7 +18,7 @@ pub fn btf(
     a: &CscMatrix,
     row_permutations: &mut [isize],
     column_permutations: &mut [isize],
-    blocks: &mut [isize],
+    blocks: &mut [usize],
 ) -> (usize, usize) {
     let n = a.dim.ncols;
     let number_of_matches = btf_max_transversal(a, column_permutations);

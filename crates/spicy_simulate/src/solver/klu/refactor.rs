@@ -62,8 +62,8 @@ pub fn refactor(
 
     // factor each block
     for block in 0..nblocks {
-        let k1 = symbolic.row_scaling[block] as usize;
-        let k2 = symbolic.row_scaling[block + 1] as usize;
+        let k1 = symbolic.block_boundaries[block];
+        let k2 = symbolic.block_boundaries[block + 1];
         let nk = k2 - k1;
 
         if nk == 1 {

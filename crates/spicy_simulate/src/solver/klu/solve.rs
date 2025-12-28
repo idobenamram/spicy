@@ -218,7 +218,7 @@ pub fn solve(
     let n = symbolic.n;
     let nblocks = symbolic.nblocks;
     let q = &symbolic.column_permutation;
-    let r = &symbolic.row_scaling;
+    let r = &symbolic.block_boundaries;
 
     debug_assert!(nblocks == numeric.nblocks);
     let pnum = &numeric.pnum;
@@ -324,8 +324,8 @@ pub fn solve(
         // we use "back substitution" on the blocks to solve the system
         // look at the KLU article page 6
         for block in (0..nblocks).rev() {
-            let k1 = r[block] as usize;
-            let k2 = r[block + 1] as usize;
+            let k1 = r[block];
+            let k2 = r[block + 1];
             let nk = k2 - k1;
 
             // solve the block system

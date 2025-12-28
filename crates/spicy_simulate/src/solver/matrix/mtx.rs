@@ -5,10 +5,179 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// A larger-than-default buffer helps for huge `.mtx` files (tens of millions of lines).
+///
+/// Note: parsing tends to dominate, but this reduces syscalls and iterator overhead on some OSes.
+const MTX_READER_CAPACITY_BYTES: usize = 1024 * 1024; // 1 MiB
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MmField {
     Integer,
     Real,
+}
+
+#[inline]
+fn ascii_eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter()
+        .zip(b.iter())
+        .all(|(&x, &y)| x.to_ascii_lowercase() == y.to_ascii_lowercase())
+}
+
+#[inline]
+fn parse_usize_ascii(tok: &[u8]) -> Option<usize> {
+    if tok.is_empty() {
+        return None;
+    }
+    let mut v: usize = 0;
+    for &b in tok {
+        if !b.is_ascii_digit() {
+            return None;
+        }
+        #[cfg(debug_assertions)]
+        {
+            v = v.checked_mul(10)?.checked_add((b - b'0') as usize)?;
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            v = v * 10 + (b - b'0') as usize;
+        }
+    }
+    Some(v)
+}
+
+#[inline]
+fn parse_f64_ascii(tok: &[u8]) -> Option<f64> {
+    // Safety: MatrixMarket numeric tokens are ASCII (a subset of UTF-8).
+    let s = unsafe { std::str::from_utf8_unchecked(tok) };
+    s.parse::<f64>().ok()
+}
+
+#[inline]
+fn line_lossy_trimmed(line: &[u8]) -> String {
+    String::from_utf8_lossy(line).trim_end().to_string()
+}
+
+#[inline]
+fn skip_ws_ascii(buf: &[u8], i: &mut usize) {
+    while *i < buf.len() && buf[*i] <= b' ' {
+        *i += 1;
+    }
+}
+
+#[inline]
+fn parse_usize_at(buf: &[u8], i: &mut usize) -> Option<usize> {
+    if *i >= buf.len() || !buf[*i].is_ascii_digit() {
+        return None;
+    }
+    let mut v: usize = 0;
+    while *i < buf.len() {
+        let b = buf[*i];
+        if !b.is_ascii_digit() {
+            break;
+        }
+        #[cfg(debug_assertions)]
+        {
+            v = v.checked_mul(10)?.checked_add((b - b'0') as usize)?;
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            v = v * 10 + (b - b'0') as usize;
+        }
+        *i += 1;
+    }
+    Some(v)
+}
+
+#[inline]
+fn parse_i64_at(buf: &[u8], i: &mut usize) -> Option<i64> {
+    if *i >= buf.len() {
+        return None;
+    }
+    let mut sign: i64 = 1;
+    match buf[*i] {
+        b'+' => *i += 1,
+        b'-' => {
+            sign = -1;
+            *i += 1;
+        }
+        _ => {}
+    }
+    if *i >= buf.len() || !buf[*i].is_ascii_digit() {
+        return None;
+    }
+    let mut v: i64 = 0;
+    while *i < buf.len() {
+        let b = buf[*i];
+        if !b.is_ascii_digit() {
+            break;
+        }
+        #[cfg(debug_assertions)]
+        {
+            v = v.checked_mul(10)?.checked_add((b - b'0') as i64)?;
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            v = v * 10 + (b - b'0') as i64;
+        }
+        *i += 1;
+    }
+    if sign == 1 {
+        Some(v)
+    } else {
+        #[cfg(debug_assertions)]
+        {
+            v.checked_neg()
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            Some(-v)
+        }
+    }
+}
+
+#[inline]
+fn parse_f64_token_at(buf: &[u8], i: &mut usize) -> Option<f64> {
+    let start = *i;
+    while *i < buf.len() && buf[*i] > b' ' {
+        *i += 1;
+    }
+    if *i == start {
+        return None;
+    }
+    parse_f64_ascii(&buf[start..*i])
+}
+
+struct TokenIter<'a> {
+    buf: &'a [u8],
+    i: usize,
+}
+
+impl<'a> TokenIter<'a> {
+    #[inline]
+    fn new(buf: &'a [u8]) -> Self {
+        Self { buf, i: 0 }
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a [u8]> {
+        // Fast-path whitespace for MatrixMarket: treat any ASCII control char (<= ' ')
+        // as whitespace. This is slightly more permissive than `is_ascii_whitespace()`,
+        // but MatrixMarket files are ASCII text and this avoids an extra range check.
+        while self.i < self.buf.len() && self.buf[self.i] <= b' ' {
+            self.i += 1;
+        }
+        if self.i >= self.buf.len() {
+            return None;
+        }
+        let start = self.i;
+        while self.i < self.buf.len() && self.buf[self.i] > b' ' {
+            self.i += 1;
+        }
+        Some(&self.buf[start..self.i])
+    }
 }
 
 /// Load a sparse matrix from a MatrixMarket `.mtx` file (coordinate format) into a canonical CSC.
@@ -18,7 +187,7 @@ enum MmField {
 /// - 1-based indices in the file, converted to 0-based indices internally.
 pub fn load_matrix_market_csc_file(path: impl AsRef<Path>) -> Result<CscMatrix, MatrixError> {
     let f = File::open(path.as_ref()).map_err(MatrixMarketError::from)?;
-    let reader = BufReader::new(f);
+    let reader = BufReader::with_capacity(MTX_READER_CAPACITY_BYTES, f);
     load_matrix_market_csc_from_reader(reader)
 }
 
@@ -28,7 +197,7 @@ pub fn load_matrix_market_csc_file_keep_zeros(
     path: impl AsRef<Path>,
 ) -> Result<CscMatrix, MatrixError> {
     let f = File::open(path.as_ref()).map_err(MatrixMarketError::from)?;
-    let reader = BufReader::new(f);
+    let reader = BufReader::with_capacity(MTX_READER_CAPACITY_BYTES, f);
     load_matrix_market_csc_from_reader_keep_zeros(reader)
 }
 
@@ -45,124 +214,188 @@ pub fn load_matrix_market_csc_from_reader_keep_zeros<R: BufRead>(
 }
 
 fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
-    reader: R,
+    mut reader: R,
     keep_zeros: bool,
 ) -> Result<CscMatrix, MatrixError> {
-    let mut lines = reader.lines().enumerate();
+    // Performance notes:
+    // - Use `read_until(b'\n', ...)` to reuse a single `Vec<u8>` buffer and avoid per-line `String`
+    //   allocations + UTF-8 validation.
+    // - Tokenize by scanning bytes (no `split_whitespace().collect()` allocations).
+    let mut buf: Vec<u8> = Vec::with_capacity(256);
+    let mut line_no: usize = 0;
 
     // Header (first non-empty line)
-    let (header_line_no, header) = loop {
-        match lines.next() {
-            None => return Err(MatrixMarketError::InvalidBanner("empty input".to_string()).into()),
-            Some((i, line)) => {
-                let line = line.map_err(MatrixMarketError::from)?;
-                let t = line.trim();
-                if t.is_empty() {
-                    continue;
-                }
-                // tolerate BOM
-                let t = t.trim_start_matches('\u{feff}');
-                break (i + 1, t.to_string());
-            }
+    let field = loop {
+        buf.clear();
+        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        if nread == 0 {
+            return Err(MatrixMarketError::InvalidBanner("empty input".to_string()).into());
         }
-    };
+        line_no += 1;
 
-    let tokens: Vec<&str> = header.split_whitespace().collect();
-    if tokens.len() != 5 {
-        return Err(MatrixMarketError::InvalidBanner(format!(
-            "expected 5 tokens, got {} at line {}: {:?}",
-            tokens.len(),
-            header_line_no,
-            header
-        ))
-        .into());
-    }
+        // tolerate UTF-8 BOM (0xEF 0xBB 0xBF) at start of file
+        let mut line: &[u8] = &buf;
+        if line_no == 1 && line.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            line = &line[3..];
+        }
 
-    let mm = tokens[0];
-    let object = tokens[1].to_ascii_lowercase();
-    let format = tokens[2].to_ascii_lowercase();
-    let field = tokens[3].to_ascii_lowercase();
-    let symmetry = tokens[4].to_ascii_lowercase();
+        let mut it = TokenIter::new(line);
+        let mm = match it.next() {
+            None => continue,
+            Some(mm) => mm,
+        };
 
-    if mm != "%%MatrixMarket" {
-        return Err(MatrixMarketError::InvalidBanner(format!(
-            "missing %%MatrixMarket at line {}: {}",
-            header_line_no, header
-        ))
-        .into());
-    }
-    if object != "matrix" || format != "coordinate" {
-        return Err(MatrixMarketError::UnsupportedType(format!(
-            "only 'matrix coordinate' is supported, got '{}' '{}' (line {}): {}",
-            tokens[1], tokens[2], header_line_no, header
-        ))
-        .into());
-    }
-    if symmetry != "general" {
-        return Err(MatrixMarketError::UnsupportedType(format!(
-            "only 'general' symmetry is supported, got '{}' (line {}): {}",
-            tokens[4], header_line_no, header
-        ))
-        .into());
-    }
-
-    let field = match field.as_str() {
-        "integer" => MmField::Integer,
-        "real" => MmField::Real,
-        other => {
-            return Err(MatrixMarketError::UnsupportedType(format!(
-                "only 'integer' and 'real' fields are supported, got '{}' (line {}): {}",
-                other, header_line_no, header
+        let object = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidBanner(format!(
+                "expected 5 tokens, got 1 at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+        })?;
+        let format = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidBanner(format!(
+                "expected 5 tokens, got 2 at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+        })?;
+        let field_s = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidBanner(format!(
+                "expected 5 tokens, got 3 at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+        })?;
+        let symmetry = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidBanner(format!(
+                "expected 5 tokens, got 4 at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+        })?;
+        if it.next().is_some() {
+            return Err(MatrixMarketError::InvalidBanner(format!(
+                "expected 5 tokens, got more at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
             ))
             .into());
         }
+
+        if mm != b"%%MatrixMarket" {
+            return Err(MatrixMarketError::InvalidBanner(format!(
+                "missing %%MatrixMarket at line {}: {}",
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+            .into());
+        }
+        if !ascii_eq_ignore_case(object, b"matrix") || !ascii_eq_ignore_case(format, b"coordinate") {
+            return Err(MatrixMarketError::UnsupportedType(format!(
+                "only 'matrix coordinate' is supported, got '{}' '{}' (line {}): {}",
+                line_lossy_trimmed(object),
+                line_lossy_trimmed(format),
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+            .into());
+        }
+        if !ascii_eq_ignore_case(symmetry, b"general") {
+            return Err(MatrixMarketError::UnsupportedType(format!(
+                "only 'general' symmetry is supported, got '{}' (line {}): {}",
+                line_lossy_trimmed(symmetry),
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+            .into());
+        }
+
+        let field = if ascii_eq_ignore_case(field_s, b"integer") {
+            MmField::Integer
+        } else if ascii_eq_ignore_case(field_s, b"real") {
+            MmField::Real
+        } else {
+            return Err(MatrixMarketError::UnsupportedType(format!(
+                "only 'integer' and 'real' fields are supported, got '{}' (line {}): {}",
+                line_lossy_trimmed(field_s),
+                line_no,
+                line_lossy_trimmed(line)
+            ))
+            .into());
+        };
+
+        break field;
     };
 
     // Size line (skip comments/empty)
-    let (size_line_no, size_line) = loop {
-        match lines.next() {
-            None => {
-                return Err(
-                    MatrixMarketError::InvalidSizeLine("missing size line".to_string()).into(),
-                );
-            }
-            Some((i, line)) => {
-                let line = line.map_err(MatrixMarketError::from)?;
-                let t = line.trim();
-                if t.is_empty() || t.starts_with('%') {
-                    continue;
-                }
-                break (i + 1, t.to_string());
-            }
+    let (nrows, ncols, nnz) = loop {
+        buf.clear();
+        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        if nread == 0 {
+            return Err(MatrixMarketError::InvalidSizeLine("missing size line".to_string()).into());
         }
-    };
+        line_no += 1;
 
-    let parts: Vec<&str> = size_line.split_whitespace().collect();
-    if parts.len() != 3 {
-        return Err(MatrixMarketError::InvalidSizeLine(format!(
-            "expected 3 integers at line {}: {}",
-            size_line_no, size_line
-        ))
-        .into());
-    }
-    let nrows: usize = parts[0].parse().map_err(|e| {
-        MatrixMarketError::InvalidSizeLine(format!(
-            "bad nrows '{}' at line {}: {} ({})",
-            parts[0], size_line_no, size_line, e
-        ))
-    })?;
-    let ncols: usize = parts[1].parse().map_err(|e| {
-        MatrixMarketError::InvalidSizeLine(format!(
-            "bad ncols '{}' at line {}: {} ({})",
-            parts[1], size_line_no, size_line, e
-        ))
-    })?;
-    let nnz: usize = parts[2].parse().map_err(|e| {
-        MatrixMarketError::InvalidSizeLine(format!(
-            "bad nnz '{}' at line {}: {} ({})",
-            parts[2], size_line_no, size_line, e
-        ))
-    })?;
+        let mut it = TokenIter::new(&buf);
+        let first = match it.next() {
+            None => continue,
+            Some(t) => t,
+        };
+        if first.first() == Some(&b'%') {
+            continue;
+        }
+
+        let nrows_s = first;
+        let ncols_s = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidSizeLine(format!(
+                "expected 3 integers at line {}: {}",
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+        })?;
+        let nnz_s = it.next().ok_or_else(|| {
+            MatrixMarketError::InvalidSizeLine(format!(
+                "expected 3 integers at line {}: {}",
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+        })?;
+        if it.next().is_some() {
+            return Err(MatrixMarketError::InvalidSizeLine(format!(
+                "expected 3 integers at line {}: {}",
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+            .into());
+        }
+
+        let nrows: usize = parse_usize_ascii(nrows_s).ok_or_else(|| {
+            MatrixMarketError::InvalidSizeLine(format!(
+                "bad nrows '{}' at line {}: {}",
+                line_lossy_trimmed(nrows_s),
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+        })?;
+        let ncols: usize = parse_usize_ascii(ncols_s).ok_or_else(|| {
+            MatrixMarketError::InvalidSizeLine(format!(
+                "bad ncols '{}' at line {}: {}",
+                line_lossy_trimmed(ncols_s),
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+        })?;
+        let nnz: usize = parse_usize_ascii(nnz_s).ok_or_else(|| {
+            MatrixMarketError::InvalidSizeLine(format!(
+                "bad nnz '{}' at line {}: {}",
+                line_lossy_trimmed(nnz_s),
+                line_no,
+                line_lossy_trimmed(&buf)
+            ))
+        })?;
+
+        break (nrows, ncols, nnz);
+    };
 
     let mut b = if keep_zeros {
         MatrixBuilder::new_keep_zeros(nrows, ncols)
@@ -172,13 +405,22 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
     b.reserve(nnz);
 
     let mut read_entries = 0usize;
-    let mut file_zero_values = 0usize;
-    let mut file_nonzero_values = 0usize;
-    for (i, line) in lines {
-        let line_no = i + 1;
-        let line = line.map_err(MatrixMarketError::from)?;
-        let t = line.trim();
-        if t.is_empty() || t.starts_with('%') {
+    loop {
+        buf.clear();
+        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        if nread == 0 {
+            break;
+        }
+        line_no += 1;
+
+        // Avoid tokenization for the hot-path entry lines: parse `row col val` in a single
+        // cursor pass (scan whitespace once, parse digits inline).
+        let mut idx: usize = 0;
+        skip_ws_ascii(&buf, &mut idx);
+        if idx >= buf.len() {
+            continue;
+        }
+        if buf[idx] == b'%' {
             continue;
         }
         if read_entries >= nnz {
@@ -189,27 +431,57 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
             .into());
         }
 
-        let parts: Vec<&str> = t.split_whitespace().collect();
-        if parts.len() != 3 {
+        // row
+        let row_tok_start = idx;
+        let row_1: usize = parse_usize_at(&buf, &mut idx).ok_or_else(|| {
+            // capture the offending token for a nicer message
+            let mut end = row_tok_start;
+            while end < buf.len() && buf[end] > b' ' {
+                end += 1;
+            }
+            MatrixMarketError::InvalidEntry {
+                line: line_no,
+                msg: format!("bad row index '{}'", line_lossy_trimmed(&buf[row_tok_start..end])),
+            }
+        })?;
+
+        // col
+        skip_ws_ascii(&buf, &mut idx);
+        if idx >= buf.len() {
             return Err(MatrixMarketError::InvalidEntry {
                 line: line_no,
-                msg: format!("expected 3 tokens 'row col val', got: {}", t),
+                msg: format!(
+                    "expected 3 tokens 'row col val', got: {}",
+                    line_lossy_trimmed(&buf)
+                ),
             }
             .into());
         }
+        let col_tok_start = idx;
+        let col_1: usize = parse_usize_at(&buf, &mut idx).ok_or_else(|| {
+            let mut end = col_tok_start;
+            while end < buf.len() && buf[end] > b' ' {
+                end += 1;
+            }
+            MatrixMarketError::InvalidEntry {
+                line: line_no,
+                msg: format!("bad col index '{}'", line_lossy_trimmed(&buf[col_tok_start..end])),
+            }
+        })?;
 
-        let row_1: usize = parts[0]
-            .parse()
-            .map_err(|e| MatrixMarketError::InvalidEntry {
+        // val
+        skip_ws_ascii(&buf, &mut idx);
+        if idx >= buf.len() {
+            return Err(MatrixMarketError::InvalidEntry {
                 line: line_no,
-                msg: format!("bad row index '{}': {}", parts[0], e),
-            })?;
-        let col_1: usize = parts[1]
-            .parse()
-            .map_err(|e| MatrixMarketError::InvalidEntry {
-                line: line_no,
-                msg: format!("bad col index '{}': {}", parts[1], e),
-            })?;
+                msg: format!(
+                    "expected 3 tokens 'row col val', got: {}",
+                    line_lossy_trimmed(&buf)
+                ),
+            }
+            .into());
+        }
+        let val_tok_start = idx;
 
         if row_1 == 0 || col_1 == 0 {
             return Err(MatrixMarketError::InvalidEntry {
@@ -224,29 +496,47 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
 
         let val = match field {
             MmField::Integer => {
-                let v: i64 = parts[2]
-                    .parse()
-                    .map_err(|e| MatrixMarketError::InvalidEntry {
+                let v: i64 = parse_i64_at(&buf, &mut idx).ok_or_else(|| {
+                    let mut end = val_tok_start;
+                    while end < buf.len() && buf[end] > b' ' {
+                        end += 1;
+                    }
+                    MatrixMarketError::InvalidEntry {
                         line: line_no,
-                        msg: format!("bad integer value '{}': {}", parts[2], e),
-                    })?;
+                        msg: format!(
+                            "bad integer value '{}'",
+                            line_lossy_trimmed(&buf[val_tok_start..end])
+                        ),
+                    }
+                })?;
                 v as f64
             }
             MmField::Real => {
-                let v: f64 = parts[2]
-                    .parse()
-                    .map_err(|e| MatrixMarketError::InvalidEntry {
+                let v: f64 = parse_f64_token_at(&buf, &mut idx).ok_or_else(|| {
+                    let mut end = val_tok_start;
+                    while end < buf.len() && buf[end] > b' ' {
+                        end += 1;
+                    }
+                    MatrixMarketError::InvalidEntry {
                         line: line_no,
-                        msg: format!("bad real value '{}': {}", parts[2], e),
-                    })?;
+                        msg: format!("bad real value '{}'", line_lossy_trimmed(&buf[val_tok_start..end])),
+                    }
+                })?;
                 v
             }
         };
 
-        if val == 0.0 {
-            file_zero_values += 1;
-        } else {
-            file_nonzero_values += 1;
+        // Extra trailing tokens are treated as an error (to match the previous behavior).
+        skip_ws_ascii(&buf, &mut idx);
+        if idx < buf.len() {
+            return Err(MatrixMarketError::InvalidEntry {
+                line: line_no,
+                msg: format!(
+                    "expected 3 tokens 'row col val', got: {}",
+                    line_lossy_trimmed(&buf)
+                ),
+            }
+            .into());
         }
 
         // MatrixBuilder expects (column, row, value)

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::SourceMap;
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
@@ -17,6 +19,7 @@ use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
 #[derive(Debug)]
 pub struct Deck {
     pub title: String,
+    pub node_mapping: HashMap<String, Node>,
     pub commands: Vec<Command>,
     pub devices: Vec<Device>,
 }
@@ -382,7 +385,6 @@ impl<'s> InstanceParser<'s> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
-        println!("parse_resistor {:?}", name);
         let mut resistor = Resistor::new(name, cursor.span, positive, negative);
 
         let params_order = vec![
@@ -432,7 +434,6 @@ impl<'s> InstanceParser<'s> {
                 }
                 "m" => {
                     let value = self.parse_value(&mut cursor, scope)?;
-                    println!("setting m to {:?}", value);
                     resistor.set_m(value);
                 }
                 "scale" => {
@@ -917,6 +918,7 @@ impl<'s> InstanceParser<'s> {
 
         let mut commands = vec![];
         let mut devices = vec![];
+        let mut node_mapping = HashMap::new();
 
         for statement in statements_iter {
             let cursor = statement.stmt.into_cursor();
@@ -960,6 +962,7 @@ impl<'s> InstanceParser<'s> {
 
         Ok(Deck {
             title,
+            node_mapping,
             commands,
             devices,
         })

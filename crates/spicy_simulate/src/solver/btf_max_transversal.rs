@@ -16,7 +16,7 @@
 /// the easier thing is to read the implementation of Timothy A. Davis.
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/stable/BTF/Include/btf.h
 /// the code is pretty well documented and much easier to understand.
-use crate::solver::matrix::csc::CscMatrix;
+use crate::solver::matrix::{csc::CscMatrix, slice::SpicySlice};
 
 /// for the given column, try to find a column permutation that will match this row and
 /// there are 2 main parts to the algorithm:
@@ -27,13 +27,13 @@ use crate::solver::matrix::csc::CscMatrix;
 fn try_augmenting_path(
     m: &CscMatrix,
     current_column: usize, // the column we are currently looking at
-    column_permutations: &mut [isize],
-    cheap: &mut [usize], // for each column, holds the current row pointer
+    column_permutations: &mut SpicySlice<isize>,
+    cheap: &mut SpicySlice<usize>, // for each column, holds the current row pointer
     // for the next non-zero entry to try to use the cheap test with
-    visited: &mut [usize], // use the current column as an index into visted to track loops
-    row_stack: &mut [usize],
-    column_stack: &mut [usize],
-    position_stack: &mut [usize],
+    visited: &mut SpicySlice<usize>, // use the current column as an index into visted to track loops
+    row_stack: &mut SpicySlice<usize>,
+    column_stack: &mut SpicySlice<usize>,
+    position_stack: &mut SpicySlice<usize>,
 ) -> bool {
     let mut found = false;
     let mut head: i64 = 0;
@@ -105,11 +105,11 @@ fn try_augmenting_path(
 pub(crate) fn btf_max_transversal(
     m: &CscMatrix,
     // match in davis's code
-    column_permutations: &mut [isize],
+    column_permutations: &mut SpicySlice<isize>,
 ) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
-    column_permutations.fill(-1);
+    column_permutations.0.fill(-1);
 
     let mut cheap: Vec<usize> = vec![0; n];
     // flag in davis's code
@@ -131,11 +131,11 @@ pub(crate) fn btf_max_transversal(
             m,
             col,
             column_permutations,
-            &mut cheap,
-            &mut visited,
-            &mut row_stack,
-            &mut column_stack,
-            &mut position_stack,
+            SpicySlice::from_mut_slice(cheap.as_mut_slice()),
+            SpicySlice::from_mut_slice(visited.as_mut_slice()),
+            SpicySlice::from_mut_slice(row_stack.as_mut_slice()),
+            SpicySlice::from_mut_slice(column_stack.as_mut_slice()),
+            SpicySlice::from_mut_slice(position_stack.as_mut_slice()),
         );
 
         if found {
@@ -149,7 +149,8 @@ pub(crate) fn btf_max_transversal(
 pub(crate) fn run_btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
     let nrows = m.dim.nrows;
     let mut column_permutations: Vec<isize> = vec![-1; nrows];
-    let number_of_matches = btf_max_transversal(m, &mut column_permutations);
+    let number_of_matches =
+        btf_max_transversal(m, SpicySlice::from_mut_slice(column_permutations.as_mut_slice()));
     (number_of_matches, column_permutations)
 }
 

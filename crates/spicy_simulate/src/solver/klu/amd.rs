@@ -14,10 +14,11 @@ use crate::solver::utils::{as_usize_slice, as_usize_slice_mut};
 use crate::solver::{
     aat::{aat_first_phase, aat_second_phase},
     matrix::csc::CscPointers,
+    matrix::slice::SpicySlice,
 };
 
 /// Assumes A is square with sorted columns and no duplicates
-pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
+pub fn amd(a: CscPointers, permutation: &mut SpicySlice<isize>) -> solver::amd::AmdInfo {
     debug_assert!(a.check_invariants().is_ok());
 
     let n = a.dim.ncols;
@@ -28,7 +29,11 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
     // TODO: could techincally be allocated in the workspace
     let mut inverse_permutation = vec![0; n];
 
-    let aat_info = aat_first_phase(&a, &mut column_lengths, permutation);
+    let aat_info = aat_first_phase(
+        &a,
+        SpicySlice::from_mut_slice(column_lengths.as_mut_slice()),
+        permutation,
+    );
     let nzaat = aat_info.nz_aat;
     debug_assert!((std::cmp::max(nz - n, 0) <= nzaat) && (nzaat <= 2 * nz));
 
@@ -73,23 +78,30 @@ pub fn amd(a: CscPointers, permutation: &mut [isize]) -> solver::amd::AmdInfo {
         let nv_usize: &mut [usize] = as_usize_slice_mut(nv);
         let pe_usize: &[usize] = as_usize_slice(pe);
 
-        aat_second_phase(&a, free_position, iw_usize, nv_usize, pe_usize, w);
+        aat_second_phase(
+            &a,
+            free_position,
+            SpicySlice::from_mut_slice(iw_usize),
+            SpicySlice::from_mut_slice(nv_usize),
+            SpicySlice::from_slice(pe_usize),
+            SpicySlice::from_mut_slice(w),
+        );
     }
 
     solver::amd::amd(
         n,
-        pe,
-        iw,
-        &mut column_lengths,
+        SpicySlice::from_mut_slice(pe),
+        SpicySlice::from_mut_slice(iw),
+        SpicySlice::from_mut_slice(column_lengths.as_mut_slice()),
         iwlen,
         free_position,
-        nv,
-        &mut inverse_permutation, // inverse permutation workspace
+        SpicySlice::from_mut_slice(nv),
+        SpicySlice::from_mut_slice(inverse_permutation.as_mut_slice()), // inverse permutation workspace
         permutation,              // output permutation
-        head,
-        elen,
-        degree,
-        w,
+        SpicySlice::from_mut_slice(head),
+        SpicySlice::from_mut_slice(elen),
+        SpicySlice::from_mut_slice(degree),
+        SpicySlice::from_mut_slice(w),
         AmdControl::default(),
     )
 }
@@ -99,6 +111,7 @@ mod tests {
     use super::amd;
     use crate::solver::matrix::Dim;
     use crate::solver::matrix::csc::CscPointers;
+    use crate::solver::matrix::slice::SpicySlice;
 
     #[test]
     fn amd_regression_matrix_5x5_ap_ai() {
@@ -115,7 +128,7 @@ mod tests {
         a.check_invariants().unwrap();
 
         let mut p = vec![0isize; n];
-        let info = amd(a, &mut p);
+        let info = amd(a, SpicySlice::from_mut_slice(p.as_mut_slice()));
 
         // For such a small n, the "dense" threshold (>=16) should not trigger.
         assert_eq!(info.ndense, 0);

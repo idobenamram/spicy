@@ -18,7 +18,10 @@
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
 ///
-use crate::solver::utils::{flip, inverse_permutation, unflip};
+use crate::solver::{
+    matrix::slice::SpicySlice,
+    utils::{flip, inverse_permutation, unflip},
+};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -40,6 +43,7 @@ impl Default for AmdControl {
 impl AmdControl {
     /// A row is "dense" if the number of entries exceeds the value
     /// returned by get_dense. A row with 16 or fewer entries is never considered "dense".
+    #[inline(never)]
     fn get_dense(&self, n: usize) -> usize {
         let dense = (self.dense as f64 * (n as f64).sqrt()) as usize;
         dense.max(16).min(n)
@@ -65,6 +69,7 @@ pub struct AmdInfo {
 }
 
 impl AmdInfo {
+    #[inline(never)]
     pub fn new() -> Self {
         Self {
             lnz: 0.0,
@@ -80,7 +85,8 @@ impl AmdInfo {
 
 const EMPTY: isize = -1;
 
-fn clear_flag(mut wflg: isize, wbig: isize, w: &mut [isize], n: usize) -> isize {
+#[inline(never)]
+fn clear_flag(mut wflg: isize, wbig: isize, w: &mut SpicySlice<isize>, n: usize) -> isize {
     if wflg < 2 || wflg >= wbig {
         for i in 0..n {
             if w[i] != 0 {
@@ -93,13 +99,14 @@ fn clear_flag(mut wflg: isize, wbig: isize, w: &mut [isize], n: usize) -> isize 
     wflg
 }
 
+#[inline(never)]
 fn add_to_degree_list(
     i: usize,
     n: usize,
     deg: usize,
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
 ) {
     let inext = head[deg];
     debug_assert!(inext >= EMPTY && inext < n as isize);
@@ -111,13 +118,14 @@ fn add_to_degree_list(
     head[deg] = i as isize;
 }
 
+#[inline(never)]
 fn remove_head_from_degree_list(
     i: usize,
     n: usize,
     deg: usize,
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
 ) {
     let inext = next[i];
     debug_assert!(inext >= EMPTY && inext < n as isize);
@@ -127,13 +135,14 @@ fn remove_head_from_degree_list(
     head[deg] = inext;
 }
 
+#[inline(never)]
 fn remove_from_degree_list(
     i: usize,
     n: usize,
     deg: usize,
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
 ) {
     let inext = next[i];
     let ilast = last[i];
@@ -153,14 +162,15 @@ fn remove_from_degree_list(
 
 // temporarly use the degree list to store the hash list for variables
 // same hash means the might be able to be joined into a single supervariable
+#[inline(never)]
 fn add_hash_to_degree_list(
     i: usize,
     hash: usize, // a "hash" key for a variables,
     //  basically if two variables have the same incident elements and variables
     // they will have the same hash key
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
 ) {
     let j = head[hash];
     // if the degree list for jis empty we can use it
@@ -177,30 +187,31 @@ fn add_hash_to_degree_list(
     last[i] = hash as isize;
 }
 
+#[inline(never)]
 fn initialize_amd(
     n: usize,
     control: &AmdControl,
-    last: &mut [isize],
-    head: &mut [isize],
-    next: &mut [isize],
-    nv: &mut [isize],
-    w: &mut [isize],
-    elen: &mut [isize],
-    degree: &mut [isize],
-    len: &mut [usize],
-    pe: &mut [isize],
+    last: &mut SpicySlice<isize>,
+    head: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
+    nv: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
+    elen: &mut SpicySlice<isize>,
+    degree: &mut SpicySlice<isize>,
+    len: &mut SpicySlice<usize>,
+    pe: &mut SpicySlice<isize>,
 ) -> (usize, usize) {
     // all lists are empty at the start
-    last.fill(EMPTY);
-    head.fill(EMPTY);
-    next.fill(EMPTY);
+    last.0.fill(EMPTY);
+    head.0.fill(EMPTY);
+    next.0.fill(EMPTY);
 
     // the size of all supervariables at the start is just 1 (simple variable)
-    nv.fill(1);
+    nv.0.fill(1);
     // no variables have been marked yet
-    w.fill(1);
+    w.0.fill(1);
     // no variables are part of elements at the start
-    elen.fill(0);
+    elen.0.fill(0);
 
     // number of eliminated variables
     let mut nel = 0;
@@ -252,7 +263,8 @@ fn initialize_amd(
 }
 
 // find next supervariable for elimination
-fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &[isize]) -> usize {
+#[inline(never)]
+fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &SpicySlice<isize>) -> usize {
     let mut me = EMPTY;
 
     debug_assert!(*mindeg < n);
@@ -274,6 +286,7 @@ fn get_pivot_of_minimum_degree(mindeg: &mut usize, n: usize, head: &[isize]) -> 
 /// new list, compressing when necessary. this loop is
 /// executed once for each element in the list and once for
 /// all the supervariables in the list.
+#[inline(never)]
 fn add_neighboring_supervariables_to_pivot(
     // element we are searching
     e: usize,
@@ -294,15 +307,15 @@ fn add_neighboring_supervariables_to_pivot(
     n: usize,
     me: usize,
     iwlen: usize,
-    elen: &mut [isize],
-    nv: &mut [isize],
-    pe: &mut [isize],
-    len: &mut [usize],
-    iw: &mut [isize],
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
-    degree: &mut [isize],
+    elen: &mut SpicySlice<isize>,
+    nv: &mut SpicySlice<isize>,
+    pe: &mut SpicySlice<isize>,
+    len: &mut SpicySlice<usize>,
+    iw: &mut SpicySlice<isize>,
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
+    degree: &mut SpicySlice<isize>,
 ) {
     for knt2 in 1..=ln {
         debug_assert!(iw[*pj] >= 0 && iw[*pj] < n as isize);
@@ -389,25 +402,26 @@ fn add_neighboring_supervariables_to_pivot(
 // at the end Lme (list of supervariables neighboring the **element** me) will be
 // contained in Iw [pme1 .. pme2]
 // also degme holds the external degree |Lme| of new element
+#[inline(never)]
 fn construct_new_element(
     me: usize,
     nel: &mut usize,
     n: usize,
     pfree: &mut usize,
     iwlen: usize,
-    elen: &mut [isize],
+    elen: &mut SpicySlice<isize>,
     // degme holds the external degree of new element (or |Lme|)
     degme: &mut usize,
-    nv: &mut [isize],
-    pe: &mut [isize],
-    iw: &mut [isize],
-    len: &mut [usize],
-    degree: &mut [isize],
-    w: &mut [isize],
+    nv: &mut SpicySlice<isize>,
+    pe: &mut SpicySlice<isize>,
+    iw: &mut SpicySlice<isize>,
+    len: &mut SpicySlice<usize>,
+    degree: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
     // degree list
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
 ) -> (usize, usize, usize, isize) {
     let elenme = elen[me];
     debug_assert!(nv[me] > 0);
@@ -465,7 +479,7 @@ fn construct_new_element(
                 p += 1;
                 debug_assert!(pe[e] >= 0);
                 pj = pe[e] as usize;
-                debug_assert!(len[e] >= 0);
+                // debug_assert!(len[e] >= 0);
                 ln = len[e];
                 debug_assert!(elen[e] < EMPTY && w[e] > 0);
             }
@@ -531,18 +545,19 @@ fn construct_new_element(
 // iw[pme1..pme2]).   If aggressive absorption is enabled, and
 // (w[e] - wflg) becomes zero, then the element e will be absorbed
 // in Scan 2.
+#[inline(never)]
 fn compute_outside_degrees(
     pme1: usize,
     pme2: usize,
     n: usize,
     iwlen: usize,
-    pe: &[isize],
-    iw: &[isize],
-    elen: &[isize],
-    nv: &[isize],
-    degree: &[isize],
+    pe: &SpicySlice<isize>,
+    iw: &SpicySlice<isize>,
+    elen: &SpicySlice<isize>,
+    nv: &SpicySlice<isize>,
+    degree: &SpicySlice<isize>,
     wflg: isize,
-    w: &mut [isize],
+    w: &mut SpicySlice<isize>,
 ) {
     for pme in pme1..=pme2 {
         // index of the supervariable in Lme
@@ -584,6 +599,7 @@ fn compute_outside_degrees(
     }
 }
 
+#[inline(never)]
 fn update_degrees(
     me: usize,
     pme1: usize,
@@ -593,17 +609,17 @@ fn update_degrees(
     n: usize,
     iwlen: usize,
     degme: &mut usize,
-    pe: &mut [isize],
-    iw: &mut [isize],
-    nv: &mut [isize],
-    elen: &mut [isize],
-    len: &mut [usize],
-    degree: &mut [isize],
-    w: &mut [isize],
+    pe: &mut SpicySlice<isize>,
+    iw: &mut SpicySlice<isize>,
+    nv: &mut SpicySlice<isize>,
+    elen: &mut SpicySlice<isize>,
+    len: &mut SpicySlice<usize>,
+    degree: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
     wflg: isize,
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
     aggressive: bool,
 ) {
     for pme in pme1..=pme2 {
@@ -732,20 +748,21 @@ fn update_degrees(
     }
 }
 
+#[inline(never)]
 fn supervairable_detection(
     pme1: usize,
     pme2: usize,
     n: usize,
     iwlen: usize,
-    pe: &mut [isize],
-    elen: &mut [isize],
-    len: &[usize],
-    iw: &[isize],
-    nv: &mut [isize],
-    head: &mut [isize],
-    next: &mut [isize],
-    last: &mut [isize],
-    w: &mut [isize],
+    pe: &mut SpicySlice<isize>,
+    elen: &mut SpicySlice<isize>,
+    len: &SpicySlice<usize>,
+    iw: &SpicySlice<isize>,
+    nv: &mut SpicySlice<isize>,
+    head: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
     wflg: &mut isize,
 ) {
     for pme in pme1..=pme2 {
@@ -846,18 +863,19 @@ fn supervairable_detection(
     }
 }
 
+#[inline(never)]
 fn restore_degree_list(
     pme1: usize,
     pme2: usize,
     n: usize,
     nel: usize,
     degme: usize,
-    nv: &mut [isize],
-    iw: &mut [isize],
-    head: &mut [isize],
-    last: &mut [isize],
-    next: &mut [isize],
-    degree: &mut [isize],
+    nv: &mut SpicySlice<isize>,
+    iw: &mut SpicySlice<isize>,
+    head: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
+    degree: &mut SpicySlice<isize>,
     aggressive: bool,
     mindeg: &mut usize,
 ) -> usize {
@@ -894,16 +912,17 @@ fn restore_degree_list(
     p
 }
 
+#[inline(never)]
 fn finalize_new_element(
     me: usize,
     nvpiv: usize,
     pme1: usize,
     p: usize,
     pfree: &mut usize,
-    nv: &mut [isize],
-    len: &mut [usize],
-    pe: &mut [isize],
-    w: &mut [isize],
+    nv: &mut SpicySlice<isize>,
+    len: &mut SpicySlice<usize>,
+    pe: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
     elenme: isize,
     info: &mut AmdInfo,
 ) {
@@ -944,7 +963,13 @@ fn finalize_new_element(
  * n: the size of the matrix.
  * No other scalars needed (pfree, iwlen, etc.)
  */
-fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) {
+#[inline(never)]
+fn compress_paths(
+    n: usize,
+    pe: &mut SpicySlice<isize>,
+    elen: &mut SpicySlice<isize>,
+    nv: &SpicySlice<isize>,
+) {
     // restore pe
     for i in 0..n {
         pe[i] = flip(pe[i]);
@@ -996,18 +1021,19 @@ fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) 
 }
 
 // postordering of a supernodal elimination tree
+#[inline(never)]
 fn post_tree(
     // root of a tree
     root: usize,
     // start numbering at k
     mut k: usize,
     // input argument of size nn, undefined on output. child[i] is the head of a link list of all nodes that are children of node i in the tree.
-    child: &mut [isize],
+    child: &mut SpicySlice<isize>,
     // input argument of size nn, not modified. If f is a node in the link list of the children of node i, then sibiling[f] is the next child of node i.
-    sibling: &[isize],
+    sibling: &SpicySlice<isize>,
     // output order, of size nn. order[i] = k if node i is the kth node of the reordered tree.
-    order: &mut [isize],
-    stack: &mut [isize],
+    order: &mut SpicySlice<isize>,
+    stack: &mut SpicySlice<isize>,
     n: usize,
 ) -> usize {
     let mut head: isize = 0;
@@ -1060,20 +1086,21 @@ fn post_tree(
 }
 
 // perform a postordering (via depth-first search) of an assembly tree
+#[inline(never)]
 fn postorder_assembly_tree(
     // inputs, not modified on output:
     n: usize,
-    parent: &[isize],
-    nv: &[isize],
-    fsize: &[isize],
+    parent: &SpicySlice<isize>,
+    nv: &SpicySlice<isize>,
+    fsize: &SpicySlice<isize>,
 
     // output, not defined on input:
-    order: &mut [isize],
+    order: &mut SpicySlice<isize>,
 
     // workspaces of size nn:
-    child: &mut [isize],
-    sibling: &mut [isize],
-    stack: &mut [isize],
+    child: &mut SpicySlice<isize>,
+    sibling: &mut SpicySlice<isize>,
+    stack: &mut SpicySlice<isize>,
 ) {
     for j in 0..n {
         child[j] = EMPTY;
@@ -1144,7 +1171,7 @@ fn postorder_assembly_tree(
 
     // postorder the assembly tree
 
-    order.fill(EMPTY);
+    order.0.fill(EMPTY);
 
     let mut k = 0;
     for i in 0..n {
@@ -1154,15 +1181,16 @@ fn postorder_assembly_tree(
     }
 }
 
+#[inline(never)]
 fn compute_output_permutation(
     n: usize,
     ndense: usize,
-    nv: &[isize],
-    pe: &[isize],
-    head: &mut [isize],
-    next: &mut [isize],
-    last: &mut [isize],
-    w: &[isize],
+    nv: &SpicySlice<isize>,
+    pe: &SpicySlice<isize>,
+    head: &mut SpicySlice<isize>,
+    next: &mut SpicySlice<isize>,
+    last: &mut SpicySlice<isize>,
+    w: &SpicySlice<isize>,
 ) {
     for k in 0..n {
         head[k] = EMPTY;
@@ -1218,22 +1246,23 @@ fn compute_output_permutation(
     inverse_permutation(n, next, last);
 }
 
+#[inline(never)]
 pub fn amd(
-    n: usize,          // A is n-by-n, where n > 0
-    pe: &mut [isize],  // Pe[0..n-1]: index in Iw of row i on input
-    iw: &mut [isize],  // workspace of size iwlen. Iw[0..pfree-1] holds the matrix on input
-    len: &mut [usize], // Len[0..n-1]: length for row/column i on input
-    iwlen: usize,      // length of Iw. iwlen >= pfree + n
-    mut pfree: usize,  // Iw[pfree .. iwlen-1] is empty on input
+    n: usize,                    // A is n-by-n, where n > 0
+    pe: &mut SpicySlice<isize>,  // Pe[0..n-1]: index in Iw of row i on input
+    iw: &mut SpicySlice<isize>, // workspace of size iwlen. Iw[0..pfree-1] holds the matrix on input
+    len: &mut SpicySlice<usize>, // Len[0..n-1]: length for row/column i on input
+    iwlen: usize,               // length of Iw. iwlen >= pfree + n
+    mut pfree: usize,           // Iw[pfree .. iwlen-1] is empty on input
 
     // 7 size-n workspaces, not defined on input:
-    nv: &mut [isize],   // the size of each supernode on output
-    next: &mut [isize], // the output inverse permutation
-    last: &mut [isize], // the output permutation
-    head: &mut [isize],
-    elen: &mut [isize], // the size (in columns of L) for each supernode
-    degree: &mut [isize],
-    w: &mut [isize],
+    nv: &mut SpicySlice<isize>,   // the size of each supernode on output
+    next: &mut SpicySlice<isize>, // the output inverse permutation
+    last: &mut SpicySlice<isize>, // the output permutation
+    head: &mut SpicySlice<isize>,
+    elen: &mut SpicySlice<isize>, // the size (in columns of L) for each supernode
+    degree: &mut SpicySlice<isize>,
+    w: &mut SpicySlice<isize>,
 
     control: AmdControl,
 ) -> AmdInfo {

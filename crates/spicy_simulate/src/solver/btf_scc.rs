@@ -29,7 +29,7 @@ use crate::solver::utils::EMPTY;
 /// which are the non zero rows in the column. now the matrix is symmetric by definition of MNA
 /// meaning that the non-zero row (j) is an edge from the column i -> column j (by row j).
 /// it was a little confusing for me at first, so i wanted to write it down.
-use crate::solver::{matrix::csc::CscMatrix, utils::unflip};
+use crate::solver::{matrix::{csc::CscMatrix, slice::SpicySlice}, utils::unflip};
 
 const UNVISITED: usize = usize::MAX; // visited[j] = UNVISITED means node j has not been visited yet
 const UNASSIGNED: usize = usize::MAX - 1; // visited[j] = UNASSIGNED means node j has been visited 
@@ -41,7 +41,7 @@ fn dfs(
     m: &CscMatrix,
     // Q in davis's code
     // this is the column permutation we got from the max transversal algorithm
-    column_permutations: &[isize],
+    column_permutations: &SpicySlice<isize>,
     // the current column we are visiting
     current_column: usize,
 
@@ -51,16 +51,16 @@ fn dfs(
     number_of_scc_blocks: &mut usize,
 
     // see docs above on UNASSIGNED
-    visited: &mut [usize],
+    visited: &mut SpicySlice<usize>,
     // graph_indices[j] is the index of the node j in the graph if it has been visited
-    graph_indices: &mut [isize],
+    graph_indices: &mut SpicySlice<isize>,
     // low[j] is the lowest graph_index of any node reachable from node j
-    low: &mut [isize],
+    low: &mut SpicySlice<isize>,
 
     // stacks
-    component_stack: &mut [usize],
-    column_stack: &mut [usize],
-    position_stack: &mut [usize],
+    component_stack: &mut SpicySlice<usize>,
+    column_stack: &mut SpicySlice<usize>,
+    position_stack: &mut SpicySlice<usize>,
 ) {
     let mut component_head = 0;
     let mut column_head: i64 = 0;
@@ -145,24 +145,23 @@ fn dfs(
 
 pub(crate) fn btf_scc(
     m: &CscMatrix,
-    column_permutations: &mut [isize],
-    row_permutations: &mut [isize],
+    column_permutations: &mut SpicySlice<isize>,
+    row_permutations: &mut SpicySlice<isize>,
     // n+1 size
-    boundary_array: &mut [usize],
+    boundary_array: &mut SpicySlice<usize>,
 ) -> usize {
     let n = m.dim.ncols;
     let out_of_bounds = n + 1;
 
     let mut graph_indices: Vec<isize> = vec![EMPTY; n];
-    // reuse row as low array
-    let mut low = row_permutations.as_mut();
-    low.fill(EMPTY);
+    // reuse row_permutations as low array
+    row_permutations.0.fill(EMPTY);
+
     // called flag in davis's code
     let mut visited: Vec<usize> = vec![UNVISITED; n];
 
-    // reuse boundary array as component stack (n + 1)
-    let mut component_stack = boundary_array.as_mut();
-    component_stack.fill(out_of_bounds);
+    // reuse boundary_array as component stack (n + 1)
+    boundary_array.0.fill(out_of_bounds);
 
     let mut column_stack: Vec<usize> = vec![out_of_bounds; n];
     let mut position_stack: Vec<usize> = vec![out_of_bounds; n];
@@ -176,17 +175,17 @@ pub(crate) fn btf_scc(
         if visited[col] == UNVISITED {
             dfs(
                 m,
-                &column_permutations,
+                column_permutations,
                 col,
                 &mut node_graph_index,
                 &mut number_of_scc_blocks,
-                &mut visited,
-                &mut graph_indices,
-                &mut low,
+                SpicySlice::from_mut_slice(visited.as_mut_slice()),
+                SpicySlice::from_mut_slice(graph_indices.as_mut_slice()),
+                row_permutations,
                 // stacks outside of function for allocation efficiency
-                &mut component_stack,
-                &mut column_stack,
-                &mut position_stack,
+                boundary_array,
+                SpicySlice::from_mut_slice(column_stack.as_mut_slice()),
+                SpicySlice::from_mut_slice(position_stack.as_mut_slice()),
             );
         }
     }
@@ -204,7 +203,7 @@ pub(crate) fn btf_scc(
     for col in 0..n {
         // sanity checks that the blocks were generated correctly
         debug_assert!(graph_indices[col] > 0 && graph_indices[col] <= n as isize);
-        debug_assert!(low[col] > 0 && low[col] <= n as isize);
+        debug_assert!(row_permutations[col] > 0 && row_permutations[col] <= n as isize);
         debug_assert!(visited[col] < number_of_scc_blocks);
         // visited[col] is the SCC block index of the current column
         // increment the boundary array to get the number of nodes in the current block
@@ -255,12 +254,12 @@ pub(crate) fn btf_scc(
     // so the final permutation is P*A*Q
     for k in 0..n {
         // row_permutations[k] is the new column index for the k-th column after the column permutation
-        graph_indices[k] = column_permutations[row_permutations[k] as usize] as isize;
+        graph_indices[k] = column_permutations[row_permutations[k] as usize];
     }
     // overwrite the column permutation with the (Q*P^T) permutation
     for col in 0..n {
         column_permutations[col] = graph_indices[col];
     }
 
-    return number_of_scc_blocks;
+    number_of_scc_blocks
 }

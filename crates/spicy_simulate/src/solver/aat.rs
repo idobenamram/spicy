@@ -9,7 +9,7 @@
 // Modifications/porting for this project:
 // Copyright (c) 2025 Ido Ben Amram
 
-use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
+use crate::solver::{matrix::{csc::CscPointers, slice::SpicySlice}, utils::EMPTY};
 
 /// calculating the symmetric pattern of A (A + A^T)
 
@@ -27,13 +27,13 @@ pub struct AatInfo {
 pub fn aat_first_phase(
     a: &CscPointers,
     // len n
-    column_lengths: &mut [usize],
+    column_lengths: &mut SpicySlice<usize>,
     // len n, as the scan continues, the last_columns_positions[i] will be the position of the last entry in the column of i
     // that has been scanned
-    last_columns_positions: &mut [isize],
+    last_columns_positions: &mut SpicySlice<isize>,
 ) -> AatInfo {
-    last_columns_positions.fill(EMPTY);
-    column_lengths.fill(0);
+    last_columns_positions.0.fill(EMPTY);
+    column_lengths.0.fill(0);
 
     let mut nz_diagonal = 0;
     let mut nz_both = 0;
@@ -131,7 +131,7 @@ pub fn aat_first_phase(
     }
 
     // excluding diagonals
-    let nz_aat = column_lengths.iter().sum::<usize>();
+    let nz_aat = column_lengths.0.iter().sum::<usize>();
 
     AatInfo {
         sym,
@@ -147,14 +147,14 @@ pub fn aat_second_phase(
     a: &CscPointers,
     free_position: usize,
     // will be filled with the AAT matrix
-    aat_rows: &mut [usize],
+    aat_rows: &mut SpicySlice<usize>,
     // the current position in the AAT matrix for row/col
     // on input, contains the start position of the column in the AAT matrix
-    current_pos: &mut [usize],
+    current_pos: &mut SpicySlice<usize>,
     // on input, contains the end position of the column in the AAT matrix
-    pe: &[usize],
+    pe: &SpicySlice<usize>,
     // for each column/row, the position of the last scanned entry in the column
-    last_columns_positions: &mut [isize],
+    last_columns_positions: &mut SpicySlice<isize>,
 ) {
     let n = a.dim.ncols;
 

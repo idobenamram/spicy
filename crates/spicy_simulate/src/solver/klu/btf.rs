@@ -11,14 +11,17 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::{
-    btf_max_transversal::btf_max_transversal, btf_scc::btf_scc, matrix::csc::CscMatrix, utils::flip,
+    btf_max_transversal::btf_max_transversal,
+    btf_scc::btf_scc,
+    matrix::{csc::CscMatrix, slice::SpicySlice},
+    utils::flip,
 };
 
 pub fn btf(
     a: &CscMatrix,
-    row_permutations: &mut [isize],
-    column_permutations: &mut [isize],
-    blocks: &mut [usize],
+    row_permutations: &mut SpicySlice<isize>,
+    column_permutations: &mut SpicySlice<isize>,
+    blocks: &mut SpicySlice<usize>,
 ) -> (usize, usize) {
     let n = a.dim.ncols;
     let number_of_matches = btf_max_transversal(a, column_permutations);

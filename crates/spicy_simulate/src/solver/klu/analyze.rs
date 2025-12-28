@@ -12,14 +12,21 @@
 use std::cmp::max;
 
 use crate::solver::{
-    klu::{amd::amd, btf::btf, klu_valid, KluConfig, KluOrdering, KluResult, KluSymbolic},
-    matrix::{csc::{CscMatrix, CscPointers}, Dim},
+    klu::{KluConfig, KluOrdering, KluResult, KluSymbolic, amd::amd, btf::btf, klu_valid},
+    matrix::{
+        Dim,
+        csc::{CscMatrix, CscPointers},
+        slice::SpicySlice,
+    },
     utils::{EMPTY, inverse_permutation, unflip},
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
     debug_assert!(a.is_square(), "Klu analyze only supports square matrices");
-    debug_assert!(a.check_invariants().is_ok(), "Klu analyze only supports valid CSC matrices");
+    debug_assert!(
+        a.check_invariants().is_ok(),
+        "Klu analyze only supports valid CSC matrices"
+    );
     let n = a.dim.ncols;
     let mut row_permutation = vec![-1; n];
     for col in 0..n {
@@ -72,7 +79,11 @@ fn analyze_worker(
 
     // TODO: this doesn't have to happen in this funciton tbh
     // compute row permutation inverse
-    inverse_permutation(n, &btf_row_permutation, &mut row_inv_permutations);
+    inverse_permutation(
+        n,
+        SpicySlice::from_slice(&btf_row_permutation),
+        SpicySlice::from_mut_slice(&mut row_inv_permutations),
+    );
 
     let mut nzoff = 0;
     let mut lnz = 0.;
@@ -81,8 +92,8 @@ fn analyze_worker(
 
     for block in 0..symbolic.nblocks {
         // the block is from rows/columns k1 to k2-1
-        let k1 = symbolic.block_boundaries[block] as usize;
-        let k2 = symbolic.block_boundaries[block + 1] as usize;
+        let k1 = symbolic.block_boundaries[block];
+        let k2 = symbolic.block_boundaries[block + 1];
         let size = k2 - k1;
 
         symbolic.lower_nz[block] = -1.0;
@@ -104,7 +115,7 @@ fn analyze_worker(
                     nzoff += 1;
                 } else {
                     debug_assert!(new_row < k2);
-                    new_row = new_row - k1;
+                    new_row -= k1;
                     block_row_pointers[pc] = new_row;
                     pc += 1;
                 }
@@ -130,7 +141,9 @@ fn analyze_worker(
                 &block_row_pointers[..pc],
             );
 
-            let info = amd(block_ptrs, &mut block_row_permutation[..size]);
+            let block_row_per_slice =
+                SpicySlice::from_mut_slice(&mut block_row_permutation[..size]);
+            let info = amd(block_ptrs, block_row_per_slice);
             lnz1 = info.lnz + size as f64;
         } else {
             todo!()
@@ -144,9 +157,9 @@ fn analyze_worker(
             debug_assert!(k + k1 < n);
             debug_assert!(block_row_permutation[k] as usize + k1 < n);
             symbolic.column_permutation[k + k1] =
-                btf_column_permutation[block_row_permutation[k] as usize + k1] as isize;
+                btf_column_permutation[block_row_permutation[k] as usize + k1];
             symbolic.row_permutation[k + k1] =
-                btf_row_permutation[block_row_permutation[k] as usize + k1] as isize;
+                btf_row_permutation[block_row_permutation[k] as usize + k1];
         }
     }
 
@@ -175,17 +188,17 @@ pub fn analyze(a: &CscMatrix, config: &KluConfig) -> KluResult<KluSymbolic> {
     if config.btf {
         let (number_of_matches, scc_blocks) = btf(
             a,
-            &mut btf_row_permutation,
-            &mut btf_column_permutation,
-            &mut symbolic.block_boundaries,
+            SpicySlice::from_mut_slice(btf_row_permutation.as_mut_slice()),
+            SpicySlice::from_mut_slice(btf_column_permutation.as_mut_slice()),
+            SpicySlice::from_mut_slice(symbolic.block_boundaries.as_mut_slice()),
         );
         number_of_scc_blocks = scc_blocks;
         symbolic.structural_rank = number_of_matches;
 
         // unflip the column permutation if the matrix is structurally singular
         if symbolic.structural_rank < symbolic.n {
-            for col in 0..symbolic.n {
-                symbolic.column_permutation[col] = unflip(symbolic.column_permutation[col]);
+            for q in btf_column_permutation.iter_mut() {
+                *q = unflip(*q);
             }
         }
 

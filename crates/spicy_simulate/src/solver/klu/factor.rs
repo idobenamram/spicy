@@ -10,16 +10,16 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::klu::{
-    scale::scale, KluConfig, KluError, KluNumeric, KluNumericMetrics, KluResult, KluSymbolic,
+    KluConfig, KluError, KluNumeric, KluNumericMetrics, KluResult, KluSymbolic, scale::scale,
 };
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
 use crate::solver::matrix::csc::CscMatrix;
-use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
+use crate::solver::matrix::slice::SpicySlice;
+use crate::solver::utils::{
+    as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation,
+};
 
-pub fn allocate_klu_numeric(
-    symbolic: &KluSymbolic,
-    config: &KluConfig,
-) -> KluResult<KluNumeric> {
+pub fn allocate_klu_numeric(symbolic: &KluSymbolic, config: &KluConfig) -> KluResult<KluNumeric> {
     let n = symbolic.n;
     let nzoff = symbolic.nzoff;
     let nblocks = symbolic.nblocks;
@@ -49,7 +49,9 @@ pub fn allocate_klu_numeric(
         .ok_or(KluError::overflow("3 * n * sizeof(f64) for workspace"))?;
     let b6 = maxblock
         .checked_mul(6 * std::mem::size_of::<isize>())
-        .ok_or(KluError::overflow("6 * maxblock * sizeof(isize) for workspace"))?;
+        .ok_or(KluError::overflow(
+            "6 * maxblock * sizeof(isize) for workspace",
+        ))?;
     let worksize = s
         .checked_add(std::cmp::max(n3, b6))
         .ok_or(KluError::overflow("total workspace size"))?;
@@ -208,7 +210,11 @@ pub fn factor(
     /* compute the inverse of P from symbolic analysis.  Will be updated to
      * become the inverse of the numerical factorization when the factorization
      * is done, for use in KLU_refactor */
-    inverse_permutation(n, &symbolic.row_permutation, &mut numeric.pinv);
+    inverse_permutation(
+        n,
+        SpicySlice::from_slice(&symbolic.row_permutation),
+        SpicySlice::from_mut_slice(&mut numeric.pinv),
+    );
 
     numeric.offp[0] = 0;
 
@@ -361,7 +367,11 @@ pub fn factor(
     numeric.max_unz_block = max_unz_block;
 
     // compute inverse of pnum
-    inverse_permutation(n, &numeric.pnum, &mut numeric.pinv);
+    inverse_permutation(
+        n,
+        SpicySlice::from_slice(&numeric.pnum),
+        SpicySlice::from_mut_slice(&mut numeric.pinv),
+    );
 
     // permute the rwo scaling according to the pivtol row order
     match &mut numeric.rs {

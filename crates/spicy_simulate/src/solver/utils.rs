@@ -1,6 +1,8 @@
 use std::{mem, slice};
 use thiserror::Error;
 
+use crate::solver::matrix::slice::SpicySlice;
+
 pub const EMPTY: isize = -1;
 
 /// negation about -1, used to mark an integer i that is normally non-negative.
@@ -104,26 +106,31 @@ pub(crate) fn dunits<T>(n: usize) -> Result<usize, SolverOverflowError> {
     let unit_bytes = mem::size_of::<f64>();
 
     // bytes = sizeof(T) * n  (checked to avoid overflow)
-    let bytes = type_bytes.checked_mul(n).ok_or(SolverOverflowError::Overflow {
-        context: "DUNITS byte count",
-    })?;
+    let bytes = type_bytes
+        .checked_mul(n)
+        .ok_or(SolverOverflowError::Overflow {
+            context: "DUNITS byte count",
+        })?;
 
     // ceil(bytes / unit_bytes)
     let units = bytes
         .checked_add(unit_bytes - 1)
         .ok_or(SolverOverflowError::Overflow {
             context: "DUNITS units",
-        })? / unit_bytes;
+        })?
+        / unit_bytes;
 
     Ok(units)
 }
 
-pub(crate) fn inverse_permutation(n: usize, permutation: &[isize], inverse: &mut [isize]) {
+pub(crate) fn inverse_permutation(
+    n: usize,
+    permutation: &SpicySlice<isize>,
+    inverse: &mut SpicySlice<isize>,
+) {
     #[cfg(debug_assertions)]
     {
-        for k in 0..n {
-            inverse[k] = EMPTY;
-        }
+        inverse.0.fill(EMPTY);
     }
 
     for k in 0..n {

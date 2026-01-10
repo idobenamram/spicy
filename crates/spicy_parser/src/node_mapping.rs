@@ -1,12 +1,44 @@
 use crate::netlist_types::{CurrentBranchIndex, NodeIndex, NodeName};
+use std::fmt;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NodeMapping {
     node_mapping: HashMap<NodeName, NodeIndex>,
     node_counter: usize,
     branch_mapping: HashMap<String, CurrentBranchIndex>,
     branch_counter: usize,
+}
+
+// NOTE: We use `assert_debug_snapshot!` on parsed decks. `HashMap`'s iteration order is not
+// deterministic, so we provide a stable `Debug` implementation for snapshot (and log) sanity.
+impl fmt::Debug for NodeMapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut node_entries: Vec<_> = self.node_mapping.iter().collect();
+        node_entries.sort_by_key(|(_name, node_index)| node_index.0);
+
+        let mut branch_entries: Vec<_> = self.branch_mapping.iter().collect();
+        branch_entries.sort_by_key(|(_name, branch_index)| branch_index.0);
+
+        let mut ds = f.debug_struct("NodeMapping");
+        ds.field("node_mapping", &SortedDebugMap(&node_entries));
+        ds.field("node_counter", &self.node_counter);
+        ds.field("branch_mapping", &SortedDebugMap(&branch_entries));
+        ds.field("branch_counter", &self.branch_counter);
+        ds.finish()
+    }
+}
+
+struct SortedDebugMap<'a, K: 'a, V: 'a>(&'a [(&'a K, &'a V)]);
+
+impl<'a, K: fmt::Debug, V: fmt::Debug> fmt::Debug for SortedDebugMap<'a, K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut m = f.debug_map();
+        for (k, v) in self.0 {
+            m.entry(k, v);
+        }
+        m.finish()
+    }
 }
 
 impl NodeMapping {

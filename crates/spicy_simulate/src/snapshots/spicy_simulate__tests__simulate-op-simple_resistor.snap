@@ -10,7 +10,7 @@ OperatingPointResult {
         ),
         (
             "out",
-            2.0,
+            1.9999999999999998,
         ),
     ],
     currents: [],

@@ -7,14 +7,14 @@ Deck {
     node_mapping: NodeMapping {
         node_mapping: {
             NodeName(
-                "out",
-            ): NodeIndex(
-                1,
-            ),
-            NodeName(
                 "0",
             ): NodeIndex(
                 0,
+            ),
+            NodeName(
+                "out",
+            ): NodeIndex(
+                1,
             ),
         },
         node_counter: 2,

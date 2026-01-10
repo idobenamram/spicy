@@ -4,6 +4,50 @@ expression: deck
 ---
 Deck {
     title: "params mixing",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "n1",
+            ): NodeIndex(
+                1,
+            ),
+            NodeName(
+                "n0",
+            ): NodeIndex(
+                2,
+            ),
+            NodeName(
+                "n2",
+            ): NodeIndex(
+                3,
+            ),
+            NodeName(
+                "n3",
+            ): NodeIndex(
+                4,
+            ),
+            NodeName(
+                "n4",
+            ): NodeIndex(
+                5,
+            ),
+        },
+        node_counter: 6,
+        branch_mapping: {
+            "V1": CurrentBranchIndex(
+                1,
+            ),
+            "V2": CurrentBranchIndex(
+                2,
+            ),
+        },
+        branch_counter: 3,
+    },
     commands: [
         Op(
             OpCommand {
@@ -17,9 +61,9 @@ Deck {
             },
         ),
     ],
-    devices: [
-        Resistor(
-            Resistor {
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
                 name: "R1",
                 span: Span {
                     start: 40,
@@ -28,12 +72,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n1",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: Some(
                     Value {
                         value: 1.0,
@@ -97,9 +141,7 @@ Deck {
                     true,
                 ),
             },
-        ),
-        Resistor(
-            Resistor {
+            ResistorSpec {
                 name: "R2",
                 span: Span {
                     start: 158,
@@ -108,12 +150,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n1",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: Some(
                     Value {
                         value: 2.0,
@@ -175,9 +217,7 @@ Deck {
                 ),
                 noisy: None,
             },
-        ),
-        Resistor(
-            Resistor {
+            ResistorSpec {
                 name: "R3",
                 span: Span {
                     start: 191,
@@ -186,12 +226,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n1",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: Some(
                     Value {
                         value: 3.0,
@@ -231,9 +271,7 @@ Deck {
                     true,
                 ),
             },
-        ),
-        Resistor(
-            Resistor {
+            ResistorSpec {
                 name: "R3",
                 span: Span {
                     start: 224,
@@ -242,12 +280,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n1",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: Some(
                     Value {
                         value: 2.0,
@@ -293,9 +331,7 @@ Deck {
                 tc2: None,
                 noisy: None,
             },
-        ),
-        Resistor(
-            Resistor {
+            ResistorSpec {
                 name: "R4",
                 span: Span {
                     start: 249,
@@ -304,12 +340,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n1",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: None,
                 model: Some(
                     ResistorModel {
@@ -347,9 +383,9 @@ Deck {
                 tc2: None,
                 noisy: None,
             },
-        ),
-        Capacitor(
-            Capacitor {
+        ],
+        capacitors: [
+            CapacitorSpec {
                 name: "C1",
                 span: Span {
                     start: 270,
@@ -358,12 +394,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n2",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    3,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 capacitance: Some(
                     Value {
                         value: 1.0,
@@ -425,9 +461,7 @@ Deck {
                     },
                 ),
             },
-        ),
-        Capacitor(
-            Capacitor {
+            CapacitorSpec {
                 name: "C2",
                 span: Span {
                     start: 335,
@@ -436,12 +470,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n2",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    3,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 capacitance: Some(
                     Value {
                         value: 2.0,
@@ -503,9 +537,7 @@ Deck {
                     },
                 ),
             },
-        ),
-        Capacitor(
-            Capacitor {
+            CapacitorSpec {
                 name: "C3",
                 span: Span {
                     start: 370,
@@ -514,12 +546,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "n2",
-                },
-                negative: Node {
-                    name: "n0",
-                },
+                positive: NodeIndex(
+                    3,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 capacitance: Some(
                     Value {
                         value: 3.0,
@@ -557,16 +589,20 @@ Deck {
                     },
                 ),
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+        ],
+        inductors: [],
+        voltage_sources: [
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "n3",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    4,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -578,16 +614,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V2",
-                positive: Node {
-                    name: "n3",
-                },
-                negative: Node {
-                    name: "n4",
-                },
+                positive: NodeIndex(
+                    4,
+                ),
+                negative: NodeIndex(
+                    5,
+                ),
+                current_branch: CurrentBranchIndex(
+                    2,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -601,6 +638,7 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-    ],
+        ],
+        current_sources: [],
+    },
 }

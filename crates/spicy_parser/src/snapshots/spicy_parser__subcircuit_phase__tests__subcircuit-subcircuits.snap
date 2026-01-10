@@ -74,12 +74,8 @@ expression: json
           }
         },
         "node_mapping": {
-          "in": {
-            "name": "n1"
-          },
-          "out": {
-            "name": "n2"
-          }
+          "in": "n1",
+          "out": "n2"
         }
       },
       {
@@ -116,12 +112,8 @@ expression: json
           }
         },
         "node_mapping": {
-          "in": {
-            "name": "a"
-          },
-          "out": {
-            "name": "b"
-          }
+          "in": "a",
+          "out": "b"
         }
       },
       {
@@ -158,12 +150,8 @@ expression: json
           }
         },
         "node_mapping": {
-          "in": {
-            "name": "x"
-          },
-          "out": {
-            "name": "y"
-          }
+          "in": "x",
+          "out": "y"
         }
       }
     ]
@@ -177,12 +165,8 @@ expression: json
       "LP": {
         "name": "LP",
         "nodes": [
-          {
-            "name": "in"
-          },
-          {
-            "name": "out"
-          }
+          "in",
+          "out"
         ],
         "default_params": {
           "C": {

@@ -158,6 +158,10 @@ impl CscMatrix {
         }
     }
 
+    pub fn get_mut_nnz(&mut self, nnz: usize) -> &mut f64 {
+        &mut self.values[nnz]
+    }
+
     /// Transpose into CSR (current matrix doesn't have duplicates)
     /// This is O(n + nnz) with counting sort by row.
     pub fn transpose_to_csr(&self) -> CsrMatrix {

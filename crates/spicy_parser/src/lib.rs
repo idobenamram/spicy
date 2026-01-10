@@ -2,6 +2,8 @@ pub mod error;
 mod expr;
 mod expression_phase;
 pub mod instance_parser;
+pub mod devices;
+pub mod node_mapping;
 mod lexer;
 pub mod libs_phase;
 mod netlist_models;

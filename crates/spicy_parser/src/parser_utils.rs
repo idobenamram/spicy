@@ -3,7 +3,7 @@ use crate::error::{ParserError, SpicyError};
 use crate::expr::{Expr, Params};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{TokenKind, token_text};
-use crate::netlist_types::Node;
+use crate::netlist_types::{NodeIndex, NodeName};
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;
 
@@ -12,7 +12,7 @@ pub(crate) struct Ident<'a> {
     pub span: Span,
 }
 
-pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<Node, SpicyError> {
+pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<NodeName, SpicyError> {
     let node = cursor
         .next_non_whitespace()
         .ok_or_else(|| ParserError::MissingToken {
@@ -29,7 +29,7 @@ pub(crate) fn parse_node(cursor: &mut StmtCursor, src: &str) -> Result<Node, Spi
         .into());
     }
     let node_string = token_text(src, node).to_string();
-    Ok(Node { name: node_string })
+    Ok(NodeName(node_string))
 }
 
 pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, SpicyError> {

@@ -227,7 +227,9 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
     // Header (first non-empty line)
     let field = loop {
         buf.clear();
-        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        let nread = reader
+            .read_until(b'\n', &mut buf)
+            .map_err(MatrixMarketError::from)?;
         if nread == 0 {
             return Err(MatrixMarketError::InvalidBanner("empty input".to_string()).into());
         }
@@ -290,7 +292,8 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
             ))
             .into());
         }
-        if !ascii_eq_ignore_case(object, b"matrix") || !ascii_eq_ignore_case(format, b"coordinate") {
+        if !ascii_eq_ignore_case(object, b"matrix") || !ascii_eq_ignore_case(format, b"coordinate")
+        {
             return Err(MatrixMarketError::UnsupportedType(format!(
                 "only 'matrix coordinate' is supported, got '{}' '{}' (line {}): {}",
                 line_lossy_trimmed(object),
@@ -330,7 +333,9 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
     // Size line (skip comments/empty)
     let (nrows, ncols, nnz) = loop {
         buf.clear();
-        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        let nread = reader
+            .read_until(b'\n', &mut buf)
+            .map_err(MatrixMarketError::from)?;
         if nread == 0 {
             return Err(MatrixMarketError::InvalidSizeLine("missing size line".to_string()).into());
         }
@@ -397,17 +402,15 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
         break (nrows, ncols, nnz);
     };
 
-    let mut b = if keep_zeros {
-        MatrixBuilder::new_keep_zeros(nrows, ncols)
-    } else {
-        MatrixBuilder::new(nrows, ncols)
-    };
+    let mut b = MatrixBuilder::new(nrows, ncols);
     b.reserve(nnz);
 
     let mut read_entries = 0usize;
     loop {
         buf.clear();
-        let nread = reader.read_until(b'\n', &mut buf).map_err(MatrixMarketError::from)?;
+        let nread = reader
+            .read_until(b'\n', &mut buf)
+            .map_err(MatrixMarketError::from)?;
         if nread == 0 {
             break;
         }
@@ -441,7 +444,10 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
             }
             MatrixMarketError::InvalidEntry {
                 line: line_no,
-                msg: format!("bad row index '{}'", line_lossy_trimmed(&buf[row_tok_start..end])),
+                msg: format!(
+                    "bad row index '{}'",
+                    line_lossy_trimmed(&buf[row_tok_start..end])
+                ),
             }
         })?;
 
@@ -465,7 +471,10 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
             }
             MatrixMarketError::InvalidEntry {
                 line: line_no,
-                msg: format!("bad col index '{}'", line_lossy_trimmed(&buf[col_tok_start..end])),
+                msg: format!(
+                    "bad col index '{}'",
+                    line_lossy_trimmed(&buf[col_tok_start..end])
+                ),
             }
         })?;
 
@@ -519,7 +528,10 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
                     }
                     MatrixMarketError::InvalidEntry {
                         line: line_no,
-                        msg: format!("bad real value '{}'", line_lossy_trimmed(&buf[val_tok_start..end])),
+                        msg: format!(
+                            "bad real value '{}'",
+                            line_lossy_trimmed(&buf[val_tok_start..end])
+                        ),
                     }
                 })?;
                 v
@@ -539,9 +551,13 @@ fn load_matrix_market_csc_from_reader_impl<R: BufRead>(
             .into());
         }
 
-        // MatrixBuilder expects (column, row, value)
-        b.push(col, row, val)?;
         read_entries += 1;
+        // MatrixBuilder expects (column, row, value)
+        if !keep_zeros && val == 0.0 {
+            continue;
+        }
+
+        b.push(col, row, val)?;
     }
 
     if read_entries != nnz {

@@ -242,9 +242,8 @@ pub(crate) fn write_ac_raw(
     let mut writer = BufWriter::new(file);
 
     // Rebuild names
-    let nodes = crate::nodes::Nodes::new(&deck.devices);
-    let node_names = nodes.get_node_names();
-    let source_names = nodes.get_source_names();
+    let node_names = deck.node_mapping.node_names_mna_order();
+    let source_names = deck.node_mapping.branch_names_mna_order();
     let traces = build_trace_variables_from_names(&node_names, &source_names);
     let trace_count = traces.len();
 
@@ -262,8 +261,8 @@ pub(crate) fn write_ac_raw(
 
     // Binary: per point -> f64 frequency, then for each trace: f64 re, f64 im
     writeln!(&mut writer, "Binary:")?;
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+    let n = node_names.len();
+    let k = source_names.len();
     for (f, xr, xi) in ac {
         writer.write_all(&f.to_le_bytes())?;
         // node voltages

@@ -1,16 +1,11 @@
 use std::collections::HashMap;
 
-use ndarray::{Array1, Array2};
-use ndarray_linalg::{FactorizeInto, Solve};
-use spicy_parser::{
-    Value,
-    instance_parser::Deck,
-    netlist_types::{Capacitor, Device, IndependentSource, TranCommand},
-};
+use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand, node_mapping::NodeMapping};
 
 use crate::{
     dc::{simulate_op_inner, stamp_resistor, stamp_voltage_source_incidence},
-    nodes::Nodes,
+    devices::{Capacitor, Devices, IndependentSource},
+    matrix::SolverMatrix,
 };
 
 fn steps(dt: f64, tstop: f64) -> Vec<f64> {
@@ -19,15 +14,15 @@ fn steps(dt: f64, tstop: f64) -> Vec<f64> {
 }
 
 fn get_previous_voltage(
-    previous_voltages: &Array1<f64>,
+    previous_voltages: &[f64],
     positive: Option<usize>,
     negative: Option<usize>,
-    ic: &Option<Value>,
+    ic: f64,
     use_device_ic: bool,
 ) -> f64 {
     if use_device_ic {
         // if we set the uic flag we should just take the initial condition from the device
-        ic.clone().unwrap_or(Value::zero()).get_value()
+        ic
     } else {
         // TODO: breh this trash
         match (positive, negative) {
@@ -44,16 +39,16 @@ fn get_previous_voltage(
 #[derive(Debug)]
 pub enum Integrator<'a> {
     BackwardEuler {
-        previous: Array1<f64>,
+        previous: Vec<f64>,
     },
     Trapezoidal {
-        previous_output: Array1<f64>,
+        previous_output: Vec<f64>,
         previous_currents: HashMap<&'a str, f64>,
     },
 }
 
 impl<'a> Integrator<'a> {
-    fn capcitor_values(
+    fn capacitor_values(
         &self,
         device: &Capacitor,
         positive: Option<usize>,
@@ -62,13 +57,13 @@ impl<'a> Integrator<'a> {
     ) -> (f64, f64) {
         match self {
             Integrator::BackwardEuler { previous } => {
-                let c = device.capacitance();
+                let c = device.capacitance;
                 let g = c / config.step;
                 let previous_voltage = get_previous_voltage(
                     previous,
                     positive,
                     negative,
-                    &device.ic,
+                    device.ic,
                     config.use_device_ic,
                 );
                 let i = g * previous_voltage;
@@ -78,13 +73,13 @@ impl<'a> Integrator<'a> {
                 previous_output,
                 previous_currents,
             } => {
-                let c = device.capacitance();
+                let c = device.capacitance;
                 let g = 2.0 * c / config.step;
                 let previous_voltage = get_previous_voltage(
                     previous_output,
                     positive,
                     negative,
-                    &device.ic,
+                    device.ic,
                     config.use_device_ic,
                 );
                 let previous_current = previous_currents.get(device.name.as_str()).unwrap_or(&0.0);
@@ -94,19 +89,18 @@ impl<'a> Integrator<'a> {
         }
     }
 
-    fn save_capcitor_current(&mut self, device: &'a Capacitor, current: f64) {
+    fn save_capacitor_current(&mut self, device: &'a Capacitor, current: f64) {
         match self {
             Integrator::BackwardEuler { previous: _ } => {}
             Integrator::Trapezoidal {
                 previous_currents, ..
             } => {
-                // TODO: i hate this clone
                 previous_currents.insert(device.name.as_str(), current);
             }
         }
     }
 
-    fn save_previous_voltage(&mut self, voltage: Array1<f64>) {
+    fn save_previous_voltage(&mut self, voltage: Vec<f64>) {
         match self {
             Integrator::BackwardEuler { previous } => {
                 *previous = voltage;
@@ -119,7 +113,7 @@ impl<'a> Integrator<'a> {
         }
     }
 
-    fn get_previous_output(&self) -> &Array1<f64> {
+    fn get_previous_output(&self) -> &[f64] {
         match self {
             Integrator::BackwardEuler { previous } => previous,
             Integrator::Trapezoidal {
@@ -141,88 +135,75 @@ struct TransientConfig {
     use_device_ic: bool,
 }
 
-fn stamp_capacitor_trans(
-    m: &mut Array2<f64>,
-    s: &mut Array1<f64>,
-    positive: Option<usize>,
-    negative: Option<usize>,
-    g: f64,
-    i: f64,
-) {
-    if let Some(p) = positive {
-        m[[p, p]] += g;
+fn stamp_capacitor_trans(m: &mut SolverMatrix, device: &Capacitor, g: f64, i: f64) {
+    if let Some(index) = device.stamp.pos_pos {
+        *m.get_mut_nnz(index) += g;
     }
-    if let Some(n) = negative {
-        m[[n, n]] += g;
+    if let Some(index) = device.stamp.neg_neg {
+        *m.get_mut_nnz(index) += g;
     }
-    if let (Some(p), Some(n)) = (positive, negative) {
-        m[[p, n]] -= g;
-        m[[n, p]] -= g;
+    if let Some((pos_neg, neg_pos)) = device.stamp.off_diagonals {
+        *m.get_mut_nnz(pos_neg) -= g;
+        *m.get_mut_nnz(neg_pos) -= g;
     }
 
-    if let Some(p) = positive {
-        s[p] += i;
+    let pos = m.mna_node_index(device.positive);
+    let neg = m.mna_node_index(device.negative);
+
+    if let Some(p) = pos {
+        *m.get_mut_rhs(p) += i;
     }
-    if let Some(n) = negative {
-        s[n] -= i;
+    if let Some(n) = neg {
+        *m.get_mut_rhs(n) -= i;
     }
 }
 
+
 fn stamp_voltage_source_trans(
-    m: &mut Array2<f64>,
-    s: &mut Array1<f64>,
+    m: &mut SolverMatrix,
     device: &IndependentSource,
-    nodes: &Nodes,
     config: &TransientConfig,
 ) {
-    stamp_voltage_source_incidence(m, device, nodes);
-    let src_index = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
-
-    let value = match &device.dc {
-        Some(value) => value.compute(config.t, config.step, config.tstop),
-        None => 0.0,
-    };
-    s[src_index] = value;
+    stamp_voltage_source_incidence(m, device);
+    let src_index = m.mna_branch_index(device.current_branch);
+    let value = device.dc.compute(config.t, config.step, config.tstop);
+    *m.get_mut_rhs(src_index) = value;
 }
 
 fn simulation_step<'a>(
-    nodes: &Nodes,
-    devices: &'a Vec<Device>,
+    matrix: &mut SolverMatrix,
+    devices: &'a Devices,
     config: &TransientConfig,
     integrator: &mut Integrator<'a>,
-) -> Array1<f64> {
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+) -> Vec<f64> {
 
-    let mut m = Array2::<f64>::zeros((n + k, n + k));
-    let mut s = Array1::<f64>::zeros(n + k);
-
-    for device in devices {
-        match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, device, nodes),
-            Device::Capacitor(device) => {
-                let positive = nodes.get_node_index(&device.positive.name);
-                let negative = nodes.get_node_index(&device.negative.name);
-
-                let (g, i) = integrator.capcitor_values(device, positive, negative, config);
-                stamp_capacitor_trans(&mut m, &mut s, positive, negative, g, i);
-                integrator.save_capcitor_current(device, i);
-            }
-            // TODO: we don't support functions on the sources yet
-            Device::VoltageSource(device) => {
-                stamp_voltage_source_trans(&mut m, &mut s, device, nodes, config)
-            }
-            _ => {
-                unimplemented!("Unsupported device type: {:?}", device)
-            }
-        }
+    for r in &devices.resistors {
+        stamp_resistor(matrix, r);
     }
 
-    let lu = m.factorize_into().expect("Failed to factorize matrix");
+    for c in &devices.capacitors {
+        let pos = matrix.mna_node_index(c.positive);
+        let neg = matrix.mna_node_index(c.negative);
 
-    lu.solve(&s).expect("Failed to solve linear system")
+        let (g, i) = integrator.capacitor_values(c, pos, neg, config);
+        stamp_capacitor_trans(matrix, c, g, i);
+        integrator.save_capacitor_current(&c, i);
+    }
+
+    // TODO: we don't support functions on the sources yet
+    for vsrc in &devices.voltage_sources {
+        stamp_voltage_source_trans(matrix, vsrc, config);
+    }
+
+    // TODO: stamp current sources
+
+    // Solve.
+    // TODO: don't analyze each step
+    matrix.analyze().expect("Failed to analyze matrix");
+    matrix.factorize().expect("Failed to factorize matrix");
+    matrix.solve().expect("Failed to solve linear system");
+
+    matrix.rhs().to_vec()
 }
 
 #[derive(Debug, Clone)]
@@ -240,15 +221,13 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
     let tstep = cmd.tstep.get_value();
     let tstop = cmd.tstop.get_value();
 
-    let nodes = Nodes::new(&deck.devices);
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+    let mut devices = Devices::from_spec(&deck.devices);
+    if !devices.inductors.is_empty() {
+        unimplemented!("Transient analysis does not yet support inductors");
+    }
 
-    let initial_condition = match cmd.uic {
-        // when there is no inital conditions we just the operating point as the inital condition
-        false => simulate_op_inner(&nodes, &deck.devices),
-        true => Array1::<f64>::zeros(n + k),
-    };
+    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), true)
+        .expect("Failed to create matrix");
 
     let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
@@ -257,6 +236,16 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
         t: 0.0,
         use_device_ic: cmd.uic,
     };
+
+    // Initialize previous solution vector.
+    let initial_condition: Vec<f64> = if cmd.uic {
+        unimplemented!("UIC is not supported yet");
+    } else {
+        // When there is no initial conditions we use the operating point as the initial condition.
+        simulate_op_inner(&mut matrix, &devices).expect("Failed to simulate OP");
+        matrix.rhs().to_vec()
+    };
+
     let mut integrator = Integrator::BackwardEuler {
         previous: initial_condition,
     };
@@ -271,7 +260,7 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
 
     let steps = steps(config.step, tstop);
     for step in steps.into_iter().skip(1) {
-        let x = simulation_step(&nodes, &deck.devices, &config, &mut integrator);
+        let x = simulation_step(&mut matrix, &devices, &config, &mut integrator);
 
         integrator.save_previous_voltage(x.clone());
         config.use_device_ic = false;
@@ -283,8 +272,8 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
 
     TransientResult {
         times,
-        node_names: nodes.get_node_names(),
-        source_names: nodes.get_source_names(),
+        node_names: deck.node_mapping.node_names_mna_order(),
+        source_names: deck.node_mapping.branch_names_mna_order(),
         samples,
     }
 }

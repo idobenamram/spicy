@@ -9,7 +9,11 @@ use crate::{
 
 pub mod ac;
 pub mod dc;
-mod nodes;
+// mod nodes;
+mod matrix;
+mod error;
+mod devices;
+mod setup_pattern;
 pub(crate) mod raw_writer;
 pub mod solver;
 pub mod trans;
@@ -49,8 +53,9 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
                     // detect if sweep is a voltage source by scanning devices
                     let is_voltage = deck
                         .devices
+                        .voltage_sources
                         .iter()
-                        .any(|d| d.name() == command_params.srcnam);
+                        .any(|v| v.name == command_params.srcnam);
                     let _ = raw_writer::write_dc_raw(
                         &deck,
                         &dc,
@@ -83,74 +88,32 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
 mod tests {
     use super::*;
     use rstest::rstest;
-    use spicy_parser::Value;
-    use spicy_parser::libs_phase::SourceFileId;
-    use spicy_parser::netlist_types::Node;
-    use spicy_parser::netlist_types::{Capacitor, Device, Resistor};
+    use spicy_parser::netlist_types::{NodeIndex, NodeName};
+    use spicy_parser::node_mapping::NodeMapping;
 
-    use spicy_parser::Span;
     use spicy_parser::parse;
     use spicy_parser::{ParseOptions, SourceMap};
 
     use std::path::PathBuf;
 
-    use crate::nodes::Nodes;
+    #[test]
+    fn test_node_mapping_mna_indices() {
+        let mut mapping = NodeMapping::new();
+        let n1 = mapping.insert_node(NodeName("n1".to_string()));
+        let n2 = mapping.insert_node(NodeName("n2".to_string()));
 
-    fn make_resistor(name: &str, n1: &str, n2: &str, value: f64) -> Resistor {
-        let mut r = Resistor::new(
-            name.to_string(),
-            Span::new(0, 0, SourceFileId::dummy()),
-            Node {
-                name: n1.to_string(),
-            },
-            Node {
-                name: n2.to_string(),
-            },
-        );
-        r.set_resistance(Value::new(value, None, None));
-        r
-    }
-    fn make_capacitor(name: &str, n1: &str, n2: &str, value: f64) -> Capacitor {
-        let mut c = Capacitor::new(
-            name.to_string(),
-            Span::new(0, 0, SourceFileId::dummy()),
-            Node {
-                name: n1.to_string(),
-            },
-            Node {
-                name: n2.to_string(),
-            },
-        );
-        c.set_capacitance(Value::new(value, None, None));
-        c
+        assert_eq!(mapping.mna_node_index(NodeIndex(0)), None);
+        assert_eq!(mapping.mna_node_index(n1), Some(0));
+        assert_eq!(mapping.mna_node_index(n2), Some(1));
     }
 
     #[test]
-    fn test_nodes_indices_with_resistors() {
-        let devices = vec![
-            Device::Resistor(make_resistor("1", "n1", "0", 1_000.0)),
-            Device::Resistor(make_resistor("2", "n2", "n1", 2_000.0)),
-        ];
+    fn test_node_mapping_names_mna_order() {
+        let mut mapping = NodeMapping::new();
+        mapping.insert_node(NodeName("n1".to_string()));
+        mapping.insert_node(NodeName("n2".to_string()));
 
-        let nodes = Nodes::new(&devices);
-
-        assert_eq!(nodes.get_node_index("0"), None);
-        assert_eq!(nodes.get_node_index("n1"), Some(0));
-        assert_eq!(nodes.get_node_index("n2"), Some(1));
-    }
-
-    #[test]
-    fn test_nodes_indices_with_capacitors() {
-        let devices = vec![
-            Device::Capacitor(make_capacitor("1", "n1", "0", 1e-6)),
-            Device::Capacitor(make_capacitor("2", "n2", "n1", 2e-6)),
-        ];
-
-        let nodes = Nodes::new(&devices);
-
-        assert_eq!(nodes.get_node_index("0"), None);
-        assert_eq!(nodes.get_node_index("n1"), Some(0));
-        assert_eq!(nodes.get_node_index("n2"), Some(1));
+        assert_eq!(mapping.node_names_mna_order(), vec!["n1".to_string(), "n2".to_string()]);
     }
 
     #[rstest]

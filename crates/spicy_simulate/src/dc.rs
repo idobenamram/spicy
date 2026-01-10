@@ -1,12 +1,6 @@
-use crate::nodes::Nodes;
-use ndarray::{Array1, Array2, s};
-use ndarray_linalg::{FactorizeInto, Solve};
-use spicy_parser::{
-    Value,
-    instance_parser::Deck,
-    netlist_types::{DcCommand, Device, IndependentSource, Inductor, Resistor},
-    netlist_waveform::WaveForm,
-};
+use spicy_parser::{instance_parser::Deck, netlist_types::DcCommand};
+
+use crate::{devices::{Devices, IndependentSource, Inductor, Resistor}, error::SimulationError, matrix::SolverMatrix};
 
 #[derive(Debug)]
 pub struct OperatingPointResult {
@@ -19,169 +13,140 @@ pub struct DcSweepResult {
     pub results: Vec<(OperatingPointResult, f64)>,
 }
 
-pub(crate) fn stamp_resistor(g: &mut Array2<f64>, resistor: &Resistor, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&resistor.positive.name);
-    let node2 = nodes.get_node_index(&resistor.negative.name);
+pub(crate) fn stamp_resistor(m: &mut SolverMatrix, resistor: &Resistor) {
+    let conductance = 1.0 / resistor.resistance;
 
-    let conductance = 1.0 / resistor.resistance();
-
-    if let Some(node1) = node1 {
-        g[[node1, node1]] += conductance;
+    if let Some(index) = resistor.stamp.pos_pos {
+        *m.get_mut_nnz(index) += conductance;
     }
-    if let Some(node2) = node2 {
-        g[[node2, node2]] += conductance;
+    if let Some(index) = resistor.stamp.neg_neg {
+        *m.get_mut_nnz(index) += conductance;
     }
-    if let Some(node1) = node1
-        && let Some(node2) = node2
-    {
-        g[[node1, node2]] -= conductance;
-        g[[node2, node1]] -= conductance;
+    if let Some((pos_neg, neg_pos)) = resistor.stamp.off_diagonals {
+        *m.get_mut_nnz(pos_neg) -= conductance;
+        *m.get_mut_nnz(neg_pos) -= conductance;
     }
 }
 
-fn stamp_current_source(s: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&device.positive.name);
-    let node2 = nodes.get_node_index(&device.negative.name);
-    let value = match &device.dc {
-        Some(value) => value.compute(0.0, 0.0, 0.0),
-        None => 0.0,
-    };
+fn stamp_current_source(m: &mut SolverMatrix, current_source: &IndependentSource) {
+    let pos = m.mna_node_index(current_source.positive);
+    let neg = m.mna_node_index(current_source.negative);
 
-    if let Some(node1) = node1 {
-        s[node1] += value;
+    let value = current_source.dc.compute(0.0, 0.0, 0.0);
+
+    if let Some(pos) = pos {
+        *m.get_mut_rhs(pos) += value;
     }
-    if let Some(node2) = node2 {
-        s[node2] -= value;
+    if let Some(neg) = neg {
+        *m.get_mut_rhs(neg) -= value;
     }
 }
 
-pub(crate) fn stamp_voltage_source_incidence(
-    m: &mut Array2<f64>,
-    device: &IndependentSource,
-    nodes: &Nodes,
-) {
-    let node1 = nodes.get_node_index(&device.positive.name);
-    let node2 = nodes.get_node_index(&device.negative.name);
-    let src_index = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+pub(crate) fn stamp_voltage_source_incidence(m: &mut SolverMatrix, device: &IndependentSource) {
+    if let Some((pos_branch, branch_pos)) = device.stamp.pos_branch {
+        // stamp in voltage incidence matrix (B)
+        *m.get_mut_nnz(pos_branch) = 1.0;
 
-    // stamp in voltage incidence matrix (B)
-    if let Some(node1) = node1 {
-        m[[node1, src_index]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[node2, src_index]] = -1.0;
+        // stamp in voltage incidence matrix (B^T)
+        *m.get_mut_nnz(branch_pos) = 1.0;
     }
 
-    // stamp in voltage incidence matrix (B^T)
-    if let Some(node1) = node1 {
-        m[[src_index, node1]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[src_index, node2]] = -1.0;
+    if let Some((neg_branch, branch_neg)) = device.stamp.neg_branch {
+        // stamp in voltage incidence matrix (B)
+        *m.get_mut_nnz(neg_branch) = -1.0;
+
+        // stamp in voltage incidence matrix (B^T)
+        *m.get_mut_nnz(branch_neg) = -1.0;
     }
 }
 
-fn stamp_voltage_source_value(s: &mut Array1<f64>, device: &IndependentSource, nodes: &Nodes) {
-    let src_index = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+fn stamp_voltage_source_value(m: &mut SolverMatrix, device: &IndependentSource) {
+    let src_index = m.mna_branch_index(device.current_branch);
 
-    let value = match &device.dc {
-        Some(value) => value.compute(0.0, 0.0, 0.0),
-        None => 0.0,
-    };
-    s[src_index] = value;
+    let value = device.dc.compute(0.0, 0.0, 0.0);
+
+    *m.get_mut_rhs(src_index) = value;
 }
 
-pub(crate) fn stamp_voltage_source(
-    m: &mut Array2<f64>,
-    s: &mut Array1<f64>,
-    device: &IndependentSource,
-    nodes: &Nodes,
-) {
-    stamp_voltage_source_incidence(m, device, nodes);
-    stamp_voltage_source_value(s, device, nodes);
+pub(crate) fn stamp_voltage_source(m: &mut SolverMatrix, device: &IndependentSource) {
+    stamp_voltage_source_incidence(m, device);
+    stamp_voltage_source_value(m, device);
 }
 
-fn stamp_inductor(m: &mut Array2<f64>, s: &mut Array1<f64>, device: &Inductor, nodes: &Nodes) {
-    let node1 = nodes.get_node_index(&device.positive.name);
-    let node2 = nodes.get_node_index(&device.negative.name);
-    let src_index = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+fn stamp_inductor(m: &mut SolverMatrix, device: &Inductor) {
+    let src_index = m.mna_branch_index(device.current_branch);
+    if let Some((pos_branch, branch_pos)) = device.stamp.pos_branch {
+        // stamp in voltage incidence matrix (B)
+        *m.get_mut_nnz(pos_branch) = 1.0;
 
-    // stamp in voltage incidence matrix (B)
-    if let Some(node1) = node1 {
-        m[[node1, src_index]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[node2, src_index]] = -1.0;
+        // stamp in voltage incidence matrix (B^T)
+        *m.get_mut_nnz(branch_pos) = 1.0;
     }
 
-    // stamp in voltage incidence matrix (B^T)
-    if let Some(node1) = node1 {
-        m[[src_index, node1]] = 1.0;
-    }
-    if let Some(node2) = node2 {
-        m[[src_index, node2]] = -1.0;
+    if let Some((neg_branch, branch_neg)) = device.stamp.neg_branch {
+        // stamp in voltage incidence matrix (B)
+        *m.get_mut_nnz(neg_branch) = -1.0;
+
+        // stamp in voltage incidence matrix (B^T)
+        *m.get_mut_nnz(branch_neg) = -1.0;
     }
 
     // stamp in voltage source vector (E)
-    s[src_index] = 0.0;
+    *m.get_mut_rhs(src_index) = 0.0;
 }
 
-pub(crate) fn simulate_op_inner(nodes: &Nodes, devices: &Vec<Device>) -> Array1<f64> {
-    let n = nodes.node_len();
-    let k = nodes.source_len();
-    // Modified nodal analysis matrix
-    // [G, B]
-    // [B^T, 0]
-    // conductance matrix (n) + incidence of each voltage-defined element (k)
-    let mut m = Array2::<f64>::zeros((n + k, n + k));
-    // [I] current vector
-    // [E] source voltages
-    // current and voltage source vectors
-    let mut s = Array1::<f64>::zeros(n + k);
+pub(crate) fn simulate_op_inner(
+    m: &mut SolverMatrix,
+    devices: &Devices,
+) -> Result<(), SimulationError> {
+    for r in &devices.resistors {
+        stamp_resistor(m, r);
+    }
+    // capcitors are just open circuits in dc
 
-    for device in devices {
-        match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, device, nodes),
-            Device::Capacitor(_) => {} // capcitors are just open circuits
-            Device::Inductor(device) => stamp_inductor(&mut m, &mut s, device, nodes),
-            Device::CurrentSource(device) => stamp_current_source(&mut s, device, nodes),
-            Device::VoltageSource(device) => stamp_voltage_source(&mut m, &mut s, device, nodes),
-        }
+    for i in &devices.inductors {
+        stamp_inductor(m, i);
     }
 
-    // // println!("m: {:?}", m);
-    // println!("s: {:?}", s);
-    let lu = m.factorize_into().expect("Failed to factorize matrix");
+    for v in &devices.voltage_sources {
+        stamp_voltage_source(m, v);
+    }
+
+    for c in &devices.current_sources {
+        stamp_current_source(m, c);
+    }
+
+    // KLU requires an analyze phase before factorization.
+    m.analyze()?;
+    m.factorize()?;
     // [V] node voltages
     // [I] branch currents for voltage sources (also inductors)
+    m.solve()?;
 
-    lu.solve(&s).expect("Failed to solve linear system")
+    Ok(())
 }
 
 pub fn simulate_op(deck: &Deck) -> OperatingPointResult {
-    let nodes = Nodes::new(&deck.devices);
-    let n = nodes.node_len();
+    let mut devices = Devices::from_spec(&deck.devices);
 
-    let x = simulate_op_inner(&nodes, &deck.devices);
+    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), true)
+        .expect("Failed to create matrix");
 
-    let mut voltages = Vec::new();
-    let mut currents = Vec::new();
-    let node_names = nodes.get_node_names();
-    for (i, voltage) in x.slice(s![..n]).iter().enumerate() {
-        let name = &node_names[i];
-        voltages.push((name.to_string(), *voltage));
+    simulate_op_inner(&mut matrix, &devices).expect("Failed to simulate OP");
+
+    let x = matrix.rhs();
+    let node_names = deck.node_mapping.node_names_mna_order();
+    let branch_names = deck.node_mapping.branch_names_mna_order();
+    let n = node_names.len();
+
+    let mut voltages = Vec::with_capacity(n);
+    for (i, name) in node_names.into_iter().enumerate() {
+        voltages.push((name, x[i]));
     }
 
-    let source_names = nodes.get_source_names();
-    for (i, current) in x.slice(s![n..]).iter().enumerate() {
-        let name = &source_names[i];
-        currents.push((name.to_string(), *current));
+    let mut currents = Vec::with_capacity(branch_names.len());
+    for (i, name) in branch_names.into_iter().enumerate() {
+        currents.push((name, x[n + i]));
     }
 
     OperatingPointResult { voltages, currents }
@@ -198,74 +163,110 @@ pub fn simulate_dc(deck: &Deck, command: &DcCommand) -> DcSweepResult {
     let vstop = command.vstop.get_value();
     let vincr = command.vincr.get_value();
 
-    let nodes = Nodes::new(&deck.devices);
+    let mut devices = Devices::from_spec(&deck.devices);
 
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+    // Matrix pattern setup stores nnz indices into the compiled devices.
+    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), true)
+        .expect("Failed to create matrix");
 
-    let mut m = Array2::<f64>::zeros((n + k, n + k));
-    let mut s_before = Array1::<f64>::zeros(n + k);
-
-    // println!("srcnam: {:?}", srcnam);
-    let source_index = deck
-        .devices
-        .iter()
-        .position(|d| d.name() == srcnam)
-        .expect("Source not found");
-    for device in &deck.devices {
-        match device {
-            Device::Resistor(device) => stamp_resistor(&mut m, device, &nodes),
-            Device::Capacitor(_) => {} // capcitors are just open circuits
-            Device::Inductor(device) => stamp_inductor(&mut m, &mut s_before, device, &nodes),
-            Device::VoltageSource(device) => {
-                stamp_voltage_source_incidence(&mut m, device, &nodes);
-            }
-            Device::CurrentSource(device) => {
-                if device.name != *srcnam {
-                    stamp_current_source(&mut s_before, device, &nodes);
-                }
-            }
+    // Stamp matrix entries and baseline RHS (excluding the swept source).
+    for r in &devices.resistors {
+        stamp_resistor(&mut matrix, r);
+    }
+    // capacitors are open circuits in DC
+    for l in &devices.inductors {
+        stamp_inductor(&mut matrix, l);
+    }
+    for v in &devices.voltage_sources {
+        stamp_voltage_source_incidence(&mut matrix, v);
+        if v.name != *srcnam {
+            stamp_voltage_source_value(&mut matrix, v);
+        }
+    }
+    for c in &devices.current_sources {
+        if c.name != *srcnam {
+            stamp_current_source(&mut matrix, c);
         }
     }
 
-    let lu = m.factorize_into().expect("Failed to factorize matrix");
+    matrix.analyze().expect("Failed to analyze matrix");
+    matrix.factorize().expect("Failed to factorize matrix");
+
+    // Baseline RHS; will be overwritten in-place by `solve()`.
+    let rhs_base = matrix.rhs().to_vec();
+
+    // TODO: this could all be a little prettier & maybe we can run the solve in batches.
+    // Determine how to apply the swept value.
+    #[derive(Clone, Copy)]
+    enum Sweep {
+        Voltage {
+            rhs_index: usize,
+        },
+        Current {
+            pos: Option<usize>,
+            neg: Option<usize>,
+        },
+    }
+
+    let sweep_spec = if let Some(vsrc) = devices
+        .voltage_sources
+        .iter()
+        .find(|v| v.name == *srcnam)
+    {
+        Sweep::Voltage {
+            rhs_index: matrix.mna_branch_index(vsrc.current_branch),
+        }
+    } else if let Some(isrc) = devices
+        .current_sources
+        .iter()
+        .find(|i| i.name == *srcnam)
+    {
+        Sweep::Current {
+            pos: matrix.mna_node_index(isrc.positive),
+            neg: matrix.mna_node_index(isrc.negative),
+        }
+    } else {
+        panic!("Source '{srcnam}' not found (expected a V or I source)");
+    };
 
     let sweep_values = sweep(vstart, vstop, vincr);
 
+    let node_names = deck.node_mapping.node_names_mna_order();
+    let branch_names = deck.node_mapping.branch_names_mna_order();
+    let n = node_names.len();
+
     let mut results = Vec::new();
     for v in sweep_values {
-        let mut s = s_before.clone();
-        let device = deck.devices[source_index].clone();
-        // TODO: this sucks
-        let value = WaveForm::Constant(Value::new(v, None, None));
-        match device {
-            Device::VoltageSource(mut device) => {
-                device.dc = Some(value);
-                stamp_voltage_source_value(&mut s, &device, &nodes);
-            }
-            Device::CurrentSource(mut device) => {
-                device.dc = Some(value);
-                stamp_current_source(&mut s, &device, &nodes);
-            }
-            _ => {}
-        }
-        let x = lu.solve(&s).expect("Failed to solve linear system");
+        // Restore baseline RHS.
+        matrix.rhs_mut().copy_from_slice(&rhs_base);
 
-        let node_names = nodes.get_node_names();
-        let mut voltages = Vec::new();
-        let mut currents = Vec::new();
-        for (index, voltage) in x.slice(s![..n]).iter().enumerate() {
-            let name = &node_names[index];
-            voltages.push((name.to_string(), *voltage));
-            // println!("{}: {:.6}V", name, voltage);
+        // Apply swept value to RHS.
+        match sweep_spec {
+            Sweep::Voltage { rhs_index } => {
+                *matrix.get_mut_rhs(rhs_index) = v;
+            }
+            Sweep::Current { pos, neg } => {
+                if let Some(p) = pos {
+                    *matrix.get_mut_rhs(p) += v;
+                }
+                if let Some(nidx) = neg {
+                    *matrix.get_mut_rhs(nidx) -= v;
+                }
+            }
         }
 
-        let source_names = nodes.get_source_names();
-        for (i, current) in x.slice(s![n..]).iter().enumerate() {
-            let name = &source_names[i];
-            currents.push((name.to_string(), *current));
-            // println!("{}: {:.6}A", name, current);
+        matrix.solve().expect("Failed to solve linear system");
+        let x = matrix.rhs();
+
+        let mut voltages = Vec::with_capacity(node_names.len());
+        let mut currents = Vec::with_capacity(branch_names.len());
+        for (i, name) in node_names.iter().enumerate() {
+            voltages.push((name.clone(), x[i]));
         }
+        for (i, name) in branch_names.iter().enumerate() {
+            currents.push((name.clone(), x[n + i]));
+        }
+
         results.push((OperatingPointResult { voltages, currents }, v));
     }
 

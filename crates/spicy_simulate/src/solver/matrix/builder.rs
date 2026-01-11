@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::mem::MaybeUninit;
 
 use crate::solver::matrix::Dim;
@@ -307,6 +306,73 @@ mod tests {
     }
 
     #[test]
+    fn build_csc_pattern_entry_mapping_allows_stamping_into_final_nnz() {
+        // This test exercises the "pattern + entry mapping" flow used by the simulator:
+        // - build a sparsity pattern with `build_csc_pattern()`
+        // - use the returned `EntryMapping` to map builder entry indices -> final CSC nnz indices
+        // - stamp values by directly indexing into the CSC values array
+        //
+        // The final stamped matrix should match `build_csc()` for the same entries.
+
+        // A = [ 10  0  3
+        //       0 20  0
+        //       2  0 30 ] with duplicate (2,2)+=5 => 35
+        let mut b = MatrixBuilder::new(3, 3);
+        let e00 = b.push(0, 0, 10.0).unwrap();
+        let e20 = b.push(2, 0, 3.0).unwrap();
+        let e11 = b.push(1, 1, 20.0).unwrap();
+        let e02 = b.push(0, 2, 2.0).unwrap();
+        let e22a = b.push(2, 2, 30.0).unwrap();
+        let e22b = b.push(2, 2, 5.0).unwrap(); // duplicate -> combine to 35
+
+        let (mut pattern, mapping) = b.build_csc_pattern().unwrap();
+
+        // Pattern should match the canonical CSC structure.
+        assert_eq!(pattern.column_pointers, vec![0, 2, 3, 5]);
+        assert_eq!(pattern.row_indices, vec![0, 2, 1, 0, 2]);
+
+        // Entry indices should map to final nnz indices in canonical (col,row) order:
+        // (0,0)->0, (0,2)->1, (1,1)->2, (2,0)->3, (2,2)->4
+        assert_eq!(mapping.get(e00), 0);
+        assert_eq!(mapping.get(e02), 1);
+        assert_eq!(mapping.get(e11), 2);
+        assert_eq!(mapping.get(e20), 3);
+        assert_eq!(mapping.get(e22a), 4);
+        assert_eq!(mapping.get(e22b), 4);
+
+        // Stamp values using the entry mapping.
+        for (entry, value) in [
+            (e00, 10.0),
+            (e20, 3.0),
+            (e11, 20.0),
+            (e02, 2.0),
+            (e22a, 30.0),
+            (e22b, 5.0),
+        ] {
+            let nnz = mapping.get(entry);
+            *pattern.get_mut_nnz(nnz) += value;
+        }
+
+        // Duplicates must have accumulated into a single nnz slot.
+        assert_eq!(pattern.values, vec![10.0, 2.0, 20.0, 3.0, 35.0]);
+        debug_assert!(pattern.check_invariants().is_ok());
+
+        // Sanity: matches building CSC directly from the same entries.
+        let mut b2 = MatrixBuilder::new(3, 3);
+        b2.push(0, 0, 10.0).unwrap();
+        b2.push(2, 0, 3.0).unwrap();
+        b2.push(1, 1, 20.0).unwrap();
+        b2.push(0, 2, 2.0).unwrap();
+        b2.push(2, 2, 30.0).unwrap();
+        b2.push(2, 2, 5.0).unwrap();
+        let direct = b2.build_csc().unwrap();
+
+        assert_eq!(pattern.column_pointers, direct.column_pointers);
+        assert_eq!(pattern.row_indices, direct.row_indices);
+        assert_eq!(pattern.values, direct.values);
+    }
+
+    #[test]
     fn build_csc_keeps_explicit_zeros() {
         // Explicit zeros are sometimes used to pre-allocate a pattern that will be updated later.
         // This test ensures they are preserved in the canonical CSC when requested.
@@ -330,6 +396,47 @@ mod tests {
         assert_eq!(a.row_indices, vec![0, 1, 0, 1, 2]);
         assert_eq!(a.values, vec![1.0, 0.0, 0.0, 2.0, 3.0]);
         debug_assert!(a.check_invariants().is_ok());
+    }
+
+    #[test]
+    fn build_csc_pattern_keeps_explicit_zeros() {
+        // Same scenario as `build_csc_keeps_explicit_zeros`, but through the pattern + entry mapping path.
+        let mut b = MatrixBuilder::new(3, 3);
+        let e00 = b.push(0, 0, 1.0).unwrap();
+        let e01 = b.push(0, 1, 0.0).unwrap(); // explicit structural zero
+        let e10a = b.push(1, 0, 5.0).unwrap();
+        let e10b = b.push(1, 0, -5.0).unwrap(); // cancels to 0.0, should still be kept
+        let e11 = b.push(1, 1, 2.0).unwrap();
+        let e22 = b.push(2, 2, 3.0).unwrap();
+
+        let (mut pattern, mapping) = b.build_csc_pattern().unwrap();
+
+        for (entry, value) in [
+            (e00, 1.0),
+            (e01, 0.0),
+            (e10a, 5.0),
+            (e10b, -5.0),
+            (e11, 2.0),
+            (e22, 3.0),
+        ] {
+            let nnz = mapping.get(entry);
+            *pattern.get_mut_nnz(nnz) += value;
+        }
+
+        // Sanity: matches building CSC directly from the same entries.
+        let mut b2 = MatrixBuilder::new(3, 3);
+        b2.push(0, 0, 1.0).unwrap();
+        b2.push(0, 1, 0.0).unwrap();
+        b2.push(1, 0, 5.0).unwrap();
+        b2.push(1, 0, -5.0).unwrap();
+        b2.push(1, 1, 2.0).unwrap();
+        b2.push(2, 2, 3.0).unwrap();
+
+        let direct = b2.build_csc().unwrap();
+        assert_eq!(pattern.column_pointers, direct.column_pointers);
+        assert_eq!(pattern.row_indices, direct.row_indices);
+        assert_eq!(pattern.values, direct.values);
+        debug_assert!(pattern.check_invariants().is_ok());
     }
 
     #[test]

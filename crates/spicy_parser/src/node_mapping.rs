@@ -143,3 +143,122 @@ impl Default for NodeMapping {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ParseOptions, SourceMap, parse};
+    use std::path::PathBuf;
+
+    #[test]
+    fn insert_node_ground_does_not_allocate() {
+        let mut m = NodeMapping::new();
+
+        let g = m.insert_node(NodeName("0".to_string()));
+        assert_eq!(g, NodeIndex(0));
+        assert_eq!(m.nodes_len(), 0);
+        assert_eq!(m.node_names_mna_order(), Vec::<String>::new());
+
+        // Next non-ground node should still get NodeIndex(1).
+        let n1 = m.insert_node(NodeName("n1".to_string()));
+        assert_eq!(n1, NodeIndex(1));
+        assert_eq!(m.nodes_len(), 1);
+        assert_eq!(m.node_names_mna_order(), vec!["n1".to_string()]);
+    }
+
+    #[test]
+    #[should_panic(expected = "branch index 0 is reserved")]
+    fn mna_branch_index_panics_on_zero() {
+        let m = NodeMapping::new();
+        let _ = m.mna_branch_index(CurrentBranchIndex(0));
+    }
+
+    #[test]
+    fn node_mapping_nodes_and_branches_behave_as_expected() {
+        let mut m = NodeMapping::new();
+
+        // Ground always exists and maps to NodeIndex(0), but does not appear in MNA unknowns.
+        assert_eq!(m.mna_node_index(NodeIndex(0)), None);
+        assert_eq!(m.nodes_len(), 0);
+        assert_eq!(m.branches_len(), 0);
+        assert_eq!(m.mna_matrix_dim(), 0);
+        assert_eq!(m.node_names_mna_order(), Vec::<String>::new());
+        assert_eq!(m.branch_names_mna_order(), Vec::<String>::new());
+
+        // Nodes.
+        let n1 = m.insert_node(NodeName("n1".to_string()));
+        let n2 = m.insert_node(NodeName("n2".to_string()));
+        assert_eq!(n1, NodeIndex(1));
+        assert_eq!(n2, NodeIndex(2));
+        assert_eq!(m.nodes_len(), 2);
+        assert_eq!(m.mna_node_index(n1), Some(0));
+        assert_eq!(m.mna_node_index(n2), Some(1));
+        assert_eq!(m.node_names_mna_order(), vec!["n1".to_string(), "n2".to_string()]);
+
+        // Inserting the same node again must not allocate a new index.
+        let n1_again = m.insert_node(NodeName("n1".to_string()));
+        assert_eq!(n1_again, n1);
+        assert_eq!(m.nodes_len(), 2);
+
+        // Branches (current unknowns).
+        let v1 = m.insert_branch("V1".to_string());
+        let l1 = m.insert_branch("L1".to_string());
+        assert_eq!(v1, CurrentBranchIndex(1));
+        assert_eq!(l1, CurrentBranchIndex(2));
+        assert_eq!(m.branches_len(), 2);
+
+        // Inserting the same branch again must not allocate a new index.
+        let v1_again = m.insert_branch("V1".to_string());
+        assert_eq!(v1_again, v1);
+        assert_eq!(m.branches_len(), 2);
+
+        // Branch indices are appended after node-voltage unknowns in MNA.
+        // Here: nodes_len=2, so branch 1 -> 2, branch 2 -> 3.
+        assert_eq!(m.mna_branch_index(v1), 2);
+        assert_eq!(m.mna_branch_index(l1), 3);
+        assert_eq!(m.mna_matrix_dim(), 4);
+        assert_eq!(m.branch_names_mna_order(), vec!["V1".to_string(), "L1".to_string()]);
+    }
+
+    #[test]
+    fn parse_populates_node_and_branch_mapping_consistently() {
+        let netlist = r#"mapping test
+V1 in 0 1
+R1 in out 1k
+.op
+.end
+"#;
+
+        let source_map = SourceMap::new(PathBuf::from("inline.spicy"), netlist.to_string());
+        let mut options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            source_map,
+            max_include_depth: 10,
+        };
+
+        let deck = parse(&mut options).expect("parse");
+
+        // Node names are ordered by allocated NodeIndex (ground excluded).
+        assert_eq!(
+            deck.node_mapping.node_names_mna_order(),
+            vec!["in".to_string(), "out".to_string()]
+        );
+        // Branch names are ordered by allocated CurrentBranchIndex (reserved 0 excluded).
+        assert_eq!(deck.node_mapping.branch_names_mna_order(), vec!["V1".to_string()]);
+
+        assert_eq!(deck.devices.voltage_sources.len(), 1);
+        assert_eq!(deck.devices.resistors.len(), 1);
+
+        let v1 = &deck.devices.voltage_sources[0];
+        assert_eq!(v1.name, "V1");
+        assert_eq!(v1.positive, NodeIndex(1));
+        assert_eq!(v1.negative, NodeIndex(0));
+        assert_eq!(v1.current_branch, CurrentBranchIndex(1));
+
+        let r1 = &deck.devices.resistors[0];
+        assert_eq!(r1.name, "R1");
+        assert_eq!(r1.positive, NodeIndex(1));
+        assert_eq!(r1.negative, NodeIndex(2));
+    }
+}
+

@@ -3,7 +3,7 @@ use crate::error::{ParserError, SpicyError};
 use crate::expr::{Expr, Params};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{TokenKind, token_text};
-use crate::netlist_types::{NodeIndex, NodeName};
+use crate::netlist_types::NodeName;
 use crate::netlist_types::ValueSuffix;
 use crate::statement_phase::StmtCursor;
 

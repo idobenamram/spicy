@@ -149,11 +149,11 @@ fn model_statement_to_device_model(
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ResistorModel {
-    resistance: Option<Value>,
-    tc1: Option<Value>,
-    tc2: Option<Value>,
-    w: Option<Value>,
-    l: Option<Value>,
+    pub resistance: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
+    pub w: Option<Value>,
+    pub l: Option<Value>,
 }
 
 impl ResistorModel {
@@ -182,9 +182,9 @@ impl ResistorModel {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct CapacitorModel {
-    cap: Option<Value>,
-    tc1: Option<Value>,
-    tc2: Option<Value>,
+    pub cap: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
 }
 
 impl CapacitorModel {
@@ -211,9 +211,9 @@ impl CapacitorModel {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct InductorModel {
-    inductance: Option<Value>,
-    tc1: Option<Value>,
-    tc2: Option<Value>,
+    pub inductance: Option<Value>,
+    pub tc1: Option<Value>,
+    pub tc2: Option<Value>,
 }
 
 impl InductorModel {

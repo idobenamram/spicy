@@ -8,7 +8,7 @@ use crate::expr::{Params, Scope, ScopeId};
 use crate::expr::{PlaceholderMap, ScopeArena};
 use crate::netlist_models::partial_parse_model_command;
 use crate::netlist_models::{ModelStatementTable, ModelTable};
-use crate::netlist_types::Node;
+use crate::netlist_types::NodeName;
 use crate::netlist_types::{CommandType, DeviceType};
 use crate::parser_utils::{
     parse_dot_param, parse_equal_expr, parse_ident, parse_node, parse_value_or_placeholder,
@@ -31,7 +31,7 @@ pub(crate) struct UnexpandedDeck {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct SubcktDecl {
     pub name: String,
-    pub nodes: Vec<Node>,
+    pub nodes: Vec<NodeName>,
     pub default_params: Params,
     pub local_params: Params,
     pub body: Vec<Statement>, // statements between .subckt and .ends (already placeholderized)
@@ -130,7 +130,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl
         };
         let node = parse_node(cursor, src)?;
         if cursor.consume(TokenKind::Equal).is_some() {
-            let param_name = node.name;
+            let param_name = node.0;
             let value = parse_value_or_placeholder(cursor, src)?;
             default_params.set_param(param_name, value);
         } else {
@@ -151,7 +151,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl
 fn parse_x_device(
     cursor: &mut StmtCursor,
     src: &str,
-) -> Result<(Vec<Node>, String, Params), SpicyError> {
+) -> Result<(Vec<NodeName>, String, Params), SpicyError> {
     // Phase 1: parse only nodes (last one is the subcircuit name)
     let first_node = parse_node(cursor, src)?;
 
@@ -180,8 +180,7 @@ fn parse_x_device(
         .pop()
         .ok_or_else(|| SubcircuitError::MissingSubcircuitName {
             span: cursor.peek_span(),
-        })?
-        .name;
+        })?.0;
 
     if nodes.is_empty() {
         return Err(SubcircuitError::NoNodes {

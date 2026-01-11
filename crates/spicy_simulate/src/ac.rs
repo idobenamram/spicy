@@ -1,26 +1,37 @@
-use crate::nodes::Nodes;
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
     Value,
     instance_parser::Deck,
-    netlist_types::Device,
-    netlist_types::{AcCommand, AcSweepType, IndependentSource, Inductor},
+    netlist_types::{AcCommand, AcSweepType},
 };
 
-use crate::dc::stamp_resistor;
+use crate::devices::{Capacitor, Devices, IndependentSource, Inductor, Resistor};
+use spicy_parser::node_mapping::NodeMapping;
 use std::f64::consts::PI;
 
-fn stamp_capacitor_ac(
-    ai: &mut Array2<f64>,
-    device: &spicy_parser::netlist_types::Capacitor,
-    nodes: &Nodes,
-    w: f64,
-) {
-    let node1 = nodes.get_node_index(&device.positive.name);
-    let node2 = nodes.get_node_index(&device.negative.name);
+fn stamp_resistor_ac(ar: &mut Array2<f64>, device: &Resistor, node_mapping: &NodeMapping) {
+    let g = 1.0 / device.ac;
+    let node1 = node_mapping.mna_node_index(device.positive);
+    let node2 = node_mapping.mna_node_index(device.negative);
+
+    if let Some(n1) = node1 {
+        ar[[n1, n1]] += g;
+    }
+    if let Some(n2) = node2 {
+        ar[[n2, n2]] += g;
+    }
+    if let (Some(n1), Some(n2)) = (node1, node2) {
+        ar[[n1, n2]] -= g;
+        ar[[n2, n1]] -= g;
+    }
+}
+
+fn stamp_capacitor_ac(ai: &mut Array2<f64>, device: &Capacitor, node_mapping: &NodeMapping, w: f64) {
+    let node1 = node_mapping.mna_node_index(device.positive);
+    let node2 = node_mapping.mna_node_index(device.negative);
     // Yc = j * w * C -> purely imaginary admittance placed on ai
-    let yc = w * device.capacitance();
+    let yc = w * device.capacitance;
 
     if let Some(n1) = node1 {
         ai[[n1, n1]] += yc;
@@ -38,14 +49,12 @@ fn stamp_inductor_ac_mna(
     ar: &mut Array2<f64>,
     ai: &mut Array2<f64>,
     device: &Inductor,
-    nodes: &Nodes,
+    node_mapping: &NodeMapping,
     w: f64,
 ) {
-    let node1 = nodes.get_node_index(&device.positive.name);
-    let node2 = nodes.get_node_index(&device.negative.name);
-    let k = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+    let node1 = node_mapping.mna_node_index(device.positive);
+    let node2 = node_mapping.mna_node_index(device.negative);
+    let k = node_mapping.mna_branch_index(device.current_branch);
 
     // Incidence (real part): same as DC B and B^T
     if let Some(n1) = node1 {
@@ -58,7 +67,7 @@ fn stamp_inductor_ac_mna(
     }
 
     // KVL: v = (Va - Vb) - j*w*L*i = 0 -> put +w*L on imag diagonal of KVL row/col
-    let wl = w * device.inductance();
+    let wl = w * device.inductance;
     ai[[k, k]] += wl;
 }
 
@@ -66,21 +75,19 @@ fn stamp_inductor_ac_mna(
 fn stamp_voltage_source_incidence_real(
     ar: &mut Array2<f64>,
     device: &IndependentSource,
-    nodes: &Nodes,
+    node_mapping: &NodeMapping,
 ) {
-    let n1 = nodes.get_node_index(&device.positive.name);
-    let n2 = nodes.get_node_index(&device.negative.name);
-    let k = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+    let n1 = node_mapping.mna_node_index(device.positive);
+    let n2 = node_mapping.mna_node_index(device.negative);
+    let k = node_mapping.mna_branch_index(device.current_branch);
 
     if let Some(n1) = n1 {
-        ar[[n1, k]] = 1.0;
-        ar[[k, n1]] = 1.0;
+        ar[[n1, k]] += 1.0;
+        ar[[k, n1]] += 1.0;
     }
     if let Some(n2) = n2 {
-        ar[[n2, k]] = -1.0;
-        ar[[k, n2]] = -1.0;
+        ar[[n2, k]] += -1.0;
+        ar[[k, n2]] += -1.0;
     }
 }
 
@@ -88,15 +95,13 @@ fn stamp_voltage_source_phasor_ac(
     br: &mut Array1<f64>,
     bi: &mut Array1<f64>,
     device: &IndependentSource,
-    nodes: &Nodes,
+    node_mapping: &NodeMapping,
 ) {
-    let k = nodes
-        .get_voltage_source_index(&device.name)
-        .expect("should exist");
+    let k = node_mapping.mna_branch_index(device.current_branch);
 
     if let Some(phasor) = &device.ac {
         let mag = phasor.mag.get_value();
-        let phase = phasor.phase.clone().unwrap_or(Value::zero()).get_value();
+        let phase = phasor.phase.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
         let ph = phase * PI / 180.0;
         let re = mag * ph.cos();
         let im = mag * ph.sin();
@@ -109,17 +114,17 @@ fn stamp_current_source_phasor_ac(
     br: &mut Array1<f64>,
     bi: &mut Array1<f64>,
     device: &IndependentSource,
-    nodes: &Nodes,
+    node_mapping: &NodeMapping,
 ) {
     if let Some(ac) = &device.ac {
         let mag = ac.mag.get_value();
-        let phase = ac.phase.clone().unwrap_or(Value::zero()).get_value();
+        let phase = ac.phase.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
         let ph = phase * PI / 180.0;
         let re = mag * ph.cos();
         let im = mag * ph.sin();
 
-        let n1 = nodes.get_node_index(&device.positive.name);
-        let n2 = nodes.get_node_index(&device.negative.name);
+        let n1 = node_mapping.mna_node_index(device.positive);
+        let n2 = node_mapping.mna_node_index(device.negative);
 
         if let Some(n1) = n1 {
             br[n1] -= re;
@@ -195,10 +200,13 @@ fn ac_frequencies(cmd: &AcCommand) -> Vec<f64> {
 /// which is the same as the real system:
 /// Assemble the AC small-signal system using a real 2x2 block expansion.
 /// Returns (M, s) where M is 2*(n+k) square and s is length 2*(n+k).
-fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>) {
-    let nodes = Nodes::new(&deck.devices);
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+fn assemble_ac_real_expansion(
+    devices: &Devices,
+    node_mapping: &NodeMapping,
+    w: f64,
+) -> (Array2<f64>, Array1<f64>) {
+    let n = node_mapping.nodes_len();
+    let k = node_mapping.branches_len();
 
     // Real and Imag parts of the small-signal MNA (size (n+k) x (n+k))
     let mut ar = Array2::<f64>::zeros((n + k, n + k));
@@ -208,26 +216,21 @@ fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>)
     let mut br = Array1::<f64>::zeros(n + k);
     let mut bi = Array1::<f64>::zeros(n + k);
 
-    for device in &deck.devices {
-        match device {
-            Device::Resistor(dev) => {
-                // purely real conductance -> stamp into ar using existing DC helper
-                stamp_resistor(&mut ar, dev, &nodes);
-            }
-            Device::Capacitor(dev) => {
-                stamp_capacitor_ac(&mut ai, dev, &nodes, w);
-            }
-            Device::Inductor(dev) => {
-                stamp_inductor_ac_mna(&mut ar, &mut ai, dev, &nodes, w);
-            }
-            Device::VoltageSource(dev) => {
-                stamp_voltage_source_incidence_real(&mut ar, dev, &nodes);
-                stamp_voltage_source_phasor_ac(&mut br, &mut bi, dev, &nodes);
-            }
-            Device::CurrentSource(dev) => {
-                stamp_current_source_phasor_ac(&mut br, &mut bi, dev, &nodes);
-            }
-        }
+    for dev in &devices.resistors {
+        stamp_resistor_ac(&mut ar, dev, node_mapping);
+    }
+    for dev in &devices.capacitors {
+        stamp_capacitor_ac(&mut ai, dev, node_mapping, w);
+    }
+    for dev in &devices.inductors {
+        stamp_inductor_ac_mna(&mut ar, &mut ai, dev, node_mapping, w);
+    }
+    for dev in &devices.voltage_sources {
+        stamp_voltage_source_incidence_real(&mut ar, dev, node_mapping);
+        stamp_voltage_source_phasor_ac(&mut br, &mut bi, dev, node_mapping);
+    }
+    for dev in &devices.current_sources {
+        stamp_current_source_phasor_ac(&mut br, &mut bi, dev, node_mapping);
     }
 
     // Build the 2x2 real system: [ Ar  -Ai ; Ai  Ar ] * [xr; xi] = [br; bi]
@@ -249,15 +252,16 @@ fn assemble_ac_real_expansion(deck: &Deck, w: f64) -> (Array2<f64>, Array1<f64>)
 
 pub fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array1<f64>)> {
     let freqs = ac_frequencies(cmd);
-    let nodes = Nodes::new(&deck.devices);
-    let n = nodes.node_len();
-    let k = nodes.source_len();
+    let devices = Devices::from_spec(&deck.devices);
+    let node_mapping = &deck.node_mapping;
+    let n = node_mapping.nodes_len();
+    let k = node_mapping.branches_len();
 
     let mut out = Vec::new();
 
     for f in freqs {
         let w = 2.0 * PI * f;
-        let (m, s_vec) = assemble_ac_real_expansion(deck, w);
+        let (m, s_vec) = assemble_ac_real_expansion(&devices, node_mapping, w);
         let lu = m.factorize_into().expect("Failed to factorize AC matrix");
         let x = lu.solve(&s_vec).expect("Failed to solve AC system");
 
@@ -266,7 +270,7 @@ pub fn simulate_ac(deck: &Deck, cmd: &AcCommand) -> Vec<(f64, Array1<f64>, Array
         let xi = x.slice(s![dim..2 * dim]).to_owned();
 
         // Optional: print node phasors
-        let node_names = nodes.get_node_names();
+        let node_names = node_mapping.node_names_mna_order();
         for i in 0..n {
             let vr = xr[i];
             let vi = xi[i];

@@ -4,9 +4,11 @@ use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
-    AcCommand, AcSweepType, Capacitor, Command, CommandType, DcCommand, Device, DeviceType,
-    IndependentSource, Inductor, Node, OpCommand, Phasor, Resistor, TranCommand,
+    AcCommand, AcSweepType, Command, CommandType, CurrentBranchIndex, DcCommand, 
+    DeviceType, NodeName, OpCommand, Phasor,
+    TranCommand,
 };
+use crate::devices::{Devices, CapacitorSpec, IndependentSourceSpec, InductorSpec, ResistorSpec};
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
     parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize,
@@ -14,11 +16,14 @@ use crate::parser_utils::{
 use crate::statement_phase::StmtCursor;
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
 
+use crate::node_mapping::NodeMapping;
+
 #[derive(Debug)]
 pub struct Deck {
     pub title: String,
+    pub node_mapping: NodeMapping,
     pub commands: Vec<Command>,
-    pub devices: Vec<Device>,
+    pub devices: Devices,
 }
 
 #[derive(Debug)]
@@ -309,9 +314,10 @@ impl<'s> InstanceParser<'s> {
         Ok(waveform)
     }
 
-    fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Node, SpicyError> {
+    fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<NodeName, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let node = parse_node(cursor, input)?;
+
         if let Some(node) = scope.node_mapping.get(&node) {
             Ok(node.clone())
         } else {
@@ -378,12 +384,16 @@ impl<'s> InstanceParser<'s> {
         name: String,
         cursor: &mut StmtCursor,
         scope: &Scope,
-    ) -> Result<Resistor, SpicyError> {
+        node_mapping: &mut NodeMapping,
+    ) -> Result<ResistorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
+        let positive_node = node_mapping.insert_node(positive);
+        let negative_node = node_mapping.insert_node(negative);
+
         println!("parse_resistor {:?}", name);
-        let mut resistor = Resistor::new(name, cursor.span, positive, negative);
+        let mut resistor = ResistorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
             ParamSlot::other("resistance"),
@@ -478,12 +488,16 @@ impl<'s> InstanceParser<'s> {
         name: String,
         cursor: &mut StmtCursor,
         scope: &Scope,
-    ) -> Result<Capacitor, SpicyError> {
+        node_mapping: &mut NodeMapping,
+    ) -> Result<CapacitorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
+        let positive_node = node_mapping.insert_node(positive);
+        let negative_node = node_mapping.insert_node(negative);
+
         // TODO: support models
-        let mut capacitor = Capacitor::new(name, cursor.span, positive, negative);
+        let mut capacitor = CapacitorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
             ParamSlot::other("capacitance"),
@@ -575,11 +589,17 @@ impl<'s> InstanceParser<'s> {
         name: String,
         cursor: &mut StmtCursor,
         scope: &Scope,
-    ) -> Result<Inductor, SpicyError> {
+        node_mapping: &mut NodeMapping,
+    ) -> Result<InductorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
-        let mut inductor = Inductor::new(name, cursor.span, positive, negative);
+        let positive_node = node_mapping.insert_node(positive);
+        let negative_node = node_mapping.insert_node(negative);
+        let current_branch = node_mapping.insert_branch(name.clone());
+
+        let mut inductor =
+            InductorSpec::new(name, cursor.span, positive_node, negative_node, current_branch);
 
         let params_order = vec![
             ParamSlot::other("inductance"),
@@ -672,7 +692,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         cursor: &mut StmtCursor,
         scope: &Scope,
-        independent_source: &mut IndependentSource,
+        independent_source: &mut IndependentSourceSpec,
     ) -> Result<(), SpicyError> {
         cursor.skip_ws();
         if let Some(token) = cursor.consume(TokenKind::Ident) {
@@ -712,11 +732,22 @@ impl<'s> InstanceParser<'s> {
         name: String,
         cursor: &mut StmtCursor,
         scope: &Scope,
-    ) -> Result<IndependentSource, SpicyError> {
+        node_mapping: &mut NodeMapping,
+        alloc_branch: bool,
+    ) -> Result<IndependentSourceSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
-        let mut independent_source = IndependentSource::new(name, positive, negative);
+        let positive_node = node_mapping.insert_node(positive);
+        let negative_node = node_mapping.insert_node(negative);
+        let current_branch = if alloc_branch {
+            node_mapping.insert_branch(name.clone())
+        } else {
+            CurrentBranchIndex(0)
+        };
+
+        let mut independent_source =
+            IndependentSourceSpec::new(name, positive_node, negative_node, current_branch);
 
         self.parse_source_value(cursor, scope, &mut independent_source)?;
         let next_token = cursor.peek_non_whitespace();
@@ -739,7 +770,12 @@ impl<'s> InstanceParser<'s> {
         Ok(independent_source)
     }
 
-    fn parse_device(&self, statement: &ScopedStmt) -> Result<Device, SpicyError> {
+    fn parse_device(
+        &self,
+        statement: &ScopedStmt,
+        node_mapping: &mut NodeMapping,
+        devices: &mut Devices,
+    ) -> Result<(), SpicyError> {
         let mut cursor = statement.stmt.into_cursor();
         let ident = cursor.expect(TokenKind::Ident)?;
 
@@ -756,36 +792,45 @@ impl<'s> InstanceParser<'s> {
         let name = scope.get_device_name(&ident_string);
 
         match element_type {
-            DeviceType::Resistor => Ok(Device::Resistor(self.parse_resistor(
+            DeviceType::Resistor => devices.resistors.push(self.parse_resistor(
                 name,
                 &mut cursor,
                 scope,
-            )?)),
-            DeviceType::Capacitor => Ok(Device::Capacitor(self.parse_capacitor(
+                node_mapping,
+            )?),
+            DeviceType::Capacitor => devices.capacitors.push(self.parse_capacitor(
                 name,
                 &mut cursor,
                 scope,
-            )?)),
-            DeviceType::Inductor => Ok(Device::Inductor(self.parse_inductor(
+                node_mapping,
+            )?),
+            DeviceType::Inductor => devices.inductors.push(self.parse_inductor(
                 name,
                 &mut cursor,
                 scope,
-            )?)),
-            DeviceType::VoltageSource => Ok(Device::VoltageSource(self.parse_independent_source(
+                node_mapping,
+            )?),
+            DeviceType::VoltageSource => devices.voltage_sources.push(self.parse_independent_source(
                 name,
                 &mut cursor,
                 scope,
-            )?)),
-            DeviceType::CurrentSource => Ok(Device::CurrentSource(self.parse_independent_source(
+                node_mapping,
+                true,
+            )?),
+            DeviceType::CurrentSource => devices.current_sources.push(self.parse_independent_source(
                 name,
                 &mut cursor,
                 scope,
-            )?)),
-            _ => Err(ParserError::InvalidDeviceType {
+                node_mapping,
+                false,
+            )?),
+            _ => return Err(ParserError::InvalidDeviceType {
                 s: element_type.to_char().to_string(),
             }
-            .into()),
-        }
+            .into())
+        };
+
+        Ok(())
     }
 
     // .dc srcnam vstart vstop vincr [src2 start2 stop2 incr2]
@@ -916,7 +961,8 @@ impl<'s> InstanceParser<'s> {
         let title = self.parse_title(&statements_iter.next().ok_or(ParserError::MissingTitle)?);
 
         let mut commands = vec![];
-        let mut devices = vec![];
+        let mut devices = Devices::new();
+        let mut node_mapping = NodeMapping::new();
 
         for statement in statements_iter {
             let cursor = statement.stmt.into_cursor();
@@ -944,8 +990,7 @@ impl<'s> InstanceParser<'s> {
                     // TODO: save comments?
                 }
                 TokenKind::Ident => {
-                    let device = self.parse_device(&statement)?;
-                    devices.push(device);
+                    self.parse_device(&statement, &mut node_mapping, &mut devices)?;
                 }
                 _ => {
                     return Err(ParserError::UnexpectedToken {
@@ -960,6 +1005,7 @@ impl<'s> InstanceParser<'s> {
 
         Ok(Deck {
             title,
+            node_mapping,
             commands,
             devices,
         })

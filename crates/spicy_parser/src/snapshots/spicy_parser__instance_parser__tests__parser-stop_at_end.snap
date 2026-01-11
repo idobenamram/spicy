@@ -4,6 +4,28 @@ expression: deck
 ---
 Deck {
     title: "stop after end",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "in",
+            ): NodeIndex(
+                1,
+            ),
+            NodeName(
+                "out",
+            ): NodeIndex(
+                2,
+            ),
+        },
+        node_counter: 3,
+        branch_mapping: {},
+        branch_counter: 1,
+    },
     commands: [
         Op(
             OpCommand {
@@ -17,9 +39,9 @@ Deck {
             },
         ),
     ],
-    devices: [
-        Resistor(
-            Resistor {
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
                 name: "R1",
                 span: Span {
                     start: 15,
@@ -28,12 +50,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "out",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
                 resistance: Some(
                     Value {
                         value: 1.0,
@@ -53,6 +75,10 @@ Deck {
                 tc2: None,
                 noisy: None,
             },
-        ),
-    ],
+        ],
+        capacitors: [],
+        inductors: [],
+        voltage_sources: [],
+        current_sources: [],
+    },
 }

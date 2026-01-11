@@ -1,7 +1,7 @@
 use crate::error::{ExpressionError, SpicyError};
 use crate::{
     lexer::{Span, Token, TokenKind, token_text},
-    netlist_types::Node,
+    netlist_types::NodeName,
     netlist_types::ValueSuffix,
     parser_utils::parse_value,
     statement_phase::StmtCursor,
@@ -262,14 +262,14 @@ pub struct Scope {
     pub instance_name: Option<String>,
     pub param_map: Params, // store Expr; evaluation is later
     #[cfg_attr(test, serde(serialize_with = "crate::test_utils::serialize_node_map"))]
-    pub node_mapping: HashMap<Node, Node>,
+    pub node_mapping: HashMap<NodeName, NodeName>,
 }
 
 impl Scope {
     pub fn new(
         instance_name: Option<String>,
         param_map: Params,
-        node_mapping: HashMap<Node, Node>,
+        node_mapping: HashMap<NodeName, NodeName>,
     ) -> Self {
         Self {
             parent: None,

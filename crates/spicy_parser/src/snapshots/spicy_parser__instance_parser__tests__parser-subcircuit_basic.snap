@@ -4,31 +4,41 @@ expression: deck
 ---
 Deck {
     title: "basic subcircuit",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "vcc",
+            ): NodeIndex(
+                1,
+            ),
+            NodeName(
+                "in",
+            ): NodeIndex(
+                2,
+            ),
+            NodeName(
+                "out",
+            ): NodeIndex(
+                3,
+            ),
+        },
+        node_counter: 4,
+        branch_mapping: {
+            "1_V1": CurrentBranchIndex(
+                1,
+            ),
+        },
+        branch_counter: 2,
+    },
     commands: [],
-    devices: [
-        VoltageSource(
-            IndependentSource {
-                name: "1_V1",
-                positive: Node {
-                    name: "vcc",
-                },
-                negative: Node {
-                    name: "0",
-                },
-                dc: Some(
-                    Constant(
-                        Value {
-                            value: 5.0,
-                            exponent: None,
-                            suffix: None,
-                        },
-                    ),
-                ),
-                ac: None,
-            },
-        ),
-        Resistor(
-            Resistor {
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
                 name: "1_R1",
                 span: Span {
                     start: 57,
@@ -37,12 +47,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "out",
-                },
+                positive: NodeIndex(
+                    2,
+                ),
+                negative: NodeIndex(
+                    3,
+                ),
                 resistance: Some(
                     Value {
                         value: 1.0,
@@ -62,9 +72,9 @@ Deck {
                 tc2: None,
                 noisy: None,
             },
-        ),
-        Capacitor(
-            Capacitor {
+        ],
+        capacitors: [
+            CapacitorSpec {
                 name: "1_C2",
                 span: Span {
                     start: 70,
@@ -73,12 +83,12 @@ Deck {
                         0,
                     ),
                 },
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    3,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
                 capacitance: Some(
                     Value {
                         value: 0.1,
@@ -98,6 +108,32 @@ Deck {
                 tc2: None,
                 ic: None,
             },
-        ),
-    ],
+        ],
+        inductors: [],
+        voltage_sources: [
+            IndependentSourceSpec {
+                name: "1_V1",
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                    ),
+                ),
+                ac: None,
+            },
+        ],
+        current_sources: [],
+    },
 }

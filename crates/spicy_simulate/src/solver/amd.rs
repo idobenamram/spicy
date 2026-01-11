@@ -465,7 +465,7 @@ fn construct_new_element(
                 p += 1;
                 debug_assert!(pe[e] >= 0);
                 pj = pe[e] as usize;
-                debug_assert!(len[e] >= 0);
+                // debug_assert!(len[e] >= 0);
                 ln = len[e];
                 debug_assert!(elen[e] < EMPTY && w[e] > 0);
             }

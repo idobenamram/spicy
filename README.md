@@ -46,7 +46,7 @@ and only assisted by ai. Those should be readable.
 
 # TODO:
 
-** Parser **:
+## Parser
 - [x] output raw files
 - [x] support libs in parser
 - [x] support models in parser
@@ -54,20 +54,24 @@ and only assisted by ai. Those should be readable.
 - [ ] add BJT transistor
 
 
-** Simulation **
+## Simulation
 - [x] implementation of KLU
 - [x] refactor errors and metrics in klu
 - [x] test KLU implementation
       - [x] make sure the output is bit exact to c
       - [x] make sure solve close 
       - [x] make sure unroll optimization doesn't lose numerical stability
-- [ ] create spicyVec for boundary checks
-- [ ] hook up to simulation code
+- [x] hook up to simulation code
+
+## KLU
 - [ ] make sure singular matricies work (when not using halt_if_singular)
 - [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
 - [ ] support KLU complex?
 
-** visualizations **
+### Optimizations
+- [ ] create spicyVec for boundary checks
+
+## visualizations
 - [ ] merge the recorder macro
 - [ ] generate nice visualizations for btf and amd
 

@@ -4,6 +4,27 @@ expression: deck
 ---
 Deck {
     title: "AC test with voltage source DC and AC",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "out",
+            ): NodeIndex(
+                1,
+            ),
+        },
+        node_counter: 2,
+        branch_mapping: {
+            "V1": CurrentBranchIndex(
+                1,
+            ),
+        },
+        branch_counter: 2,
+    },
     commands: [
         Ac(
             AcCommand {
@@ -30,16 +51,57 @@ Deck {
             },
         ),
     ],
-    devices: [
-        VoltageSource(
-            IndependentSource {
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
+                name: "R1",
+                span: Span {
+                    start: 62,
+                    end: 72,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        voltage_sources: [
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -66,42 +128,7 @@ Deck {
                     },
                 ),
             },
-        ),
-        Resistor(
-            Resistor {
-                name: "R1",
-                span: Span {
-                    start: 62,
-                    end: 72,
-                    source_index: SourceFileId(
-                        0,
-                    ),
-                },
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
-                resistance: Some(
-                    Value {
-                        value: 1.0,
-                        exponent: None,
-                        suffix: Some(
-                            Kilo,
-                        ),
-                    },
-                ),
-                model: None,
-                ac: None,
-                m: None,
-                scale: None,
-                temp: None,
-                dtemp: None,
-                tc1: None,
-                tc2: None,
-                noisy: None,
-            },
-        ),
-    ],
+        ],
+        current_sources: [],
+    },
 }

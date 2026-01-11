@@ -1,20 +1,73 @@
 ---
-source: crates/spicy_parser/src/parser.rs
+source: crates/spicy_parser/src/instance_parser.rs
 expression: deck
 ---
 Deck {
     title: "waveforms coverage for independent sources",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "in",
+            ): NodeIndex(
+                1,
+            ),
+            NodeName(
+                "out",
+            ): NodeIndex(
+                2,
+            ),
+        },
+        node_counter: 3,
+        branch_mapping: {
+            "V1": CurrentBranchIndex(
+                1,
+            ),
+            "V2": CurrentBranchIndex(
+                2,
+            ),
+            "V3": CurrentBranchIndex(
+                3,
+            ),
+            "V4": CurrentBranchIndex(
+                4,
+            ),
+            "V5": CurrentBranchIndex(
+                5,
+            ),
+            "V6": CurrentBranchIndex(
+                6,
+            ),
+            "V7": CurrentBranchIndex(
+                7,
+            ),
+            "V8": CurrentBranchIndex(
+                8,
+            ),
+        },
+        branch_counter: 9,
+    },
     commands: [],
-    devices: [
-        VoltageSource(
-            IndependentSource {
+    devices: Devices {
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        voltage_sources: [
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -28,16 +81,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -51,16 +105,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -89,16 +144,17 @@ Deck {
                     },
                 ),
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V1",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    1,
+                ),
                 dc: Some(
                     Pulse {
                         voltage1: Value {
@@ -121,52 +177,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        CurrentSource(
-            IndependentSource {
-                name: "I1",
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
-                dc: Some(
-                    Pulse {
-                        voltage1: Value {
-                            value: 1.0,
-                            exponent: None,
-                            suffix: Some(
-                                Milli,
-                            ),
-                        },
-                        voltage2: Value {
-                            value: 2.0,
-                            exponent: None,
-                            suffix: Some(
-                                Milli,
-                            ),
-                        },
-                        delay: None,
-                        rise_time: None,
-                        fall_time: None,
-                        pulse_width: None,
-                        period: None,
-                        number_of_pulses: None,
-                    },
-                ),
-                ac: None,
-            },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V2",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    2,
+                ),
                 dc: Some(
                     Pulse {
                         voltage1: Value {
@@ -221,16 +242,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V3",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    3,
+                ),
                 dc: Some(
                     Pulse {
                         voltage1: Value {
@@ -295,16 +317,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V4",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    4,
+                ),
                 dc: Some(
                     Pulse {
                         voltage1: Value {
@@ -367,16 +390,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V5",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    5,
+                ),
                 dc: Some(
                     Sinusoidal {
                         offset: Value {
@@ -397,16 +421,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V6",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    6,
+                ),
                 dc: Some(
                     Sinusoidal {
                         offset: Value {
@@ -455,74 +480,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        CurrentSource(
-            IndependentSource {
-                name: "I2",
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
-                dc: Some(
-                    Sinusoidal {
-                        offset: Value {
-                            value: 0.0,
-                            exponent: None,
-                            suffix: None,
-                        },
-                        amplitude: Value {
-                            value: 0.5,
-                            exponent: None,
-                            suffix: None,
-                        },
-                        frequency: Some(
-                            Value {
-                                value: 2.0,
-                                exponent: None,
-                                suffix: Some(
-                                    Kilo,
-                                ),
-                            },
-                        ),
-                        delay: Some(
-                            Value {
-                                value: 1.0,
-                                exponent: None,
-                                suffix: Some(
-                                    Micro,
-                                ),
-                            },
-                        ),
-                        damping_factor: Some(
-                            Value {
-                                value: 0.0,
-                                exponent: None,
-                                suffix: None,
-                            },
-                        ),
-                        phase: Some(
-                            Value {
-                                value: 0.0,
-                                exponent: None,
-                                suffix: None,
-                            },
-                        ),
-                    },
-                ),
-                ac: None,
-            },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V7",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    7,
+                ),
                 dc: Some(
                     Exponential {
                         initial_value: Value {
@@ -543,16 +511,17 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        VoltageSource(
-            IndependentSource {
+            IndependentSourceSpec {
                 name: "V8",
-                positive: Node {
-                    name: "in",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    8,
+                ),
                 dc: Some(
                     Exponential {
                         initial_value: Value {
@@ -605,16 +574,115 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-        CurrentSource(
-            IndependentSource {
+        ],
+        current_sources: [
+            IndependentSourceSpec {
+                name: "I1",
+                positive: NodeIndex(
+                    2,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    0,
+                ),
+                dc: Some(
+                    Pulse {
+                        voltage1: Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: Some(
+                                Milli,
+                            ),
+                        },
+                        voltage2: Value {
+                            value: 2.0,
+                            exponent: None,
+                            suffix: Some(
+                                Milli,
+                            ),
+                        },
+                        delay: None,
+                        rise_time: None,
+                        fall_time: None,
+                        pulse_width: None,
+                        period: None,
+                        number_of_pulses: None,
+                    },
+                ),
+                ac: None,
+            },
+            IndependentSourceSpec {
+                name: "I2",
+                positive: NodeIndex(
+                    2,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    0,
+                ),
+                dc: Some(
+                    Sinusoidal {
+                        offset: Value {
+                            value: 0.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        amplitude: Value {
+                            value: 0.5,
+                            exponent: None,
+                            suffix: None,
+                        },
+                        frequency: Some(
+                            Value {
+                                value: 2.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Kilo,
+                                ),
+                            },
+                        ),
+                        delay: Some(
+                            Value {
+                                value: 1.0,
+                                exponent: None,
+                                suffix: Some(
+                                    Micro,
+                                ),
+                            },
+                        ),
+                        damping_factor: Some(
+                            Value {
+                                value: 0.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                        phase: Some(
+                            Value {
+                                value: 0.0,
+                                exponent: None,
+                                suffix: None,
+                            },
+                        ),
+                    },
+                ),
+                ac: None,
+            },
+            IndependentSourceSpec {
                 name: "I3",
-                positive: Node {
-                    name: "out",
-                },
-                negative: Node {
-                    name: "0",
-                },
+                positive: NodeIndex(
+                    2,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                current_branch: CurrentBranchIndex(
+                    0,
+                ),
                 dc: Some(
                     Exponential {
                         initial_value: Value {
@@ -667,6 +735,6 @@ Deck {
                 ),
                 ac: None,
             },
-        ),
-    ],
+        ],
+    },
 }

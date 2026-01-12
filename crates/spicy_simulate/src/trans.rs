@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand, node_mapping::NodeMapping};
+use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand};
 
 use crate::{
     dc::{simulate_op_inner, stamp_resistor, stamp_voltage_source_incidence},

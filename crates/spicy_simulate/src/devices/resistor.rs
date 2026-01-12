@@ -5,7 +5,10 @@ use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Resistor {
+    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
@@ -14,18 +17,25 @@ pub struct Resistor {
     /// Optional AC override value (Ohms). If not provided, defaults to `resistance`.
     pub ac: f64,
     /// Multiplier; replicates the resistor in parallel.
+    #[allow(dead_code)]
     pub m: f64,
     /// Scaling factor applied to the resistance value.
+    #[allow(dead_code)]
     pub scale: f64,
     /// Instance temperature (typically in °C).
+    #[allow(dead_code)]
     pub temp: f64,
     /// Instance temperature delta applied on top of the ambient/circuit temperature.
+    #[allow(dead_code)]
     pub dtemp: f64,
     /// First-order temperature coefficient.
+    #[allow(dead_code)]
     pub tc1: f64,
     /// Second-order temperature coefficient.
+    #[allow(dead_code)]
     pub tc2: f64,
     /// Enable/disable including this resistor in noise analysis.
+    #[allow(dead_code)]
     pub noisy: bool,
     pub stamp: NodePairStamp,
 }

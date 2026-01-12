@@ -127,17 +127,14 @@ mod tests {
             SpicyError::Parser(e) => e,
             _ => panic!("expected parser error"),
         };
-        let source_index = input_options.source_map.main_index();
-        assert!(matches!(
-            err,
-            ParserError::EmptyExpressionInsideBraces {
-                // make sure we include the entire `{ }` in the span
-                span: Span {
-                    start: 13,
-                    end: 15,
-                    source_index
-                }
+        match err {
+            ParserError::EmptyExpressionInsideBraces { span } => {
+                // Make sure we include the entire `{ }` in the span.
+                assert_eq!(span.start, 13);
+                assert_eq!(span.end, 15);
+                assert_eq!(span.source_index, input_options.source_map.main_index());
             }
-        ));
+            _ => panic!("expected EmptyExpressionInsideBraces"),
+        }
     }
 }

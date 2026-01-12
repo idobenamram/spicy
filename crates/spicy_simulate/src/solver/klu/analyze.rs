@@ -56,7 +56,7 @@ pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
 
 fn analyze_worker(
     a: &CscMatrix,
-    config: &KluConfig,
+    _config: &KluConfig,
     symbolic: &mut KluSymbolic,
     btf_row_permutation: Vec<isize>,
     btf_column_permutation: Vec<isize>,
@@ -65,7 +65,7 @@ fn analyze_worker(
     mut block_row_permutation: Vec<isize>,
     mut block_col_pointers: Vec<usize>,
     mut block_row_pointers: Vec<usize>,
-    ci_len: usize,
+    _ci_len: usize,
     mut row_inv_permutations: Vec<isize>,
 ) {
     let n = symbolic.n;

@@ -5,19 +5,30 @@ use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Inductor {
+    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
     pub current_branch: CurrentBranchIndex,
     pub inductance: f64,
+    #[allow(dead_code)]
     pub nt: f64,
+    #[allow(dead_code)]
     pub m: f64,
+    #[allow(dead_code)]
     pub scale: f64,
+    #[allow(dead_code)]
     pub temp: f64,
+    #[allow(dead_code)]
     pub dtemp: f64,
+    #[allow(dead_code)]
     pub tc1: f64,
+    #[allow(dead_code)]
     pub tc2: f64,
+    #[allow(dead_code)]
     pub ic: f64,
     pub stamp: NodeBranchPairStamp,
 }

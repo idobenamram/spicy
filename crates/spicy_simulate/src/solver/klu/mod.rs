@@ -34,6 +34,7 @@ pub use solve::solve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
+    #[allow(dead_code)]
     Sum,
     Max,
 }
@@ -239,6 +240,7 @@ impl KluNumeric {
     /// This mirrors how Xwork is used in the C implementation for simple scratch space.
     /// NOTE: we can't use &mut self here because this will keep a mutable ref to the entire KluNumeric
     /// because rust is dumb
+    #[allow(dead_code)]
     pub(crate) fn x_scratch(work: &mut [f64], worksize: usize, n: usize) -> &mut [f64] {
         let bytes_needed = n
             .checked_mul(mem::size_of::<f64>())
@@ -356,6 +358,8 @@ mod tests {
     use rstest::rstest;
     use std::path::PathBuf;
 
+    // TODO: clean this up
+    #[allow(dead_code)]
     #[derive(Debug)]
     enum KluRunSnapshot {
         Skipped { reason: String },
@@ -373,6 +377,7 @@ mod tests {
         },
     }
 
+    #[allow(dead_code)]
     #[derive(Debug)]
     struct VecPreview {
         len: usize,

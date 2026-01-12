@@ -64,6 +64,7 @@ and only assisted by ai. Those should be readable.
 - [x] hook up to simulation code
 
 ## KLU
+- [ ] implement klu statistics and use them to know when to fully factorize the matrix again.
 - [ ] make sure singular matricies work (when not using halt_if_singular)
 - [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
 - [ ] support KLU complex?

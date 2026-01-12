@@ -15,10 +15,13 @@ use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
 
 pub struct AatInfo {
     // symmetry pattern of A
+    #[allow(dead_code)]
     pub sym: f64,
     // non zeros on the diagonal of A
+    #[allow(dead_code)]
     pub nz_diagonal: usize,
     // symmetric non zeros in original A
+    #[allow(dead_code)]
     pub nz_both: usize,
     // non zeros in the symmetric pattern of A
     pub nz_aat: usize,

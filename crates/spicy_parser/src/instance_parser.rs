@@ -893,6 +893,7 @@ impl<'s> InstanceParser<'s> {
         let tstep = self.parse_value(cursor, scope)?;
         let tstop = self.parse_value(cursor, scope)?;
 
+        #[allow(unused_assignments)]
         let mut uic = false;
         match cursor.peek_non_whitespace() {
             Some(t) if t.kind == TokenKind::Ident => {

@@ -7,9 +7,6 @@ pub enum SimulationError {
     #[error(transparent)]
     Matrix(#[from] CscError),
 
-    #[error("missing sparsity-pattern entry at (row={row}, col={col})")]
-    MissingPatternEntry { row: usize, col: usize },
-
     #[error(transparent)]
     KluError(#[from] klu::KluError),
 

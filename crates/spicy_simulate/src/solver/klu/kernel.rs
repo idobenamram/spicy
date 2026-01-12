@@ -364,8 +364,8 @@ fn lpivot(
     let mut pdiag = EMPTY;
     let mut ppivrow = EMPTY;
     let mut abs_pivot = -1.0;
-    let mut i = llen[k] - 1;
-    let (li, lx, _) = get_pointers_to_lu(lu, lip, llen, k)?;
+    let i = llen[k] - 1;
+    let (li, _lx, _) = get_pointers_to_lu(lu, lip, llen, k)?;
     let last_row_index = li[i];
 
     // decrement the length by 1

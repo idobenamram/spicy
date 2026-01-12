@@ -61,6 +61,8 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                     }
                 };
 
+                let _ = tx.send(SimMsg::SimulationStarted);
+
                 for command in &deck.commands {
                     match command {
                         Command::Op(_) => {
@@ -86,10 +88,4 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
             }
         }
     }
-}
-
-fn offset_to_line(src: &str, byte_offset: usize) -> usize {
-    let offset = byte_offset.min(src.len());
-    let prefix = &src[..offset];
-    prefix.chars().filter(|&c| c == '\n').count() + 1
 }

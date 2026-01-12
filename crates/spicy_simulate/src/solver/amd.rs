@@ -18,7 +18,7 @@
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
 ///
-use crate::solver::utils::{flip, inverse_permutation, unflip};
+use crate::solver::utils::{flip, inverse_permutation};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -411,14 +411,14 @@ fn construct_new_element(
 ) -> (usize, usize, usize, isize) {
     let elenme = elen[me];
     debug_assert!(nv[me] > 0);
-    let mut nvpiv = nv[me] as usize;
+    let nvpiv = nv[me] as usize;
     *nel += nvpiv;
 
     // flag the variable "me" as being in Lme by negating Nv [me]
     nv[me] = -(nvpiv as isize);
     debug_assert!(pe[me] >= 0 && pe[me] < iwlen as isize);
-    let mut pme1: usize = 0;
-    let mut pme2 = 0;
+    let mut pme1: usize;
+    let mut pme2: isize;
 
     if elenme == 0 {
         // construct the new element in place
@@ -905,7 +905,7 @@ fn finalize_new_element(
     pe: &mut [isize],
     w: &mut [isize],
     elenme: isize,
-    info: &mut AmdInfo,
+    _info: &mut AmdInfo,
 ) {
     nv[me] = nvpiv as isize;
     len[me] = p - pme1;

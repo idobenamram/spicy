@@ -200,7 +200,7 @@ impl CscMatrix {
         }
     }
 
-    pub fn as_pointers(&self) -> CscPointers {
+    pub fn as_pointers(&self) -> CscPointers<'_> {
         CscPointers::new(self.dim, &self.column_pointers, &self.row_indices)
     }
 }

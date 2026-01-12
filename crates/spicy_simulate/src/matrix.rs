@@ -14,7 +14,6 @@ use crate::{
 };
 
 pub struct BlasMatrix {
-    n: usize,
     node_mapping: NodeMapping,
     lu: Option<LUFactorized<OwnedRepr<f64>>>,
     m: ndarray::Array2<f64>,
@@ -33,7 +32,6 @@ impl BlasMatrix {
         // current and voltage source vectors
         let s = Array1::<f64>::zeros(n);
         Self {
-            n,
             node_mapping,
             lu: None,
             m,
@@ -78,7 +76,7 @@ impl SolverMatrix {
     ) -> Result<SolverMatrix, SimulationError> {
         let matrix_dim = node_mapping.mna_matrix_dim();
 
-        let mut sm = if klu {
+        let sm = if klu {
             let matrix = setup_pattern(devices, &node_mapping)?;
             // KLU solve overwrites RHS in-place, so we allocate it up-front.
             Self::KLU(KluMatrix::new(matrix, vec![0.0; matrix_dim], node_mapping))
@@ -92,7 +90,7 @@ impl SolverMatrix {
     pub fn get_mut_nnz(&mut self, nnz: usize) -> &mut f64 {
         match self {
             Self::KLU(matrix) => matrix.matrix.get_mut_nnz(nnz),
-            Self::BLAS(matrix) => {
+            Self::BLAS(_matrix) => {
                 todo!()
             }
         }
@@ -193,7 +191,7 @@ impl SolverMatrix {
                     &matrix.config,
                 )?;
             }
-            Self::BLAS(matrix) => {
+            Self::BLAS(_matrix) => {
                 todo!()
             }
         }

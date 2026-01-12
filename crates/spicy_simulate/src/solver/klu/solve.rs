@@ -194,7 +194,7 @@ pub fn solve(
 
     // right-hand-side on input, overwritten with solution to Ax=b on output
     b: &mut [f64],
-    config: &KluConfig,
+    _config: &KluConfig,
 ) -> KluResult<()> {
     if d < symbolic.n {
         return Err(KluError::InvalidLeadingDimension {

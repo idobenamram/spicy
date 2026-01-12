@@ -1,7 +1,6 @@
 use ndarray::{Array1, Array2, s};
 use ndarray_linalg::{FactorizeInto, Solve};
 use spicy_parser::{
-    Value,
     instance_parser::Deck,
     netlist_types::{AcCommand, AcSweepType},
 };

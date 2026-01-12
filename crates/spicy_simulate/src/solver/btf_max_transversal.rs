@@ -146,13 +146,6 @@ pub(crate) fn btf_max_transversal(
     number_of_matches
 }
 
-pub(crate) fn run_btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
-    let nrows = m.dim.nrows;
-    let mut column_permutations: Vec<isize> = vec![-1; nrows];
-    let number_of_matches = btf_max_transversal(m, &mut column_permutations);
-    (number_of_matches, column_permutations)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,6 +157,13 @@ mod tests {
             b.push(c, r, 1.0).unwrap();
         }
         b.build_csc().unwrap()
+    }
+
+    fn run_btf_max_transversal(m: &CscMatrix) -> (usize, Vec<isize>) {
+        let nrows = m.dim.nrows;
+        let mut column_permutations: Vec<isize> = vec![-1; nrows];
+        let number_of_matches = btf_max_transversal(m, &mut column_permutations);
+        (number_of_matches, column_permutations)
     }
 
     #[test]

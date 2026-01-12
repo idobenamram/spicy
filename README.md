@@ -62,6 +62,8 @@ and only assisted by ai. Those should be readable.
       - [x] make sure solve close 
       - [x] make sure unroll optimization doesn't lose numerical stability
 - [x] hook up to simulation code
+- [ ] cleanup device function use
+- [ ] implement gmin
 
 ## KLU
 - [ ] implement klu statistics and use them to know when to fully factorize the matrix again.

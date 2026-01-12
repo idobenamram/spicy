@@ -13,10 +13,13 @@ pub enum SimulationError {
     #[error(transparent)]
     NdarrayLinalgError(#[from] ndarray_linalg::error::LinalgError),
 
-    #[error("symbolic not analyzed")]
-    SymbolicNotAnalyzed,
+    #[error("Klu symbolic not analyzed")]
+    KLUSymbolicNotAnalyzed,
 
-    #[error("numeric not factorized")]
-    NumericNotFactorized,
+    #[error("Klu numeric not factorized")]
+    KluNumericNotFactorized,
+
+    #[error("Blas LU not factorized")]
+    BlasLUNotFactorized,
 }
 

@@ -187,7 +187,7 @@ fn simulation_step<'a>(
 
         let (g, i) = integrator.capacitor_values(c, pos, neg, config);
         stamp_capacitor_trans(matrix, c, g, i);
-        integrator.save_capacitor_current(&c, i);
+        integrator.save_capacitor_current(c, i);
     }
 
     // TODO: we don't support functions on the sources yet
@@ -198,9 +198,7 @@ fn simulation_step<'a>(
     // TODO: stamp current sources
 
     // Solve.
-    // TODO: don't analyze each step
-    matrix.analyze().expect("Failed to analyze matrix");
-    matrix.factorize().expect("Failed to factorize matrix");
+    matrix.refactor().expect("Failed to refactor matrix");
     matrix.solve().expect("Failed to solve linear system");
 
     matrix.rhs().to_vec()

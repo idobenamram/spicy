@@ -1,5 +1,5 @@
 use ndarray::{Array1, Array2, OwnedRepr};
-use ndarray_linalg::{Factorize, LUFactorized};
+use ndarray_linalg::{Factorize, LUFactorized, Solve};
 use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex};
 use spicy_parser::node_mapping::NodeMapping;
 
@@ -107,10 +107,7 @@ impl SolverMatrix {
     pub fn rhs(&self) -> &[f64] {
         match self {
             Self::KLU(matrix) => matrix.s.as_slice(),
-            Self::BLAS(matrix) => matrix
-                .s
-                .as_slice()
-                .expect("BLAS RHS should be contiguous"),
+            Self::BLAS(matrix) => matrix.s.as_slice().expect("BLAS RHS should be contiguous"),
         }
     }
 
@@ -124,7 +121,6 @@ impl SolverMatrix {
                 .expect("BLAS RHS should be contiguous"),
         }
     }
-
 
     pub fn mna_node_index(&self, node_index: NodeIndex) -> Option<usize> {
         match self {
@@ -154,10 +150,10 @@ impl SolverMatrix {
     pub fn factorize(&mut self) -> Result<(), SimulationError> {
         match self {
             Self::KLU(matrix) => {
-                if matrix.symbolic.is_none() {
-                    return Err(SimulationError::SymbolicNotAnalyzed);
-                }
-                let symbolic = matrix.symbolic.as_mut().unwrap();
+                let symbolic = matrix
+                    .symbolic
+                    .as_mut()
+                    .ok_or(SimulationError::KLUSymbolicNotAnalyzed)?;
                 let numeric = klu::factor(&matrix.matrix, symbolic, &mut matrix.config)?;
                 matrix.numeric = Some(numeric);
             }
@@ -169,18 +165,39 @@ impl SolverMatrix {
         Ok(())
     }
 
+    pub fn refactor(&mut self) -> Result<(), SimulationError> {
+        match self {
+            Self::KLU(matrix) => {
+                let symbolic = matrix
+                    .symbolic
+                    .as_mut()
+                    .ok_or(SimulationError::KLUSymbolicNotAnalyzed)?;
+                let numeric = matrix
+                    .numeric
+                    .as_mut()
+                    .ok_or(SimulationError::KluNumericNotFactorized)?;
+                klu::refactor(&matrix.matrix, symbolic, numeric, &matrix.config)?;
+            }
+            Self::BLAS(matrix) => {
+                let lu = matrix.m.factorize()?;
+                matrix.lu = Some(lu);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn solve(&mut self) -> Result<(), SimulationError> {
         match self {
             Self::KLU(matrix) => {
-                if matrix.symbolic.is_none() {
-                    return Err(SimulationError::SymbolicNotAnalyzed);
-                }
-
-                if matrix.numeric.is_none() {
-                    return Err(SimulationError::NumericNotFactorized);
-                }
-                let symbolic = matrix.symbolic.as_ref().unwrap();
-                let numeric = matrix.numeric.as_mut().unwrap();
+                let symbolic = matrix
+                    .symbolic
+                    .as_ref()
+                    .ok_or(SimulationError::KLUSymbolicNotAnalyzed)?;
+                let numeric = matrix
+                    .numeric
+                    .as_mut()
+                    .ok_or(SimulationError::KluNumericNotFactorized)?;
 
                 klu::solve(
                     symbolic,
@@ -191,8 +208,13 @@ impl SolverMatrix {
                     &matrix.config,
                 )?;
             }
-            Self::BLAS(_matrix) => {
-                todo!()
+            Self::BLAS(matrix) => {
+                let lu = matrix
+                    .lu
+                    .as_mut()
+                    .ok_or(SimulationError::BlasLUNotFactorized)?;
+                let x = lu.solve(&matrix.s)?;
+                matrix.s = x;
             }
         }
         Ok(())

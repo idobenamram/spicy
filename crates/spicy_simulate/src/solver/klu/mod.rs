@@ -20,8 +20,6 @@ mod scale;
 mod solve;
 mod refactor;
 
-use std::{mem, slice};
-
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
 pub use error::{KluError, KluResult};
 pub use analyze::analyze;
@@ -31,6 +29,7 @@ pub use dump::{
 };
 pub use factor::factor;
 pub use solve::solve;
+pub use refactor::refactor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -232,26 +231,6 @@ impl std::fmt::Debug for KluNumeric {
             .field("max_unz_block", &self.max_unz_block)
             .field("lu_size", &pv(&self.lu_size));
         s.finish()
-    }
-}
-
-impl KluNumeric {
-    /// Returns a temporary slice of length `n` into the workspace, interpreted as `f64`.
-    /// This mirrors how Xwork is used in the C implementation for simple scratch space.
-    /// NOTE: we can't use &mut self here because this will keep a mutable ref to the entire KluNumeric
-    /// because rust is dumb
-    #[allow(dead_code)]
-    pub(crate) fn x_scratch(work: &mut [f64], worksize: usize, n: usize) -> &mut [f64] {
-        let bytes_needed = n
-            .checked_mul(mem::size_of::<f64>())
-            .expect("overflow computing workspace size");
-
-        debug_assert!(
-            worksize >= bytes_needed,
-            "workspace too small for requested scratch slice"
-        );
-        let ptr = work.as_mut_ptr() as *mut f64;
-        unsafe { slice::from_raw_parts_mut(ptr, n) }
     }
 }
 

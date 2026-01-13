@@ -12,14 +12,20 @@
 use std::cmp::max;
 
 use crate::solver::{
-    klu::{amd::amd, btf::btf, klu_valid, KluConfig, KluOrdering, KluResult, KluSymbolic},
-    matrix::{csc::{CscMatrix, CscPointers}, Dim},
+    klu::{KluConfig, KluOrdering, KluResult, KluSymbolic, amd::amd, btf::btf, klu_valid},
+    matrix::{
+        Dim,
+        csc::{CscMatrix, CscPointers},
+    },
     utils::{EMPTY, inverse_permutation, unflip},
 };
 
 pub fn allocate_symbolic(a: &CscMatrix) -> KluSymbolic {
     debug_assert!(a.is_square(), "Klu analyze only supports square matrices");
-    debug_assert!(a.check_invariants().is_ok(), "Klu analyze only supports valid CSC matrices");
+    debug_assert!(
+        a.check_invariants().is_ok(),
+        "Klu analyze only supports valid CSC matrices"
+    );
     let n = a.dim.ncols;
     let mut row_permutation = vec![-1; n];
     for col in 0..n {

@@ -69,9 +69,11 @@ impl KluMatrix {
     }
 }
 
+// We create 1 solver matrix per simulation and only use it by reference.
+#[allow(clippy::large_enum_variant)]
 pub enum SolverMatrix {
-    KLU(KluMatrix),
-    BLAS(BlasMatrix),
+    Klu(KluMatrix),
+    Blas(BlasMatrix),
 }
 
 impl SolverMatrix {
@@ -86,7 +88,7 @@ impl SolverMatrix {
             LinearSolver::Klu { config } => {
                 let matrix = setup_pattern(devices, &node_mapping)?;
                 // KLU solve overwrites RHS in-place, so we allocate it up-front.
-                Self::KLU(KluMatrix::new(
+                Self::Klu(KluMatrix::new(
                     matrix,
                     vec![0.0; matrix_dim],
                     node_mapping,
@@ -95,7 +97,7 @@ impl SolverMatrix {
             }
             LinearSolver::Blas => {
                 setup_dense_stamps(devices, &node_mapping);
-                Self::BLAS(BlasMatrix::new(matrix_dim, node_mapping))
+                Self::Blas(BlasMatrix::new(matrix_dim, node_mapping))
             }
         };
 
@@ -104,8 +106,8 @@ impl SolverMatrix {
 
     pub fn get_mut_nnz(&mut self, nnz: usize) -> &mut f64 {
         match self {
-            Self::KLU(matrix) => matrix.matrix.get_mut_nnz(nnz),
-            Self::BLAS(matrix) => {
+            Self::Klu(matrix) => matrix.matrix.get_mut_nnz(nnz),
+            Self::Blas(matrix) => {
                 let dim = matrix.m.ncols();
                 let row = nnz / dim;
                 let col = nnz % dim;
@@ -116,19 +118,19 @@ impl SolverMatrix {
 
     pub fn get_mut_rhs(&mut self, index: usize) -> &mut f64 {
         match self {
-            Self::KLU(matrix) => &mut matrix.s[index],
-            Self::BLAS(matrix) => &mut matrix.s[index],
+            Self::Klu(matrix) => &mut matrix.s[index],
+            Self::Blas(matrix) => &mut matrix.s[index],
         }
     }
 
     /// Zero out matrix entries + RHS (keeps sparsity pattern / mapping).
     pub fn clear(&mut self) {
         match self {
-            Self::KLU(matrix) => {
+            Self::Klu(matrix) => {
                 matrix.matrix.values.fill(0.0);
                 matrix.s.fill(0.0);
             }
-            Self::BLAS(matrix) => {
+            Self::Blas(matrix) => {
                 matrix.m.fill(0.0);
                 matrix.s.fill(0.0);
                 matrix.lu = None;
@@ -139,16 +141,16 @@ impl SolverMatrix {
     /// Current RHS vector (overwritten with solution after `solve()`).
     pub fn rhs(&self) -> &[f64] {
         match self {
-            Self::KLU(matrix) => matrix.s.as_slice(),
-            Self::BLAS(matrix) => matrix.s.as_slice().expect("BLAS RHS should be contiguous"),
+            Self::Klu(matrix) => matrix.s.as_slice(),
+            Self::Blas(matrix) => matrix.s.as_slice().expect("BLAS RHS should be contiguous"),
         }
     }
 
     /// Mutable RHS vector (overwritten with solution after `solve()`).
     pub fn rhs_mut(&mut self) -> &mut [f64] {
         match self {
-            Self::KLU(matrix) => matrix.s.as_mut_slice(),
-            Self::BLAS(matrix) => matrix
+            Self::Klu(matrix) => matrix.s.as_mut_slice(),
+            Self::Blas(matrix) => matrix
                 .s
                 .as_slice_mut()
                 .expect("BLAS RHS should be contiguous"),
@@ -157,32 +159,32 @@ impl SolverMatrix {
 
     pub fn mna_node_index(&self, node_index: NodeIndex) -> Option<usize> {
         match self {
-            Self::KLU(matrix) => matrix.node_mapping.mna_node_index(node_index),
-            Self::BLAS(matrix) => matrix.node_mapping.mna_node_index(node_index),
+            Self::Klu(matrix) => matrix.node_mapping.mna_node_index(node_index),
+            Self::Blas(matrix) => matrix.node_mapping.mna_node_index(node_index),
         }
     }
     pub fn mna_branch_index(&self, branch_index: CurrentBranchIndex) -> usize {
         match self {
-            Self::KLU(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
-            Self::BLAS(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
+            Self::Klu(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
+            Self::Blas(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
         }
     }
 
     pub fn analyze(&mut self) -> Result<(), SimulationError> {
         match self {
-            Self::KLU(matrix) => {
+            Self::Klu(matrix) => {
                 let symbolic = klu::analyze(&matrix.matrix, &matrix.config)?;
                 matrix.symbolic = Some(symbolic);
             }
             // no analyze phase for blas
-            Self::BLAS(_) => {}
+            Self::Blas(_) => {}
         }
         Ok(())
     }
 
     pub fn factorize(&mut self) -> Result<(), SimulationError> {
         match self {
-            Self::KLU(matrix) => {
+            Self::Klu(matrix) => {
                 let symbolic = matrix
                     .symbolic
                     .as_mut()
@@ -190,7 +192,7 @@ impl SolverMatrix {
                 let numeric = klu::factor(&matrix.matrix, symbolic, &mut matrix.config)?;
                 matrix.numeric = Some(numeric);
             }
-            Self::BLAS(matrix) => {
+            Self::Blas(matrix) => {
                 let lu = matrix.m.factorize()?;
                 matrix.lu = Some(lu);
             }
@@ -200,7 +202,7 @@ impl SolverMatrix {
 
     pub fn refactor(&mut self) -> Result<(), SimulationError> {
         match self {
-            Self::KLU(matrix) => {
+            Self::Klu(matrix) => {
                 let symbolic = matrix
                     .symbolic
                     .as_mut()
@@ -211,7 +213,7 @@ impl SolverMatrix {
                     .ok_or(SimulationError::KluNumericNotFactorized)?;
                 klu::refactor(&matrix.matrix, symbolic, numeric, &matrix.config)?;
             }
-            Self::BLAS(matrix) => {
+            Self::Blas(matrix) => {
                 let lu = matrix.m.factorize()?;
                 matrix.lu = Some(lu);
             }
@@ -222,7 +224,7 @@ impl SolverMatrix {
 
     pub fn solve(&mut self) -> Result<(), SimulationError> {
         match self {
-            Self::KLU(matrix) => {
+            Self::Klu(matrix) => {
                 let symbolic = matrix
                     .symbolic
                     .as_ref()
@@ -241,7 +243,7 @@ impl SolverMatrix {
                     &matrix.config,
                 )?;
             }
-            Self::BLAS(matrix) => {
+            Self::Blas(matrix) => {
                 let lu = matrix
                     .lu
                     .as_mut()

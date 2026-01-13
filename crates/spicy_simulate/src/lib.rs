@@ -10,11 +10,11 @@ use crate::{
 pub mod ac;
 pub mod dc;
 // mod nodes;
-mod matrix;
-mod error;
 mod devices;
-mod setup_pattern;
+mod error;
+mod matrix;
 pub(crate) mod raw_writer;
+mod setup_pattern;
 pub mod solver;
 pub mod trans;
 pub use dc::{DcSweepResult, OperatingPointResult};
@@ -132,7 +132,10 @@ mod tests {
         mapping.insert_node(NodeName("n1".to_string()));
         mapping.insert_node(NodeName("n2".to_string()));
 
-        assert_eq!(mapping.node_names_mna_order(), vec!["n1".to_string(), "n2".to_string()]);
+        assert_eq!(
+            mapping.node_names_mna_order(),
+            vec!["n1".to_string(), "n2".to_string()]
+        );
     }
 
     #[rstest]

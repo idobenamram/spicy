@@ -204,9 +204,9 @@ pub fn write_solve_dump<W: io::Write>(
         })
     }
 
-    let len = d.checked_mul(nrhs).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "overflow computing d*nrhs")
-    })?;
+    let len = d
+        .checked_mul(nrhs)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "overflow computing d*nrhs"))?;
     if b.len() < len {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -229,5 +229,3 @@ pub fn write_solve_dump<W: io::Write>(
 
     Ok(())
 }
-
-

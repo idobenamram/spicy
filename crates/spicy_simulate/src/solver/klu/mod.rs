@@ -16,20 +16,20 @@ mod dump;
 mod error;
 mod factor;
 mod kernel;
+mod refactor;
 mod scale;
 mod solve;
-mod refactor;
 
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
-pub use error::{KluError, KluResult};
 pub use analyze::analyze;
 pub use dump::{
     KLU_PERM_DUMP_MAGIC, KLU_PERM_DUMP_VERSION, KLU_SOLVE_DUMP_MAGIC, KLU_SOLVE_DUMP_VERSION,
     KluPermDumpStage, write_perm_dump, write_solve_dump,
 };
+pub use error::{KluError, KluResult};
 pub use factor::factor;
-pub use solve::solve;
 pub use refactor::refactor;
+pub use solve::solve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
@@ -341,9 +341,16 @@ mod tests {
     #[allow(dead_code)]
     #[derive(Debug)]
     enum KluRunSnapshot {
-        Skipped { reason: String },
-        AnalyzeError { error: KluError },
-        FactorError { symbolic: KluSymbolic, error: KluError },
+        Skipped {
+            reason: String,
+        },
+        AnalyzeError {
+            error: KluError,
+        },
+        FactorError {
+            symbolic: KluSymbolic,
+            error: KluError,
+        },
         SolveError {
             symbolic: KluSymbolic,
             numeric: KluNumeric,
@@ -511,4 +518,3 @@ mod tests {
         insta::assert_debug_snapshot!(name, (n, nnz, is_square, seed, run, x_preview));
     }
 }
-

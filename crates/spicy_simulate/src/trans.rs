@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand};
 
 use crate::{
+    SimulationConfig,
     dc::simulate_op_inner,
     devices::{Capacitor, Devices},
     matrix::SolverMatrix,
-    SimulationConfig,
 };
 
 fn steps(dt: f64, tstop: f64) -> Vec<f64> {
@@ -182,7 +182,11 @@ pub struct TransientResult {
     pub samples: Vec<Vec<f64>>,
 }
 
-pub fn simulate_trans(deck: &Deck, cmd: &TranCommand, sim_config: &SimulationConfig) -> TransientResult {
+pub fn simulate_trans(
+    deck: &Deck,
+    cmd: &TranCommand,
+    sim_config: &SimulationConfig,
+) -> TransientResult {
     let tstep = cmd.tstep.get_value();
     let tstop = cmd.tstop.get_value();
 
@@ -191,8 +195,9 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand, sim_config: &SimulationCon
         unimplemented!("Transient analysis does not yet support inductors");
     }
 
-    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)
-        .expect("Failed to create matrix");
+    let mut matrix =
+        SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)
+            .expect("Failed to create matrix");
 
     let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
@@ -246,8 +251,8 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand, sim_config: &SimulationCon
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LinearSolver, SimulationConfig};
     use crate::solver::klu::KluConfig;
+    use crate::{LinearSolver, SimulationConfig};
     use spicy_parser::{ParseOptions, SourceMap, netlist_types::Command, parse};
     use std::path::PathBuf;
 
@@ -305,9 +310,19 @@ C1 out 0 1u\n\
         let blas = simulate_trans(&deck, tran_cmd, &blas_cfg);
 
         assert_eq!(klu.times, blas.times, "time grids differ");
-        assert_eq!(klu.node_names, blas.node_names, "node name ordering differs");
-        assert_eq!(klu.source_names, blas.source_names, "source name ordering differs");
-        assert_eq!(klu.samples.len(), blas.samples.len(), "sample count differs");
+        assert_eq!(
+            klu.node_names, blas.node_names,
+            "node name ordering differs"
+        );
+        assert_eq!(
+            klu.source_names, blas.source_names,
+            "source name ordering differs"
+        );
+        assert_eq!(
+            klu.samples.len(),
+            blas.samples.len(),
+            "sample count differs"
+        );
 
         // Compare with "smart rounding" (significant digits) to avoid tiny solver-dependent noise.
         const SIG: i32 = 10;

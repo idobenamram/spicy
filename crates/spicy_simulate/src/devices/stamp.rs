@@ -1,4 +1,3 @@
-
 /// Cached MNA stamp indices for a 2-terminal device (both diagonal and off-diagonal entries).
 ///
 /// The meaning of the stored indices depends on the linear solver:

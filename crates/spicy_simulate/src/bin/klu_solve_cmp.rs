@@ -120,9 +120,8 @@ fn read_perm_dump(path: &Path) -> io::Result<PermDump> {
     let n = read_u32_le(&mut f)?;
     let nblocks = read_u32_le(&mut f)?;
 
-    let n_usize = usize::try_from(n).map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidData, format!("n out of range: {n}"))
-    })?;
+    let n_usize = usize::try_from(n)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, format!("n out of range: {n}")))?;
     let nblocks_usize = usize::try_from(nblocks).map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -222,7 +221,13 @@ fn read_solve_dump(path: &Path) -> io::Result<SolveDump> {
         bits.push(read_u64_le(&mut f)?);
     }
 
-    Ok(SolveDump { n, d, nrhs, len, bits })
+    Ok(SolveDump {
+        n,
+        d,
+        nrhs,
+        len,
+        bits,
+    })
 }
 
 fn ordered_f64_bits(bits: u64) -> u64 {
@@ -268,12 +273,7 @@ fn compare_perm_exact(a_path: &Path, b_path: &Path) -> io::Result<bool> {
 
     fn first_mismatch(name: &str, a: &[i32], b: &[i32]) -> Option<(String, usize, i32, i32)> {
         if a.len() != b.len() {
-            return Some((
-                format!("{name} length"),
-                0,
-                a.len() as i32,
-                b.len() as i32,
-            ));
+            return Some((format!("{name} length"), 0, a.len() as i32, b.len() as i32));
         }
         for (i, (&av, &bv)) in a.iter().zip(b.iter()).enumerate() {
             if av != bv {
@@ -343,14 +343,8 @@ fn main() -> io::Result<()> {
 
     if a.n != b.n || a.d != b.d || a.nrhs != b.nrhs || a.len != b.len {
         eprintln!("header mismatch:");
-        eprintln!(
-            "  A: n={} d={} nrhs={} len={}",
-            a.n, a.d, a.nrhs, a.len
-        );
-        eprintln!(
-            "  B: n={} d={} nrhs={} len={}",
-            b.n, b.d, b.nrhs, b.len
-        );
+        eprintln!("  A: n={} d={} nrhs={} len={}", a.n, a.d, a.nrhs, a.len);
+        eprintln!("  B: n={} d={} nrhs={} len={}", b.n, b.d, b.nrhs, b.len);
         std::process::exit(2);
     }
 
@@ -456,5 +450,3 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
 }
-
-

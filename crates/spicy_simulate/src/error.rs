@@ -22,4 +22,3 @@ pub enum SimulationError {
     #[error("Blas LU not factorized")]
     BlasLUNotFactorized,
 }
-

@@ -1,10 +1,10 @@
 use super::stamp::NodePairStamp;
 use crate::matrix::SolverMatrix;
 use ndarray::Array2;
+use spicy_parser::Span;
 use spicy_parser::devices::ResistorSpec;
 use spicy_parser::netlist_types::NodeIndex;
 use spicy_parser::node_mapping::NodeMapping;
-use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Resistor {
@@ -89,7 +89,11 @@ impl Resistor {
         let dtemp = spec.dtemp.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
         let noisy = spec.noisy.unwrap_or(true);
 
-        let ac = spec.ac.as_ref().map(|v| v.get_value()).unwrap_or(resistance);
+        let ac = spec
+            .ac
+            .as_ref()
+            .map(|v| v.get_value())
+            .unwrap_or(resistance);
 
         Self {
             name: spec.name.clone(),

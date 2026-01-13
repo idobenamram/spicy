@@ -1,10 +1,10 @@
 use super::stamp::NodePairStamp;
 use crate::matrix::SolverMatrix;
 use ndarray::Array2;
+use spicy_parser::Span;
 use spicy_parser::devices::CapacitorSpec;
 use spicy_parser::netlist_types::NodeIndex;
 use spicy_parser::node_mapping::NodeMapping;
-use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Capacitor {
@@ -134,4 +134,3 @@ impl Capacitor {
         }
     }
 }
-

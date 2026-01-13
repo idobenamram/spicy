@@ -104,16 +104,19 @@ pub(crate) fn dunits<T>(n: usize) -> Result<usize, SolverOverflowError> {
     let unit_bytes = mem::size_of::<f64>();
 
     // bytes = sizeof(T) * n  (checked to avoid overflow)
-    let bytes = type_bytes.checked_mul(n).ok_or(SolverOverflowError::Overflow {
-        context: "DUNITS byte count",
-    })?;
+    let bytes = type_bytes
+        .checked_mul(n)
+        .ok_or(SolverOverflowError::Overflow {
+            context: "DUNITS byte count",
+        })?;
 
     // ceil(bytes / unit_bytes)
     let units = bytes
         .checked_add(unit_bytes - 1)
         .ok_or(SolverOverflowError::Overflow {
             context: "DUNITS units",
-        })? / unit_bytes;
+        })?
+        / unit_bytes;
 
     Ok(units)
 }

@@ -2,7 +2,7 @@ use crate::netlist_models::InductorModel;
 use crate::{
     Span,
     expr::Value,
-    netlist_types::{NodeIndex, CurrentBranchIndex},
+    netlist_types::{CurrentBranchIndex, NodeIndex},
 };
 
 #[derive(Debug, Clone)]

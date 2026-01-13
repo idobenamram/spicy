@@ -1,6 +1,6 @@
 use crate::netlist_types::{CurrentBranchIndex, NodeIndex, NodeName};
-use std::fmt;
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Clone)]
 pub struct NodeMapping {
@@ -192,7 +192,10 @@ mod tests {
         assert_eq!(m.nodes_len(), 2);
         assert_eq!(m.mna_node_index(n1), Some(0));
         assert_eq!(m.mna_node_index(n2), Some(1));
-        assert_eq!(m.node_names_mna_order(), vec!["n1".to_string(), "n2".to_string()]);
+        assert_eq!(
+            m.node_names_mna_order(),
+            vec!["n1".to_string(), "n2".to_string()]
+        );
 
         // Inserting the same node again must not allocate a new index.
         let n1_again = m.insert_node(NodeName("n1".to_string()));
@@ -216,7 +219,10 @@ mod tests {
         assert_eq!(m.mna_branch_index(v1), 2);
         assert_eq!(m.mna_branch_index(l1), 3);
         assert_eq!(m.mna_matrix_dim(), 4);
-        assert_eq!(m.branch_names_mna_order(), vec!["V1".to_string(), "L1".to_string()]);
+        assert_eq!(
+            m.branch_names_mna_order(),
+            vec!["V1".to_string(), "L1".to_string()]
+        );
     }
 
     #[test]
@@ -244,7 +250,10 @@ R1 in out 1k
             vec!["in".to_string(), "out".to_string()]
         );
         // Branch names are ordered by allocated CurrentBranchIndex (reserved 0 excluded).
-        assert_eq!(deck.node_mapping.branch_names_mna_order(), vec!["V1".to_string()]);
+        assert_eq!(
+            deck.node_mapping.branch_names_mna_order(),
+            vec!["V1".to_string()]
+        );
 
         assert_eq!(deck.devices.voltage_sources.len(), 1);
         assert_eq!(deck.devices.resistors.len(), 1);
@@ -261,4 +270,3 @@ R1 in out 1k
         assert_eq!(r1.negative, NodeIndex(2));
     }
 }
-

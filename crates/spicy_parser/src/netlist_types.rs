@@ -168,7 +168,6 @@ impl DeviceType {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Phasor {
     pub mag: Value,
@@ -184,7 +183,6 @@ impl Phasor {
         self.phase = Some(phase);
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ValueSuffix {

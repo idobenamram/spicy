@@ -1,10 +1,10 @@
 use super::stamp::NodeBranchPairStamp;
 use crate::matrix::SolverMatrix;
 use ndarray::Array2;
+use spicy_parser::Span;
 use spicy_parser::devices::InductorSpec;
 use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex};
 use spicy_parser::node_mapping::NodeMapping;
-use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Inductor {
@@ -151,4 +151,3 @@ impl Inductor {
         ai[[k, k]] += wl;
     }
 }
-

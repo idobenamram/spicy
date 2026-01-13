@@ -1,6 +1,4 @@
-use crate::{
-    Span, Value, netlist_models::ResistorModel, netlist_types::NodeIndex,
-};
+use crate::{Span, Value, netlist_models::ResistorModel, netlist_types::NodeIndex};
 
 #[derive(Debug, Clone)]
 pub struct ResistorSpec {

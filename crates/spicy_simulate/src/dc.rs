@@ -1,11 +1,6 @@
 use spicy_parser::{instance_parser::Deck, netlist_types::DcCommand};
 
-use crate::{
-    SimulationConfig,
-    devices::Devices,
-    error::SimulationError,
-    matrix::SolverMatrix,
-};
+use crate::{SimulationConfig, devices::Devices, error::SimulationError, matrix::SolverMatrix};
 
 #[derive(Debug)]
 pub struct OperatingPointResult {

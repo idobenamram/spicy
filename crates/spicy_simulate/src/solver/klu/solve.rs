@@ -10,7 +10,7 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::klu::{
-    get_pointers_to_lu, klu_valid, KluConfig, KluError, KluNumeric, KluResult, KluSymbolic,
+    KluConfig, KluError, KluNumeric, KluResult, KluSymbolic, get_pointers_to_lu, klu_valid,
 };
 
 /// solve Lx = b, Assumes L is unit lower triangular and where the unit diagonal
@@ -197,10 +197,7 @@ pub fn solve(
     _config: &KluConfig,
 ) -> KluResult<()> {
     if d < symbolic.n {
-        return Err(KluError::InvalidLeadingDimension {
-            d,
-            n: symbolic.n,
-        });
+        return Err(KluError::InvalidLeadingDimension { d, n: symbolic.n });
     }
     // B is column-oriented with leading dimension d, so it must have at least d*nrhs entries.
     let b_required = d

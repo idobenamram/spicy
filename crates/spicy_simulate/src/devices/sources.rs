@@ -1,11 +1,11 @@
 use super::stamp::NodeVoltageSourceStamp;
 use crate::matrix::SolverMatrix;
 use ndarray::{Array1, Array2};
+use spicy_parser::Value;
 use spicy_parser::devices::IndependentSourceSpec;
 use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex, Phasor};
-use spicy_parser::node_mapping::NodeMapping;
 use spicy_parser::netlist_waveform::WaveForm;
-use spicy_parser::Value;
+use spicy_parser::node_mapping::NodeMapping;
 use std::f64::consts::PI;
 
 // TODO: should probably be split to voltage source and current source
@@ -159,4 +159,3 @@ impl IndependentSource {
         }
     }
 }
-

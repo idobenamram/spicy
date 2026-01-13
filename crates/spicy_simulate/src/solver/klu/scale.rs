@@ -18,8 +18,8 @@ use crate::solver::{
 /// A must be a valid CSC matrix.
 pub fn scale(
     a: &CscMatrix,
-    rs: &mut Vec<f64>,
-    mut w: Option<&mut Vec<isize>>,
+    rs: &mut [f64],
+    mut w: Option<&mut [isize]>,
     scale: Option<KluScale>,
 ) -> KluResult<()> {
     let n = a.dim.nrows;

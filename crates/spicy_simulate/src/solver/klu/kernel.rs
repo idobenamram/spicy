@@ -18,7 +18,7 @@ use crate::solver::{
     utils::{EMPTY, dunits, f64_as_usize_slice, f64_as_usize_slice_mut, flip, unflip},
 };
 
-fn get_free_pointer(lu: &mut Vec<f64>, lup: usize) -> (&mut [f64], &mut [usize]) {
+fn get_free_pointer(lu: &mut [f64], lup: usize) -> (&mut [f64], &mut [usize]) {
     let (before, xp) = lu.split_at_mut(lup);
 
     (before, unsafe { f64_as_usize_slice_mut(xp) })
@@ -113,7 +113,7 @@ fn dfs(
     }
 
     *plength = l_length;
-    return top;
+    top
 }
 
 fn lsolve_symbolic(
@@ -129,7 +129,7 @@ fn lsolve_symbolic(
     lpend: &mut [isize],
     ap_pos: &mut [isize],
 
-    lu: &mut Vec<f64>,
+    lu: &mut [f64],
     lup: usize,
     llen: &mut [usize],
     lip: &mut [usize],
@@ -327,7 +327,7 @@ fn lpivot(
     p_abs_pivot: &mut f64,
     tol: f64,
     x: &mut [f64],
-    lu: &mut Vec<f64>,
+    lu: &mut [f64],
     lip: &[usize],
     llen: &mut [usize],
     k: usize,
@@ -453,7 +453,7 @@ fn prune(
     k: usize,
     pivrow: usize,
 
-    lu: &mut Vec<f64>,
+    lu: &mut [f64],
     lip: &[usize],
     llen: &[usize],
     uip: &[usize],
@@ -492,9 +492,7 @@ fn prune(
                             ptail -= 1;
                             li[phead] = li[ptail];
                             li[ptail] = i;
-                            let x = lx[phead];
-                            lx[phead] = lx[ptail];
-                            lx[ptail] = x;
+                            lx.swap(phead, ptail);
                         }
                     }
 

@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand};
 
 use crate::{
-    dc::{simulate_op_inner, stamp_resistor, stamp_voltage_source_incidence},
-    devices::{Capacitor, Devices, IndependentSource},
+    dc::simulate_op_inner,
+    devices::{Capacitor, Devices},
     matrix::SolverMatrix,
+    SimulationConfig,
 };
 
 fn steps(dt: f64, tstop: f64) -> Vec<f64> {
@@ -135,50 +136,16 @@ struct TransientConfig {
     use_device_ic: bool,
 }
 
-fn stamp_capacitor_trans(m: &mut SolverMatrix, device: &Capacitor, g: f64, i: f64) {
-    if let Some(index) = device.stamp.pos_pos {
-        *m.get_mut_nnz(index) += g;
-    }
-    if let Some(index) = device.stamp.neg_neg {
-        *m.get_mut_nnz(index) += g;
-    }
-    if let Some((pos_neg, neg_pos)) = device.stamp.off_diagonals {
-        *m.get_mut_nnz(pos_neg) -= g;
-        *m.get_mut_nnz(neg_pos) -= g;
-    }
-
-    let pos = m.mna_node_index(device.positive);
-    let neg = m.mna_node_index(device.negative);
-
-    if let Some(p) = pos {
-        *m.get_mut_rhs(p) += i;
-    }
-    if let Some(n) = neg {
-        *m.get_mut_rhs(n) -= i;
-    }
-}
-
-
-fn stamp_voltage_source_trans(
-    m: &mut SolverMatrix,
-    device: &IndependentSource,
-    config: &TransientConfig,
-) {
-    stamp_voltage_source_incidence(m, device);
-    let src_index = m.mna_branch_index(device.current_branch);
-    let value = device.dc.compute(config.t, config.step, config.tstop);
-    *m.get_mut_rhs(src_index) = value;
-}
-
 fn simulation_step<'a>(
     matrix: &mut SolverMatrix,
     devices: &'a Devices,
     config: &TransientConfig,
     integrator: &mut Integrator<'a>,
 ) -> Vec<f64> {
+    matrix.clear();
 
     for r in &devices.resistors {
-        stamp_resistor(matrix, r);
+        r.stamp_dc(matrix);
     }
 
     for c in &devices.capacitors {
@@ -186,13 +153,13 @@ fn simulation_step<'a>(
         let neg = matrix.mna_node_index(c.negative);
 
         let (g, i) = integrator.capacitor_values(c, pos, neg, config);
-        stamp_capacitor_trans(matrix, c, g, i);
+        c.stamp_trans(matrix, g, i);
         integrator.save_capacitor_current(c, i);
     }
 
     // TODO: we don't support functions on the sources yet
     for vsrc in &devices.voltage_sources {
-        stamp_voltage_source_trans(matrix, vsrc, config);
+        vsrc.stamp_voltage_source_trans(matrix, config.t, config.step, config.tstop);
     }
 
     // TODO: stamp current sources
@@ -215,7 +182,7 @@ pub struct TransientResult {
     pub samples: Vec<Vec<f64>>,
 }
 
-pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
+pub fn simulate_trans(deck: &Deck, cmd: &TranCommand, sim_config: &SimulationConfig) -> TransientResult {
     let tstep = cmd.tstep.get_value();
     let tstop = cmd.tstop.get_value();
 
@@ -224,7 +191,7 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
         unimplemented!("Transient analysis does not yet support inductors");
     }
 
-    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), true)
+    let mut matrix = SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)
         .expect("Failed to create matrix");
 
     let mut config = TransientConfig {
@@ -273,5 +240,93 @@ pub fn simulate_trans(deck: &Deck, cmd: &TranCommand) -> TransientResult {
         node_names: deck.node_mapping.node_names_mna_order(),
         source_names: deck.node_mapping.branch_names_mna_order(),
         samples,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{LinearSolver, SimulationConfig};
+    use crate::solver::klu::KluConfig;
+    use spicy_parser::{ParseOptions, SourceMap, netlist_types::Command, parse};
+    use std::path::PathBuf;
+
+    fn round_sig(x: f64, sig: i32) -> f64 {
+        if x == 0.0 || !x.is_finite() {
+            return x;
+        }
+        let exp10 = x.abs().log10().floor() as i32;
+        let digits = sig - 1 - exp10;
+        let scale = 10f64.powi(digits);
+        (x * scale).round() / scale
+    }
+
+    #[test]
+    fn trans_klu_and_blas_are_similar() {
+        // Simple RC with a sinusoidal source (no inductors, no UIC).
+        let netlist = "* RC driven by sinusoidal source\n\
+V1 in 0 SIN(0 1 10)\n\
+R1 in out 1k\n\
+C1 out 0 1u\n\
+.TRAN 0.001 0.01\n\
+.END";
+
+        let source_path = PathBuf::from("trans_klu_vs_blas.spicy");
+        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
+        let mut parse_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut parse_options).expect("parse");
+
+        let tran_cmd = deck
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                Command::Tran(cmd) => Some(cmd),
+                _ => None,
+            })
+            .expect("expected .TRAN command");
+
+        let klu_cfg = SimulationConfig {
+            solver: LinearSolver::Klu {
+                config: KluConfig::default(),
+            },
+            ..SimulationConfig::default()
+        };
+        let blas_cfg = SimulationConfig {
+            solver: LinearSolver::Blas,
+            ..SimulationConfig::default()
+        };
+
+        let klu = simulate_trans(&deck, tran_cmd, &klu_cfg);
+        let blas = simulate_trans(&deck, tran_cmd, &blas_cfg);
+
+        assert_eq!(klu.times, blas.times, "time grids differ");
+        assert_eq!(klu.node_names, blas.node_names, "node name ordering differs");
+        assert_eq!(klu.source_names, blas.source_names, "source name ordering differs");
+        assert_eq!(klu.samples.len(), blas.samples.len(), "sample count differs");
+
+        // Compare with "smart rounding" (significant digits) to avoid tiny solver-dependent noise.
+        const SIG: i32 = 10;
+        for (t_idx, (a, b)) in klu.samples.iter().zip(blas.samples.iter()).enumerate() {
+            assert_eq!(a.len(), b.len(), "sample width differs at t_idx={}", t_idx);
+            for (i, (&xa, &xb)) in a.iter().zip(b.iter()).enumerate() {
+                let ra = round_sig(xa, SIG);
+                let rb = round_sig(xb, SIG);
+                assert!(
+                    ra == rb,
+                    "value differs at t_idx={}, i={}: klu={} blas={} (rounded: {} vs {})",
+                    t_idx,
+                    i,
+                    xa,
+                    xb,
+                    ra,
+                    rb
+                );
+            }
+        }
     }
 }

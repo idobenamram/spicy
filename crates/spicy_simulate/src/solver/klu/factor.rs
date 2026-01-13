@@ -53,7 +53,7 @@ pub fn allocate_klu_numeric(
     let worksize = s
         .checked_add(std::cmp::max(n3, b6))
         .ok_or(KluError::overflow("total workspace size"))?;
-    let worksize_f64 = (worksize + std::mem::size_of::<f64>() - 1) / std::mem::size_of::<f64>();
+    let worksize_f64 = worksize.div_ceil(std::mem::size_of::<f64>());
     // allocate with f64 for alignment
     let work = vec![0.0; worksize_f64];
 
@@ -155,7 +155,7 @@ pub fn kernel_factor(
 
     lu_block.resize(lusize as usize, 0.0);
 
-    return kernel::kernel(
+    kernel::kernel(
         n,
         a,
         col_permutation,
@@ -182,8 +182,8 @@ pub fn kernel_factor(
         offi,
         offx,
         metrics,
-        &config,
-    );
+        config,
+    )
 }
 
 pub fn factor(
@@ -275,12 +275,11 @@ pub fn factor(
             lnz += 1;
             unz += 1;
         } else {
-            let lsize;
-            if symbolic.lower_nz[block] < 0. {
-                lsize = -(config.initmem)
+            let lsize = if symbolic.lower_nz[block] < 0. {
+                -(config.initmem)
             } else {
-                lsize = config.initmem_amd * symbolic.lower_nz[block] + block_size as f64;
-            }
+                config.initmem_amd * symbolic.lower_nz[block] + block_size as f64
+            };
             let mut lnz_block = 0;
             let mut unz_block = 0;
 
@@ -370,9 +369,7 @@ pub fn factor(
             for k in 0..n {
                 x[k] = rs[numeric.pnum[k] as usize];
             }
-            for k in 0..n {
-                rs[k] = x[k];
-            }
+            rs[..n].copy_from_slice(&x[..n]);
         }
     }
 

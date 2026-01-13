@@ -5,6 +5,7 @@ use unscanny::Scanner;
 use crate::expr::PlaceholderId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum TokenKind {
     Ident,
     Number,
@@ -217,7 +218,7 @@ impl<'s> Lexer<'s> {
         let start = self.s.cursor();
 
         match self.s.eat() {
-            Some(c) if c == '\n' => Ok(self.newline(start)),
+            Some('\n') => Ok(self.newline(start)),
             Some(c) if c.is_whitespace() => Ok(self.whitespace(start)),
             Some(c) => self.netlist(c, start),
             None => Ok(Token::end(start, self.source_index)),

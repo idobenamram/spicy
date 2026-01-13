@@ -20,15 +20,34 @@ pub mod trans;
 pub use dc::{DcSweepResult, OperatingPointResult};
 pub use trans::TransientResult;
 
-#[derive(Debug, Clone, Default)]
-pub struct SimulateOptions {
+#[derive(Debug, Clone)]
+pub enum LinearSolver {
+    Klu { config: solver::klu::KluConfig },
+    Blas,
+}
+
+#[derive(Debug, Clone)]
+pub struct SimulationConfig {
+    pub solver: LinearSolver,
     /// if true, write raw files
     pub write_raw: bool,
     /// optional output base path (without extension). If None, use deck.title in CWD
     pub output_base: Option<String>,
 }
 
-impl SimulateOptions {
+impl Default for SimulationConfig {
+    fn default() -> Self {
+        Self {
+            solver: LinearSolver::Klu {
+                config: solver::klu::KluConfig::default(),
+            },
+            write_raw: false,
+            output_base: None,
+        }
+    }
+}
+
+impl SimulationConfig {
     pub fn get_output_base(&self, deck: &Deck, extension: &str) -> String {
         self.output_base
             .clone()
@@ -36,20 +55,20 @@ impl SimulateOptions {
     }
 }
 
-pub fn simulate(deck: Deck, options: SimulateOptions) {
+pub fn simulate(deck: Deck, sim_config: SimulationConfig) {
     for command in &deck.commands {
         match command {
             Command::Op(_) => {
-                let op = simulate_op(&deck);
-                if options.write_raw {
-                    let base = options.get_output_base(&deck, "op");
+                let op = simulate_op(&deck, &sim_config);
+                if sim_config.write_raw {
+                    let base = sim_config.get_output_base(&deck, "op");
                     let _ = raw_writer::write_operating_point_raw(&deck, &op, &base);
                 }
             }
             Command::Dc(command_params) => {
-                let dc = simulate_dc(&deck, command_params);
-                if options.write_raw {
-                    let base = options.get_output_base(&deck, "dc");
+                let dc = simulate_dc(&deck, command_params, &sim_config);
+                if sim_config.write_raw {
+                    let base = sim_config.get_output_base(&deck, "dc");
                     // detect if sweep is a voltage source by scanning devices
                     let is_voltage = deck
                         .devices
@@ -66,16 +85,16 @@ pub fn simulate(deck: Deck, options: SimulateOptions) {
                 }
             }
             Command::Ac(command_params) => {
-                let ac = simulate_ac(&deck, command_params);
-                if options.write_raw {
-                    let base = options.get_output_base(&deck, "ac");
+                let ac = simulate_ac(&deck, command_params, &sim_config);
+                if sim_config.write_raw {
+                    let base = sim_config.get_output_base(&deck, "ac");
                     let _ = raw_writer::write_ac_raw(&deck, &ac, &base);
                 }
             }
             Command::Tran(command_params) => {
-                let result = simulate_trans(&deck, command_params);
-                if options.write_raw {
-                    let base = options.get_output_base(&deck, "tran");
+                let result = simulate_trans(&deck, command_params, &sim_config);
+                if sim_config.write_raw {
+                    let base = sim_config.get_output_base(&deck, "tran");
                     let _ = raw_writer::write_transient_raw(&deck, &result, &base);
                 }
             }
@@ -127,7 +146,8 @@ mod tests {
             max_include_depth: 10,
         };
         let deck = parse(&mut input_options).expect("parse");
-        let output = simulate_op(&deck);
+        let sim_config = SimulationConfig::default();
+        let output = simulate_op(&deck, &sim_config);
         let name = format!(
             "simulate-op-{}",
             input
@@ -151,7 +171,10 @@ mod tests {
         let deck = parse(&mut input_options).expect("parse");
         let command = deck.commands[1].clone();
         let output = match command {
-            Command::Dc(command) => simulate_dc(&deck, &command),
+            Command::Dc(command) => {
+                let sim_config = SimulationConfig::default();
+                simulate_dc(&deck, &command, &sim_config)
+            }
             _ => panic!("Unsupported command: {:?}", command),
         };
 

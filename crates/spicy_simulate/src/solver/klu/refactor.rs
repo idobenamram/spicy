@@ -205,9 +205,7 @@ pub fn refactor(
             for k in 0..n {
                 numeric.work[k] = rs[numeric.pnum[k] as usize];
             }
-            for k in 0..n {
-                rs[k] = numeric.work[k];
-            }
+            rs[..n].copy_from_slice(&numeric.work[..n]);
         }
     }
 

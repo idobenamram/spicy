@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
-    DcSweepResult, OperatingPointResult, TransientResult,
+    DcSweepResult, OperatingPointResult, SimulationConfig, TransientResult,
     dc::{simulate_dc, simulate_op},
     trans::simulate_trans,
 };
@@ -45,6 +45,9 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
         source_map,
         max_include_depth: 10,
     };
+
+    let sim_config = SimulationConfig::default();
+
     while let Ok(cmd) = rx.recv() {
         match cmd {
             SimCmd::RunCurrentTab(_tab) => {
@@ -54,8 +57,7 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                 let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
-                        let mut diags = Vec::new();
-                        diags.push(e);
+                        let diags = vec![e];
                         let _ = tx.send(SimMsg::Diagnostics(diags));
                         continue;
                     }
@@ -66,17 +68,17 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                 for command in &deck.commands {
                     match command {
                         Command::Op(_) => {
-                            let op = simulate_op(&deck);
+                            let op = simulate_op(&deck, &sim_config);
                             let _ = tx.send(SimMsg::Op(op));
                             continue;
                         }
                         Command::Dc(command_params) => {
-                            let dc = simulate_dc(&deck, command_params);
+                            let dc = simulate_dc(&deck, command_params, &sim_config);
                             let _ = tx.send(SimMsg::Dc(dc));
                             continue;
                         }
                         Command::Tran(command_params) => {
-                            let tr = simulate_trans(&deck, command_params);
+                            let tr = simulate_trans(&deck, command_params, &sim_config);
                             let _ = tx.send(SimMsg::Transient(tr));
                             continue;
                         }

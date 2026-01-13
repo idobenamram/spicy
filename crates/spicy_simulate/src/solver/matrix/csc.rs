@@ -151,7 +151,7 @@ impl CscMatrix {
             values.extend_from_slice(vals);
         }
         CscMatrix {
-            dim: self.dim.clone(),
+            dim: self.dim,
             column_pointers,
             row_indices,
             values,
@@ -193,7 +193,7 @@ impl CscMatrix {
             }
         }
         CsrMatrix {
-            dim: self.dim.clone(),
+            dim: self.dim,
             row_pointers: rp,
             column_indices: ci,
             values: cx,

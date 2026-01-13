@@ -262,5 +262,5 @@ pub(crate) fn btf_scc(
         column_permutations[col] = graph_indices[col];
     }
 
-    return number_of_scc_blocks;
+    number_of_scc_blocks
 }

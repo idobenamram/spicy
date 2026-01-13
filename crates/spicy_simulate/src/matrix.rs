@@ -4,9 +4,10 @@ use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex};
 use spicy_parser::node_mapping::NodeMapping;
 
 use crate::{
+    LinearSolver, SimulationConfig,
     devices::Devices,
     error::SimulationError,
-    setup_pattern::setup_pattern,
+    setup_pattern::{setup_dense_stamps, setup_pattern},
     solver::{
         klu::{self, KluConfig, KluNumeric, KluSymbolic},
         matrix::csc::CscMatrix,
@@ -51,9 +52,14 @@ pub struct KluMatrix {
 }
 
 impl KluMatrix {
-    pub fn new(matrix: CscMatrix, s: Vec<f64>, node_mapping: NodeMapping) -> Self {
+    pub fn new(
+        matrix: CscMatrix,
+        s: Vec<f64>,
+        node_mapping: NodeMapping,
+        config: KluConfig,
+    ) -> Self {
         Self {
-            config: KluConfig::default(),
+            config,
             symbolic: None,
             numeric: None,
             matrix,
@@ -72,16 +78,25 @@ impl SolverMatrix {
     pub fn create_matrix(
         devices: &mut Devices,
         node_mapping: NodeMapping,
-        klu: bool,
+        sim_config: &SimulationConfig,
     ) -> Result<SolverMatrix, SimulationError> {
         let matrix_dim = node_mapping.mna_matrix_dim();
 
-        let sm = if klu {
-            let matrix = setup_pattern(devices, &node_mapping)?;
-            // KLU solve overwrites RHS in-place, so we allocate it up-front.
-            Self::KLU(KluMatrix::new(matrix, vec![0.0; matrix_dim], node_mapping))
-        } else {
-            Self::BLAS(BlasMatrix::new(matrix_dim, node_mapping))
+        let sm = match sim_config.solver {
+            LinearSolver::Klu { config } => {
+                let matrix = setup_pattern(devices, &node_mapping)?;
+                // KLU solve overwrites RHS in-place, so we allocate it up-front.
+                Self::KLU(KluMatrix::new(
+                    matrix,
+                    vec![0.0; matrix_dim],
+                    node_mapping,
+                    config,
+                ))
+            }
+            LinearSolver::Blas => {
+                setup_dense_stamps(devices, &node_mapping);
+                Self::BLAS(BlasMatrix::new(matrix_dim, node_mapping))
+            }
         };
 
         Ok(sm)
@@ -90,8 +105,11 @@ impl SolverMatrix {
     pub fn get_mut_nnz(&mut self, nnz: usize) -> &mut f64 {
         match self {
             Self::KLU(matrix) => matrix.matrix.get_mut_nnz(nnz),
-            Self::BLAS(_matrix) => {
-                todo!()
+            Self::BLAS(matrix) => {
+                let dim = matrix.m.ncols();
+                let row = nnz / dim;
+                let col = nnz % dim;
+                &mut matrix.m[[row, col]]
             }
         }
     }
@@ -100,6 +118,21 @@ impl SolverMatrix {
         match self {
             Self::KLU(matrix) => &mut matrix.s[index],
             Self::BLAS(matrix) => &mut matrix.s[index],
+        }
+    }
+
+    /// Zero out matrix entries + RHS (keeps sparsity pattern / mapping).
+    pub fn clear(&mut self) {
+        match self {
+            Self::KLU(matrix) => {
+                matrix.matrix.values.fill(0.0);
+                matrix.s.fill(0.0);
+            }
+            Self::BLAS(matrix) => {
+                matrix.m.fill(0.0);
+                matrix.s.fill(0.0);
+                matrix.lu = None;
+            }
         }
     }
 

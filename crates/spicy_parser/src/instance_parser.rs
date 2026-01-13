@@ -896,6 +896,8 @@ impl<'s> InstanceParser<'s> {
         #[allow(unused_assignments)]
         let mut uic = false;
         match cursor.peek_non_whitespace() {
+            // .tran tstep tstop
+            None => {}
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
@@ -910,8 +912,9 @@ impl<'s> InstanceParser<'s> {
                     .into());
                 }
             }
-            _ => {
-                unimplemented!("tstart and tmax are not yet implemented")
+            // TODO: .tran tstep tstop tstart [tmax] ... (not yet supported)
+            Some(_) => {
+                unimplemented!("tstart and tmax are not yet implemented");
             }
         }
 

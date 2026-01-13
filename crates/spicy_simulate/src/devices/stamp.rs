@@ -1,8 +1,11 @@
 
 /// Cached MNA stamp indices for a 2-terminal device (both diagonal and off-diagonal entries).
 ///
-/// Note: During sparsity-pattern building this temporarily stores *builder entry indices*, and is
-/// later "finalized" to hold *CSC nnz indices* using an `EntryMapping`.
+/// The meaning of the stored indices depends on the linear solver:
+/// - **KLU (sparse)**: indices refer to the CSC `values` array (nnz indices), computed via the
+///   sparsity-pattern builder and an `EntryMapping`.
+/// - **BLAS (dense)**: indices refer to a dense row-major linear index into the MNA matrix buffer:
+///   `idx = row * dim + col`.
 #[derive(Debug, Clone)]
 pub struct NodePairStamp {
     pub pos_pos: Option<usize>,

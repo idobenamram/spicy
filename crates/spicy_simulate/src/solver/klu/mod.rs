@@ -265,7 +265,7 @@ pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usiz
 }
 
 pub(crate) fn get_pointers_to_lu_mut<'a>(
-    lu: &'a mut Vec<f64>,
+    lu: &'a mut [f64],
     xip: &[usize],
     xlen: &[usize],
     k: usize,
@@ -460,9 +460,11 @@ mod tests {
             }
         } else {
             // deterministic config for snapshots
-            let mut config = KluConfig::default();
-            config.btf = false;
-            config.scale = None;
+            let mut config = KluConfig {
+                btf: false,
+                scale: None,
+                ..Default::default()
+            };
 
             match analyze::analyze(&a, &config) {
                 Err(error) => KluRunSnapshot::AnalyzeError { error },

@@ -1,6 +1,9 @@
 use super::stamp::NodePairStamp;
+use crate::matrix::SolverMatrix;
+use ndarray::Array2;
 use spicy_parser::devices::ResistorSpec;
 use spicy_parser::netlist_types::NodeIndex;
+use spicy_parser::node_mapping::NodeMapping;
 use spicy_parser::Span;
 
 #[derive(Debug, Clone)]
@@ -103,6 +106,40 @@ impl Resistor {
             tc2,
             noisy,
             stamp: NodePairStamp::unitialized(),
+        }
+    }
+
+    /// Stamp DC MNA contributions for a resistor into the solver matrix.
+    pub(crate) fn stamp_dc(&self, m: &mut SolverMatrix) {
+        let conductance = 1.0 / self.resistance;
+
+        if let Some(index) = self.stamp.pos_pos {
+            *m.get_mut_nnz(index) += conductance;
+        }
+        if let Some(index) = self.stamp.neg_neg {
+            *m.get_mut_nnz(index) += conductance;
+        }
+        if let Some((pos_neg, neg_pos)) = self.stamp.off_diagonals {
+            *m.get_mut_nnz(pos_neg) -= conductance;
+            *m.get_mut_nnz(neg_pos) -= conductance;
+        }
+    }
+
+    /// Stamp AC small-signal admittance for a resistor into the real part matrix.
+    pub(crate) fn stamp_ac(&self, ar: &mut Array2<f64>, node_mapping: &NodeMapping) {
+        let g = 1.0 / self.ac;
+        let node1 = node_mapping.mna_node_index(self.positive);
+        let node2 = node_mapping.mna_node_index(self.negative);
+
+        if let Some(n1) = node1 {
+            ar[[n1, n1]] += g;
+        }
+        if let Some(n2) = node2 {
+            ar[[n2, n2]] += g;
+        }
+        if let (Some(n1), Some(n2)) = (node1, node2) {
+            ar[[n1, n2]] -= g;
+            ar[[n2, n1]] -= g;
         }
     }
 }

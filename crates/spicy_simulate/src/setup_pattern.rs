@@ -7,6 +7,12 @@ use spicy_parser::node_mapping::NodeMapping;
 
 use crate::solver::matrix::builder::MatrixBuilder;
 
+fn dense_index(row: usize, col: usize, dim: usize) -> usize {
+    row.checked_mul(dim)
+        .and_then(|x| x.checked_add(col))
+        .expect("overflow computing dense index")
+}
+
 fn setup_resistors(
     resistors: &mut [Resistor],
     node_mapping: &NodeMapping,
@@ -195,6 +201,60 @@ pub fn setup_pattern(
     finialize_voltage_sources(&mut devices.voltage_sources, &mapping);
 
     Ok(matrix)
+}
+
+/// Initialize device stamp indices for a dense (BLAS) matrix.
+///
+/// For BLAS we store a *dense linear index* into the MNA matrix buffer in each stamp field:
+/// `idx = row * dim + col` (row-major). This avoids building a sparse CSC pattern just to
+/// compute per-device stamp locations.
+pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
+    let dim = node_mapping.mna_matrix_dim();
+
+    for r in &mut devices.resistors {
+        let pos = node_mapping.mna_node_index(r.positive);
+        let neg = node_mapping.mna_node_index(r.negative);
+        let pos_pos = pos.map(|p| dense_index(p, p, dim));
+        let neg_neg = neg.map(|n| dense_index(n, n, dim));
+        let off = if let (Some(p), Some(n)) = (pos, neg) {
+            Some((dense_index(p, n, dim), dense_index(n, p, dim)))
+        } else {
+            None
+        };
+        r.stamp.finialize(pos_pos, neg_neg, off);
+    }
+
+    for c in &mut devices.capacitors {
+        let pos = node_mapping.mna_node_index(c.positive);
+        let neg = node_mapping.mna_node_index(c.negative);
+        let pos_pos = pos.map(|p| dense_index(p, p, dim));
+        let neg_neg = neg.map(|n| dense_index(n, n, dim));
+        let off = if let (Some(p), Some(n)) = (pos, neg) {
+            Some((dense_index(p, n, dim), dense_index(n, p, dim)))
+        } else {
+            None
+        };
+        c.stamp.finialize(pos_pos, neg_neg, off);
+    }
+
+    for ind in &mut devices.inductors {
+        let pos = node_mapping.mna_node_index(ind.positive);
+        let neg = node_mapping.mna_node_index(ind.negative);
+        let b = node_mapping.mna_branch_index(ind.current_branch);
+        let pos_branch = pos.map(|p| (dense_index(p, b, dim), dense_index(b, p, dim)));
+        let neg_branch = neg.map(|n| (dense_index(n, b, dim), dense_index(b, n, dim)));
+        let bb = dense_index(b, b, dim);
+        ind.stamp.finialize(pos_branch, neg_branch, bb);
+    }
+
+    for v in &mut devices.voltage_sources {
+        let pos = node_mapping.mna_node_index(v.positive);
+        let neg = node_mapping.mna_node_index(v.negative);
+        let b = node_mapping.mna_branch_index(v.current_branch);
+        let pos_branch = pos.map(|p| (dense_index(p, b, dim), dense_index(b, p, dim)));
+        let neg_branch = neg.map(|n| (dense_index(n, b, dim), dense_index(b, n, dim)));
+        v.stamp.finialize(pos_branch, neg_branch);
+    }
 }
 
 #[cfg(test)]

@@ -81,8 +81,8 @@ fn analyze_worker(
 
     for block in 0..symbolic.nblocks {
         // the block is from rows/columns k1 to k2-1
-        let k1 = symbolic.block_boundaries[block] as usize;
-        let k2 = symbolic.block_boundaries[block + 1] as usize;
+        let k1 = symbolic.block_boundaries[block];
+        let k2 = symbolic.block_boundaries[block + 1];
         let size = k2 - k1;
 
         symbolic.lower_nz[block] = -1.0;
@@ -104,7 +104,7 @@ fn analyze_worker(
                     nzoff += 1;
                 } else {
                     debug_assert!(new_row < k2);
-                    new_row = new_row - k1;
+                    new_row -= k1;
                     block_row_pointers[pc] = new_row;
                     pc += 1;
                 }
@@ -144,9 +144,9 @@ fn analyze_worker(
             debug_assert!(k + k1 < n);
             debug_assert!(block_row_permutation[k] as usize + k1 < n);
             symbolic.column_permutation[k + k1] =
-                btf_column_permutation[block_row_permutation[k] as usize + k1] as isize;
+                btf_column_permutation[block_row_permutation[k] as usize + k1];
             symbolic.row_permutation[k + k1] =
-                btf_row_permutation[block_row_permutation[k] as usize + k1] as isize;
+                btf_row_permutation[block_row_permutation[k] as usize + k1];
         }
     }
 

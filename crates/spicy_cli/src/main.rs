@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use spicy_parser::{ParseOptions, SourceMap, Span, parse};
-use spicy_simulate::{SimulateOptions, simulate};
+use spicy_simulate::{SimulationConfig, simulate};
 
 use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
 
@@ -66,11 +66,12 @@ fn main() {
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "spicy".to_string());
-            let opts = SimulateOptions {
+            let sim_config = SimulationConfig {
                 write_raw: args.raw,
                 output_base: Some(base),
+                ..Default::default()
             };
-            simulate(deck, opts);
+            simulate(deck, sim_config);
         }
         Err(e) => {
             eprintln!("Parse error: {}", e);

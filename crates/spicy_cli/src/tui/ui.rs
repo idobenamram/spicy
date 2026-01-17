@@ -343,7 +343,7 @@ impl LineDiagnostic {
 
 pub fn render_netlist_lines(
     raw_netlist: &str,
-    netlist: &Vec<String>,
+    netlist: &[String],
     scroll: usize,
     height: usize,
     diags: &[SpicyError],
@@ -364,15 +364,10 @@ pub fn render_netlist_lines(
             diags_by_line.insert(ld.line_index, (ld, diag));
         } else {
             // simply display it at the top
-            let mut spans = Vec::new();
-            spans.push(UiSpan::styled(
-                "! ".to_string(),
-                Style::default().fg(Color::Red),
-            ));
-            spans.push(UiSpan::styled(
-                diag.to_string(),
-                Style::default().fg(Color::Red),
-            ));
+            let spans = vec![
+                UiSpan::styled("! ".to_string(), Style::default().fg(Color::Red)),
+                UiSpan::styled(diag.to_string(), Style::default().fg(Color::Red)),
+            ];
             lines.push(Line::from(spans));
         }
     }

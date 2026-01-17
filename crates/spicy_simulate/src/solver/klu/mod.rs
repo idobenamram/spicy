@@ -16,24 +16,27 @@ mod dump;
 mod error;
 mod factor;
 mod kernel;
+mod refactor;
 mod scale;
 mod solve;
-mod refactor;
-
-use std::{mem, slice};
 
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
-pub use error::{KluError, KluResult};
-pub use analyze::analyze;
 pub use dump::{
     KLU_PERM_DUMP_MAGIC, KLU_PERM_DUMP_VERSION, KLU_SOLVE_DUMP_MAGIC, KLU_SOLVE_DUMP_VERSION,
     KluPermDumpStage, write_perm_dump, write_solve_dump,
 };
+pub use error::{KluError, KluResult};
+// TODO: might be more correct to move this outside of klu module
+pub use btf::btf;
+pub use analyze::{allocate_symbolic, analyze};
+pub use amd::amd;
 pub use factor::factor;
+pub use refactor::refactor;
 pub use solve::solve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KluScale {
+    #[allow(dead_code)]
     Sum,
     Max,
 }
@@ -234,25 +237,6 @@ impl std::fmt::Debug for KluNumeric {
     }
 }
 
-impl KluNumeric {
-    /// Returns a temporary slice of length `n` into the workspace, interpreted as `f64`.
-    /// This mirrors how Xwork is used in the C implementation for simple scratch space.
-    /// NOTE: we can't use &mut self here because this will keep a mutable ref to the entire KluNumeric
-    /// because rust is dumb
-    pub(crate) fn x_scratch(work: &mut [f64], worksize: usize, n: usize) -> &mut [f64] {
-        let bytes_needed = n
-            .checked_mul(mem::size_of::<f64>())
-            .expect("overflow computing workspace size");
-
-        debug_assert!(
-            worksize >= bytes_needed,
-            "workspace too small for requested scratch slice"
-        );
-        let ptr = work.as_mut_ptr() as *mut f64;
-        unsafe { slice::from_raw_parts_mut(ptr, n) }
-    }
-}
-
 pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usize]) -> bool {
     if n == 0 {
         return false;
@@ -284,7 +268,7 @@ pub(crate) fn klu_valid(n: usize, column_pointers: &[usize], row_indices: &[usiz
 }
 
 pub(crate) fn get_pointers_to_lu_mut<'a>(
-    lu: &'a mut Vec<f64>,
+    lu: &'a mut [f64],
     xip: &[usize],
     xlen: &[usize],
     k: usize,
@@ -356,11 +340,20 @@ mod tests {
     use rstest::rstest;
     use std::path::PathBuf;
 
+    // TODO: clean this up
+    #[allow(dead_code)]
     #[derive(Debug)]
     enum KluRunSnapshot {
-        Skipped { reason: String },
-        AnalyzeError { error: KluError },
-        FactorError { symbolic: KluSymbolic, error: KluError },
+        Skipped {
+            reason: String,
+        },
+        AnalyzeError {
+            error: KluError,
+        },
+        FactorError {
+            symbolic: KluSymbolic,
+            error: KluError,
+        },
         SolveError {
             symbolic: KluSymbolic,
             numeric: KluNumeric,
@@ -373,6 +366,7 @@ mod tests {
         },
     }
 
+    #[allow(dead_code)]
     #[derive(Debug)]
     struct VecPreview {
         len: usize,
@@ -476,9 +470,11 @@ mod tests {
             }
         } else {
             // deterministic config for snapshots
-            let mut config = KluConfig::default();
-            config.btf = false;
-            config.scale = None;
+            let mut config = KluConfig {
+                btf: false,
+                scale: None,
+                ..Default::default()
+            };
 
             match analyze::analyze(&a, &config) {
                 Err(error) => KluRunSnapshot::AnalyzeError { error },
@@ -525,4 +521,3 @@ mod tests {
         insta::assert_debug_snapshot!(name, (n, nnz, is_square, seed, run, x_preview));
     }
 }
-

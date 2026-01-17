@@ -20,7 +20,6 @@ pub fn run_tui(path: &str) -> Result<()> {
     let (tx_msg, rx_msg) = unbounded();
 
     // Spawn worker thread
-    let netlist_for_worker = input.clone();
     let netlist_path = Path::new(path).to_path_buf();
     std::thread::spawn(move || worker_loop(netlist_path, rx_cmd, tx_msg));
 

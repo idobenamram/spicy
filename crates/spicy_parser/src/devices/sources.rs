@@ -1,7 +1,7 @@
 use crate::{
-    netlist_types::{NodeIndex, CurrentBranchIndex},
-    netlist_waveform::WaveForm,
     netlist_types::Phasor,
+    netlist_types::{CurrentBranchIndex, NodeIndex},
+    netlist_waveform::WaveForm,
 };
 
 #[derive(Debug, Clone)]

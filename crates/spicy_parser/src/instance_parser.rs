@@ -1,14 +1,13 @@
 use crate::SourceMap;
+use crate::devices::{CapacitorSpec, Devices, IndependentSourceSpec, InductorSpec, ResistorSpec};
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
-    AcCommand, AcSweepType, Command, CommandType, CurrentBranchIndex, DcCommand, 
-    DeviceType, NodeName, OpCommand, Phasor,
-    TranCommand,
+    AcCommand, AcSweepType, Command, CommandType, CurrentBranchIndex, DcCommand, DeviceType,
+    NodeName, OpCommand, Phasor, TranCommand,
 };
-use crate::devices::{Devices, CapacitorSpec, IndependentSourceSpec, InductorSpec, ResistorSpec};
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
     parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize,
@@ -598,8 +597,13 @@ impl<'s> InstanceParser<'s> {
         let negative_node = node_mapping.insert_node(negative);
         let current_branch = node_mapping.insert_branch(name.clone());
 
-        let mut inductor =
-            InductorSpec::new(name, cursor.span, positive_node, negative_node, current_branch);
+        let mut inductor = InductorSpec::new(
+            name,
+            cursor.span,
+            positive_node,
+            negative_node,
+            current_branch,
+        );
 
         let params_order = vec![
             ParamSlot::other("inductance"),
@@ -810,24 +814,18 @@ impl<'s> InstanceParser<'s> {
                 scope,
                 node_mapping,
             )?),
-            DeviceType::VoltageSource => devices.voltage_sources.push(self.parse_independent_source(
-                name,
-                &mut cursor,
-                scope,
-                node_mapping,
-                true,
-            )?),
-            DeviceType::CurrentSource => devices.current_sources.push(self.parse_independent_source(
-                name,
-                &mut cursor,
-                scope,
-                node_mapping,
-                false,
-            )?),
-            _ => return Err(ParserError::InvalidDeviceType {
-                s: element_type.to_char().to_string(),
+            DeviceType::VoltageSource => devices.voltage_sources.push(
+                self.parse_independent_source(name, &mut cursor, scope, node_mapping, true)?,
+            ),
+            DeviceType::CurrentSource => devices.current_sources.push(
+                self.parse_independent_source(name, &mut cursor, scope, node_mapping, false)?,
+            ),
+            _ => {
+                return Err(ParserError::InvalidDeviceType {
+                    s: element_type.to_char().to_string(),
+                }
+                .into());
             }
-            .into())
         };
 
         Ok(())
@@ -893,8 +891,11 @@ impl<'s> InstanceParser<'s> {
         let tstep = self.parse_value(cursor, scope)?;
         let tstop = self.parse_value(cursor, scope)?;
 
+        #[allow(unused_assignments)]
         let mut uic = false;
         match cursor.peek_non_whitespace() {
+            // .tran tstep tstop
+            None => {}
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
@@ -909,8 +910,9 @@ impl<'s> InstanceParser<'s> {
                     .into());
                 }
             }
-            _ => {
-                unimplemented!("tstart and tmax are not yet implemented")
+            // TODO: .tran tstep tstop tstart [tmax] ... (not yet supported)
+            Some(_) => {
+                unimplemented!("tstart and tmax are not yet implemented");
             }
         }
 

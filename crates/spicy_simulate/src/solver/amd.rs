@@ -18,7 +18,7 @@
 /// here: https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Source/amd_2.c
 /// the code is extensively documented but is not very easy to understand.
 ///
-use crate::solver::utils::{flip, inverse_permutation, unflip};
+use crate::solver::utils::{flip, inverse_permutation};
 
 pub struct AmdControl {
     /// If true, then aggressive absorption is performed.
@@ -75,6 +75,12 @@ impl AmdInfo {
             dmax: 1.0,
             ncmpa: 0,
         }
+    }
+}
+
+impl Default for AmdInfo {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -320,12 +326,12 @@ fn add_neighboring_supervariables_to_pivot(
                 // the inner and outer loops contain only the
                 // remaining entries.
                 pe[me] = (*p) as isize;
-                len[me] -= knt1 as usize;
+                len[me] -= knt1;
                 if len[me] == 0 {
                     pe[me] = EMPTY;
                 }
                 pe[e] = (*pj) as isize;
-                len[e] = ln - knt2 as usize;
+                len[e] = ln - knt2;
                 // nothing left of element e
                 if len[e] == 0 {
                     pe[e] = EMPTY;
@@ -411,14 +417,14 @@ fn construct_new_element(
 ) -> (usize, usize, usize, isize) {
     let elenme = elen[me];
     debug_assert!(nv[me] > 0);
-    let mut nvpiv = nv[me] as usize;
+    let nvpiv = nv[me] as usize;
     *nel += nvpiv;
 
     // flag the variable "me" as being in Lme by negating Nv [me]
     nv[me] = -(nvpiv as isize);
     debug_assert!(pe[me] >= 0 && pe[me] < iwlen as isize);
-    let mut pme1: usize = 0;
-    let mut pme2 = 0;
+    let mut pme1: usize;
+    let mut pme2: isize;
 
     if elenme == 0 {
         // construct the new element in place
@@ -697,7 +703,7 @@ fn update_degrees(
             // set me as the parent of i (a negative value in pe)
             pe[i] = flip(me as isize);
             let nvi = (-nv[i]) as usize;
-            *degme -= nvi as usize;
+            *degme -= nvi;
             *nvpiv += nvi;
             *nel += nvi;
             nv[i] = 0;
@@ -784,7 +790,7 @@ fn supervairable_detection(
                 let eln = elen[i as usize];
                 debug_assert!(pe[i as usize] >= 0 && pe[i as usize] < iwlen as isize);
                 let p1 = pe[i as usize] as usize;
-                let p2 = (p1 + ln as usize - 1) as isize;
+                let p2 = (p1 + ln - 1) as isize;
 
                 // skip the first element in the list (me)
                 for p in (p1 + 1) as isize..=p2 {
@@ -803,7 +809,7 @@ fn supervairable_detection(
                     debug_assert!(pe[j as usize] >= 0 && pe[j as usize] < iwlen as isize);
                     let mut ok = (len[j as usize] == ln) && (elen[j as usize] == eln);
                     let p1 = pe[j as usize] as usize;
-                    let p2 = (p1 + ln as usize - 1) as isize;
+                    let p2 = (p1 + ln - 1) as isize;
 
                     // skip the first element in the list (me)
                     for p in (p1 + 1) as isize..=p2 {
@@ -816,7 +822,7 @@ fn supervairable_detection(
 
                     if ok {
                         // j can be absorbed into i
-                        pe[j as usize] = flip(i as isize);
+                        pe[j as usize] = flip(i);
                         // both Nv [i] and Nv [j] are negated since they
                         // are in Lme, and the absolute values of each
                         // are the number of variables in i and j:
@@ -905,7 +911,7 @@ fn finalize_new_element(
     pe: &mut [isize],
     w: &mut [isize],
     elenme: isize,
-    info: &mut AmdInfo,
+    _info: &mut AmdInfo,
 ) {
     nv[me] = nvpiv as isize;
     len[me] = p - pme1;
@@ -987,7 +993,7 @@ fn compress_paths(n: usize, pe: &mut [isize], elen: &mut [isize], nv: &[isize]) 
             // while j is a variable
             while nv[j as usize] == 0 {
                 let jnext = pe[j as usize];
-                pe[j as usize] = e as isize;
+                pe[j as usize] = e;
                 j = jnext;
                 debug_assert!(j >= 0 && j < n as isize);
             }
@@ -1089,7 +1095,7 @@ fn postorder_assembly_tree(
             if parent != EMPTY {
                 // place the element in link list of the children its parent
                 sibling[j as usize] = child[parent as usize];
-                child[parent as usize] = j as isize;
+                child[parent as usize] = j;
             }
         }
         j -= 1;

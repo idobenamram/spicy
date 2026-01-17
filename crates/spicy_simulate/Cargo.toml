@@ -13,9 +13,12 @@ thiserror = "2.0.16"
 ndarray-linalg = { version = "0.17", features = ["openblas-system"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
-[profile.release]
-debug = true
-
 [dev-dependencies]
 rstest = "0.23.0"
 insta = "1.42.1"
+criterion = { workspace = true }
+
+[[bench]]
+name = "klu_analyze"
+path = "benches/klu_analyze.rs"
+harness = false

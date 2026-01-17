@@ -23,10 +23,7 @@ fn fmt_duration(d: Duration) -> String {
 }
 
 fn print_timing_breakdown(stages: &[(&str, Duration)], total_elapsed: Duration) {
-    let accounted_secs = stages
-        .iter()
-        .map(|(_, d)| d.as_secs_f64())
-        .sum::<f64>();
+    let accounted_secs = stages.iter().map(|(_, d)| d.as_secs_f64()).sum::<f64>();
     let total_secs = total_elapsed.as_secs_f64();
 
     println!();
@@ -100,16 +97,19 @@ fn print_matrix_stats(path: &Path, a: &CscMatrix) {
     println!("dim: {} x {}", a.dim.nrows, a.dim.ncols);
     println!("nnz: {}", a.nnz());
     println!("square: {}", a.is_square());
-    println!("csc: col_ptr_len={} row_idx_len={} values_len={}", a.column_pointers.len(), a.row_indices.len(), a.values.len());
+    println!(
+        "csc: col_ptr_len={} row_idx_len={} values_len={}",
+        a.column_pointers.len(),
+        a.row_indices.len(),
+        a.values.len()
+    );
 }
 
 fn make_demo_rhs(n: usize) -> Vec<f64> {
     // Match kluldemo.c:
     // B[i] = 1 + (i+1)/n
     let nf = n as f64;
-    (0..n)
-        .map(|i| 1.0 + ((i + 1) as f64) / nf)
-        .collect()
+    (0..n).map(|i| 1.0 + ((i + 1) as f64) / nf).collect()
 }
 
 /// Compute the demo residual exactly like SuiteSparse `KLU/Demo/kluldemo.c`:
@@ -241,7 +241,10 @@ fn main() {
         let mut f = match std::fs::File::create(&out) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("failed to create permutation dump file {}: {e}", out.display());
+                eprintln!(
+                    "failed to create permutation dump file {}: {e}",
+                    out.display()
+                );
                 stages.push(("dump_perms_analyze_factor", t.elapsed()));
                 print_timing_breakdown(&stages, total_start.elapsed());
                 std::process::exit(1);
@@ -253,7 +256,10 @@ fn main() {
             &symbolic,
             &numeric,
         ) {
-            eprintln!("failed to write permutation dump file {}: {e}", out.display());
+            eprintln!(
+                "failed to write permutation dump file {}: {e}",
+                out.display()
+            );
             stages.push(("dump_perms_analyze_factor", t.elapsed()));
             print_timing_breakdown(&stages, total_start.elapsed());
             std::process::exit(1);
@@ -373,5 +379,3 @@ fn main() {
     stages.push(("report", t.elapsed()));
     print_timing_breakdown(&stages, total_start.elapsed());
 }
-
-

@@ -11,8 +11,8 @@
 
 use crate::solver::{
     klu::{
-        get_pointers_to_lu, get_pointers_to_lu_mut, klu_valid, scale::scale, KluConfig, KluError,
-        KluNumeric, KluResult, KluSymbolic,
+        KluConfig, KluError, KluNumeric, KluResult, KluSymbolic, get_pointers_to_lu,
+        get_pointers_to_lu_mut, klu_valid, scale::scale,
     },
     matrix::csc::CscMatrix,
     utils::dunits,
@@ -131,8 +131,7 @@ pub fn refactor(
                             Some(rs) => a.value(p) / rs[oldrow],
                         };
                         debug_assert!(
-                            numeric.offi.get(poff).copied()
-                                == Some(numeric.pinv[oldrow] as usize),
+                            numeric.offi.get(poff).copied() == Some(numeric.pinv[oldrow] as usize),
                             "off-diagonal entry order mismatch at poff={}",
                             poff
                         );
@@ -205,9 +204,7 @@ pub fn refactor(
             for k in 0..n {
                 numeric.work[k] = rs[numeric.pnum[k] as usize];
             }
-            for k in 0..n {
-                rs[k] = numeric.work[k];
-            }
+            rs[..n].copy_from_slice(&numeric.work[..n]);
         }
     }
 

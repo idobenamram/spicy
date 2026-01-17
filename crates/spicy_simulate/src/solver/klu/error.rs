@@ -50,4 +50,3 @@ impl KluError {
         Self::Overflow(SolverOverflowError::Overflow { context })
     }
 }
-

@@ -24,11 +24,7 @@ impl Devices {
     pub fn from_spec(spec: &DevicesSpec) -> Self {
         Self {
             resistors: spec.resistors.iter().map(Resistor::from_spec).collect(),
-            capacitors: spec
-                .capacitors
-                .iter()
-                .map(Capacitor::from_spec)
-                .collect(),
+            capacitors: spec.capacitors.iter().map(Capacitor::from_spec).collect(),
             inductors: spec.inductors.iter().map(Inductor::from_spec).collect(),
             voltage_sources: spec
                 .voltage_sources

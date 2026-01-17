@@ -1,9 +1,5 @@
 use crate::netlist_models::CapacitorModel;
-use crate::{
-    Span,
-    expr::Value,
-    netlist_types::NodeIndex,
-};
+use crate::{Span, expr::Value, netlist_types::NodeIndex};
 
 #[derive(Debug, Clone)]
 pub struct CapacitorSpec {

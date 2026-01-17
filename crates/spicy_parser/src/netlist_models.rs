@@ -157,7 +157,7 @@ pub struct ResistorModel {
 }
 
 impl ResistorModel {
-    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+    pub(crate) fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
         let mut model = Self::default();
 
         for (ident, value) in params {
@@ -188,7 +188,7 @@ pub struct CapacitorModel {
 }
 
 impl CapacitorModel {
-    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+    pub(crate) fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
         let mut model = Self::default();
 
         for (ident, value) in params {
@@ -217,7 +217,7 @@ pub struct InductorModel {
 }
 
 impl InductorModel {
-    pub fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+    pub(crate) fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
         let mut model = Self::default();
 
         for (ident, value) in params {

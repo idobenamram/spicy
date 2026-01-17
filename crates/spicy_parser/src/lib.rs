@@ -1,14 +1,14 @@
+pub mod devices;
 pub mod error;
 mod expr;
 mod expression_phase;
 pub mod instance_parser;
-pub mod devices;
-pub mod node_mapping;
 mod lexer;
 pub mod libs_phase;
 mod netlist_models;
 pub mod netlist_types;
 pub mod netlist_waveform;
+pub mod node_mapping;
 mod parser_utils;
 mod statement_phase;
 mod subcircuit_phase;

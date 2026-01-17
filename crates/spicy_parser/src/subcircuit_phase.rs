@@ -180,7 +180,8 @@ fn parse_x_device(
         .pop()
         .ok_or_else(|| SubcircuitError::MissingSubcircuitName {
             span: cursor.peek_span(),
-        })?.0;
+        })?
+        .0;
 
     if nodes.is_empty() {
         return Err(SubcircuitError::NoNodes {

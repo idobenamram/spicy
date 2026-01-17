@@ -10,7 +10,7 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::klu::{
-    get_pointers_to_lu, klu_valid, KluConfig, KluError, KluNumeric, KluResult, KluSymbolic,
+    KluConfig, KluError, KluNumeric, KluResult, KluSymbolic, get_pointers_to_lu, klu_valid,
 };
 
 /// solve Lx = b, Assumes L is unit lower triangular and where the unit diagonal
@@ -194,13 +194,10 @@ pub fn solve(
 
     // right-hand-side on input, overwritten with solution to Ax=b on output
     b: &mut [f64],
-    config: &KluConfig,
+    _config: &KluConfig,
 ) -> KluResult<()> {
     if d < symbolic.n {
-        return Err(KluError::InvalidLeadingDimension {
-            d,
-            n: symbolic.n,
-        });
+        return Err(KluError::InvalidLeadingDimension { d, n: symbolic.n });
     }
     // B is column-oriented with leading dimension d, so it must have at least d*nrhs entries.
     let b_required = d
@@ -374,7 +371,7 @@ pub fn solve(
                             let end = offp[k + 1];
                             temp[0] = x[k];
                             for p in start..end {
-                                let i = offi[p] as usize;
+                                let i = offi[p];
                                 x[i] -= offx[p] * temp[0];
                             }
                         }
@@ -386,7 +383,7 @@ pub fn solve(
                             temp[0] = x[2 * k];
                             temp[1] = x[2 * k + 1];
                             for p in start..end {
-                                let i = offi[p] as usize;
+                                let i = offi[p];
                                 x[2 * i] -= offx[p] * temp[0];
                                 x[2 * i + 1] -= offx[p] * temp[1];
                             }
@@ -400,7 +397,7 @@ pub fn solve(
                             temp[1] = x[3 * k + 1];
                             temp[2] = x[3 * k + 2];
                             for p in start..end {
-                                let i = offi[p] as usize;
+                                let i = offi[p];
                                 x[3 * i] -= offx[p] * temp[0];
                                 x[3 * i + 1] -= offx[p] * temp[1];
                                 x[3 * i + 2] -= offx[p] * temp[2];
@@ -416,7 +413,7 @@ pub fn solve(
                             temp[2] = x[4 * k + 2];
                             temp[3] = x[4 * k + 3];
                             for p in start..end {
-                                let i = offi[p] as usize;
+                                let i = offi[p];
                                 x[4 * i] -= offx[p] * temp[0];
                                 x[4 * i + 1] -= offx[p] * temp[1];
                                 x[4 * i + 2] -= offx[p] * temp[2];

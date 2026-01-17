@@ -1,5 +1,3 @@
-
-
 pub struct SpicySlice<T>([T]);
 
 impl<T> std::ops::Index<usize> for SpicySlice<T> {
@@ -13,7 +11,6 @@ impl<T> std::ops::Index<usize> for SpicySlice<T> {
 }
 
 impl<T> std::ops::IndexMut<usize> for SpicySlice<T> {
-
     #[inline(always)]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         // SAFETY: NEED FOR SPEED

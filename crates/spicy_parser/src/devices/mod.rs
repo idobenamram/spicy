@@ -28,3 +28,9 @@ impl Devices {
         }
     }
 }
+
+impl Default for Devices {
+    fn default() -> Self {
+        Self::new()
+    }
+}

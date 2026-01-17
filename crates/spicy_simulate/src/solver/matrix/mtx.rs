@@ -23,7 +23,7 @@ fn ascii_eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
     }
     a.iter()
         .zip(b.iter())
-        .all(|(&x, &y)| x.to_ascii_lowercase() == y.to_ascii_lowercase())
+        .all(|(&x, &y)| x.eq_ignore_ascii_case(&y))
 }
 
 #[inline]

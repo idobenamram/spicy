@@ -10,16 +10,15 @@
 // Copyright (c) 2025 Ido Ben Amram
 
 use crate::solver::klu::{
-    scale::scale, KluConfig, KluError, KluNumeric, KluNumericMetrics, KluResult, KluSymbolic,
+    KluConfig, KluError, KluNumeric, KluNumericMetrics, KluResult, KluSymbolic, scale::scale,
 };
 use crate::solver::klu::{kernel, klu_valid, klu_valid_lu};
 use crate::solver::matrix::csc::CscMatrix;
-use crate::solver::utils::{as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation};
+use crate::solver::utils::{
+    as_usize_slice_mut, dunits, f64_as_isize_slice_mut, inverse_permutation,
+};
 
-pub fn allocate_klu_numeric(
-    symbolic: &KluSymbolic,
-    config: &KluConfig,
-) -> KluResult<KluNumeric> {
+pub fn allocate_klu_numeric(symbolic: &KluSymbolic, config: &KluConfig) -> KluResult<KluNumeric> {
     let n = symbolic.n;
     let nzoff = symbolic.nzoff;
     let nblocks = symbolic.nblocks;
@@ -49,11 +48,13 @@ pub fn allocate_klu_numeric(
         .ok_or(KluError::overflow("3 * n * sizeof(f64) for workspace"))?;
     let b6 = maxblock
         .checked_mul(6 * std::mem::size_of::<isize>())
-        .ok_or(KluError::overflow("6 * maxblock * sizeof(isize) for workspace"))?;
+        .ok_or(KluError::overflow(
+            "6 * maxblock * sizeof(isize) for workspace",
+        ))?;
     let worksize = s
         .checked_add(std::cmp::max(n3, b6))
         .ok_or(KluError::overflow("total workspace size"))?;
-    let worksize_f64 = (worksize + std::mem::size_of::<f64>() - 1) / std::mem::size_of::<f64>();
+    let worksize_f64 = worksize.div_ceil(std::mem::size_of::<f64>());
     // allocate with f64 for alignment
     let work = vec![0.0; worksize_f64];
 
@@ -155,7 +156,7 @@ pub fn kernel_factor(
 
     lu_block.resize(lusize as usize, 0.0);
 
-    return kernel::kernel(
+    kernel::kernel(
         n,
         a,
         col_permutation,
@@ -182,8 +183,8 @@ pub fn kernel_factor(
         offi,
         offx,
         metrics,
-        &config,
-    );
+        config,
+    )
 }
 
 pub fn factor(
@@ -275,12 +276,11 @@ pub fn factor(
             lnz += 1;
             unz += 1;
         } else {
-            let lsize;
-            if symbolic.lower_nz[block] < 0. {
-                lsize = -(config.initmem)
+            let lsize = if symbolic.lower_nz[block] < 0. {
+                -(config.initmem)
             } else {
-                lsize = config.initmem_amd * symbolic.lower_nz[block] + block_size as f64;
-            }
+                config.initmem_amd * symbolic.lower_nz[block] + block_size as f64
+            };
             let mut lnz_block = 0;
             let mut unz_block = 0;
 
@@ -370,9 +370,7 @@ pub fn factor(
             for k in 0..n {
                 x[k] = rs[numeric.pnum[k] as usize];
             }
-            for k in 0..n {
-                rs[k] = x[k];
-            }
+            rs[..n].copy_from_slice(&x[..n]);
         }
     }
 

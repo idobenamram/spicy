@@ -8,5 +8,8 @@ members = [
     "fuzz",
 ]
 
+[workspace.dependencies]
+criterion = "0.8.1"
+
 [profile.release]
 debug = 2

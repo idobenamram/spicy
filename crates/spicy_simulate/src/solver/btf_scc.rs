@@ -143,7 +143,7 @@ fn dfs(
     }
 }
 
-pub(crate) fn btf_scc(
+pub fn btf_scc(
     m: &CscMatrix,
     column_permutations: &mut [isize],
     row_permutations: &mut [isize],
@@ -262,5 +262,5 @@ pub(crate) fn btf_scc(
         column_permutations[col] = graph_indices[col];
     }
 
-    return number_of_scc_blocks;
+    number_of_scc_blocks
 }

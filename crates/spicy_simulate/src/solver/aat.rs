@@ -12,13 +12,15 @@
 use crate::solver::{matrix::csc::CscPointers, utils::EMPTY};
 
 /// calculating the symmetric pattern of A (A + A^T)
-
 pub struct AatInfo {
     // symmetry pattern of A
+    #[allow(dead_code)]
     pub sym: f64,
     // non zeros on the diagonal of A
+    #[allow(dead_code)]
     pub nz_diagonal: usize,
     // symmetric non zeros in original A
+    #[allow(dead_code)]
     pub nz_both: usize,
     // non zeros in the symmetric pattern of A
     pub nz_aat: usize,
@@ -121,14 +123,12 @@ pub fn aat_first_phase(
     }
 
     // compute the symmetry of the non-zero pattern of A
-
-    let sym;
     // only diagonal has non zeros
-    if nz == nz_diagonal {
-        sym = 1.0;
+    let sym = if nz == nz_diagonal {
+        1.0
     } else {
-        sym = (2.0 * nz_both as f64) / ((nz - nz_diagonal) as f64);
-    }
+        (2.0 * nz_both as f64) / ((nz - nz_diagonal) as f64)
+    };
 
     // excluding diagonals
     let nz_aat = column_lengths.iter().sum::<usize>();

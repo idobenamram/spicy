@@ -21,12 +21,15 @@ mod scale;
 mod solve;
 
 use crate::solver::utils::{dunits, f64_as_usize_slice, f64_as_usize_slice_mut};
-pub use analyze::analyze;
 pub use dump::{
     KLU_PERM_DUMP_MAGIC, KLU_PERM_DUMP_VERSION, KLU_SOLVE_DUMP_MAGIC, KLU_SOLVE_DUMP_VERSION,
     KluPermDumpStage, write_perm_dump, write_solve_dump,
 };
 pub use error::{KluError, KluResult};
+// TODO: might be more correct to move this outside of klu module
+pub use btf::btf;
+pub use analyze::{allocate_symbolic, analyze};
+pub use amd::amd;
 pub use factor::factor;
 pub use refactor::refactor;
 pub use solve::solve;

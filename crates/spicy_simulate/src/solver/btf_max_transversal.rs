@@ -102,7 +102,7 @@ fn try_augmenting_path(
     found
 }
 
-pub(crate) fn btf_max_transversal(
+pub fn btf_max_transversal(
     m: &CscMatrix,
     // match in davis's code
     column_permutations: &mut [isize],

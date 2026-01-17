@@ -143,7 +143,7 @@ fn dfs(
     }
 }
 
-pub(crate) fn btf_scc(
+pub fn btf_scc(
     m: &CscMatrix,
     column_permutations: &mut [isize],
     row_permutations: &mut [isize],

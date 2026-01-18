@@ -706,6 +706,7 @@ Deck {
         ],
         capacitors: [],
         inductors: [],
+        diodes: [],
         voltage_sources: [],
         current_sources: [],
     },

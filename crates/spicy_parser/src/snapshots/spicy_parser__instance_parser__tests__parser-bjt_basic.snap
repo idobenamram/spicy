@@ -3,7 +3,7 @@ source: crates/spicy_parser/src/instance_parser.rs
 expression: deck
 ---
 Deck {
-    title: "basic diode",
+    title: "basic bjt",
     node_mapping: NodeMapping {
         node_mapping: {
             NodeName(
@@ -12,17 +12,22 @@ Deck {
                 0,
             ),
             NodeName(
-                "in",
+                "c",
             ): NodeIndex(
                 1,
             ),
             NodeName(
-                "out",
+                "b",
             ): NodeIndex(
                 2,
             ),
+            NodeName(
+                "e",
+            ): NodeIndex(
+                3,
+            ),
         },
-        node_counter: 3,
+        node_counter: 4,
         branch_mapping: {},
         branch_counter: 1,
     },
@@ -31,42 +36,48 @@ Deck {
         resistors: [],
         capacitors: [],
         inductors: [],
-        diodes: [
-            DiodeSpec {
-                name: "D1",
+        diodes: [],
+        voltage_sources: [],
+        current_sources: [],
+        bjts: [
+            BjtSpec {
+                name: "Q1",
                 span: Span {
-                    start: 44,
-                    end: 124,
+                    start: 47,
+                    end: 85,
                     source_index: SourceFileId(
                         0,
                     ),
                 },
-                positive: NodeIndex(
+                collector: NodeIndex(
                     1,
                 ),
-                negative: NodeIndex(
+                base: NodeIndex(
                     2,
                 ),
-                model: DiodeModel {
+                emitter: NodeIndex(
+                    3,
+                ),
+                model: BjtModel {
                     is: Some(
                         Value {
                             value: 1.0,
                             exponent: Some(
-                                -14.0,
+                                -16.0,
                             ),
                             suffix: None,
                         },
                     ),
-                    n: Some(
+                    bf: Some(
                         Value {
-                            value: 1.0,
+                            value: 100.0,
                             exponent: None,
                             suffix: None,
                         },
                     ),
-                    rs: Some(
+                    br: Some(
                         Value {
-                            value: 2.0,
+                            value: 1.0,
                             exponent: None,
                             suffix: None,
                         },
@@ -81,14 +92,7 @@ Deck {
                 ),
                 m: Some(
                     Value {
-                        value: 3.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                pj: Some(
-                    Value {
-                        value: 4.0,
+                        value: 5.0,
                         exponent: None,
                         suffix: None,
                     },
@@ -96,59 +100,21 @@ Deck {
                 off: Some(
                     true,
                 ),
-                ic: Some(
+                ic_vbe: Some(
                     Value {
                         value: 0.7,
                         exponent: None,
                         suffix: None,
                     },
                 ),
-                temp: Some(
+                ic_vce: Some(
                     Value {
-                        value: 25.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                dtemp: Some(
-                    Value {
-                        value: 5.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                lm: Some(
-                    Value {
-                        value: 1.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                wm: Some(
-                    Value {
-                        value: 2.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                lp: Some(
-                    Value {
-                        value: 3.0,
-                        exponent: None,
-                        suffix: None,
-                    },
-                ),
-                wp: Some(
-                    Value {
-                        value: 4.0,
+                        value: 1.2,
                         exponent: None,
                         suffix: None,
                     },
                 ),
             },
         ],
-        voltage_sources: [],
-        current_sources: [],
-        bjts: [],
     },
 }

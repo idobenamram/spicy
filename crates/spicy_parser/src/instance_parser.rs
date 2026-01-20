@@ -1,6 +1,6 @@
 use crate::SourceMap;
 use crate::devices::{
-    CapacitorSpec, Devices, DiodeSpec, IndependentSourceSpec, InductorSpec, ResistorSpec,
+    BjtSpec, CapacitorSpec, Devices, DiodeSpec, IndependentSourceSpec, InductorSpec, ResistorSpec,
 };
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
@@ -530,7 +530,6 @@ impl<'s> InstanceParser<'s> {
         let positive_node = node_mapping.insert_node(positive);
         let negative_node = node_mapping.insert_node(negative);
 
-        // TODO: support models
         let mut capacitor = CapacitorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
@@ -820,6 +819,89 @@ impl<'s> InstanceParser<'s> {
         Ok(diode)
     }
 
+    // QXXXXXXX nc nb ne mname <area=val>
+    // + <m=val> <off> <ic=vbe,vce>
+    fn parse_bjt(
+        &self,
+        name: String,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+        node_mapping: &mut NodeMapping,
+    ) -> Result<BjtSpec, SpicyError> {
+        let collector = self.parse_node(cursor, scope)?;
+        let base = self.parse_node(cursor, scope)?;
+        let emitter = self.parse_node(cursor, scope)?;
+
+        let collector_node = node_mapping.insert_node(collector);
+        let base_node = node_mapping.insert_node(base);
+        let emitter_node = node_mapping.insert_node(emitter);
+
+        let input = self.source_map.get_content(cursor.span.source_index);
+        let model_name = parse_ident(cursor, input)?;
+        let model = self
+            .expanded_deck
+            .model_table
+            .get(model_name.text)
+            .ok_or_else(|| ParserError::MissingModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            })?;
+
+        let DeviceModel::Bjt(model) = model else {
+            return Err(ParserError::InvalidModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            }
+            .into());
+        };
+
+        let mut bjt = BjtSpec::new(
+            name,
+            cursor.span,
+            collector_node,
+            base_node,
+            emitter_node,
+            model.clone(),
+        );
+
+        let params_order = vec![
+            ParamSlot::other("area"),
+            ParamSlot::other("m"),
+            ParamSlot::flag("off"),
+            ParamSlot::other("ic"),
+        ];
+        let params = ParamParser::new(input, params_order, cursor);
+        for item in params {
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
+            match ident {
+                "area" => bjt.set_area(self.parse_value(&mut cursor, scope)?),
+                "m" => bjt.set_m(self.parse_value(&mut cursor, scope)?),
+                "off" => bjt.set_off(true),
+                "ic" => {
+                    let vbe = self.parse_value(&mut cursor, scope)?;
+                    let vce = if cursor.consume(TokenKind::Comma).is_some() {
+                        Some(self.parse_value(&mut cursor, scope)?)
+                    } else {
+                        None
+                    };
+                    bjt.set_ic(vbe, vce);
+                }
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.to_string(),
+                        span: cursor.span,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        Ok(bjt)
+    }
+
     fn parse_source_value(
         &self,
         cursor: &mut StmtCursor,
@@ -947,6 +1029,9 @@ impl<'s> InstanceParser<'s> {
                     .diodes
                     .push(self.parse_diode(name, &mut cursor, scope, node_mapping)?)
             }
+            DeviceType::Bjt => devices
+                .bjts
+                .push(self.parse_bjt(name, &mut cursor, scope, node_mapping)?),
             DeviceType::VoltageSource => devices.voltage_sources.push(
                 self.parse_independent_source(name, &mut cursor, scope, node_mapping, true)?,
             ),

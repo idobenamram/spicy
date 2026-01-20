@@ -1,0 +1,4 @@
+basic bjt
+.model Qmod NPN is=1e-16 bf=100 br=1
+Q1 c b e Qmod area=2 m=5 off ic=0.7,1.2
+.end

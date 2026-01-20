@@ -1,8 +1,9 @@
 pub use crate::devices::{
-    capacitor::CapacitorSpec, diode::DiodeSpec, inductor::InductorSpec, resistor::ResistorSpec,
-    sources::IndependentSourceSpec,
+    bjt::BjtSpec, capacitor::CapacitorSpec, diode::DiodeSpec, inductor::InductorSpec,
+    resistor::ResistorSpec, sources::IndependentSourceSpec,
 };
 
+mod bjt;
 mod capacitor;
 mod diode;
 mod inductor;
@@ -17,6 +18,7 @@ pub struct Devices {
     pub diodes: Vec<DiodeSpec>,
     pub voltage_sources: Vec<IndependentSourceSpec>,
     pub current_sources: Vec<IndependentSourceSpec>,
+    pub bjts: Vec<BjtSpec>,
 }
 
 impl Devices {
@@ -28,6 +30,7 @@ impl Devices {
             diodes: Vec::new(),
             voltage_sources: Vec::new(),
             current_sources: Vec::new(),
+            bjts: Vec::new(),
         }
     }
 }

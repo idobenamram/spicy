@@ -141,5 +141,6 @@ Deck {
                 ac: None,
             },
         ],
+        bjts: [],
     },
 }

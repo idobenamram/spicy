@@ -78,15 +78,17 @@ pub(crate) enum DeviceModelType {
     Capacitor,
     Inductor,
     Diode,
+    Bjt,
 }
 
 impl DeviceModelType {
     pub fn from_str(s: &str, span: Span) -> Result<DeviceModelType, SpicyError> {
-        match s.to_uppercase().to_string().as_str() {
+        match s.to_uppercase().as_str() {
             "R" => Ok(DeviceModelType::Resistor),
             "C" => Ok(DeviceModelType::Capacitor),
             "L" => Ok(DeviceModelType::Inductor),
             "D" => Ok(DeviceModelType::Diode),
+            "NPN" | "PNP" => Ok(DeviceModelType::Bjt),
             _ => Err(SubcircuitError::InvalidDeviceModelType {
                 s: s.to_string(),
                 span,
@@ -147,6 +149,7 @@ fn model_statement_to_device_model(
         DeviceModelType::Capacitor => DeviceModel::Capacitor(CapacitorModel::new(params)?),
         DeviceModelType::Inductor => DeviceModel::Inductor(InductorModel::new(params)?),
         DeviceModelType::Diode => DeviceModel::Diode(DiodeModel::new(params)?),
+        DeviceModelType::Bjt => DeviceModel::Bjt(BjtModel::new(params)?),
     })
 }
 
@@ -270,10 +273,40 @@ impl DiodeModel {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct BjtModel {
+    pub is: Option<Value>,
+    pub bf: Option<Value>,
+    pub br: Option<Value>,
+}
+
+impl BjtModel {
+    pub(crate) fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+        let mut model = Self::default();
+
+        for (ident, value) in params {
+            match ident.text {
+                "is" => model.is = Some(value),
+                "bf" => model.bf = Some(value),
+                "br" => model.br = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) enum DeviceModel {
     Resistor(ResistorModel),
     Capacitor(CapacitorModel),
     Inductor(InductorModel),
     Diode(DiodeModel),
+    Bjt(BjtModel),
 }

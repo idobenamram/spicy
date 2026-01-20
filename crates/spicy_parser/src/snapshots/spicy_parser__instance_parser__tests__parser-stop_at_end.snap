@@ -81,5 +81,6 @@ Deck {
         diodes: [],
         voltage_sources: [],
         current_sources: [],
+        bjts: [],
     },
 }

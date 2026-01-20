@@ -641,5 +641,6 @@ Deck {
             },
         ],
         current_sources: [],
+        bjts: [],
     },
 }

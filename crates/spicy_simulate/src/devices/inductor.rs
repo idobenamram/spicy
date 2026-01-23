@@ -150,4 +150,27 @@ impl Inductor {
         let wl = w * self.inductance;
         ai[[k, k]] += wl;
     }
+
+    /// Stamp transient companion model for an inductor.
+    ///
+    /// KVL form: Vpos - Vneg - r_eq * I = v_hist
+    pub(crate) fn stamp_trans(&self, m: &mut SolverMatrix, r_eq: f64, v_hist: f64) {
+        let branch_index = m.mna_branch_index(self.current_branch);
+
+        if let Some((pos_branch, branch_pos)) = self.stamp.pos_branch {
+            *m.get_mut_nnz(pos_branch) = 1.0;
+            *m.get_mut_nnz(branch_pos) = 1.0;
+        }
+
+        if let Some((neg_branch, branch_neg)) = self.stamp.neg_branch {
+            *m.get_mut_nnz(neg_branch) = -1.0;
+            *m.get_mut_nnz(branch_neg) = -1.0;
+        }
+
+        if self.stamp.branch_branch != usize::MAX {
+            *m.get_mut_nnz(self.stamp.branch_branch) -= r_eq;
+        }
+
+        *m.get_mut_rhs(branch_index) = v_hist;
+    }
 }

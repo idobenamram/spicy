@@ -3,15 +3,25 @@ use std::collections::HashMap;
 use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand};
 
 use crate::{
-    SimulationConfig,
+    SimulationConfig, TransientIntegrator,
     dc::simulate_op_inner,
-    devices::{Capacitor, Devices},
+    devices::{Capacitor, Devices, Inductor},
     matrix::SolverMatrix,
 };
 
 fn steps(dt: f64, tstop: f64) -> Vec<f64> {
     let nsteps = (tstop / dt).floor() as usize;
     (0..=nsteps).map(|i| i as f64 * dt).collect()
+}
+
+// TODO: this kinda sucks
+fn get_voltage_diff(voltages: &[f64], positive: Option<usize>, negative: Option<usize>) -> f64 {
+    match (positive, negative) {
+        (Some(positive), Some(negative)) => voltages[positive] - voltages[negative],
+        (Some(positive), None) => voltages[positive],
+        (None, Some(negative)) => -voltages[negative],
+        (None, None) => 0.0, // TODO: should through an error
+    }
 }
 
 fn get_previous_voltage(
@@ -25,17 +35,23 @@ fn get_previous_voltage(
         // if we set the uic flag we should just take the initial condition from the device
         ic
     } else {
-        // TODO: breh this trash
-        match (positive, negative) {
-            (Some(positive), Some(negative)) => {
-                previous_voltages[positive] - previous_voltages[negative]
-            }
-            (Some(positive), None) => previous_voltages[positive],
-            (None, Some(negative)) => -previous_voltages[negative],
-            (None, None) => 0.0, // TODO: should through an error
-        }
+        get_voltage_diff(previous_voltages, positive, negative)
     }
 }
+
+fn get_previous_current(
+    previous_solution: &[f64],
+    branch_index: usize,
+    ic: f64,
+    use_device_ic: bool,
+) -> f64 {
+    if use_device_ic {
+        ic
+    } else {
+        previous_solution[branch_index]
+    }
+}
+
 
 #[derive(Debug)]
 pub enum Integrator<'a> {
@@ -101,6 +117,41 @@ impl<'a> Integrator<'a> {
         }
     }
 
+    fn inductor_values(
+        &self,
+        device: &Inductor,
+        positive: Option<usize>,
+        negative: Option<usize>,
+        branch_index: usize,
+        config: &TransientConfig,
+    ) -> (f64, f64) {
+        match self {
+            Integrator::BackwardEuler { previous } => {
+                let r_eq = device.inductance / config.step;
+                let i_prev = get_previous_current(
+                    previous,
+                    branch_index,
+                    device.ic,
+                    config.use_device_ic,
+                );
+                let v_hist = -r_eq * i_prev;
+                (r_eq, v_hist)
+            }
+            Integrator::Trapezoidal { previous_output, .. } => {
+                let r_eq = 2.0 * device.inductance / config.step;
+                let i_prev = get_previous_current(
+                    previous_output,
+                    branch_index,
+                    device.ic,
+                    config.use_device_ic,
+                );
+                let v_prev = get_voltage_diff(previous_output, positive, negative);
+                let v_hist = -v_prev - r_eq * i_prev;
+                (r_eq, v_hist)
+            }
+        }
+    }
+
     fn save_previous_voltage(&mut self, voltage: Vec<f64>) {
         match self {
             Integrator::BackwardEuler { previous } => {
@@ -154,21 +205,43 @@ fn simulation_step<'a>(
 
         let (g, i) = integrator.capacitor_values(c, pos, neg, config);
         c.stamp_trans(matrix, g, i);
-        integrator.save_capacitor_current(c, i);
     }
 
-    // TODO: we don't support functions on the sources yet
+    for l in &devices.inductors {
+        let pos = matrix.mna_node_index(l.positive);
+        let neg = matrix.mna_node_index(l.negative);
+        let branch = matrix.mna_branch_index(l.current_branch);
+
+        let (r_eq, v_hist) = integrator.inductor_values(l, pos, neg, branch, config);
+        l.stamp_trans(matrix, r_eq, v_hist);
+    }
+
     for vsrc in &devices.voltage_sources {
         vsrc.stamp_voltage_source_trans(matrix, config.t, config.step, config.tstop);
     }
 
-    // TODO: stamp current sources
+    for isrc in &devices.current_sources {
+        isrc.stamp_current_source_trans(matrix, config.t, config.step, config.tstop);
+    }
 
     // Solve.
     matrix.refactor().expect("Failed to refactor matrix");
     matrix.solve().expect("Failed to solve linear system");
 
-    matrix.rhs().to_vec()
+    let solution = matrix.rhs().to_vec();
+
+    if matches!(&*integrator, Integrator::Trapezoidal { .. }) {
+        for c in &devices.capacitors {
+            let pos = matrix.mna_node_index(c.positive);
+            let neg = matrix.mna_node_index(c.negative);
+            let (g, i_hist) = integrator.capacitor_values(c, pos, neg, config);
+            let v_new = get_voltage_diff(&solution, pos, neg);
+            let i_new = g * v_new + i_hist;
+            integrator.save_capacitor_current(c, i_new);
+        }
+    }
+
+    solution
 }
 
 #[derive(Debug, Clone)]
@@ -191,9 +264,6 @@ pub fn simulate_trans(
     let tstop = cmd.tstop.get_value();
 
     let mut devices = Devices::from_spec(&deck.devices);
-    if !devices.inductors.is_empty() {
-        unimplemented!("Transient analysis does not yet support inductors");
-    }
 
     let mut matrix =
         SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)
@@ -216,8 +286,14 @@ pub fn simulate_trans(
         matrix.rhs().to_vec()
     };
 
-    let mut integrator = Integrator::BackwardEuler {
-        previous: initial_condition,
+    let mut integrator = match sim_config.integrator {
+        TransientIntegrator::BackwardEuler => Integrator::BackwardEuler {
+            previous: initial_condition,
+        },
+        TransientIntegrator::Trapezoidal => Integrator::Trapezoidal {
+            previous_output: initial_condition,
+            previous_currents: HashMap::new(),
+        },
     };
 
     let mut times: Vec<f64> = Vec::new();
@@ -343,5 +419,216 @@ C1 out 0 1u\n\
                 );
             }
         }
+    }
+
+    #[test]
+    fn trapezoidal_saves_capacitor_current_not_history_source() {
+        let netlist = "* RC with capacitor to ground\n\
+V1 in 0 DC 1\n\
+R1 in out 1k\n\
+C1 out 0 1u\n\
+.END";
+
+        let source_path = PathBuf::from("trans_trapezoidal_cap_current.spicy");
+        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
+        let mut parse_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut parse_options).expect("parse");
+
+        let sim_cfg = SimulationConfig {
+            solver: LinearSolver::Blas,
+            ..SimulationConfig::default()
+        };
+
+        let mut devices = Devices::from_spec(&deck.devices);
+        let mut matrix =
+            SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), &sim_cfg)
+                .expect("Failed to create matrix");
+
+        let previous_output = vec![0.0; matrix.rhs().len()];
+        let mut integrator = Integrator::Trapezoidal {
+            previous_output,
+            previous_currents: HashMap::new(),
+        };
+
+        let config = TransientConfig {
+            step: 1e-3,
+            tstop: 1e-3,
+            t: 0.0,
+            use_device_ic: false,
+        };
+
+        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+
+        let cap = devices.capacitors.first().expect("expected capacitor");
+        let pos = matrix.mna_node_index(cap.positive);
+        let neg = matrix.mna_node_index(cap.negative);
+        let g = 2.0 * cap.capacitance / config.step;
+        let v_new = get_voltage_diff(&solution, pos, neg);
+        let i_hist = 0.0;
+        let expected_current = g * v_new + i_hist;
+
+        let stored_current = match integrator {
+            Integrator::Trapezoidal {
+                previous_currents, ..
+            } => *previous_currents
+                .get(cap.name.as_str())
+                .expect("expected saved capacitor current"),
+            _ => unreachable!("expected trapezoidal integrator"),
+        };
+
+        assert!(
+            v_new.abs() > 1e-9,
+            "expected non-zero capacitor voltage after first step"
+        );
+        assert!(
+            (stored_current - expected_current).abs() < 1e-9,
+            "stored current should match capacitor current"
+        );
+        assert!(
+            (stored_current - i_hist).abs() > 1e-9,
+            "stored current should not equal history source"
+        );
+    }
+
+    #[test]
+    fn trans_inductor_backward_euler_one_step() {
+        let netlist = "* RL with current source\n\
+I1 n1 0 DC 1\n\
+R1 n1 0 1\n\
+L1 n1 0 1\n\
+.END";
+
+        let source_path = PathBuf::from("trans_inductor_be_one_step.spicy");
+        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
+        let mut parse_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut parse_options).expect("parse");
+
+        let sim_cfg = SimulationConfig {
+            solver: LinearSolver::Blas,
+            ..SimulationConfig::default()
+        };
+
+        let mut devices = Devices::from_spec(&deck.devices);
+        let mut matrix =
+            SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), &sim_cfg)
+                .expect("Failed to create matrix");
+
+        let previous = vec![0.0; matrix.rhs().len()];
+        let mut integrator = Integrator::BackwardEuler { previous };
+
+        let config = TransientConfig {
+            step: 1.0,
+            tstop: 1.0,
+            t: 0.0,
+            use_device_ic: false,
+        };
+
+        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+
+        let ind = devices.inductors.first().expect("expected inductor");
+        let node = matrix
+            .mna_node_index(ind.positive)
+            .expect("expected inductor node");
+        let branch = matrix.mna_branch_index(ind.current_branch);
+
+        let v = solution[node];
+        let i = solution[branch];
+
+        let r_eq = ind.inductance / config.step;
+        let i_expected = 1.0 / (1.0 + r_eq / 1.0);
+        let v_expected = r_eq * i_expected;
+
+        assert!(
+            (i - i_expected).abs() < 1e-9,
+            "inductor current mismatch: expected {}, got {}",
+            i_expected,
+            i
+        );
+        assert!(
+            (v - v_expected).abs() < 1e-9,
+            "node voltage mismatch: expected {}, got {}",
+            v_expected,
+            v
+        );
+    }
+
+    #[test]
+    fn trans_inductor_trapezoidal_one_step() {
+        let netlist = "* RL with current source\n\
+I1 n1 0 DC 1\n\
+R1 n1 0 1\n\
+L1 n1 0 1\n\
+.END";
+
+        let source_path = PathBuf::from("trans_inductor_trap_one_step.spicy");
+        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
+        let mut parse_options = ParseOptions {
+            source_map,
+            work_dir: PathBuf::from("."),
+            source_path,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut parse_options).expect("parse");
+
+        let sim_cfg = SimulationConfig {
+            solver: LinearSolver::Blas,
+            ..SimulationConfig::default()
+        };
+
+        let mut devices = Devices::from_spec(&deck.devices);
+        let mut matrix =
+            SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), &sim_cfg)
+                .expect("Failed to create matrix");
+
+        let previous_output = vec![0.0; matrix.rhs().len()];
+        let mut integrator = Integrator::Trapezoidal {
+            previous_output,
+            previous_currents: HashMap::new(),
+        };
+
+        let config = TransientConfig {
+            step: 1.0,
+            tstop: 1.0,
+            t: 0.0,
+            use_device_ic: false,
+        };
+
+        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+
+        let ind = devices.inductors.first().expect("expected inductor");
+        let node = matrix
+            .mna_node_index(ind.positive)
+            .expect("expected inductor node");
+        let branch = matrix.mna_branch_index(ind.current_branch);
+
+        let v = solution[node];
+        let i = solution[branch];
+
+        let r_eq = 2.0 * ind.inductance / config.step;
+        let i_expected = 1.0 / (1.0 + r_eq / 1.0);
+        let v_expected = r_eq * i_expected;
+
+        assert!(
+            (i - i_expected).abs() < 1e-9,
+            "inductor current mismatch: expected {}, got {}",
+            i_expected,
+            i
+        );
+        assert!(
+            (v - v_expected).abs() < 1e-9,
+            "node voltage mismatch: expected {}, got {}",
+            v_expected,
+            v
+        );
     }
 }

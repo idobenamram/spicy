@@ -26,9 +26,16 @@ pub enum LinearSolver {
     Blas,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TransientIntegrator {
+    BackwardEuler,
+    Trapezoidal,
+}
+
 #[derive(Debug, Clone)]
 pub struct SimulationConfig {
     pub solver: LinearSolver,
+    pub integrator: TransientIntegrator,
     /// if true, write raw files
     pub write_raw: bool,
     /// optional output base path (without extension). If None, use deck.title in CWD
@@ -41,6 +48,7 @@ impl Default for SimulationConfig {
             solver: LinearSolver::Klu {
                 config: solver::klu::KluConfig::default(),
             },
+            integrator: TransientIntegrator::BackwardEuler,
             write_raw: false,
             output_base: None,
         }

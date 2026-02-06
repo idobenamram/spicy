@@ -79,7 +79,7 @@ impl Diode {
             off,
             ic,
             series_resistance,
-            stamp: NodePairStamp::unitialized(),
+            stamp: NodePairStamp::uninitialized(),
         }
     }
 

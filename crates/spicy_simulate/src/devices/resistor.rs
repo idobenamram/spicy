@@ -109,7 +109,7 @@ impl Resistor {
             tc1,
             tc2,
             noisy,
-            stamp: NodePairStamp::unitialized(),
+            stamp: NodePairStamp::uninitialized(),
         }
     }
 

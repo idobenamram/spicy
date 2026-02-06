@@ -1,6 +1,5 @@
 ---
 source: crates/spicy_simulate/src/lib.rs
-assertion_line: 304
 expression: output
 ---
 TransientResult {

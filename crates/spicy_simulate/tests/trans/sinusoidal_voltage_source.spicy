@@ -1,4 +1,6 @@
 * Sinusoidal voltage source driving a resistor divider
+* Note: without UIC, transient starts from the operating point.
+* This behaves like a pure divider (out ≈ 2/3 of in).
 V1 in 0 SIN(0 1 1)
 R1 in out 1k
 R2 out 0 2k

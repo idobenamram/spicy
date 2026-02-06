@@ -87,7 +87,7 @@ impl Capacitor {
             tc1,
             tc2,
             ic,
-            stamp: NodePairStamp::unitialized(),
+            stamp: NodePairStamp::uninitialized(),
         }
     }
 

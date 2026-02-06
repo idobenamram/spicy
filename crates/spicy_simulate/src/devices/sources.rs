@@ -34,7 +34,7 @@ impl IndependentSource {
             current_branch: spec.current_branch,
             dc,
             ac: spec.ac.clone(),
-            stamp: NodeVoltageSourceStamp::unitialized(),
+            stamp: NodeVoltageSourceStamp::uninitialized(),
         }
     }
 

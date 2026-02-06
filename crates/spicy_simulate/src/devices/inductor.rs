@@ -95,7 +95,7 @@ impl Inductor {
             tc1,
             tc2,
             ic,
-            stamp: NodeBranchPairStamp::unitialized(),
+            stamp: NodeBranchPairStamp::uninitialized(),
         }
     }
 

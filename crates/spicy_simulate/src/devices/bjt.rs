@@ -117,7 +117,7 @@ impl Bjt {
             off,
             ic_vbe,
             ic_vce,
-            stamp: NodeTripletStamp::unitialized(),
+            stamp: NodeTripletStamp::uninitialized(),
         }
     }
 

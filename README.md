@@ -15,7 +15,7 @@ Spicy is a small Rust project for  running basic circuit simulations using Modif
 1) Run the TUI on a sample netlist
 
 ```bash
-cargo run -p spicy_cli -- --tui crates/spicy_simulate/tests/simple_resistor.spicy
+cargo run -p spicy_cli -- --tui crates/spicy_simulate/tests/op_dc/simple_resistor.spicy
 ```
 
 ## Testing
@@ -50,8 +50,8 @@ and only assisted by ai. Those should be readable.
 - [x] output raw files
 - [x] support libs in parser
 - [x] support models in parser
-- [ ] add diodes
-- [ ] add BJT transistor
+- [x] add diodes
+- [x] add BJT transistor
 
 
 ## Simulation
@@ -63,7 +63,11 @@ and only assisted by ai. Those should be readable.
       - [x] make sure unroll optimization doesn't lose numerical stability
 - [x] hook up to simulation code
 - [x] cleanup device function use
-- [ ] implement gmin
+- [x] implement basic newton iteration
+- [ ] implement diode model
+- [ ] implement transistor model
+- [ ] implement gmin stepping
+- [ ] implement source stepping
 
 ## KLU
 - [ ] implement klu statistics and use them to know when to fully factorize the matrix again.

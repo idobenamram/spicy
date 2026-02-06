@@ -146,17 +146,6 @@ impl SolverMatrix {
         }
     }
 
-    /// Mutable RHS vector (overwritten with solution after `solve()`).
-    pub fn rhs_mut(&mut self) -> &mut [f64] {
-        match self {
-            Self::Klu(matrix) => matrix.s.as_mut_slice(),
-            Self::Blas(matrix) => matrix
-                .s
-                .as_slice_mut()
-                .expect("BLAS RHS should be contiguous"),
-        }
-    }
-
     pub fn mna_node_index(&self, node_index: NodeIndex) -> Option<usize> {
         match self {
             Self::Klu(matrix) => matrix.node_mapping.mna_node_index(node_index),
@@ -178,6 +167,15 @@ impl SolverMatrix {
             }
             // no analyze phase for blas
             Self::Blas(_) => {}
+        }
+        Ok(())
+    }
+
+    /// Ensure the symbolic analysis is performed exactly once (KLU only).
+    pub fn ensure_analyzed(&mut self) -> Result<(), SimulationError> {
+        let needs_analyze = matches!(self, Self::Klu(matrix) if matrix.symbolic.is_none());
+        if needs_analyze {
+            self.analyze()?;
         }
         Ok(())
     }

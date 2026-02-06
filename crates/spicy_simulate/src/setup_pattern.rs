@@ -1,5 +1,5 @@
 use crate::{
-    devices::{Capacitor, Devices, IndependentSource, Inductor, Resistor},
+    devices::{Bjt, Capacitor, Devices, Diode, IndependentSource, Inductor, Resistor},
     error::SimulationError,
     solver::matrix::{builder::EntryMapping, csc::CscMatrix},
 };
@@ -49,6 +49,59 @@ fn setup_capacitors(
             None
         };
         c.stamp.temp_entries(pos_pos, neg_neg, combination);
+    }
+    Ok(())
+}
+
+fn setup_diodes(
+    diodes: &mut [Diode],
+    node_mapping: &NodeMapping,
+    builder: &mut MatrixBuilder,
+) -> Result<(), SimulationError> {
+    for d in diodes {
+        let pos = node_mapping.mna_node_index(d.positive);
+        let neg = node_mapping.mna_node_index(d.negative);
+        let pos_pos = pos.map(|p| builder.push(p, p, 0.0)).transpose()?;
+        let neg_neg = neg.map(|n| builder.push(n, n, 0.0)).transpose()?;
+        let combination = if let (Some(pos), Some(neg)) = (pos, neg) {
+            Some((builder.push(pos, neg, 0.0)?, builder.push(neg, pos, 0.0)?))
+        } else {
+            None
+        };
+        d.stamp.temp_entries(pos_pos, neg_neg, combination);
+    }
+    Ok(())
+}
+
+fn setup_bjts(
+    bjts: &mut [Bjt],
+    node_mapping: &NodeMapping,
+    builder: &mut MatrixBuilder,
+) -> Result<(), SimulationError> {
+    for bjt in bjts {
+        let b = node_mapping.mna_node_index(bjt.base);
+        let c = node_mapping.mna_node_index(bjt.collector);
+        let e = node_mapping.mna_node_index(bjt.emitter);
+
+        let mut entry =
+            |row: Option<usize>, col: Option<usize>| -> Result<Option<usize>, SimulationError> {
+                match (row, col) {
+                    (Some(r), Some(c)) => Ok(Some(builder.push(c, r, 0.0)?)),
+                    _ => Ok(None),
+                }
+            };
+
+        let bb = entry(b, b)?;
+        let bc = entry(b, c)?;
+        let be = entry(b, e)?;
+        let cb = entry(c, b)?;
+        let cc = entry(c, c)?;
+        let ce = entry(c, e)?;
+        let eb = entry(e, b)?;
+        let ec = entry(e, c)?;
+        let ee = entry(e, e)?;
+
+        bjt.stamp.temp_entries(bb, bc, be, cb, cc, ce, eb, ec, ee);
     }
     Ok(())
 }
@@ -147,6 +200,34 @@ fn finialize_capacitors(capacitors: &mut [Capacitor], entry_mapping: &EntryMappi
     }
 }
 
+fn finialize_diodes(diodes: &mut [Diode], entry_mapping: &EntryMapping) {
+    for d in diodes {
+        let pos_pos = d.stamp.pos_pos.map(|i| entry_mapping.get(i));
+        let neg_neg = d.stamp.neg_neg.map(|i| entry_mapping.get(i));
+        let combination = d
+            .stamp
+            .off_diagonals
+            .map(|(pos_neg, neg_pos)| (entry_mapping.get(pos_neg), entry_mapping.get(neg_pos)));
+        d.stamp.finialize(pos_pos, neg_neg, combination);
+    }
+}
+
+fn finialize_bjts(bjts: &mut [Bjt], entry_mapping: &EntryMapping) {
+    for bjt in bjts {
+        let bb = bjt.stamp.bb.map(|i| entry_mapping.get(i));
+        let bc = bjt.stamp.bc.map(|i| entry_mapping.get(i));
+        let be = bjt.stamp.be.map(|i| entry_mapping.get(i));
+        let cb = bjt.stamp.cb.map(|i| entry_mapping.get(i));
+        let cc = bjt.stamp.cc.map(|i| entry_mapping.get(i));
+        let ce = bjt.stamp.ce.map(|i| entry_mapping.get(i));
+        let eb = bjt.stamp.eb.map(|i| entry_mapping.get(i));
+        let ec = bjt.stamp.ec.map(|i| entry_mapping.get(i));
+        let ee = bjt.stamp.ee.map(|i| entry_mapping.get(i));
+
+        bjt.stamp.finialize(bb, bc, be, cb, cc, ce, eb, ec, ee);
+    }
+}
+
 fn finialize_inductors(inductors: &mut [Inductor], entry_mapping: &EntryMapping) {
     for ind in inductors {
         let pos_branch = ind.stamp.pos_branch.map(|(pos_branch, branch_pos)| {
@@ -190,14 +271,18 @@ pub fn setup_pattern(
     setup_resistors(&mut devices.resistors, node_mapping, &mut builder)?;
     setup_capacitors(&mut devices.capacitors, node_mapping, &mut builder)?;
     setup_inductors(&mut devices.inductors, node_mapping, &mut builder)?;
+    setup_diodes(&mut devices.diodes, node_mapping, &mut builder)?;
+    setup_bjts(&mut devices.bjts, node_mapping, &mut builder)?;
     setup_voltage_sources(&mut devices.voltage_sources, node_mapping, &mut builder)?;
-    // setup_current_sources(&devices.current_sources, node_mapping, &mut builder)?;
+    // we do not need to setup current sources as they don't effect the matrix structure (only the right hand side)
 
     let (matrix, mapping) = builder.build_csc_pattern()?;
 
     finialize_resistors(&mut devices.resistors, &mapping);
     finialize_capacitors(&mut devices.capacitors, &mapping);
     finialize_inductors(&mut devices.inductors, &mapping);
+    finialize_diodes(&mut devices.diodes, &mapping);
+    finialize_bjts(&mut devices.bjts, &mapping);
     finialize_voltage_sources(&mut devices.voltage_sources, &mapping);
 
     Ok(matrix)
@@ -235,6 +320,42 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
             None
         };
         c.stamp.finialize(pos_pos, neg_neg, off);
+    }
+
+    for d in &mut devices.diodes {
+        let pos = node_mapping.mna_node_index(d.positive);
+        let neg = node_mapping.mna_node_index(d.negative);
+        let pos_pos = pos.map(|p| dense_index(p, p, dim));
+        let neg_neg = neg.map(|n| dense_index(n, n, dim));
+        let off = if let (Some(p), Some(n)) = (pos, neg) {
+            Some((dense_index(p, n, dim), dense_index(n, p, dim)))
+        } else {
+            None
+        };
+        d.stamp.finialize(pos_pos, neg_neg, off);
+    }
+
+    for bjt in &mut devices.bjts {
+        let b = node_mapping.mna_node_index(bjt.base);
+        let c = node_mapping.mna_node_index(bjt.collector);
+        let e = node_mapping.mna_node_index(bjt.emitter);
+
+        let dense_entry = |row: Option<usize>, col: Option<usize>| match (row, col) {
+            (Some(r), Some(c)) => Some(dense_index(r, c, dim)),
+            _ => None,
+        };
+
+        let bb = dense_entry(b, b);
+        let bc = dense_entry(b, c);
+        let be = dense_entry(b, e);
+        let cb = dense_entry(c, b);
+        let cc = dense_entry(c, c);
+        let ce = dense_entry(c, e);
+        let eb = dense_entry(e, b);
+        let ec = dense_entry(e, c);
+        let ee = dense_entry(e, e);
+
+        bjt.stamp.finialize(bb, bc, be, cb, cc, ce, eb, ec, ee);
     }
 
     for ind in &mut devices.inductors {

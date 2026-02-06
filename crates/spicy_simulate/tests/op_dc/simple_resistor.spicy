@@ -1,7 +1,7 @@
 simple current source with resistor network
-V1 in 0 DC 1
+I1 in 0 DC 1m
 R1 in out 1k
 R2 out 0 2k
 .OP
-.DC V1 1 5 1
+.DC I1 1m 5m 1m
 .END

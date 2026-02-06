@@ -1,0 +1,136 @@
+---
+source: crates/spicy_simulate/src/lib.rs
+expression: output
+---
+[
+    (
+        1.0,
+        [1.0, 0.9999605231408796, -3.947685912040512e-8], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.006282937266758386, -6.282937266758386e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        1.5848931924611136,
+        [1.0, 0.9999008445312642, -9.91554687359078e-8], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.009957190212550917, -9.957190212550917e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        2.5118864315095806,
+        [1.0, 0.9997509700560014, -2.4902994399857853e-7], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.01577871756783715, -1.577871756783715e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        3.9810717055349736,
+        [1.0, 0.9993747004910178, -6.252995089822602e-7], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.02499817012315517, -2.499817012315517e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        6.309573444801934,
+        [1.0, 0.9984308021389245, -1.56919786107549e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.039582009539035484, -3.9582009539035484e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        10.000000000000004,
+        [1.0, 0.9960676824071725, -3.9323175928275816e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.06258477827057171, -6.258477827057171e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        15.848931924611142,
+        [1.0, 0.9901808418263092, -9.819158173690829e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.09860396699144981, -9.860396699144981e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        25.118864315095813,
+        [1.0, 0.9756961908471385, -2.430380915286151e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.15399069456795994, -0.00015399069456795993], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        39.81071705534975,
+        [1.0, 0.9411152867478171, -5.888471325218294e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.23540880144419213, -0.00023540880144419215], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        63.095734448019364,
+        [1.0, 0.8641799400944487, -0.00013582005990555137], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.3425973894132934, -0.00034259738941329337], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        100.00000000000007,
+        [1.0, 0.7169568003248975, -0.0002830431996751025], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.45047724336838874, -0.0004504772433683887], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        158.48931924611148,
+        [1.0, 0.5020954917241712, -0.0004979045082758287], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.4999956088951521, -0.0004999956088951521], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        251.18864315095823,
+        [1.0, 0.2864574583735093, -0.0007135425416264908], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.45210572094997703, -0.00045210572094997703], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        398.1071705534976,
+        [1.0, 0.13779974399898384, -0.0008622002560010162], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.3446896786281805, -0.0003446896786281805], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        630.9573444801939,
+        [1.0, 0.05982062976643343, -0.0009401793702335665], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.23715421569261785, -0.00023715421569261787], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        1000.0000000000011,
+        [1.0, 0.024704523031857592, -0.0009752954769681424], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.15522309613464746, -0.00015522309613464748], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        1584.8931924611154,
+        [1.0, 0.00998349712771292, -0.000990016502872287], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.09941743766972608, -9.941743766972606e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        2511.8864315095834,
+        [1.0, 0.003998528935458673, -0.0009960014710645414], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.06310737438533609, -6.310737438533608e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        3981.071705534978,
+        [1.0, 0.001595683349481163, -0.0009984043166505188], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.03991412211397555, -3.9914122113975545e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        6309.573444801941,
+        [1.0, 0.0006358636861541684, -0.0009993641363138458], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.025208319331657136, -2.520831933165714e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        10000.000000000015,
+        [1.0, 0.0002532388129651592, -0.0009997467611870348], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.0159114638883029, -1.59114638883029e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        15848.931924611159,
+        [1.0, 0.00010083155631444877, -0.0009998991684436855], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.010040985475126432, -1.0040985475126432e-5], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        25118.86431509584,
+        [1.0, 4.014420193006488e-5, -0.00099995985579807], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.006335818050821557, -6.335818050821557e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        39810.71705534979,
+        [1.0, 1.5982080811650412e-5, -0.0009999840179191885], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.003997727527576553, -3.997727527576554e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        63095.73444801944,
+        [1.0, 6.362642176918893e-6, -0.000999993637357823], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.0025224198091720225, -2.522419809172022e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+    (
+        100000.00000000019,
+        [1.0, 2.5330231748357786e-6, -0.0009999974669768251], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+        [0.0, -0.001591545399487358, -1.5915453994873582e-6], shape=[3], strides=[1], layout=CFcf (0xf), const ndim=1,
+    ),
+]

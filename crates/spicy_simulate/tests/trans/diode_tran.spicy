@@ -1,0 +1,8 @@
+diode transient rectifier
+V1 in 0 PULSE(0 1 0 1u 1u 2m 4m)
+D1 in out DMOD
+R1 out 0 1k
+C1 out 0 1u
+.MODEL DMOD D n=2
+.TRAN 0.5m 5m
+.END

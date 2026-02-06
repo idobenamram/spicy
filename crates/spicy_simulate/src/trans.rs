@@ -3,25 +3,17 @@ use std::collections::HashMap;
 use spicy_parser::{instance_parser::Deck, netlist_types::TranCommand};
 
 use crate::{
-    SimulationConfig, TransientIntegrator,
+    NewtonConfig, NewtonMode, NewtonState, SimulationConfig, TransientIntegrator,
     dc::simulate_op_inner,
     devices::{Capacitor, Devices, Inductor},
+    error::SimulationError,
     matrix::SolverMatrix,
+    util::get_voltage_diff,
 };
 
 fn steps(dt: f64, tstop: f64) -> Vec<f64> {
     let nsteps = (tstop / dt).floor() as usize;
     (0..=nsteps).map(|i| i as f64 * dt).collect()
-}
-
-// TODO: this kinda sucks
-fn get_voltage_diff(voltages: &[f64], positive: Option<usize>, negative: Option<usize>) -> f64 {
-    match (positive, negative) {
-        (Some(positive), Some(negative)) => voltages[positive] - voltages[negative],
-        (Some(positive), None) => voltages[positive],
-        (None, Some(negative)) => -voltages[negative],
-        (None, None) => 0.0, // TODO: should through an error
-    }
 }
 
 fn get_previous_voltage(
@@ -52,6 +44,64 @@ fn get_previous_current(
     }
 }
 
+fn abs_rel_ok(a: f64, b: f64, abs_tol: f64, rel_tol: f64) -> bool {
+    let diff = (a - b).abs();
+    if diff <= abs_tol {
+        return true;
+    }
+    let scale = a.abs().max(b.abs());
+    diff <= abs_tol + rel_tol * scale
+}
+
+fn converged(prev: &[f64], next: &[f64], config: &NewtonConfig) -> bool {
+    prev.iter()
+        .zip(next.iter())
+        .all(|(&a, &b)| abs_rel_ok(a, b, config.abs_tol, config.rel_tol))
+}
+
+pub(crate) fn newton_solve<F>(
+    matrix: &mut SolverMatrix,
+    state: &mut NewtonState,
+    mut guess: Vec<f64>,
+    time: Option<f64>,
+    mut stamp: F,
+) -> Result<(Vec<f64>, usize), SimulationError>
+where
+    F: FnMut(&mut SolverMatrix, &[f64]) -> Result<(), SimulationError>,
+{
+    let max_iters = state.config.max_iters;
+    for iter in 0..max_iters {
+        matrix.clear();
+        stamp(matrix, &guess)?;
+
+        matrix.ensure_analyzed()?;
+        let is_init = matches!(state.mode, NewtonMode::InitOp | NewtonMode::InitTrans);
+        if is_init && iter == 0 {
+            matrix.factorize()?;
+        } else {
+            // TODO: for KLU, consider retrying full factorization on refactor failure.
+            matrix.refactor()?;
+        }
+
+        // after the first iteration we iterate
+        if is_init {
+            state.mode = NewtonMode::Iterate;
+        }
+
+        matrix.solve()?;
+        let solution = matrix.rhs().to_vec();
+
+        if iter > 0 && converged(&guess, &solution, &state.config) {
+            return Ok((solution, iter + 1));
+        }
+        guess = solution;
+    }
+
+    Err(SimulationError::NonConvergence {
+        time,
+        iters: max_iters,
+    })
+}
 
 #[derive(Debug)]
 pub enum Integrator<'a> {
@@ -128,16 +178,14 @@ impl<'a> Integrator<'a> {
         match self {
             Integrator::BackwardEuler { previous } => {
                 let r_eq = device.inductance / config.step;
-                let i_prev = get_previous_current(
-                    previous,
-                    branch_index,
-                    device.ic,
-                    config.use_device_ic,
-                );
+                let i_prev =
+                    get_previous_current(previous, branch_index, device.ic, config.use_device_ic);
                 let v_hist = -r_eq * i_prev;
                 (r_eq, v_hist)
             }
-            Integrator::Trapezoidal { previous_output, .. } => {
+            Integrator::Trapezoidal {
+                previous_output, ..
+            } => {
                 let r_eq = 2.0 * device.inductance / config.step;
                 let i_prev = get_previous_current(
                     previous_output,
@@ -187,16 +235,23 @@ struct TransientConfig {
     use_device_ic: bool,
 }
 
-fn simulation_step<'a>(
+fn stamp_transient<'a>(
     matrix: &mut SolverMatrix,
     devices: &'a Devices,
     config: &TransientConfig,
-    integrator: &mut Integrator<'a>,
-) -> Vec<f64> {
-    matrix.clear();
-
+    integrator: &Integrator<'a>,
+    guess: &[f64],
+) -> Result<(), SimulationError> {
     for r in &devices.resistors {
         r.stamp_dc(matrix);
+    }
+
+    for d in &devices.diodes {
+        d.stamp_nonlinear(matrix, guess);
+    }
+
+    for bjt in &devices.bjts {
+        bjt.stamp_nonlinear(matrix, guess);
     }
 
     for c in &devices.capacitors {
@@ -224,11 +279,22 @@ fn simulation_step<'a>(
         isrc.stamp_current_source_trans(matrix, config.t, config.step, config.tstop);
     }
 
-    // Solve.
-    matrix.refactor().expect("Failed to refactor matrix");
-    matrix.solve().expect("Failed to solve linear system");
+    Ok(())
+}
 
-    let solution = matrix.rhs().to_vec();
+fn simulation_step<'a>(
+    matrix: &mut SolverMatrix,
+    devices: &'a Devices,
+    config: &TransientConfig,
+    integrator: &mut Integrator<'a>,
+    newton: &mut NewtonState,
+    time: f64,
+) -> Result<(Vec<f64>, usize), SimulationError> {
+    let initial_guess = integrator.get_previous_output().to_vec();
+    let (solution, iters) =
+        newton_solve(matrix, newton, initial_guess, Some(time), |m, guess| {
+            stamp_transient(m, devices, config, integrator, guess)
+        })?;
 
     if matches!(&*integrator, Integrator::Trapezoidal { .. }) {
         for c in &devices.capacitors {
@@ -241,7 +307,7 @@ fn simulation_step<'a>(
         }
     }
 
-    solution
+    Ok((solution, iters))
 }
 
 #[derive(Debug, Clone)]
@@ -253,21 +319,22 @@ pub struct TransientResult {
     pub source_names: Vec<String>,
     /// one sample per time with all unknowns (node voltages and source currents)
     pub samples: Vec<Vec<f64>>,
+    /// number of Newton iterations per time sample (aligned with `times`)
+    pub newton_iterations: Vec<usize>,
 }
 
 pub fn simulate_trans(
     deck: &Deck,
     cmd: &TranCommand,
     sim_config: &SimulationConfig,
-) -> TransientResult {
+) -> Result<TransientResult, SimulationError> {
     let tstep = cmd.tstep.get_value();
     let tstop = cmd.tstop.get_value();
 
     let mut devices = Devices::from_spec(&deck.devices);
 
     let mut matrix =
-        SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)
-            .expect("Failed to create matrix");
+        SolverMatrix::create_matrix(&mut devices, deck.node_mapping.clone(), sim_config)?;
 
     let mut config = TransientConfig {
         // TODO: this is not really correct but ok for now, tstep doesn't have to be the step size
@@ -282,7 +349,8 @@ pub fn simulate_trans(
         unimplemented!("UIC is not supported yet");
     } else {
         // When there is no initial conditions we use the operating point as the initial condition.
-        simulate_op_inner(&mut matrix, &devices).expect("Failed to simulate OP");
+        let mut op_state = NewtonState::new(sim_config.newton, NewtonMode::InitOp);
+        simulate_op_inner(&mut matrix, &devices, &mut op_state)?;
         matrix.rhs().to_vec()
     };
 
@@ -298,30 +366,42 @@ pub fn simulate_trans(
 
     let mut times: Vec<f64> = Vec::new();
     let mut samples: Vec<Vec<f64>> = Vec::new();
+    let mut newton_iterations: Vec<usize> = Vec::new();
+    let mut newton_state = NewtonState::new(sim_config.newton, NewtonMode::InitTrans);
 
     // initial sample at t=0 using current state (before any transient step)
     // note this means that for UIC even the the voltage source nodes will have a value of 0 at t=0
     times.push(0.0);
     samples.push(integrator.get_previous_output().to_vec());
+    newton_iterations.push(0);
 
     let steps = steps(config.step, tstop);
     for step in steps.into_iter().skip(1) {
-        let x = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+        config.t = step;
+        let (x, iters) = simulation_step(
+            &mut matrix,
+            &devices,
+            &config,
+            &mut integrator,
+            &mut newton_state,
+            step,
+        )?;
 
         integrator.save_previous_voltage(x.clone());
         config.use_device_ic = false;
-        config.t = step;
 
         times.push(step);
         samples.push(x.to_vec());
+        newton_iterations.push(iters);
     }
 
-    TransientResult {
+    Ok(TransientResult {
         times,
         node_names: deck.node_mapping.node_names_mna_order(),
         source_names: deck.node_mapping.branch_names_mna_order(),
         samples,
-    }
+        newton_iterations,
+    })
 }
 
 #[cfg(test)]
@@ -382,8 +462,8 @@ C1 out 0 1u\n\
             ..SimulationConfig::default()
         };
 
-        let klu = simulate_trans(&deck, tran_cmd, &klu_cfg);
-        let blas = simulate_trans(&deck, tran_cmd, &blas_cfg);
+        let klu = simulate_trans(&deck, tran_cmd, &klu_cfg).expect("simulate_trans klu");
+        let blas = simulate_trans(&deck, tran_cmd, &blas_cfg).expect("simulate_trans blas");
 
         assert_eq!(klu.times, blas.times, "time grids differ");
         assert_eq!(
@@ -398,6 +478,16 @@ C1 out 0 1u\n\
             klu.samples.len(),
             blas.samples.len(),
             "sample count differs"
+        );
+        assert_eq!(
+            klu.newton_iterations.len(),
+            klu.times.len(),
+            "klu newton iteration count differs from times"
+        );
+        assert_eq!(
+            blas.newton_iterations.len(),
+            blas.times.len(),
+            "blas newton iteration count differs from times"
         );
 
         // Compare with "smart rounding" (significant digits) to avoid tiny solver-dependent noise.
@@ -462,7 +552,16 @@ C1 out 0 1u\n\
             use_device_ic: false,
         };
 
-        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+        let mut newton_state = NewtonState::new(sim_cfg.newton, NewtonMode::InitTrans);
+        let (solution, _iters) = simulation_step(
+            &mut matrix,
+            &devices,
+            &config,
+            &mut integrator,
+            &mut newton_state,
+            config.step,
+        )
+        .expect("simulation_step");
 
         let cap = devices.capacitors.first().expect("expected capacitor");
         let pos = matrix.mna_node_index(cap.positive);
@@ -533,7 +632,16 @@ L1 n1 0 1\n\
             use_device_ic: false,
         };
 
-        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+        let mut newton_state = NewtonState::new(sim_cfg.newton, NewtonMode::InitTrans);
+        let (solution, _iters) = simulation_step(
+            &mut matrix,
+            &devices,
+            &config,
+            &mut integrator,
+            &mut newton_state,
+            config.step,
+        )
+        .expect("simulation_step");
 
         let ind = devices.inductors.first().expect("expected inductor");
         let node = matrix
@@ -603,7 +711,16 @@ L1 n1 0 1\n\
             use_device_ic: false,
         };
 
-        let solution = simulation_step(&mut matrix, &devices, &config, &mut integrator);
+        let mut newton_state = NewtonState::new(sim_cfg.newton, NewtonMode::InitTrans);
+        let (solution, _iters) = simulation_step(
+            &mut matrix,
+            &devices,
+            &config,
+            &mut integrator,
+            &mut newton_state,
+            config.step,
+        )
+        .expect("simulation_step");
 
         let ind = devices.inductors.first().expect("expected inductor");
         let node = matrix

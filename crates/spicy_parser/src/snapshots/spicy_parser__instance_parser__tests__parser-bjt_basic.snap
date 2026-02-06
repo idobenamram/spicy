@@ -59,6 +59,7 @@ Deck {
                     3,
                 ),
                 model: BjtModel {
+                    polarity: Npn,
                     is: Some(
                         Value {
                             value: 1.0,
@@ -82,6 +83,8 @@ Deck {
                             suffix: None,
                         },
                     ),
+                    nf: None,
+                    nr: None,
                 },
                 area: Some(
                     Value {

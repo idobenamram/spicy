@@ -146,9 +146,9 @@ impl Inductor {
             ar[[k, n2]] -= 1.0;
         }
 
-        // KVL: v = (Va - Vb) - j*w*L*i = 0 -> put +w*L on imag diagonal of KVL row/col
+        // KVL: v = (Va - Vb) - j*w*L*i = 0 -> put -w*L on imag diagonal of KVL row/col
         let wl = w * self.inductance;
-        ai[[k, k]] += wl;
+        ai[[k, k]] -= wl;
     }
 
     /// Stamp transient companion model for an inductor.

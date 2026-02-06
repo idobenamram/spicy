@@ -8,32 +8,46 @@ use spicy_simulate::{
 };
 
 use crate::tui::app::{App, Tab};
+use crate::tui::ui::format_error_snippet;
 use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, netlist_types::Command, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
-    RunCurrentTab(Tab),
+    RunCurrentTab { tab: Tab, config: SimulationConfig },
 }
 
 #[derive(Debug)]
 pub enum SimMsg {
-    Diagnostics(Vec<SpicyError>),
     SimulationStarted,
     Op(OperatingPointResult),
     Dc(DcSweepResult),
     Transient(TransientResult),
+    FatalError(String),
     Done,
 }
 
 pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     match msg {
-        SimMsg::Diagnostics(d) => app.diags = d,
         SimMsg::SimulationStarted => app.running = true,
         SimMsg::Op(op) => app.op = Some(op),
         SimMsg::Dc(dc) => app.dc = Some(dc),
         SimMsg::Transient(tr) => app.trans = Some(tr),
+        SimMsg::FatalError(_) => app.running = false,
         SimMsg::Done => app.running = false,
     }
+}
+
+fn format_parse_error(error: &SpicyError, source_map: &SourceMap) -> String {
+    let mut out = format!("Parse error: {error}");
+    if let Some(span) = error.error_span() {
+        let path = source_map.get_path(span.source_index);
+        out.push_str(&format!("\n--> {}", path.display()));
+        if let Some(snippet) = format_error_snippet(source_map.get_content(span.source_index), span) {
+            out.push('\n');
+            out.push_str(&snippet);
+        }
+    }
+    out
 }
 
 pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
@@ -46,19 +60,17 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
         max_include_depth: 10,
     };
 
-    let sim_config = SimulationConfig::default();
-
     while let Ok(cmd) = rx.recv() {
         match cmd {
-            SimCmd::RunCurrentTab(_tab) => {
+            SimCmd::RunCurrentTab { tab: _tab, config } => {
+                let sim_config = config;
                 // Parse
                 // TODO: fix
 
                 let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
-                        let diags = vec![e];
-                        let _ = tx.send(SimMsg::Diagnostics(diags));
+                        let _ = tx.send(SimMsg::FatalError(format_parse_error(&e, &parse_options.source_map)));
                         continue;
                     }
                 };
@@ -68,8 +80,17 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                 for command in &deck.commands {
                     match command {
                         Command::Op(_) => {
-                            let op = simulate_op(&deck, &sim_config);
-                            let _ = tx.send(SimMsg::Op(op));
+                            match simulate_op(&deck, &sim_config) {
+                                Ok(op) => {
+                                    let _ = tx.send(SimMsg::Op(op));
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(SimMsg::FatalError(format!(
+                                        "Simulation error: {}",
+                                        e
+                                    )));
+                                }
+                            }
                             continue;
                         }
                         Command::Dc(command_params) => {
@@ -78,8 +99,17 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                             continue;
                         }
                         Command::Tran(command_params) => {
-                            let tr = simulate_trans(&deck, command_params, &sim_config);
-                            let _ = tx.send(SimMsg::Transient(tr));
+                            match simulate_trans(&deck, command_params, &sim_config) {
+                                Ok(tr) => {
+                                    let _ = tx.send(SimMsg::Transient(tr));
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(SimMsg::FatalError(format!(
+                                        "Simulation error: {}",
+                                        e
+                                    )));
+                                }
+                            }
                             continue;
                         }
                         _ => {}

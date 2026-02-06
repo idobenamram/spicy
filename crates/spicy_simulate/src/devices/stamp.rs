@@ -45,6 +45,84 @@ impl NodePairStamp {
     }
 }
 
+/// Cached MNA stamp indices for a 3-terminal device (base/collector/emitter).
+///
+/// Field names use row-first notation: `bc` means row=base, col=collector.
+#[derive(Debug, Clone)]
+pub struct NodeTripletStamp {
+    pub bb: Option<usize>,
+    pub cc: Option<usize>,
+    pub ee: Option<usize>,
+    pub bc: Option<usize>,
+    pub cb: Option<usize>,
+    pub ce: Option<usize>,
+    pub ec: Option<usize>,
+    pub be: Option<usize>,
+    pub eb: Option<usize>,
+}
+
+impl NodeTripletStamp {
+    pub fn unitialized() -> Self {
+        Self {
+            bb: None,
+            bc: None,
+            be: None,
+            cb: None,
+            cc: None,
+            ce: None,
+            eb: None,
+            ec: None,
+            ee: None,
+        }
+    }
+
+    pub fn temp_entries(
+        &mut self,
+        bb: Option<usize>,
+        bc: Option<usize>,
+        be: Option<usize>,
+        cb: Option<usize>,
+        cc: Option<usize>,
+        ce: Option<usize>,
+        eb: Option<usize>,
+        ec: Option<usize>,
+        ee: Option<usize>,
+    ) {
+        self.bb = bb;
+        self.bc = bc;
+        self.be = be;
+        self.cb = cb;
+        self.cc = cc;
+        self.ce = ce;
+        self.eb = eb;
+        self.ec = ec;
+        self.ee = ee;
+    }
+
+    pub fn finialize(
+        &mut self,
+        bb: Option<usize>,
+        bc: Option<usize>,
+        be: Option<usize>,
+        cb: Option<usize>,
+        cc: Option<usize>,
+        ce: Option<usize>,
+        eb: Option<usize>,
+        ec: Option<usize>,
+        ee: Option<usize>,
+    ) {
+        self.bb = bb;
+        self.bc = bc;
+        self.be = be;
+        self.cb = cb;
+        self.cc = cc;
+        self.ce = ce;
+        self.eb = eb;
+        self.ec = ec;
+        self.ee = ee;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NodeBranchPairStamp {
     // (pos, branch), (branch, pos)

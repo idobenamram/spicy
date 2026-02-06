@@ -1,0 +1,7 @@
+simple diode with resistor
+V1 in 0 DC 1
+R1 in out 10k
+D1 out 0 DMOD
+.MODEL DMOD D n=2
+.OP
+.END

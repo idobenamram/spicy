@@ -2,12 +2,152 @@ use anyhow::Result;
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::tui::app::{App, Tab};
+use crate::tui::app::{App, ConfigField, Tab};
 use crate::tui::worker::SimCmd;
+use spicy_simulate::{LinearSolver, TransientIntegrator, solver::klu::KluConfig};
+
+fn clear_config_edit(app: &mut App) {
+    app.config_edit = None;
+    app.config_error = None;
+}
+
+fn toggle_solver(app: &mut App) {
+    app.config.solver = match app.config.solver {
+        LinearSolver::Klu { .. } => LinearSolver::Blas,
+        LinearSolver::Blas => LinearSolver::Klu {
+            config: KluConfig::default(),
+        },
+    };
+}
+
+fn toggle_integrator(app: &mut App) {
+    app.config.integrator = match app.config.integrator {
+        TransientIntegrator::BackwardEuler => TransientIntegrator::Trapezoidal,
+        TransientIntegrator::Trapezoidal => TransientIntegrator::BackwardEuler,
+    };
+}
+
+fn start_config_edit(app: &mut App) {
+    app.config_error = None;
+    let value = match app.config_field {
+        ConfigField::AbsTol => format!("{:e}", app.config.newton.abs_tol),
+        ConfigField::RelTol => format!("{:e}", app.config.newton.rel_tol),
+        ConfigField::MaxIters => app.config.newton.max_iters.to_string(),
+        _ => String::new(),
+    };
+    app.config_edit = Some(value);
+}
+
+fn apply_config_edit(app: &mut App) {
+    let Some(input) = app.config_edit.as_deref() else {
+        return;
+    };
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        app.config_error = Some("value required".to_string());
+        return;
+    }
+    match app.config_field {
+        ConfigField::AbsTol => match trimmed.parse::<f64>() {
+            Ok(v) if v.is_finite() && v > 0.0 => {
+                app.config.newton.abs_tol = v;
+                clear_config_edit(app);
+            }
+            _ => app.config_error = Some("abs_tol must be a positive number".to_string()),
+        },
+        ConfigField::RelTol => match trimmed.parse::<f64>() {
+            Ok(v) if v.is_finite() && v > 0.0 => {
+                app.config.newton.rel_tol = v;
+                clear_config_edit(app);
+            }
+            _ => app.config_error = Some("rel_tol must be a positive number".to_string()),
+        },
+        ConfigField::MaxIters => match trimmed.parse::<usize>() {
+            Ok(v) if v > 0 => {
+                app.config.newton.max_iters = v;
+                clear_config_edit(app);
+            }
+            _ => app.config_error = Some("max_iters must be a positive integer".to_string()),
+        },
+        _ => {}
+    }
+}
+
+fn handle_config_key(k: KeyEvent, app: &mut App) -> Result<bool> {
+    if let Some(buffer) = app.config_edit.as_mut() {
+        match k.code {
+            KeyCode::Esc => {
+                clear_config_edit(app);
+            }
+            KeyCode::Enter => {
+                apply_config_edit(app);
+            }
+            KeyCode::Backspace => {
+                buffer.pop();
+            }
+            KeyCode::Char(c) => {
+                let allow = match app.config_field {
+                    ConfigField::MaxIters => c.is_ascii_digit(),
+                    _ => c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '-' | '+'),
+                };
+                if allow {
+                    buffer.push(c);
+                }
+            }
+            _ => {}
+        }
+        return Ok(false);
+    }
+
+    match k.code {
+        KeyCode::Esc => {
+            app.show_config = false;
+            clear_config_edit(app);
+        }
+        KeyCode::Up | KeyCode::Char('k') => app.config_field = app.config_field.prev(),
+        KeyCode::Down | KeyCode::Char('j') => app.config_field = app.config_field.next(),
+        KeyCode::Left | KeyCode::Right | KeyCode::Char(' ') => match app.config_field {
+            ConfigField::Solver => toggle_solver(app),
+            ConfigField::Integrator => toggle_integrator(app),
+            _ => {}
+        },
+        KeyCode::Enter => match app.config_field {
+            ConfigField::Solver => toggle_solver(app),
+            ConfigField::Integrator => toggle_integrator(app),
+            ConfigField::AbsTol | ConfigField::RelTol | ConfigField::MaxIters => {
+                start_config_edit(app);
+            }
+        },
+        _ => {}
+    }
+    Ok(false)
+}
 
 pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<bool> {
     match k.code {
         KeyCode::Char('q') => return Ok(true),
+        KeyCode::Char('h') | KeyCode::Char('?') => {
+            app.show_help = !app.show_help;
+            if app.show_help {
+                app.show_config = false;
+                clear_config_edit(app);
+            }
+            return Ok(false);
+        }
+        KeyCode::Char('c') => {
+            app.show_config = !app.show_config;
+            if app.show_config {
+                app.show_help = false;
+            }
+            clear_config_edit(app);
+            return Ok(false);
+        }
+        KeyCode::Esc if app.show_help => {
+            app.show_help = false;
+            return Ok(false);
+        }
+        _ if app.show_help => return Ok(false),
+        _ if app.show_config => return handle_config_key(k, app),
         KeyCode::Tab => app.focus_right = !app.focus_right,
         KeyCode::Char('j') if !app.focus_right => app.scroll = app.scroll.saturating_add(1),
         KeyCode::Char('k') if !app.focus_right => app.scroll = app.scroll.saturating_sub(1),
@@ -15,8 +155,8 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             app.scroll = app.netlist.len().saturating_sub(1)
         }
         KeyCode::Char('g') if !app.focus_right => app.scroll = 0,
-        KeyCode::Char('h') => app.tab = app.tab.next(),
-        KeyCode::Char('l') => app.tab = app.tab.prev(),
+        KeyCode::Left => app.tab = app.tab.prev(),
+        KeyCode::Right => app.tab = app.tab.next(),
         // transient tab node selection
         KeyCode::Down if app.focus_right && matches!(app.tab, Tab::Trans) => {
             app.trans_list_index = app.trans_list_index.saturating_add(1);
@@ -43,7 +183,10 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
         KeyCode::Char('3') => app.tab = Tab::Trans,
         // KeyCode::Char('3') => app.tab = Tab::Ac,
         KeyCode::Char('r') => {
-            tx.send(SimCmd::RunCurrentTab(app.tab))?;
+            tx.send(SimCmd::RunCurrentTab {
+                tab: app.tab,
+                config: app.config.clone(),
+            })?;
             app.running = true;
         }
         _ => {}

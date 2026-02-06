@@ -36,7 +36,7 @@ fn main() {
         if let Err(e) = tui::run_tui(&path) {
             // try to gracefully restore terminal
             let _ = tui::term::restore_terminal();
-            eprintln!("TUI error: {}", e);
+            eprintln!("{}", e);
             std::process::exit(1);
         }
         let _ = tui::term::restore_terminal();
@@ -71,7 +71,10 @@ fn main() {
                 output_base: Some(base),
                 ..Default::default()
             };
-            simulate(deck, sim_config);
+            if let Err(e) = simulate(deck, sim_config) {
+                eprintln!("Simulation error: {}", e);
+                std::process::exit(3);
+            }
         }
         Err(e) => {
             eprintln!("Parse error: {}", e);

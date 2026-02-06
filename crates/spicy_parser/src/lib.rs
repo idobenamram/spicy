@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 pub use expr::Value;
 pub use lexer::Span;
 pub use libs_phase::SourceMap;
+pub use netlist_models::BjtPolarity;
 
 use crate::{
     error::{IncludeError, SpicyError},

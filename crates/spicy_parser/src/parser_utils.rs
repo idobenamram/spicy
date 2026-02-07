@@ -274,7 +274,6 @@ pub(crate) fn parse_dot_param(
 ) -> Result<(), SpicyError> {
     while let Some(token) = cursor.next() {
         if token.kind != TokenKind::WhiteSpace {
-            println!("warning: unexpected token: {:?}", token);
             break;
         }
         let (ident, value) = parse_equal_expr(cursor, src)?;

@@ -1,0 +1,9 @@
+bjt tran base pulse
+Vcc vcc 0 DC 5
+Rc vcc c 1k
+Vb b 0 PULSE(0 0.7 0 1u 1u 0.5m 1m)
+Ve e 0 DC 0
+Q1 c b e QMOD
+.MODEL QMOD NPN is=1e-16 bf=100 br=1
+.TRAN 0.1m 1m
+.END

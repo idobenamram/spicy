@@ -72,19 +72,36 @@ pub(crate) struct ModelStatement {
     pub statement: Statement,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum BjtPolarity {
+    Npn,
+    Pnp,
+}
+
+impl Default for BjtPolarity {
+    fn default() -> Self {
+        Self::Npn
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) enum DeviceModelType {
     Resistor,
     Capacitor,
     Inductor,
+    Diode,
+    Bjt(BjtPolarity),
 }
 
 impl DeviceModelType {
     pub fn from_str(s: &str, span: Span) -> Result<DeviceModelType, SpicyError> {
-        match s.to_uppercase().to_string().as_str() {
+        match s.to_uppercase().as_str() {
             "R" => Ok(DeviceModelType::Resistor),
             "C" => Ok(DeviceModelType::Capacitor),
             "L" => Ok(DeviceModelType::Inductor),
+            "D" => Ok(DeviceModelType::Diode),
+            "NPN" => Ok(DeviceModelType::Bjt(BjtPolarity::Npn)),
+            "PNP" => Ok(DeviceModelType::Bjt(BjtPolarity::Pnp)),
             _ => Err(SubcircuitError::InvalidDeviceModelType {
                 s: s.to_string(),
                 span,
@@ -144,6 +161,8 @@ fn model_statement_to_device_model(
         DeviceModelType::Resistor => DeviceModel::Resistor(ResistorModel::new(params)?),
         DeviceModelType::Capacitor => DeviceModel::Capacitor(CapacitorModel::new(params)?),
         DeviceModelType::Inductor => DeviceModel::Inductor(InductorModel::new(params)?),
+        DeviceModelType::Diode => DeviceModel::Diode(DiodeModel::new(params)?),
+        DeviceModelType::Bjt(polarity) => DeviceModel::Bjt(BjtModel::new(polarity, params)?),
     })
 }
 
@@ -238,9 +257,80 @@ impl InductorModel {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DiodeModel {
+    pub is: Option<Value>,
+    pub n: Option<Value>,
+    pub rs: Option<Value>,
+}
+
+impl DiodeModel {
+    pub(crate) fn new(params: Vec<(Ident, Value)>) -> Result<Self, SpicyError> {
+        let mut model = Self::default();
+
+        for (ident, value) in params {
+            match ident.text {
+                "is" => model.is = Some(value),
+                "n" => model.n = Some(value),
+                "rs" => model.rs = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct BjtModel {
+    pub polarity: BjtPolarity,
+    pub is: Option<Value>,
+    pub bf: Option<Value>,
+    pub br: Option<Value>,
+    pub nf: Option<Value>,
+    pub nr: Option<Value>,
+}
+
+impl BjtModel {
+    pub(crate) fn new(
+        polarity: BjtPolarity,
+        params: Vec<(Ident, Value)>,
+    ) -> Result<Self, SpicyError> {
+        let mut model = Self {
+            polarity,
+            ..Self::default()
+        };
+
+        for (ident, value) in params {
+            match ident.text {
+                "is" => model.is = Some(value),
+                "bf" => model.bf = Some(value),
+                "br" => model.br = Some(value),
+                "nf" => model.nf = Some(value),
+                "nr" => model.nr = Some(value),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(model)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) enum DeviceModel {
     Resistor(ResistorModel),
     Capacitor(CapacitorModel),
     Inductor(InductorModel),
+    Diode(DiodeModel),
+    Bjt(BjtModel),
 }

@@ -34,7 +34,7 @@ impl IndependentSource {
             current_branch: spec.current_branch,
             dc,
             ac: spec.ac.clone(),
-            stamp: NodeVoltageSourceStamp::unitialized(),
+            stamp: NodeVoltageSourceStamp::uninitialized(),
         }
     }
 
@@ -74,6 +74,27 @@ impl IndependentSource {
         let neg = m.mna_node_index(self.negative);
 
         let value = self.dc.compute(0.0, 0.0, 0.0);
+
+        if let Some(pos) = pos {
+            *m.get_mut_rhs(pos) += value;
+        }
+        if let Some(neg) = neg {
+            *m.get_mut_rhs(neg) -= value;
+        }
+    }
+
+    /// Stamp a transient current source at time `t` with step `dt` and stop `tstop`.
+    pub(crate) fn stamp_current_source_trans(
+        &self,
+        m: &mut SolverMatrix,
+        t: f64,
+        dt: f64,
+        tstop: f64,
+    ) {
+        let pos = m.mna_node_index(self.positive);
+        let neg = m.mna_node_index(self.negative);
+
+        let value = self.dc.compute(t, dt, tstop);
 
         if let Some(pos) = pos {
             *m.get_mut_rhs(pos) += value;

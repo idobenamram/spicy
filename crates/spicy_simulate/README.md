@@ -12,10 +12,10 @@ MNA-based circuit analyzers for Spicy. Consumes a `spicy_parser::parser::Deck` a
 
 ```rust
 use spicy_parser::parser::parse;
-use spicy_simulate::{simulate_op, simulate_dc, simulate_ac};
+use spicy_simulate::{simulate_op, simulate_dc, simulate_ac, SimulationConfig};
 
-let deck = parse(include_str!("../tests/simple_resistor.spicy"))?;
-let op = simulate_op(&deck);
+let deck = parse(include_str!("../tests/op_dc/simple_resistor.spicy"))?;
+let op = simulate_op(&deck, &SimulationConfig::default())?;
 println!("OP voltages: {:?}", op.voltages);
 
 // For DC sweep, extract the .DC command from the deck
@@ -26,9 +26,9 @@ println!("OP voltages: {:?}", op.voltages);
 
 ## Example netlists
 
-- `tests/simple_resistor.spicy`
-- `tests/simple_voltage_source.spicy`
-- `tests/simple_inductor_capacitor.spicy`
+- `tests/op_dc/simple_resistor.spicy`
+- `tests/op_dc/simple_voltage_source.spicy`
+- `tests/op_dc/simple_inductor_capacitor.spicy`
 
 Run tests:
 

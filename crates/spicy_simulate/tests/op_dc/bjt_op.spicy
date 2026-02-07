@@ -1,0 +1,9 @@
+bjt op biased
+Vcc vcc 0 DC 5
+Rc vcc c 1k
+Vb b 0 DC 0.7
+Ve e 0 DC 0
+Q1 c b e QMOD
+.MODEL QMOD NPN is=1e-16 bf=100 br=1
+.OP
+.END

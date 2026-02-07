@@ -1,5 +1,7 @@
 use crate::SourceMap;
-use crate::devices::{CapacitorSpec, Devices, IndependentSourceSpec, InductorSpec, ResistorSpec};
+use crate::devices::{
+    BjtSpec, CapacitorSpec, Devices, DiodeSpec, IndependentSourceSpec, InductorSpec, ResistorSpec,
+};
 use crate::error::{ParserError, SpicyError};
 use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
@@ -30,6 +32,7 @@ pub(crate) struct ParamSlot<'s> {
     pub canonical: &'s str,
     // pub aliases: Vec<&'s str>,
     pub is_ident: bool,
+    pub is_flag: bool,
 }
 
 impl<'s> ParamSlot<'s> {
@@ -37,6 +40,7 @@ impl<'s> ParamSlot<'s> {
         Self {
             canonical,
             is_ident: true,
+            is_flag: false,
         }
     }
 
@@ -44,8 +48,23 @@ impl<'s> ParamSlot<'s> {
         Self {
             canonical,
             is_ident: false,
+            is_flag: false,
         }
     }
+
+    pub fn flag(canonical: &'s str) -> Self {
+        Self {
+            canonical,
+            is_ident: true,
+            is_flag: true,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedParam<'s> {
+    pub name: &'s str,
+    pub cursor: StmtCursor<'s>,
 }
 
 pub(crate) struct ParamParser<'s> {
@@ -73,7 +92,10 @@ impl<'s> ParamParser<'s> {
         }
     }
 
-    fn parse_named_param(&mut self, cursor: &mut StmtCursor) -> Result<&'s str, SpicyError> {
+    fn parse_named_param(
+        &mut self,
+        mut cursor: StmtCursor<'s>,
+    ) -> Result<ParsedParam<'s>, SpicyError> {
         let Ok(ident) = cursor.expect(TokenKind::Ident) else {
             return Err(ParserError::MissingToken {
                 message: "ident",
@@ -83,7 +105,7 @@ impl<'s> ParamParser<'s> {
         };
         let ident_str = token_text(self.input, ident);
 
-        if !self.params_order.iter().any(|p| p.canonical == ident_str) {
+        let Some(param) = self.params_order.iter().find(|p| p.canonical == ident_str) else {
             return Err(ParserError::InvalidParam {
                 param: ident_str.to_string(),
                 span: cursor.span,
@@ -91,30 +113,48 @@ impl<'s> ParamParser<'s> {
             .into());
         };
 
-        let Ok(_equal_sign) = cursor.expect(TokenKind::Equal) else {
+        if !param.is_flag {
+            let Ok(_equal_sign) = cursor.expect(TokenKind::Equal) else {
+                return Err(ParserError::MissingToken {
+                    message: "equal",
+                    span: Some(cursor.span),
+                }
+                .into());
+            };
+            return Ok(ParsedParam {
+                name: ident_str,
+                cursor,
+            });
+        }
+
+        if cursor.consume(TokenKind::Equal).is_some() {
             return Err(ParserError::MissingToken {
-                message: "equal",
+                message: "flag does not take a value",
                 span: Some(cursor.span),
             }
             .into());
-        };
-        Ok(ident_str)
+        }
+        Ok(ParsedParam {
+            name: ident_str,
+            cursor,
+        })
     }
 }
 
 impl<'s> Iterator for ParamParser<'s> {
-    type Item = Result<(&'s str, StmtCursor<'s>), SpicyError>;
+    type Item = Result<ParsedParam<'s>, SpicyError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_cursor >= self.param_cursors.len() {
             None
         } else {
-            let mut cursor = self.param_cursors[self.current_cursor].clone();
+            let cursor = self.param_cursors[self.current_cursor].clone();
+
             let item = if !self.named_mode {
                 if cursor.contains(TokenKind::Equal) {
                     self.named_mode = true;
-                    match self.parse_named_param(&mut cursor) {
-                        Ok(ident) => Some(Ok((ident, cursor))),
+                    match self.parse_named_param(cursor) {
+                        Ok(param) => Some(Ok(param)),
                         Err(e) => Some(Err(e)),
                     }
                 } else {
@@ -126,15 +166,10 @@ impl<'s> Iterator for ParamParser<'s> {
                     match self.params_order.get(self.current_param) {
                         Some(p) => {
                             if is_ident != p.is_ident {
-                                println!("current param: {:?}, {:?}", self.current_param, p);
                                 self.current_param += 1;
                                 match self.params_order.get(self.current_param) {
                                     Some(p) => {
-                                        println!(
-                                            "inside current param: {:?}, {:?}",
-                                            self.current_param, p
-                                        );
-                                        Some(Ok((p.canonical, cursor)))
+                                        Some(Ok(ParsedParam { name: p.canonical, cursor }))
                                     }
                                     None => Some(Err(ParserError::TooManyParameters {
                                         index: self.current_param,
@@ -143,8 +178,7 @@ impl<'s> Iterator for ParamParser<'s> {
                                     .into())),
                                 }
                             } else {
-                                println!("else current param: {:?}, {:?}", self.current_param, p);
-                                Some(Ok((p.canonical, cursor)))
+                                Some(Ok(ParsedParam { name: p.canonical, cursor }))
                             }
                         }
                         None => Some(Err(ParserError::TooManyParameters {
@@ -155,8 +189,8 @@ impl<'s> Iterator for ParamParser<'s> {
                     }
                 }
             } else {
-                match self.parse_named_param(&mut cursor) {
-                    Ok(ident) => Some(Ok((ident, cursor))),
+                match self.parse_named_param(cursor) {
+                    Ok(param) => Some(Ok(param)),
                     Err(e) => Some(Err(e)),
                 }
             };
@@ -391,7 +425,6 @@ impl<'s> InstanceParser<'s> {
         let positive_node = node_mapping.insert_node(positive);
         let negative_node = node_mapping.insert_node(negative);
 
-        println!("parse_resistor {:?}", name);
         let mut resistor = ResistorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
@@ -409,7 +442,10 @@ impl<'s> InstanceParser<'s> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let params = ParamParser::new(input, params_order, cursor);
         for item in params {
-            let (ident, mut cursor) = item?;
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
             match ident {
                 "resistance" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -441,7 +477,6 @@ impl<'s> InstanceParser<'s> {
                 }
                 "m" => {
                     let value = self.parse_value(&mut cursor, scope)?;
-                    println!("setting m to {:?}", value);
                     resistor.set_m(value);
                 }
                 "scale" => {
@@ -495,7 +530,6 @@ impl<'s> InstanceParser<'s> {
         let positive_node = node_mapping.insert_node(positive);
         let negative_node = node_mapping.insert_node(negative);
 
-        // TODO: support models
         let mut capacitor = CapacitorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
@@ -513,7 +547,10 @@ impl<'s> InstanceParser<'s> {
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
-            let (ident, mut cursor) = item?;
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
             match ident {
                 "capacitance" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -621,7 +658,10 @@ impl<'s> InstanceParser<'s> {
         let params = ParamParser::new(input, params_order, cursor);
 
         for item in params {
-            let (ident, mut cursor) = item?;
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
             match ident {
                 "inductance" => {
                     let value = self.parse_value(&mut cursor, scope)?;
@@ -690,6 +730,176 @@ impl<'s> InstanceParser<'s> {
         }
 
         Ok(inductor)
+    }
+
+    // DXXXXXXX n+ n- mname <area=val> <m=val> <pj=val> <off>
+    // + <ic=vd> <temp=val> <dtemp=val>
+    // + <lm=val> <wm=val> <lp=val> <wp=val>
+    fn parse_diode(
+        &self,
+        name: String,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+        node_mapping: &mut NodeMapping,
+    ) -> Result<DiodeSpec, SpicyError> {
+        let positive = self.parse_node(cursor, scope)?;
+        let negative = self.parse_node(cursor, scope)?;
+
+        let positive_node = node_mapping.insert_node(positive);
+        let negative_node = node_mapping.insert_node(negative);
+
+        let input = self.source_map.get_content(cursor.span.source_index);
+        let model_name = parse_ident(cursor, input)?;
+        let model = self
+            .expanded_deck
+            .model_table
+            .get(model_name.text)
+            .ok_or_else(|| ParserError::MissingModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            })?;
+
+        let DeviceModel::Diode(model) = model else {
+            return Err(ParserError::InvalidModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            }
+            .into());
+        };
+
+        let mut diode = DiodeSpec::new(
+            name,
+            cursor.span,
+            positive_node,
+            negative_node,
+            model.clone(),
+        );
+
+        let params_order = vec![
+            ParamSlot::other("area"),
+            ParamSlot::other("m"),
+            ParamSlot::other("pj"),
+            ParamSlot::flag("off"),
+            ParamSlot::other("ic"),
+            ParamSlot::other("temp"),
+            ParamSlot::other("dtemp"),
+            ParamSlot::other("lm"),
+            ParamSlot::other("wm"),
+            ParamSlot::other("lp"),
+            ParamSlot::other("wp"),
+        ];
+        let params = ParamParser::new(input, params_order, cursor);
+        for item in params {
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
+            match ident {
+                "area" => diode.set_area(self.parse_value(&mut cursor, scope)?),
+                "m" => diode.set_m(self.parse_value(&mut cursor, scope)?),
+                "pj" => diode.set_pj(self.parse_value(&mut cursor, scope)?),
+                "off" => diode.set_off(true),
+                "ic" => diode.set_ic(self.parse_value(&mut cursor, scope)?),
+                "temp" => diode.set_temp(self.parse_value(&mut cursor, scope)?),
+                "dtemp" => diode.set_dtemp(self.parse_value(&mut cursor, scope)?),
+                "lm" => diode.set_lm(self.parse_value(&mut cursor, scope)?),
+                "wm" => diode.set_wm(self.parse_value(&mut cursor, scope)?),
+                "lp" => diode.set_lp(self.parse_value(&mut cursor, scope)?),
+                "wp" => diode.set_wp(self.parse_value(&mut cursor, scope)?),
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.to_string(),
+                        span: cursor.span,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        Ok(diode)
+    }
+
+    // QXXXXXXX nc nb ne mname <area=val>
+    // + <m=val> <off> <ic=vbe,vce>
+    fn parse_bjt(
+        &self,
+        name: String,
+        cursor: &mut StmtCursor,
+        scope: &Scope,
+        node_mapping: &mut NodeMapping,
+    ) -> Result<BjtSpec, SpicyError> {
+        let collector = self.parse_node(cursor, scope)?;
+        let base = self.parse_node(cursor, scope)?;
+        let emitter = self.parse_node(cursor, scope)?;
+
+        let collector_node = node_mapping.insert_node(collector);
+        let base_node = node_mapping.insert_node(base);
+        let emitter_node = node_mapping.insert_node(emitter);
+
+        let input = self.source_map.get_content(cursor.span.source_index);
+        let model_name = parse_ident(cursor, input)?;
+        let model = self
+            .expanded_deck
+            .model_table
+            .get(model_name.text)
+            .ok_or_else(|| ParserError::MissingModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            })?;
+
+        let DeviceModel::Bjt(model) = model else {
+            return Err(ParserError::InvalidModel {
+                model: model_name.text.to_string(),
+                span: model_name.span,
+            }
+            .into());
+        };
+
+        let mut bjt = BjtSpec::new(
+            name,
+            cursor.span,
+            collector_node,
+            base_node,
+            emitter_node,
+            model.clone(),
+        );
+
+        let params_order = vec![
+            ParamSlot::other("area"),
+            ParamSlot::other("m"),
+            ParamSlot::flag("off"),
+            ParamSlot::other("ic"),
+        ];
+        let params = ParamParser::new(input, params_order, cursor);
+        for item in params {
+            let ParsedParam {
+                name: ident,
+                mut cursor,
+            } = item?;
+            match ident {
+                "area" => bjt.set_area(self.parse_value(&mut cursor, scope)?),
+                "m" => bjt.set_m(self.parse_value(&mut cursor, scope)?),
+                "off" => bjt.set_off(true),
+                "ic" => {
+                    let vbe = self.parse_value(&mut cursor, scope)?;
+                    let vce = if cursor.consume(TokenKind::Comma).is_some() {
+                        Some(self.parse_value(&mut cursor, scope)?)
+                    } else {
+                        None
+                    };
+                    bjt.set_ic(vbe, vce);
+                }
+                _ => {
+                    return Err(ParserError::InvalidParam {
+                        param: ident.to_string(),
+                        span: cursor.span,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        Ok(bjt)
     }
 
     fn parse_source_value(
@@ -814,6 +1024,14 @@ impl<'s> InstanceParser<'s> {
                 scope,
                 node_mapping,
             )?),
+            DeviceType::Diode => {
+                devices
+                    .diodes
+                    .push(self.parse_diode(name, &mut cursor, scope, node_mapping)?)
+            }
+            DeviceType::Bjt => devices
+                .bjts
+                .push(self.parse_bjt(name, &mut cursor, scope, node_mapping)?),
             DeviceType::VoltageSource => devices.voltage_sources.push(
                 self.parse_independent_source(name, &mut cursor, scope, node_mapping, true)?,
             ),
@@ -1018,7 +1236,14 @@ impl<'s> InstanceParser<'s> {
 mod tests {
     use rstest::rstest;
 
-    use crate::{ParseOptions, libs_phase::SourceMap};
+    use super::{ParamParser, ParamSlot, ParsedParam};
+    use crate::{
+        ParseOptions,
+        error::{ParserError, SpicyError},
+        libs_phase::{SourceFileId, SourceMap},
+        parser_utils::{parse_ident, parse_value},
+        statement_phase::Statements,
+    };
 
     use std::path::PathBuf;
 
@@ -1044,5 +1269,307 @@ mod tests {
                 .unwrap_or_else(|| "unknown".to_string())
         );
         insta::assert_debug_snapshot!(name, deck);
+    }
+
+    #[test]
+    fn test_param_parser_positional_flag_and_named() {
+        let input = "1 2 off ic=0.7\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![
+            ParamSlot::other("area"),
+            ParamSlot::other("m"),
+            ParamSlot::flag("off"),
+            ParamSlot::other("ic"),
+        ];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("area").expect("area ok");
+        assert_eq!(name, "area");
+        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("m").expect("m ok");
+        assert_eq!(name, "m");
+        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+
+        let ParsedParam {
+            name,
+            cursor: _,
+        } = params.next().expect("off").expect("off ok");
+        assert_eq!(name, "off");
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("ic").expect("ic ok");
+        assert_eq!(name, "ic");
+        assert_eq!(
+            parse_value(&mut cursor, input).expect("ic value").get_value(),
+            0.7
+        );
+
+        assert!(params.next().is_none());
+    }
+
+    #[test]
+    fn test_param_parser_named_flag_rejects_value() {
+        let input = "off=0 area=2\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let first = params.next().expect("off");
+        let err = first.expect_err("off should reject value");
+        match err {
+            SpicyError::Parser(ParserError::MissingToken { message, .. }) => {
+                assert_eq!(message, "flag does not take a value");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_param_parser_named_flag_after_named() {
+        let input = "area=2 off\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("area").expect("area ok");
+        assert_eq!(name, "area");
+        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 2.0);
+
+        let ParsedParam { name, cursor: _ } = params.next().expect("off").expect("off ok");
+        assert_eq!(name, "off");
+
+        assert!(params.next().is_none());
+    }
+
+    #[test]
+    fn test_param_parser_ident_slot_skip() {
+        let input = "1 2\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![
+            ParamSlot::other("resistance"),
+            ParamSlot::ident("mname"),
+            ParamSlot::other("m"),
+        ];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("resistance").expect("resistance ok");
+        assert_eq!(name, "resistance");
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("resistance value")
+                .get_value(),
+            1.0
+        );
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("m").expect("m ok");
+        assert_eq!(name, "m");
+        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+
+        assert!(params.next().is_none());
+    }
+
+    #[test]
+    fn test_param_parser_ident_slot_value() {
+        let input = "1 modelX 2\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![
+            ParamSlot::other("resistance"),
+            ParamSlot::ident("mname"),
+            ParamSlot::other("m"),
+        ];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("resistance").expect("resistance ok");
+        assert_eq!(name, "resistance");
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("resistance value")
+                .get_value(),
+            1.0
+        );
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("mname").expect("mname ok");
+        assert_eq!(name, "mname");
+        assert_eq!(
+            parse_ident(&mut cursor, input)
+                .expect("mname ident")
+                .text,
+            "modelX"
+        );
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("m").expect("m ok");
+        assert_eq!(name, "m");
+        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+
+        assert!(params.next().is_none());
+    }
+
+    #[test]
+    fn test_param_parser_named_missing_equal() {
+        let input = "area=1 m 2\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("area").expect("area ok");
+        assert_eq!(name, "area");
+        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+
+        let err = params.next().expect("m").expect_err("m should need '='");
+        match err {
+            SpicyError::Parser(ParserError::MissingToken { message, .. }) => {
+                assert_eq!(message, "equal");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_param_parser_named_missing_value() {
+        let input = "area=\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("area").expect("area ok");
+        assert_eq!(name, "area");
+        assert!(parse_value(&mut cursor, input).is_err());
+        assert!(params.next().is_none());
+    }
+
+    #[test]
+    fn test_param_parser_named_invalid_param() {
+        let input = "bad=1\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let err = params.next().expect("bad").expect_err("bad should fail");
+        match err {
+            SpicyError::Parser(ParserError::InvalidParam { param, .. }) => {
+                assert_eq!(param, "bad");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_param_parser_named_rejects_positional() {
+        let input = "area=1 2\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("area").expect("area ok");
+        assert_eq!(name, "area");
+        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+
+        let err = params.next().expect("m").expect_err("positional not allowed");
+        match err {
+            SpicyError::Parser(ParserError::MissingToken { message, .. }) => {
+                assert_eq!(message, "ident");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_param_parser_too_many_parameters() {
+        let input = "1 2 3\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::other("a"), ParamSlot::other("b")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("a").expect("a ok");
+        assert_eq!(name, "a");
+        assert_eq!(parse_value(&mut cursor, input).expect("a value").get_value(), 1.0);
+
+        let ParsedParam {
+            name,
+            mut cursor,
+        } = params.next().expect("b").expect("b ok");
+        assert_eq!(name, "b");
+        assert_eq!(parse_value(&mut cursor, input).expect("b value").get_value(), 2.0);
+
+        let err = params.next().expect("extra").expect_err("too many params");
+        match err {
+            SpicyError::Parser(ParserError::TooManyParameters { index, .. }) => {
+                assert_eq!(index, 2);
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_param_parser_flag_only_positional() {
+        let input = "off\n";
+        let statements =
+            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let cursor = statements.statements[0].into_cursor();
+        let params_order = vec![ParamSlot::flag("off")];
+        let mut params = ParamParser::new(input, params_order, &cursor);
+
+        let ParsedParam { name, cursor: _ } = params.next().expect("off").expect("off ok");
+        assert_eq!(name, "off");
+        assert!(params.next().is_none());
     }
 }

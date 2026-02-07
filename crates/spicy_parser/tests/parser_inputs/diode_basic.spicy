@@ -1,0 +1,6 @@
+basic diode
+.model Dmod D is=1e-14 n=1 rs=2
+D1 in out Dmod area=2 m=3 pj=4 off
++ ic=0.7 temp=25 dtemp=5
++ lm=1 wm=2 lp=3 wp=4
+.end

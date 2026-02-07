@@ -6,11 +6,11 @@ OperatingPointResult {
     voltages: [
         (
             "in",
-            0.0,
+            5.0,
         ),
         (
             "out",
-            0.0,
+            5.0,
         ),
     ],
     currents: [

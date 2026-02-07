@@ -1,0 +1,123 @@
+---
+source: crates/spicy_parser/src/instance_parser.rs
+expression: deck
+---
+Deck {
+    title: "basic bjt",
+    node_mapping: NodeMapping {
+        node_mapping: {
+            NodeName(
+                "0",
+            ): NodeIndex(
+                0,
+            ),
+            NodeName(
+                "c",
+            ): NodeIndex(
+                1,
+            ),
+            NodeName(
+                "b",
+            ): NodeIndex(
+                2,
+            ),
+            NodeName(
+                "e",
+            ): NodeIndex(
+                3,
+            ),
+        },
+        node_counter: 4,
+        branch_mapping: {},
+        branch_counter: 1,
+    },
+    commands: [],
+    devices: Devices {
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        voltage_sources: [],
+        current_sources: [],
+        bjts: [
+            BjtSpec {
+                name: "Q1",
+                span: Span {
+                    start: 47,
+                    end: 85,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                collector: NodeIndex(
+                    1,
+                ),
+                base: NodeIndex(
+                    2,
+                ),
+                emitter: NodeIndex(
+                    3,
+                ),
+                model: BjtModel {
+                    polarity: Npn,
+                    is: Some(
+                        Value {
+                            value: 1.0,
+                            exponent: Some(
+                                -16.0,
+                            ),
+                            suffix: None,
+                        },
+                    ),
+                    bf: Some(
+                        Value {
+                            value: 100.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                    ),
+                    br: Some(
+                        Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: None,
+                        },
+                    ),
+                    nf: None,
+                    nr: None,
+                },
+                area: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                off: Some(
+                    true,
+                ),
+                ic_vbe: Some(
+                    Value {
+                        value: 0.7,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+                ic_vce: Some(
+                    Value {
+                        value: 1.2,
+                        exponent: None,
+                        suffix: None,
+                    },
+                ),
+            },
+        ],
+    },
+}

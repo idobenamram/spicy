@@ -1,3 +1,59 @@
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Direction, Layout};
+
+use crate::tui::app::App;
+
+mod config;
+mod help;
+mod netlist;
+mod output;
+mod utils;
+
+pub use utils::{LineDiagnostic, format_error_snippet};
+
+pub fn ui(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(f.size());
+
+    netlist::draw_netlist(f, chunks[0], app);
+    output::draw_outputs(f, chunks[1], app);
+
+    if app.show_config {
+        config::draw_config(f, f.size(), app);
+    } else if app.show_help {
+        help::draw_help(f, f.size());
+    }
+}
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Direction, Layout};
+
+use crate::tui::app::App;
+
+mod config;
+mod help;
+mod netlist;
+mod output;
+mod utils;
+
+pub use utils::{LineDiagnostic, format_error_snippet};
+
+pub fn ui(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(f.size());
+
+    netlist::draw_netlist(f, chunks[0], app);
+    output::draw_outputs(f, chunks[1], app);
+
+    if app.show_config {
+        config::draw_config(f, f.size(), app);
+    } else if app.show_help {
+        help::draw_help(f, f.size());
+    }
+}
 use std::collections::HashMap;
 
 use ratatui::Frame;
@@ -12,6 +68,9 @@ use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
 use crate::tui::app::{App, Tab};
 use crate::tui::graph::{Graph, Series, compute_y_bounds};
+
+mod config;
+mod help;
 
 fn palette_color(index: usize) -> Color {
     // Stable color mapping for series
@@ -36,6 +95,34 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     draw_netlist(f, chunks[0], app);
     draw_outputs(f, chunks[1], app);
+
+    if app.show_config {
+        config::draw_config(f, f.size(), app);
+    } else if app.show_help {
+        help::draw_help(f, f.size());
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(vertical[1]);
+
+    horizontal[1]
 }
 
 pub fn draw_netlist(f: &mut Frame, area: Rect, app: &App) {
@@ -339,6 +426,29 @@ impl LineDiagnostic {
             line_end,
         })
     }
+}
+
+pub fn format_error_snippet(src: &str, span: Span) -> Option<String> {
+    let ld = LineDiagnostic::new(src, span)?;
+    let len = src.len();
+    let start = span.start.min(len.saturating_sub(1));
+    let end = span.end.min(len.saturating_sub(1));
+    let prefix = &src[ld.line_start..start];
+    let highlight = &src[start..=end];
+    let line = &src[ld.line_start..ld.line_end];
+    let col = prefix.chars().count();
+    let width = highlight.chars().count().max(1);
+    let line_no = ld.line_index;
+
+    let underline = "~".repeat(width);
+    Some(format!(
+        "{:>4} | {}\n     | {:space$}\x1b[31m{}\x1b[0m\n",
+        line_no,
+        line,
+        "",
+        underline,
+        space = col
+    ))
 }
 
 pub fn render_netlist_lines(

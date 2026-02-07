@@ -591,6 +591,7 @@ Deck {
             },
         ],
         inductors: [],
+        diodes: [],
         voltage_sources: [
             IndependentSourceSpec {
                 name: "V1",
@@ -640,5 +641,6 @@ Deck {
             },
         ],
         current_sources: [],
+        bjts: [],
     },
 }

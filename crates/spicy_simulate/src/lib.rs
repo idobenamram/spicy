@@ -13,12 +13,14 @@ pub mod dc;
 mod devices;
 mod error;
 mod matrix;
+mod util;
 pub(crate) mod raw_writer;
 mod setup_pattern;
 pub mod solver;
 pub mod trans;
 pub use dc::{DcSweepResult, OperatingPointResult};
 pub use trans::TransientResult;
+pub use error::SimulationError;
 
 #[derive(Debug, Clone)]
 pub enum LinearSolver {
@@ -26,9 +28,53 @@ pub enum LinearSolver {
     Blas,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TransientIntegrator {
+    BackwardEuler,
+    Trapezoidal,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct NewtonConfig {
+    pub abs_tol: f64,
+    pub rel_tol: f64,
+    pub max_iters: usize,
+}
+
+impl Default for NewtonConfig {
+    fn default() -> Self {
+        Self {
+            abs_tol: 1e-6,
+            rel_tol: 1e-3,
+            max_iters: 50,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum NewtonMode {
+    InitOp,
+    InitTrans,
+    Iterate,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct NewtonState {
+    pub config: NewtonConfig,
+    pub mode: NewtonMode,
+}
+
+impl NewtonState {
+    pub fn new(config: NewtonConfig, mode: NewtonMode) -> Self {
+        Self { config, mode }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SimulationConfig {
     pub solver: LinearSolver,
+    pub integrator: TransientIntegrator,
+    pub newton: NewtonConfig,
     /// if true, write raw files
     pub write_raw: bool,
     /// optional output base path (without extension). If None, use deck.title in CWD
@@ -41,6 +87,8 @@ impl Default for SimulationConfig {
             solver: LinearSolver::Klu {
                 config: solver::klu::KluConfig::default(),
             },
+            integrator: TransientIntegrator::BackwardEuler,
+            newton: NewtonConfig::default(),
             write_raw: false,
             output_base: None,
         }
@@ -55,11 +103,11 @@ impl SimulationConfig {
     }
 }
 
-pub fn simulate(deck: Deck, sim_config: SimulationConfig) {
+pub fn simulate(deck: Deck, sim_config: SimulationConfig) -> Result<(), SimulationError> {
     for command in &deck.commands {
         match command {
             Command::Op(_) => {
-                let op = simulate_op(&deck, &sim_config);
+                let op = simulate_op(&deck, &sim_config)?;
                 if sim_config.write_raw {
                     let base = sim_config.get_output_base(&deck, "op");
                     let _ = raw_writer::write_operating_point_raw(&deck, &op, &base);
@@ -92,7 +140,7 @@ pub fn simulate(deck: Deck, sim_config: SimulationConfig) {
                 }
             }
             Command::Tran(command_params) => {
-                let result = simulate_trans(&deck, command_params, &sim_config);
+                let result = simulate_trans(&deck, command_params, &sim_config)?;
                 if sim_config.write_raw {
                     let base = sim_config.get_output_base(&deck, "tran");
                     let _ = raw_writer::write_transient_raw(&deck, &result, &base);
@@ -101,6 +149,7 @@ pub fn simulate(deck: Deck, sim_config: SimulationConfig) {
             Command::End => break,
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -139,7 +188,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_simulate_op(#[files("tests/*.spicy")] input: PathBuf) {
+    fn test_simulate_op(#[files("tests/op_dc/*.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let source_map = SourceMap::new(input.clone(), input_content);
         let mut input_options = ParseOptions {
@@ -150,7 +199,7 @@ mod tests {
         };
         let deck = parse(&mut input_options).expect("parse");
         let sim_config = SimulationConfig::default();
-        let output = simulate_op(&deck, &sim_config);
+        let output = simulate_op(&deck, &sim_config).expect("simulate_op");
         let name = format!(
             "simulate-op-{}",
             input
@@ -162,7 +211,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_simulate_dc(#[files("tests/simple_inductor_capacitor.spicy")] input: PathBuf) {
+    fn test_simulate_dc(#[files("tests/op_dc/simple_inductor_capacitor.spicy")] input: PathBuf) {
         let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
         let source_map = SourceMap::new(input.clone(), input_content);
         let mut input_options = ParseOptions {
@@ -183,6 +232,70 @@ mod tests {
 
         let name = format!(
             "simulate-dc-{}",
+            input
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
+        insta::assert_debug_snapshot!(name, output);
+    }
+
+    #[rstest]
+    fn test_simulate_ac(#[files("tests/ac/*.spicy")] input: PathBuf) {
+        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
+        let source_map = SourceMap::new(input.clone(), input_content);
+        let mut input_options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            source_map,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut input_options).expect("parse");
+        let command = deck
+            .commands
+            .iter()
+            .find_map(|cmd| match cmd {
+                Command::Ac(ac) => Some(ac),
+                _ => None,
+            })
+            .expect("expected .AC command");
+        let sim_config = SimulationConfig::default();
+        let output = simulate_ac(&deck, command, &sim_config);
+
+        let name = format!(
+            "simulate-ac-{}",
+            input
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
+        insta::assert_debug_snapshot!(name, output);
+    }
+
+    #[rstest]
+    fn test_simulate_tran(#[files("tests/trans/*.spicy")] input: PathBuf) {
+        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
+        let source_map = SourceMap::new(input.clone(), input_content);
+        let mut input_options = ParseOptions {
+            work_dir: PathBuf::from("."),
+            source_path: PathBuf::from("."),
+            source_map,
+            max_include_depth: 10,
+        };
+        let deck = parse(&mut input_options).expect("parse");
+        let command = deck
+            .commands
+            .iter()
+            .find_map(|cmd| match cmd {
+                Command::Tran(tran) => Some(tran),
+                _ => None,
+            })
+            .expect("expected .TRAN command");
+        let sim_config = SimulationConfig::default();
+        let output = simulate_trans(&deck, command, &sim_config).expect("simulate_trans");
+
+        let name = format!(
+            "simulate-tran-{}",
             input
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())

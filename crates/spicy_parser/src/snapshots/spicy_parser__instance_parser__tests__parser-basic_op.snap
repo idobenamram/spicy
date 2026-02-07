@@ -113,6 +113,7 @@ Deck {
             },
         ],
         inductors: [],
+        diodes: [],
         voltage_sources: [],
         current_sources: [
             IndependentSourceSpec {
@@ -140,5 +141,6 @@ Deck {
                 ac: None,
             },
         ],
+        bjts: [],
     },
 }

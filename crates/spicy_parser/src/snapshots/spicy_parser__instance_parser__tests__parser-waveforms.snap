@@ -56,6 +56,7 @@ Deck {
         resistors: [],
         capacitors: [],
         inductors: [],
+        diodes: [],
         voltage_sources: [
             IndependentSourceSpec {
                 name: "V1",
@@ -736,5 +737,6 @@ Deck {
                 ac: None,
             },
         ],
+        bjts: [],
     },
 }

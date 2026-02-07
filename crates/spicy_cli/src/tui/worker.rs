@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
@@ -51,26 +51,38 @@ fn format_parse_error(error: &SpicyError, source_map: &SourceMap) -> String {
 }
 
 pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
-    let input = std::fs::read_to_string(&netlist_path).unwrap();
-    let source_map = SourceMap::new(netlist_path.clone(), input);
-    let mut parse_options = ParseOptions {
-        work_dir: PathBuf::from(&netlist_path).parent().unwrap().to_path_buf(),
-        source_path: PathBuf::from(&netlist_path),
-        source_map,
-        max_include_depth: 10,
-    };
-
     while let Ok(cmd) = rx.recv() {
         match cmd {
             SimCmd::RunCurrentTab { tab: _tab, config } => {
                 let sim_config = config;
-                // Parse
-                // TODO: fix
+                let input = match std::fs::read_to_string(&netlist_path) {
+                    Ok(input) => input,
+                    Err(err) => {
+                        let _ = tx.send(SimMsg::FatalError(format!(
+                            "Failed to read netlist: {}",
+                            err
+                        )));
+                        continue;
+                    }
+                };
+                let source_map = SourceMap::new(netlist_path.clone(), input);
+                let mut parse_options = ParseOptions {
+                    work_dir: netlist_path
+                        .parent()
+                        .unwrap_or(Path::new("."))
+                        .to_path_buf(),
+                    source_path: netlist_path.clone(),
+                    source_map,
+                    max_include_depth: 10,
+                };
 
                 let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,
                     Err(e) => {
-                        let _ = tx.send(SimMsg::FatalError(format_parse_error(&e, &parse_options.source_map)));
+                        let _ = tx.send(SimMsg::FatalError(format_parse_error(
+                            &e,
+                            &parse_options.source_map,
+                        )));
                         continue;
                     }
                 };

@@ -1,6 +1,8 @@
 use spicy_parser::error::SpicyError;
 use spicy_simulate::{DcSweepResult, OperatingPointResult, SimulationConfig, TransientResult};
 
+use crate::tui::nvim::NvimState;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Tab {
@@ -69,6 +71,8 @@ pub struct App {
     pub raw_netlist: String,
     pub scroll: usize,
     pub diags: Vec<SpicyError>,
+    pub nvim: Option<NvimState>,
+    pub nvim_warning: Option<String>,
 
     // Right pane
     pub tab: Tab,
@@ -98,6 +102,8 @@ impl App {
             netlist: netlist_text.lines().map(|s| s.to_string()).collect(),
             scroll: 0,
             diags: Vec::new(),
+            nvim: None,
+            nvim_warning: None,
             tab: Tab::Op,
             op: None,
             dc: None,

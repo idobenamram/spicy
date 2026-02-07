@@ -123,9 +123,52 @@ fn handle_config_key(k: KeyEvent, app: &mut App) -> Result<bool> {
     Ok(false)
 }
 
+fn panel_switch_from_key(code: KeyCode, modifiers: KeyModifiers) -> Option<bool> {
+    if modifiers.contains(KeyModifiers::ALT) {
+        if let KeyCode::Char(c) = code {
+            match c.to_ascii_lowercase() {
+                'h' => return Some(false),
+                'l' => return Some(true),
+                _ => {}
+            }
+        }
+    }
+
+    match code {
+        KeyCode::Char('\u{02D9}') => Some(false), // Option-h on macOS US layout
+        KeyCode::Char('\u{00AC}') => Some(true),  // Option-l on macOS US layout
+        _ => None,
+    }
+}
+
 pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<bool> {
+    let nvim_active = app.nvim.is_some() && !app.focus_right;
+    if let Some(focus_right) = panel_switch_from_key(k.code, k.modifiers) {
+        app.focus_right = focus_right;
+        return Ok(false);
+    }
+    if k.code == KeyCode::Char('q') && !nvim_active {
+        return Ok(true);
+    }
+
+    if app.show_help {
+        if matches!(k.code, KeyCode::Esc) {
+            app.show_help = false;
+        }
+        return Ok(false);
+    }
+    if app.show_config {
+        return handle_config_key(k, app);
+    }
+
+    if nvim_active {
+        if let Some(nvim) = app.nvim.as_mut() {
+            nvim.send_key(k)?;
+        }
+        return Ok(false);
+    }
+
     match k.code {
-        KeyCode::Char('q') => return Ok(true),
         KeyCode::Char('h') | KeyCode::Char('?') => {
             app.show_help = !app.show_help;
             if app.show_help {
@@ -142,19 +185,21 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             clear_config_edit(app);
             return Ok(false);
         }
-        KeyCode::Esc if app.show_help => {
-            app.show_help = false;
-            return Ok(false);
+        // movement and navigation (tui-only)
+        KeyCode::Char('j') if !app.focus_right && app.nvim.is_none() => {
+            app.scroll = app.scroll.saturating_add(1);
         }
-        _ if app.show_help => return Ok(false),
-        _ if app.show_config => return handle_config_key(k, app),
-        KeyCode::Tab => app.focus_right = !app.focus_right,
-        KeyCode::Char('j') if !app.focus_right => app.scroll = app.scroll.saturating_add(1),
-        KeyCode::Char('k') if !app.focus_right => app.scroll = app.scroll.saturating_sub(1),
-        KeyCode::Char('g') if !app.focus_right && k.modifiers.contains(KeyModifiers::SHIFT) => {
+        KeyCode::Char('k') if !app.focus_right && app.nvim.is_none() => {
+            app.scroll = app.scroll.saturating_sub(1);
+        }
+        KeyCode::Char('g')
+            if !app.focus_right
+                && app.nvim.is_none()
+                && k.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
             app.scroll = app.netlist.len().saturating_sub(1)
         }
-        KeyCode::Char('g') if !app.focus_right => app.scroll = 0,
+        KeyCode::Char('g') if !app.focus_right && app.nvim.is_none() => app.scroll = 0,
         KeyCode::Left => app.tab = app.tab.prev(),
         KeyCode::Right => app.tab = app.tab.next(),
         // transient tab node selection

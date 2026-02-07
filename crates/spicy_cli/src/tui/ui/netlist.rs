@@ -5,10 +5,14 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
 use crate::tui::app::App;
 
-use super::utils::{render_netlist_lines, split_v};
+use super::netlist_layout;
+use super::utils::render_netlist_lines;
 
 pub(super) fn draw_netlist(f: &mut Frame, area: Rect, app: &App) {
-    let [hdr, body] = split_v(area, 3);
+    let layout = netlist_layout(area);
+    let hdr = layout.header;
+    let body = layout.body;
+    let inner = layout.inner;
 
     let mut hdr_text = format!(" {} ", app.path);
     if app.nvim.is_some() {
@@ -17,7 +21,7 @@ pub(super) fn draw_netlist(f: &mut Frame, area: Rect, app: &App) {
     if let Some(warn) = &app.nvim_warning {
         hdr_text.push_str(&format!("[{warn}] "));
     }
-    let hdr_style = if app.focus_right {
+    let hdr_style = if app.right_pane_focused() {
         Style::default()
     } else {
         Style::default()
@@ -32,20 +36,18 @@ pub(super) fn draw_netlist(f: &mut Frame, area: Rect, app: &App) {
     );
 
     let block = Block::default().borders(Borders::ALL);
-    let inner = block.inner(body);
     f.render_widget(block, body);
 
     if inner.width == 0 || inner.height == 0 {
         return;
     }
 
-    if let Some(nvim) = app.nvim.as_ref().filter(|state| state.is_alive()) {
-        let show_cursor = !app.focus_right;
+    if let Some(nvim) = app.nvim.as_ref() {
+        let show_cursor = app.left_pane_focused();
         nvim.render(f.buffer_mut(), inner, show_cursor);
     } else {
         let view = render_netlist_lines(
             &app.raw_netlist,
-            &app.netlist,
             app.scroll,
             inner.height as usize,
             &app.diags,

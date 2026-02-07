@@ -103,13 +103,14 @@ pub fn format_error_snippet(src: &str, span: Span) -> Option<String> {
 
 pub(crate) fn render_netlist_lines(
     raw_netlist: &str,
-    netlist: &[String],
     scroll: usize,
     height: usize,
     diags: &[SpicyError],
 ) -> Text<'static> {
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let gutter_width = ((scroll + height).max(netlist.len()).saturating_sub(1) + 1)
+    let netlist: Vec<&str> = raw_netlist.lines().collect();
+    let netlist_len = netlist.len();
+    let gutter_width = ((scroll + height).max(netlist_len).saturating_sub(1) + 1)
         .to_string()
         .len()
         .max(2);
@@ -133,6 +134,7 @@ pub(crate) fn render_netlist_lines(
     }
 
     for (idx, raw) in netlist.iter().enumerate().skip(scroll).take(height) {
+        let raw = *raw;
         let ln = idx + 1;
         let gutter = format!("{ln:>w$}  ", w = gutter_width);
         let mut spans = Vec::new();
@@ -164,7 +166,7 @@ pub(crate) fn render_netlist_lines(
                 lines.push(Line::from(diag_spans));
             }
             None => {
-                spans.push(UiSpan::styled(raw.clone(), Style::default()));
+                spans.push(UiSpan::styled(raw.to_string(), Style::default()));
                 lines.push(Line::from(spans));
             }
         }

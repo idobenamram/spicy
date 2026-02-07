@@ -9,6 +9,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 
+const MAIN_GRID_ID: i64 = 1;
+
 #[derive(Debug)]
 pub enum NvimEvent {
     Saved(Option<String>),
@@ -22,8 +24,8 @@ pub struct NvimState {
     events: Receiver<(String, Vec<Value>)>,
     grid: NvimGrid,
     cursor: Option<(u16, u16)>,
-    grid_id: Option<i64>,
     last_size: (u16, u16),
+    pending_size: Option<(u16, u16)>,
     alive: bool,
 }
 
@@ -32,8 +34,8 @@ impl fmt::Debug for NvimState {
         f.debug_struct("NvimState")
             .field("grid", &self.grid)
             .field("cursor", &self.cursor)
-            .field("grid_id", &self.grid_id)
             .field("last_size", &self.last_size)
+            .field("pending_size", &self.pending_size)
             .field("alive", &self.alive)
             .finish()
     }
@@ -73,8 +75,8 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
             events,
             grid: NvimGrid::new(width, height),
             cursor: None,
-            grid_id: None,
             last_size: (width, height),
+            pending_size: None,
             alive: true,
         })
     }
@@ -84,16 +86,28 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
     }
 
     pub fn resize_if_needed(&mut self, width: u16, height: u16) -> Result<()> {
-        let width = width.max(1);
-        let height = height.max(1);
-        if (width, height) == self.last_size {
+        if !self.alive {
             return Ok(());
         }
-        self.nvim
+        let width = width.max(1);
+        let height = height.max(1);
+        let desired = (width, height);
+        if desired == self.last_size {
+            self.pending_size = None;
+            return Ok(());
+        }
+        if self.pending_size == Some(desired) {
+            return Ok(());
+        }
+        if let Err(err) = self
+            .nvim
             .ui_try_resize(width as i64, height as i64)
-            .context("resize nvim ui")?;
-        self.last_size = (width, height);
-        self.grid.resize(width, height);
+            .context("resize nvim ui")
+        {
+            self.alive = false;
+            return Err(err);
+        }
+        self.pending_size = Some(desired);
         Ok(())
     }
 
@@ -170,23 +184,23 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
         }
     }
 
-    fn is_target_grid(&mut self, grid: i64) -> bool {
-        match self.grid_id {
-            Some(id) => id == grid,
-            None => {
-                self.grid_id = Some(grid);
-                true
-            }
+    fn is_target_grid(&self, grid: i64) -> bool {
+        grid == MAIN_GRID_ID
+    }
+
+    fn grid_params<'a>(&self, params: &'a [Value]) -> Option<&'a [Value]> {
+        let grid = params.get(0).and_then(Value::as_i64)?;
+        if self.is_target_grid(grid) {
+            Some(params)
+        } else {
+            None
         }
     }
 
     fn handle_grid_resize(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
+        let Some(params) = self.grid_params(params) else {
             return;
         };
-        if !self.is_target_grid(grid) {
-            return;
-        }
         let Some(width) = params.get(1).and_then(Value::as_i64) else {
             return;
         };
@@ -197,25 +211,25 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
         let height = height.max(1) as u16;
         self.grid.resize(width, height);
         self.last_size = (width, height);
+        self.pending_size = None;
+        if let Some((row, col)) = self.cursor {
+            if row >= height || col >= width {
+                self.cursor = None;
+            }
+        }
     }
 
     fn handle_grid_clear(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
-            return;
-        };
-        if !self.is_target_grid(grid) {
+        if self.grid_params(params).is_none() {
             return;
         }
         self.grid.clear();
     }
 
     fn handle_grid_line(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
+        let Some(params) = self.grid_params(params) else {
             return;
         };
-        if !self.is_target_grid(grid) {
-            return;
-        }
         let Some(row) = params.get(1).and_then(Value::as_i64) else {
             return;
         };
@@ -229,12 +243,9 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
     }
 
     fn handle_grid_scroll(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
+        let Some(params) = self.grid_params(params) else {
             return;
         };
-        if !self.is_target_grid(grid) {
-            return;
-        }
         let Some(top) = params.get(1).and_then(Value::as_i64) else {
             return;
         };
@@ -262,28 +273,36 @@ vim.api.nvim_create_autocmd('BufWritePost', { buffer = 0, callback = function() 
     }
 
     fn handle_grid_cursor(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
+        let Some(params) = self.grid_params(params) else {
             return;
         };
-        if !self.is_target_grid(grid) {
-            return;
-        }
         let Some(row) = params.get(1).and_then(Value::as_i64) else {
+            self.cursor = None;
             return;
         };
         let Some(col) = params.get(2).and_then(Value::as_i64) else {
+            self.cursor = None;
             return;
         };
+        if row < 0 || col < 0 {
+            self.cursor = None;
+            return;
+        }
+        let row = row as usize;
+        let col = col as usize;
+        if row >= self.grid.height as usize || col >= self.grid.width as usize {
+            self.cursor = None;
+            return;
+        }
         self.cursor = Some((row as u16, col as u16));
     }
 
     fn handle_grid_destroy(&mut self, params: &[Value]) {
-        let Some(grid) = params.get(0).and_then(Value::as_i64) else {
+        if self.grid_params(params).is_none() {
             return;
-        };
-        if self.grid_id == Some(grid) {
-            self.grid.clear();
         }
+        self.grid.clear();
+        self.cursor = None;
     }
 }
 

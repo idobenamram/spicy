@@ -35,7 +35,20 @@ pub enum ConfigField {
     MaxIters,
 }
 
-const CONFIG_FIELDS: [ConfigField; 5] = [
+#[derive(Debug, Clone)]
+pub struct ConfigEditState {
+    pub buffer: String,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Modal {
+    None,
+    Help,
+    Config,
+}
+
+pub(crate) const CONFIG_FIELDS: [ConfigField; 5] = [
     ConfigField::Solver,
     ConfigField::Integrator,
     ConfigField::AbsTol,
@@ -67,7 +80,6 @@ impl ConfigField {
 pub struct App {
     // Left pane
     pub path: String,
-    pub netlist: Vec<String>,
     pub raw_netlist: String,
     pub scroll: usize,
     pub diags: Vec<SpicyError>,
@@ -84,22 +96,18 @@ pub struct App {
     pub trans_list_index: usize,
 
     // Infra
-    pub running: bool,
     pub focus_right: bool,
-    pub show_help: bool,
-    pub show_config: bool,
+    pub modal: Modal,
     pub config: SimulationConfig,
     pub config_field: ConfigField,
-    pub config_edit: Option<String>,
-    pub config_error: Option<String>,
+    pub config_edit: Option<ConfigEditState>,
 }
 
 impl App {
     pub fn new(path: String, netlist_text: String) -> Self {
         Self {
             path,
-            raw_netlist: netlist_text.clone(),
-            netlist: netlist_text.lines().map(|s| s.to_string()).collect(),
+            raw_netlist: netlist_text,
             scroll: 0,
             diags: Vec::new(),
             nvim: None,
@@ -110,14 +118,82 @@ impl App {
             trans: None,
             trans_selected_nodes: Vec::new(),
             trans_list_index: 0,
-            running: false,
             focus_right: false,
-            show_help: false,
-            show_config: false,
+            modal: Modal::None,
             config: SimulationConfig::default(),
             config_field: ConfigField::Solver,
             config_edit: None,
-            config_error: None,
         }
+    }
+
+    fn set_modal(&mut self, modal: Modal) {
+        let leaving_config = self.modal == Modal::Config && modal != Modal::Config;
+        let entering_config = self.modal != Modal::Config && modal == Modal::Config;
+        self.modal = modal;
+        if leaving_config || entering_config {
+            self.clear_config_edit();
+        }
+    }
+
+    pub fn netlist_line_count(&self) -> usize {
+        self.raw_netlist.lines().count()
+    }
+
+    pub fn left_pane_focused(&self) -> bool {
+        !self.focus_right
+    }
+
+    pub fn right_pane_focused(&self) -> bool {
+        self.focus_right
+    }
+
+    pub fn nvim_active(&self) -> bool {
+        self.nvim.is_some() && !self.focus_right
+    }
+
+    pub fn left_pane_active(&self) -> bool {
+        !self.focus_right && self.nvim.is_none()
+    }
+
+    pub fn is_help(&self) -> bool {
+        self.modal == Modal::Help
+    }
+
+    pub fn is_config(&self) -> bool {
+        self.modal == Modal::Config
+    }
+
+    pub fn toggle_help(&mut self) {
+        let next = if self.modal == Modal::Help {
+            Modal::None
+        } else {
+            Modal::Help
+        };
+        self.set_modal(next);
+    }
+
+    pub fn toggle_config(&mut self) {
+        let next = if self.modal == Modal::Config {
+            Modal::None
+        } else {
+            Modal::Config
+        };
+        self.set_modal(next);
+    }
+
+    pub fn close_help(&mut self) {
+        if self.modal == Modal::Help {
+            self.set_modal(Modal::None);
+        }
+    }
+
+    pub fn close_config(&mut self) {
+        if self.modal == Modal::Config {
+            self.set_modal(Modal::None);
+        }
+    }
+
+    pub fn clear_config_edit(&mut self) {
+        self.config_edit = None;
     }
 }

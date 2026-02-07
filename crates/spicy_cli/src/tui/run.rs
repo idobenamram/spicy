@@ -5,30 +5,15 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use crossbeam_channel::unbounded;
 use crossterm::event::{self, Event as CEvent};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::Rect;
 
 use crate::tui::app::App;
 use crate::tui::input::handle_key;
 use crate::tui::nvim::{NvimEvent, NvimState};
 use crate::tui::term::setup_terminal;
-use crate::tui::ui::ui;
+use crate::tui::ui::{main_layout, netlist_layout, ui};
 use crate::tui::worker::{SimCmd, SimMsg, apply_sim_update, worker_loop};
-use spicy_parser::{ParseOptions, SourceMap, parse};
-
-fn netlist_grid_size(term: Rect) -> (u16, u16) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(term);
-    let left = chunks[0];
-    let body = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
-        .split(left)[1];
-    let width = body.width.saturating_sub(2).max(1);
-    let height = body.height.saturating_sub(2).max(1);
-    (width, height)
-}
+use spicy_parser::{ParseOptions, parse};
 
 fn refresh_netlist(app: &mut App, path: &Path) {
     let input = match fs::read_to_string(path) {
@@ -39,42 +24,22 @@ fn refresh_netlist(app: &mut App, path: &Path) {
         }
     };
 
-    app.raw_netlist = input.clone();
-    app.netlist = input.lines().map(|line| line.to_string()).collect();
-    app.scroll = app.scroll.min(app.netlist.len().saturating_sub(1));
-
-    let source_map = SourceMap::new(path.to_path_buf(), input);
-    let mut parse_options = ParseOptions {
-        work_dir: path.parent().unwrap_or(Path::new(".")).to_path_buf(),
-        source_path: path.to_path_buf(),
-        source_map,
-        max_include_depth: 10,
-    };
+    let mut parse_options = ParseOptions::new_with_source(path, input);
+    app.raw_netlist = parse_options.source_map.get_main_content().to_string();
+    let line_count = app.netlist_line_count();
+    app.scroll = app.scroll.min(line_count.saturating_sub(1));
     match parse(&mut parse_options) {
         Ok(_) => app.diags.clear(),
         Err(err) => app.diags = vec![err],
     }
 }
 
-fn clear_config_edit(app: &mut App) {
-    app.config_edit = None;
-    app.config_error = None;
-}
-
-fn toggle_help(app: &mut App) {
-    app.show_help = !app.show_help;
-    if app.show_help {
-        app.show_config = false;
-        clear_config_edit(app);
-    }
-}
-
-fn toggle_config(app: &mut App) {
-    app.show_config = !app.show_config;
-    if app.show_config {
-        app.show_help = false;
-    }
-    clear_config_edit(app);
+fn netlist_grid_size(term_size: Rect) -> (u16, u16) {
+    let [left, _right] = main_layout(term_size);
+    let netlist = netlist_layout(left);
+    let grid_width = netlist.inner.width.max(1);
+    let grid_height = netlist.inner.height.max(1);
+    (grid_width, grid_height)
 }
 
 pub fn run_tui(path: &str) -> Result<()> {
@@ -126,8 +91,8 @@ pub fn run_tui(path: &str) -> Result<()> {
         for event in events {
             match event {
                 NvimEvent::Saved(path) => saved_paths.push(path),
-                NvimEvent::Help => toggle_help(&mut app),
-                NvimEvent::Config => toggle_config(&mut app),
+                NvimEvent::Help => app.toggle_help(),
+                NvimEvent::Config => app.toggle_config(),
                 NvimEvent::Quit => quit_requested = true,
             }
         }
@@ -142,10 +107,11 @@ pub fn run_tui(path: &str) -> Result<()> {
             app.nvim = None;
         }
 
-        if let Some(nvim) = app.nvim.as_mut() {
-            if let Err(err) = nvim.resize_if_needed(grid_width, grid_height) {
-                app.nvim_warning = Some(format!("nvim resize failed: {err}"));
-            }
+        if let Some(nvim) = app.nvim.as_mut()
+            && let Err(err) = nvim.resize_if_needed(grid_width, grid_height)
+        {
+            app.nvim_warning = Some(format!("nvim resize failed: {err}"));
+            app.nvim = None;
         }
 
         if quit_requested {
@@ -167,13 +133,12 @@ pub fn run_tui(path: &str) -> Result<()> {
             match msg {
                 SimMsg::FatalError(err) => {
                     fatal_error = Some(err);
-                    app.running = false;
                 }
                 other => apply_sim_update(&mut app, other),
             }
         }
 
-        if fatal_error.is_some() || quit_requested {
+        if fatal_error.is_some() {
             break;
         }
     }

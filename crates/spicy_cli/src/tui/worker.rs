@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crossbeam_channel::{Receiver, Sender};
 use spicy_simulate::{
@@ -7,13 +7,13 @@ use spicy_simulate::{
     trans::simulate_trans,
 };
 
-use crate::tui::app::{App, Tab};
+use crate::tui::app::App;
 use crate::tui::ui::format_error_snippet;
 use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, netlist_types::Command, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
-    RunCurrentTab { tab: Tab, config: SimulationConfig },
+    RunCurrentTab { config: SimulationConfig },
 }
 
 #[derive(Debug)]
@@ -28,12 +28,10 @@ pub enum SimMsg {
 
 pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     match msg {
-        SimMsg::SimulationStarted => app.running = true,
         SimMsg::Op(op) => app.op = Some(op),
         SimMsg::Dc(dc) => app.dc = Some(dc),
         SimMsg::Transient(tr) => app.trans = Some(tr),
-        SimMsg::FatalError(_) => app.running = false,
-        SimMsg::Done => app.running = false,
+        _ => {}
     }
 }
 
@@ -53,7 +51,7 @@ fn format_parse_error(error: &SpicyError, source_map: &SourceMap) -> String {
 pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMsg>) {
     while let Ok(cmd) = rx.recv() {
         match cmd {
-            SimCmd::RunCurrentTab { tab: _tab, config } => {
+            SimCmd::RunCurrentTab { config } => {
                 let sim_config = config;
                 let input = match std::fs::read_to_string(&netlist_path) {
                     Ok(input) => input,
@@ -65,16 +63,7 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                         continue;
                     }
                 };
-                let source_map = SourceMap::new(netlist_path.clone(), input);
-                let mut parse_options = ParseOptions {
-                    work_dir: netlist_path
-                        .parent()
-                        .unwrap_or(Path::new("."))
-                        .to_path_buf(),
-                    source_path: netlist_path.clone(),
-                    source_map,
-                    max_include_depth: 10,
-                };
+                let mut parse_options = ParseOptions::new_with_source(&netlist_path, input);
 
                 let deck = match parse(&mut parse_options) {
                     Ok(deck) => deck,

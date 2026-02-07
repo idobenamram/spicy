@@ -6,8 +6,10 @@ edition = "2024"
 [dependencies]
 spicy_parser = { path = "../spicy_parser" }
 spicy_simulate = { path = "../spicy_simulate" }
-ratatui = "0.26"
-crossterm = "0.27"
+ratatui = "0.30.0"
+crossterm = "0.29.0"
 anyhow = "1"
 crossbeam-channel = "0.5"
 clap = { version = "4.5", features = ["derive"] }
+neovim-lib = "0.6"
+rmp = "=0.8.14"

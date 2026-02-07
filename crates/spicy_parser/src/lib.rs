@@ -38,6 +38,18 @@ pub struct ParseOptions {
 }
 
 impl ParseOptions {
+    pub fn new_with_source(path: impl AsRef<Path>, input: String) -> Self {
+        let path = path.as_ref();
+        let source_path = path.to_path_buf();
+        let source_map = SourceMap::new(source_path.clone(), input);
+        Self {
+            work_dir: path.parent().unwrap_or(Path::new(".")).to_path_buf(),
+            source_path,
+            source_map,
+            max_include_depth: 10,
+        }
+    }
+
     pub fn read_file(
         &mut self,
         path_str: &str,

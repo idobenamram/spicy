@@ -6,15 +6,15 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table};
 use spicy_simulate::{LinearSolver, TransientIntegrator};
 
-use crate::tui::app::{App, ConfigField};
+use crate::tui::app::{App, ConfigField, CONFIG_FIELDS};
 
 use super::utils::centered_rect;
 
 fn config_value(app: &App, field: ConfigField) -> String {
-    if app.config_edit.is_some() && app.config_field == field {
-        if let Some(buf) = app.config_edit.as_deref() {
-            return format!("{buf}_");
-        }
+    if let Some(edit) = &app.config_edit
+        && app.config_field == field
+    {
+        return format!("{}_", edit.buffer);
     }
     match field {
         ConfigField::Solver => match app.config.solver {
@@ -55,11 +55,11 @@ fn config_help_text(app: &App) -> Text<'static> {
             Line::from("Esc or c: close config"),
         ]
     };
-    if let Some(err) = &app.config_error {
+    if let Some(err) = app.config_edit.as_ref().and_then(|edit| edit.error.as_ref()) {
         lines.extend([
             Line::from(""),
             Line::from(UiSpan::styled(
-                err.clone(),
+                err.to_string(),
                 Style::default().fg(Color::Red),
             )),
         ]);
@@ -76,15 +76,7 @@ pub(super) fn draw_config(f: &mut Frame, area: Rect, app: &App) {
         .constraints([Constraint::Min(8), Constraint::Length(6)])
         .split(popup);
 
-    let fields = [
-        ConfigField::Solver,
-        ConfigField::Integrator,
-        ConfigField::AbsTol,
-        ConfigField::RelTol,
-        ConfigField::MaxIters,
-    ];
-
-    let rows = fields.into_iter().map(|field| {
+    let rows = CONFIG_FIELDS.iter().copied().map(|field| {
         let label = config_label(field);
         let value = config_value(app, field);
         let mut row = Row::new(vec![Cell::from(label), Cell::from(value)]);

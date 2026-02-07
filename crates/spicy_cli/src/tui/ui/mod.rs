@@ -1,5 +1,6 @@
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::widgets::{Block, Borders};
 
 use crate::tui::app::App;
 
@@ -9,20 +10,38 @@ mod netlist;
 mod output;
 mod utils;
 
-pub use utils::{LineDiagnostic, format_error_snippet};
+pub use utils::format_error_snippet;
 
-pub fn ui(f: &mut Frame, app: &App) {
+#[derive(Clone, Copy, Debug)]
+pub struct NetlistLayout {
+    pub header: Rect,
+    pub body: Rect,
+    pub inner: Rect,
+}
+
+pub fn main_layout(area: Rect) -> [Rect; 2] {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(f.size());
+        .split(area);
+    [chunks[0], chunks[1]]
+}
 
-    netlist::draw_netlist(f, chunks[0], app);
-    output::draw_outputs(f, chunks[1], app);
+pub fn netlist_layout(left: Rect) -> NetlistLayout {
+    let [header, body] = utils::split_v(left, 3);
+    let inner = Block::default().borders(Borders::ALL).inner(body);
+    NetlistLayout { header, body, inner }
+}
 
-    if app.show_config {
-        config::draw_config(f, f.size(), app);
-    } else if app.show_help {
-        help::draw_help(f, f.size());
+pub fn ui(f: &mut Frame, app: &App) {
+    let [left, right] = main_layout(f.area());
+
+    netlist::draw_netlist(f, left, app);
+    output::draw_outputs(f, right, app);
+
+    if app.is_config() {
+        config::draw_config(f, f.area(), app);
+    } else if app.is_help() {
+        help::draw_help(f, f.area());
     }
 }

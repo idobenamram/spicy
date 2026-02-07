@@ -1,11 +1,10 @@
 use std::fs;
-use std::path::PathBuf;
 
 use clap::Parser;
-use spicy_parser::{ParseOptions, SourceMap, Span, parse};
+use spicy_parser::{ParseOptions, parse};
 use spicy_simulate::{SimulationConfig, simulate};
 
-use crate::tui::ui::LineDiagnostic; // kept for non-TUI mode
+use crate::tui::ui::format_error_snippet; // kept for non-TUI mode
 
 mod tui;
 
@@ -28,37 +27,32 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    let path = args.netlist.unwrap_or_else(|| {
+        let message = if args.tui {
+            "--tui requires a <netlist.spicy> argument"
+        } else {
+            "Missing <netlist.spicy> argument"
+        };
+        eprintln!("{message}");
+        std::process::exit(1);
+    });
+
     if args.tui {
-        let path = args.netlist.unwrap_or_else(|| {
-            eprintln!("--tui requires a <netlist.spicy> argument");
-            std::process::exit(1);
-        });
-        if let Err(e) = tui::run_tui(&path) {
-            // try to gracefully restore terminal
-            let _ = tui::term::restore_terminal();
+        let result = tui::run_tui(&path);
+        // try to gracefully restore terminal
+        let _ = tui::term::restore_terminal();
+        if let Err(e) = result {
             eprintln!("{}", e);
             std::process::exit(1);
         }
-        let _ = tui::term::restore_terminal();
         return;
     }
-
-    let path = args.netlist.unwrap_or_else(|| {
-        eprintln!("Missing <netlist.spicy> argument");
-        std::process::exit(1);
-    });
 
     let input = fs::read_to_string(&path).unwrap_or_else(|e| {
         eprintln!("Failed to read {}: {}", path, e);
         std::process::exit(1);
     });
-    let source_map = SourceMap::new(PathBuf::from(&path), input);
-    let mut parser_options = ParseOptions {
-        work_dir: PathBuf::from(&path).parent().unwrap().to_path_buf(),
-        source_path: PathBuf::from(&path),
-        source_map,
-        max_include_depth: 10,
-    };
+    let mut parser_options = ParseOptions::new_with_source(std::path::Path::new(&path), input);
 
     match parse(&mut parser_options) {
         Ok(deck) => {
@@ -85,31 +79,11 @@ fn main() {
                     eprintln!("Failed to read {}: {}", input_path.display(), e);
                     std::process::exit(1);
                 });
-                render_error_snippet(&input, span);
+                if let Some(snippet) = format_error_snippet(&input, span) {
+                    eprint!("{snippet}");
+                }
             }
             std::process::exit(2);
         }
     }
-}
-
-fn render_error_snippet(src: &str, span: Span) {
-    let Some(ld) = LineDiagnostic::new(src, span) else {
-        return;
-    };
-    let prefix = &src[ld.line_start..span.start];
-    let highlight = &src[span.start..=span.end];
-    let line = &src[ld.line_start..ld.line_end];
-    let col = prefix.chars().count();
-    let width = highlight.chars().count().max(1);
-
-    // optionally include line number
-    let line_no = src[..ld.line_start].chars().filter(|&c| c == '\n').count() + 1;
-    eprintln!("{:>4} | {}", line_no, line);
-    let underline = "~".repeat(width);
-    eprintln!(
-        "     | {:space$}\x1b[31m{}\x1b[0m",
-        "",
-        underline,
-        space = col
-    );
 }

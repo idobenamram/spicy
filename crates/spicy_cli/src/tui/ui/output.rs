@@ -48,7 +48,7 @@ pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
         .select(app.tab as u8 as usize)
         .block(Block::default().borders(Borders::ALL));
 
-    let tabs_style = if app.focus_right {
+    let tabs_style = if app.right_pane_focused() {
         Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD)
@@ -224,7 +224,7 @@ fn draw_tran_node_list(
         };
         let mut row = Row::new(vec![Cell::from(sel_cell), Cell::from(name.clone())]);
         if is_current {
-            let style = if app.focus_right {
+            let style = if app.right_pane_focused() {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD | Modifier::REVERSED)

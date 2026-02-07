@@ -64,8 +64,10 @@ and only assisted by ai. Those should be readable.
 - [x] hook up to simulation code
 - [x] cleanup device function use
 - [x] implement basic newton iteration
-- [ ] implement diode model
-- [ ] implement transistor model
+- [x] implement diode model
+- [x] implement transistor model
+- [ ] make from_spec nicer with getting values and defaults somehow
+- [ ] creating netlist validation step
 - [ ] implement gmin stepping
 - [ ] implement source stepping
 

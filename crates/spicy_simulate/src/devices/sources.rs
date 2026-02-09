@@ -6,7 +6,6 @@ use spicy_parser::devices::IndependentSourceSpec;
 use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex, Phasor};
 use spicy_parser::netlist_waveform::WaveForm;
 use spicy_parser::node_mapping::NodeMapping;
-use std::f64::consts::PI;
 
 // TODO: should probably be split to voltage source and current source
 #[derive(Debug, Clone)]
@@ -143,8 +142,11 @@ impl IndependentSource {
 
         if let Some(phasor) = &self.ac {
             let mag = phasor.mag.get_value();
-            let phase = phasor.phase.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-            let ph = phase * PI / 180.0;
+            let ph = phasor
+                .phase
+                .as_ref()
+                .map(|v| v.angle_radians(true))
+                .unwrap_or(0.0);
             let re = mag * ph.cos();
             let im = mag * ph.sin();
             br[k] += re;
@@ -161,8 +163,11 @@ impl IndependentSource {
     ) {
         if let Some(ac) = &self.ac {
             let mag = ac.mag.get_value();
-            let phase = ac.phase.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-            let ph = phase * PI / 180.0;
+            let ph = ac
+                .phase
+                .as_ref()
+                .map(|v| v.angle_radians(true))
+                .unwrap_or(0.0);
             let re = mag * ph.cos();
             let im = mag * ph.sin();
 

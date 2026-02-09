@@ -52,6 +52,7 @@ and only assisted by ai. Those should be readable.
 - [x] support models in parser
 - [x] add diodes
 - [x] add BJT transistor
+- [ ] support underscore in names (maybe we over complicated the lexer)
 
 
 ## Simulation
@@ -66,6 +67,7 @@ and only assisted by ai. Those should be readable.
 - [x] implement basic newton iteration
 - [x] implement diode model
 - [x] implement transistor model
+- [ ] support UIC again (using a simulation mode)
 - [ ] make from_spec nicer with getting values and defaults somehow
 - [ ] creating netlist validation step
 - [ ] implement gmin stepping

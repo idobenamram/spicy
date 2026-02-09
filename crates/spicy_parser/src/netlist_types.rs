@@ -202,6 +202,8 @@ pub enum ValueSuffix {
     Pico,
     Femto,
     Atto,
+    Degree,
+    Radian,
 }
 
 impl ValueSuffix {
@@ -217,6 +219,8 @@ impl ValueSuffix {
             s if s.starts_with("p") => Some(ValueSuffix::Pico),
             s if s.starts_with("f") => Some(ValueSuffix::Femto),
             s if s.starts_with("a") => Some(ValueSuffix::Atto),
+            s if s.eq_ignore_ascii_case("deg") => Some(ValueSuffix::Degree),
+            s if s.eq_ignore_ascii_case("rad") => Some(ValueSuffix::Radian),
             // TODO: should probalby panic?
             _ => None,
         }
@@ -233,6 +237,8 @@ impl ValueSuffix {
             ValueSuffix::Pico => 1e-12,
             ValueSuffix::Femto => 1e-15,
             ValueSuffix::Atto => 1e-18,
+            ValueSuffix::Degree => 1.0,
+            ValueSuffix::Radian => 1.0,
         }
     }
 }

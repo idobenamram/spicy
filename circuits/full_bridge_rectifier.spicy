@@ -1,0 +1,11 @@
+full bridge rectifier
+V1 acp acn SIN(0 10 60)
+D1 acp outp DIO
+D2 acn outp DIO
+D3 outn acp DIO
+D4 outn acn DIO
+R1 outp outn 1k
+C1 outp outn 10u
+.MODEL DIO D n=2
+.TRAN 0.5m 100m
+.END

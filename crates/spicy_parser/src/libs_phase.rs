@@ -163,7 +163,7 @@ fn handle_lib_command(
         let mut filtered = Vec::new();
         for s in all.statements.into_iter() {
             let src = file_content;
-            let mut c = s.into_cursor();
+            let mut c = s.as_cursor();
             if c.consume_if_command(src, CommandType::Lib) {
                 continue;
             }
@@ -186,7 +186,7 @@ fn handle_lib_command(
     let mut out_stmts = Vec::new();
     for s in all.statements.into_iter() {
         let src = file_content;
-        let mut c = s.into_cursor();
+        let mut c = s.as_cursor();
         if c.consume_if_command(src, CommandType::Lib) {
             let name = parse_ident(&mut c, src)?;
             if !in_block && name.text.eq_ignore_ascii_case(&libname) {
@@ -232,7 +232,7 @@ fn expand_includes(
     for stmt in stmts.statements.into_iter() {
         // TODO: kinda sucky that you have to get the input for each statement
         let input = options.source_map.get_content(stmt.span.source_index);
-        let mut cursor = stmt.into_cursor();
+        let mut cursor = stmt.as_cursor();
 
         if let Some(command) =
             cursor.consume_if_commands(input, &[CommandType::Include, CommandType::Lib])

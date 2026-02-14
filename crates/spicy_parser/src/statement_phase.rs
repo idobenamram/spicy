@@ -29,7 +29,7 @@ impl Statement {
         })
     }
 
-    pub(crate) fn into_cursor(&self) -> StmtCursor<'_> {
+    pub(crate) fn as_cursor(&self) -> StmtCursor<'_> {
         StmtCursor::new(&self.tokens, self.span)
     }
 
@@ -157,7 +157,7 @@ impl<'a> StmtCursor<'a> {
         if self.consume(TokenKind::Dot).is_some()
             && let Some(kind) = self.consume(TokenKind::Ident)
         {
-            let found_command = CommandType::from_str(token_text(input, kind)) == Some(command);
+            let found_command = token_text(input, kind).parse::<CommandType>().ok() == Some(command);
             if found_command {
                 return true;
             }
@@ -176,7 +176,7 @@ impl<'a> StmtCursor<'a> {
         if self.consume(TokenKind::Dot).is_some()
             && let Some(kind) = self.consume(TokenKind::Ident)
         {
-            let command_type = CommandType::from_str(token_text(input, kind));
+            let command_type = token_text(input, kind).parse::<CommandType>().ok();
             for command in commands {
                 if command_type == Some(*command) {
                     return Some(*command);
@@ -295,7 +295,7 @@ impl Statements {
 
         for stmt in statements.into_iter() {
             // Find first non-whitespace token index
-            let cursor = stmt.into_cursor();
+            let cursor = stmt.as_cursor();
             let starts_with_plus = match cursor.peek_non_whitespace() {
                 Some(t) => t.kind == TokenKind::Plus,
                 None => false,
@@ -374,7 +374,7 @@ mod tests {
         // param1=value1 param2=123\n
         let input = "param1=value1 param2=123\n";
         let stmt = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = stmt.statements[0].into_cursor();
+        let cursor = stmt.statements[0].as_cursor();
 
         // split_on_whitespace should create two segments: "param1=value1" and "param2=123"
         let segments = cursor.split_on_whitespace();
@@ -398,7 +398,7 @@ mod tests {
         // param1=value1\n
         let input = "param1=value1\n";
         let stmt = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let mut cursor = stmt.statements[0].into_cursor();
+        let mut cursor = stmt.statements[0].as_cursor();
 
         // split_on '=' should return the identifier before '=' and advance the cursor to '='
         let before_eq = cursor

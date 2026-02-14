@@ -1,0 +1,12 @@
+push pull amplifier
+VCC vcc 0 DC 12
+VEE vee 0 DC -12
+VIN in 0 SIN(0 3 1k 0 0 0)
+RIN in b 1k
+Q1 vcc b out QNPN
+Q2 vee b out QPNP
+RL out 0 100
+.MODEL QNPN NPN is=1e-16 bf=120 br=1
+.MODEL QPNP PNP is=1e-16 bf=80 br=1
+.TRAN 5u 5m
+.END

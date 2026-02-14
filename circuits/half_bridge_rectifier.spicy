@@ -1,0 +1,8 @@
+half bridge rectifier
+V1 ac 0 SIN(0 10 60)
+D1 ac out DIO
+R1 out 0 1k
+C1 out 0 10u
+.MODEL DIO D n=2
+.TRAN 0.5m 100m
+.END

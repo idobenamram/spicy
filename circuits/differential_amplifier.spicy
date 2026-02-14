@@ -1,0 +1,12 @@
+simple differential amplifier
+VCC vcc 0 DC 5
+V1 inp 0 SIN(1.2 10m 1k 0 0 0)
+V2 inn 0 SIN(1.2 10m 1k 0 0 180)
+Rc1 vcc outp 2k
+Rc2 vcc outn 2k
+Re tail 0 1k
+Q1 outp inp tail QNPN
+Q2 outn inn tail QNPN
+.MODEL QNPN NPN is=1e-16 bf=100 br=1
+.TRAN 10u 5m
+.END

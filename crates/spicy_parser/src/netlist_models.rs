@@ -137,7 +137,7 @@ fn model_statement_to_device_model(
 ) -> Result<DeviceModel, SpicyError> {
     let input = source_map.get_content(model_statement.statement.span.source_index);
 
-    let mut cursor = model_statement.statement.into_cursor();
+    let mut cursor = model_statement.statement.as_cursor();
     cursor.skip_ws();
     let params_cursors = if cursor.consume(TokenKind::LeftParen).is_some() {
         let in_parentheses = cursor.split_on(TokenKind::RightParen)?;

@@ -26,7 +26,7 @@ fn brace_to_placeholders(
     input: &ParseOptions,
     pm: &mut PlaceholderMap,
 ) -> Result<(), SpicyError> {
-    let mut cursor = statement.into_cursor();
+    let mut cursor = statement.as_cursor();
     let mut replacements = Vec::new();
 
     while let Some(tok) = cursor.next() {

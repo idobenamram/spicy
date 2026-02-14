@@ -2,7 +2,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Span as UiSpan;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs};
 use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
@@ -26,26 +26,53 @@ fn palette_color(index: usize) -> Color {
     COLORS[index % COLORS.len()]
 }
 
-pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
-    let [tabs_area, body] = split_v(area, 3);
-
-    let titles = vec![
-        Line::from(vec![
+fn tab_title(tab: Tab) -> Line<'static> {
+    match tab {
+        Tab::Op => Line::from(vec![
             UiSpan::styled("⚡ ", Style::default().fg(Color::Yellow)),
             UiSpan::raw("op"),
         ]),
-        Line::from(vec![
+        Tab::DC => Line::from(vec![
             UiSpan::styled("↯ ", Style::default().fg(Color::Cyan)),
             UiSpan::raw("dc"),
         ]),
-        Line::from(vec![
+        Tab::Trans => Line::from(vec![
             UiSpan::styled("⏱ ", Style::default().fg(Color::LightMagenta)),
             UiSpan::raw("tran"),
         ]),
-    ];
+    }
+}
+
+fn draw_empty_results(f: &mut Frame, tabs_area: Rect, body: Rect) {
+    let tabs_block = Block::default().borders(Borders::ALL).title("results");
+    f.render_widget(tabs_block, tabs_area);
+
+    let helper = Text::from(vec![
+        Line::from("no results yet"),
+        Line::from(""),
+        Line::from("Press 'r' to run all simulations"),
+        Line::from("Ensure your netlist includes .op/.dc/.tran commands"),
+    ]);
+    f.render_widget(
+        Paragraph::new(helper).block(Block::default().borders(Borders::ALL)),
+        body,
+    );
+}
+
+pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
+    let [tabs_area, body] = split_v(area, 3);
+
+    let available_tabs = app.available_tabs();
+    if available_tabs.is_empty() {
+        draw_empty_results(f, tabs_area, body);
+        return;
+    }
+
+    let titles: Vec<Line<'static>> =
+        available_tabs.iter().copied().map(tab_title).collect();
 
     let tabs = Tabs::new(titles)
-        .select(app.tab as u8 as usize)
+        .select(app.selected_tab_index(&available_tabs))
         .block(Block::default().borders(Borders::ALL));
 
     let tabs_style = if app.right_pane_focused() {
@@ -57,23 +84,28 @@ pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
     };
     f.render_widget(tabs.style(tabs_style), tabs_area);
 
-    if app.tab == Tab::Op
-        && let Some(op) = &app.op
-    {
-        draw_op(f, body, op);
-    } else if app.tab == Tab::DC
-        && let Some(dc) = &app.dc
-    {
-        draw_dc(f, body, dc);
-    } else if app.tab == Tab::Trans
-        && let Some(tr) = &app.trans
-    {
-        draw_tran(f, body, app, tr);
-    } else {
-        f.render_widget(
-            Paragraph::new("no results").block(Block::default().borders(Borders::ALL)),
-            body,
-        );
+    match app.selected_tab(&available_tabs) {
+        Some(Tab::Op) => {
+            if let Some(op) = &app.op {
+                draw_op(f, body, op);
+            }
+        }
+        Some(Tab::DC) => {
+            if let Some(dc) = &app.dc {
+                draw_dc(f, body, dc);
+            }
+        }
+        Some(Tab::Trans) => {
+            if let Some(tr) = &app.trans {
+                draw_tran(f, body, app, tr);
+            }
+        }
+        None => {
+            f.render_widget(
+                Paragraph::new("no results").block(Block::default().borders(Borders::ALL)),
+                body,
+            );
+        }
     }
 }
 

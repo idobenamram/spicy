@@ -172,7 +172,7 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     {
         let ident = cursor.next().expect("just peeked");
         let ident_text = token_text(src, ident);
-        suffix = ValueSuffix::from_str(ident_text);
+        suffix = ident_text.parse::<ValueSuffix>().ok();
     }
 
     let value: f64 = number_str

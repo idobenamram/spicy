@@ -8,6 +8,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::collections::HashMap;
+use std::f64::consts::PI;
 
 #[cfg(test)]
 use crate::test_utils::serialize_sorted_map;
@@ -41,6 +42,21 @@ impl Value {
             value *= suffix.scale();
         }
         value
+    }
+
+    pub fn angle_radians(&self, default_degrees: bool) -> f64 {
+        let value = self.get_value();
+        match self.suffix {
+            Some(ValueSuffix::Degree) => value * PI / 180.0,
+            Some(ValueSuffix::Radian) => value,
+            _ => {
+                if default_degrees {
+                    value * PI / 180.0
+                } else {
+                    value
+                }
+            }
+        }
     }
 }
 

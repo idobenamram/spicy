@@ -189,8 +189,26 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             app.scroll = app.netlist_line_count().saturating_sub(1)
         }
         KeyCode::Char('g') if app.left_pane_active() => app.scroll = 0,
-        KeyCode::Left => app.tab = app.tab.prev(),
-        KeyCode::Right => app.tab = app.tab.next(),
+        KeyCode::Left => {
+            let tabs = app.available_tabs();
+            if !tabs.is_empty() {
+                let idx = app.selected_tab_index(&tabs);
+                let prev_idx = (idx + tabs.len() - 1) % tabs.len();
+                if let Some(tab) = tabs.get(prev_idx).copied() {
+                    app.tab = tab;
+                }
+            }
+        }
+        KeyCode::Right => {
+            let tabs = app.available_tabs();
+            if !tabs.is_empty() {
+                let idx = app.selected_tab_index(&tabs);
+                let next_idx = (idx + 1) % tabs.len();
+                if let Some(tab) = tabs.get(next_idx).copied() {
+                    app.tab = tab;
+                }
+            }
+        }
         // transient tab node selection
         KeyCode::Down if app.focus_right && matches!(app.tab, Tab::Trans) => {
             app.trans_list_index = app.trans_list_index.saturating_add(1);
@@ -212,10 +230,13 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
                 }
             }
         }
-        KeyCode::Char('1') => app.tab = Tab::Op,
-        KeyCode::Char('2') => app.tab = Tab::DC,
-        KeyCode::Char('3') => app.tab = Tab::Trans,
-        // KeyCode::Char('3') => app.tab = Tab::Ac,
+        KeyCode::Char(c) if ('1'..='9').contains(&c) => {
+            let idx = (c as u8 - b'1') as usize;
+            let tabs = app.available_tabs();
+            if let Some(tab) = tabs.get(idx).copied() {
+                app.tab = tab;
+            }
+        }
         KeyCode::Char('r') => {
             tx.send(SimCmd::RunCurrentTab {
                 config: app.config.clone(),

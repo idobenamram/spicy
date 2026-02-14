@@ -28,11 +28,19 @@ pub enum SimMsg {
 
 pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     match msg {
+        SimMsg::SimulationStarted => {
+            app.op = None;
+            app.dc = None;
+            app.trans = None;
+            app.trans_selected_nodes.clear();
+            app.trans_list_index = 0;
+        }
         SimMsg::Op(op) => app.op = Some(op),
         SimMsg::Dc(dc) => app.dc = Some(dc),
         SimMsg::Transient(tr) => app.trans = Some(tr),
         _ => {}
     }
+    app.ensure_visible_tab();
 }
 
 fn format_parse_error(error: &SpicyError, source_map: &SourceMap) -> String {

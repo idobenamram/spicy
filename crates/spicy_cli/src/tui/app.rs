@@ -11,20 +11,6 @@ pub enum Tab {
     Trans,
 }
 
-const TABS: [Tab; 3] = [Tab::Op, Tab::DC, Tab::Trans];
-
-impl Tab {
-    pub fn next(self) -> Tab {
-        let idx = self as usize;
-        let next_idx = (idx + 1) % TABS.len();
-        TABS[next_idx]
-    }
-    pub fn prev(self) -> Tab {
-        let idx = self as usize;
-        let prev_idx = (idx + TABS.len() - 1) % TABS.len();
-        TABS[prev_idx]
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigField {
@@ -137,6 +123,43 @@ impl App {
 
     pub fn netlist_line_count(&self) -> usize {
         self.raw_netlist.lines().count()
+    }
+
+    pub fn available_tabs(&self) -> Vec<Tab> {
+        [
+            (Tab::Op, self.op.is_some()),
+            (Tab::DC, self.dc.is_some()),
+            (Tab::Trans, self.trans.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(tab, has_results)| has_results.then_some(tab))
+        .collect()
+    }
+
+    pub fn selected_tab_index(&self, available_tabs: &[Tab]) -> usize {
+        if available_tabs.is_empty() {
+            return 0;
+        }
+        available_tabs
+            .iter()
+            .position(|tab| *tab == self.tab)
+            .unwrap_or(0)
+    }
+
+    pub fn selected_tab(&self, available_tabs: &[Tab]) -> Option<Tab> {
+        available_tabs
+            .get(self.selected_tab_index(available_tabs))
+            .copied()
+    }
+
+    pub fn ensure_visible_tab(&mut self) {
+        let available_tabs = self.available_tabs();
+        if available_tabs.is_empty() {
+            return;
+        }
+        if !available_tabs.contains(&self.tab) {
+            self.tab = available_tabs[0];
+        }
     }
 
     pub fn left_pane_focused(&self) -> bool {

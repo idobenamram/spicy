@@ -61,7 +61,7 @@ pub(crate) fn collect_subckts(
     let mut it = stmts.statements.into_iter();
 
     while let Some(s) = it.next() {
-        let mut cursor = s.into_cursor();
+        let mut cursor = s.as_cursor();
         // todo: fix this
         let input = source_map.get_content(s.span.source_index);
 
@@ -81,7 +81,7 @@ pub(crate) fn collect_subckts(
             let mut body = Vec::new();
             // TODO: this doesn't support nested subcircuits
             for next in it.by_ref() {
-                let mut inner_cursor = next.into_cursor();
+                let mut inner_cursor = next.as_cursor();
                 if inner_cursor.consume_if_command(input, CommandType::Param) {
                     parse_dot_param(&mut inner_cursor, input, &mut subckt.local_params)?;
                     continue;
@@ -225,7 +225,7 @@ pub(crate) fn expand_subckts(
 
     let root_scope_id = unexpanded_deck.global_params;
     for s in unexpanded_deck.statements.into_iter() {
-        let mut cursor = s.into_cursor();
+        let mut cursor = s.as_cursor();
 
         let src = source_map.get_content(s.span.source_index);
         if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {

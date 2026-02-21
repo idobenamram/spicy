@@ -28,9 +28,9 @@ cargo run -p spicy_cli -- --tui path/to/netlist.spicy
 - `j` / `k`: scroll netlist when left pane is focused
 - `g`: jump to top (left pane focused)
 - `G` (Shift+g): jump to bottom (left pane focused)
-- `Left` / `Right`: previous/next tab
-- `1` / `2` / `3`: select OP/DC/Tran tabs
-- `r`: run simulation for the current tab
+- `Left` / `Right`: previous/next results tab
+- `1..N`: select visible results tab
+- `r`: run all simulations
 - `Up` / `Down`: move selection in transient node list (right pane)
 - `Enter`: toggle node in transient node list (right pane)
 

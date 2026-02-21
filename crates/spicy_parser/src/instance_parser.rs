@@ -990,7 +990,7 @@ impl<'s> InstanceParser<'s> {
         node_mapping: &mut NodeMapping,
         devices: &mut Devices,
     ) -> Result<(), SpicyError> {
-        let mut cursor = statement.stmt.into_cursor();
+        let mut cursor = statement.stmt.as_cursor();
         let ident = cursor.expect(TokenKind::Ident)?;
 
         let input = self.source_map.get_content(ident.span.source_index);
@@ -1143,16 +1143,18 @@ impl<'s> InstanceParser<'s> {
     }
 
     fn parse_command(&self, statement: &ScopedStmt) -> Result<Command, SpicyError> {
-        let mut cursor = statement.stmt.into_cursor();
+        let mut cursor = statement.stmt.as_cursor();
         cursor.expect(TokenKind::Dot)?;
         let ident = cursor.expect(TokenKind::Ident)?;
         let input = self.source_map.get_content(ident.span.source_index);
         let ident_string = token_text(input, ident);
-        let command_type =
-            CommandType::from_str(ident_string).ok_or_else(|| ParserError::InvalidCommandType {
-                s: ident_string.to_string(),
-                span: cursor.span,
-            })?;
+        let command_type: CommandType =
+            ident_string
+                .parse()
+                .map_err(|_| ParserError::InvalidCommandType {
+                    s: ident_string.to_string(),
+                    span: cursor.span,
+                })?;
 
         let scope = self.expanded_deck.scope_arena.get(statement.scope);
 
@@ -1185,7 +1187,7 @@ impl<'s> InstanceParser<'s> {
         let mut node_mapping = NodeMapping::new();
 
         for statement in statements_iter {
-            let cursor = statement.stmt.into_cursor();
+            let cursor = statement.stmt.as_cursor();
 
             let first_token = cursor.peek().ok_or(ParserError::MissingToken {
                 message: "token",
@@ -1276,7 +1278,7 @@ mod tests {
         let input = "1 2 off ic=0.7\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("area"),
             ParamSlot::other("m"),
@@ -1323,7 +1325,7 @@ mod tests {
         let input = "off=0 area=2\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1342,7 +1344,7 @@ mod tests {
         let input = "area=2 off\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1364,7 +1366,7 @@ mod tests {
         let input = "1 2\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("resistance"),
             ParamSlot::ident("mname"),
@@ -1399,7 +1401,7 @@ mod tests {
         let input = "1 modelX 2\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("resistance"),
             ParamSlot::ident("mname"),
@@ -1446,7 +1448,7 @@ mod tests {
         let input = "area=1 m 2\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1471,7 +1473,7 @@ mod tests {
         let input = "area=\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1489,7 +1491,7 @@ mod tests {
         let input = "bad=1\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1507,7 +1509,7 @@ mod tests {
         let input = "area=1 2\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1532,7 +1534,7 @@ mod tests {
         let input = "1 2 3\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("a"), ParamSlot::other("b")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
@@ -1564,7 +1566,7 @@ mod tests {
         let input = "off\n";
         let statements =
             Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
-        let cursor = statements.statements[0].into_cursor();
+        let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 

@@ -1,6 +1,7 @@
 // https://ngspice.sourceforge.io/docs/ngspice-manual.pdf
 
 use serde::Serialize;
+use std::{fmt, str::FromStr};
 
 use crate::{
     error::{ParserError, SpicyError},
@@ -33,27 +34,9 @@ pub enum CommandType {
     End,
 }
 
-impl CommandType {
-    pub fn from_str(s: &str) -> Option<CommandType> {
-        match s {
-            "AC" | "ac" => Some(CommandType::AC),
-            "DC" | "dc" => Some(CommandType::DC),
-            "OP" | "op" => Some(CommandType::Op),
-            "TRAN" | "tran" => Some(CommandType::Tran),
-            "LIB" | "lib" => Some(CommandType::Lib),
-            "ENDL" | "endl" => Some(CommandType::Endl),
-            "INCLUDE" | "include" => Some(CommandType::Include),
-            "MODEL" | "model" => Some(CommandType::Model),
-            "SUBCKT" | "subckt" => Some(CommandType::Subcircuit),
-            "ENDS" | "ends" => Some(CommandType::Ends),
-            "PARAM" | "param" => Some(CommandType::Param),
-            "END" | "end" => Some(CommandType::End),
-            _ => None,
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
+impl fmt::Display for CommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let command = match self {
             CommandType::AC => "AC",
             CommandType::DC => "DC",
             CommandType::Op => "OP",
@@ -66,8 +49,30 @@ impl CommandType {
             CommandType::Ends => "ENDS",
             CommandType::Param => "PARAM",
             CommandType::End => "END",
+        };
+        f.write_str(command)
+    }
+}
+
+impl FromStr for CommandType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "AC" | "ac" => Ok(CommandType::AC),
+            "DC" | "dc" => Ok(CommandType::DC),
+            "OP" | "op" => Ok(CommandType::Op),
+            "TRAN" | "tran" => Ok(CommandType::Tran),
+            "LIB" | "lib" => Ok(CommandType::Lib),
+            "ENDL" | "endl" => Ok(CommandType::Endl),
+            "INCLUDE" | "include" => Ok(CommandType::Include),
+            "MODEL" | "model" => Ok(CommandType::Model),
+            "SUBCKT" | "subckt" => Ok(CommandType::Subcircuit),
+            "ENDS" | "ends" => Ok(CommandType::Ends),
+            "PARAM" | "param" => Ok(CommandType::Param),
+            "END" | "end" => Ok(CommandType::End),
+            _ => Err(()),
         }
-        .to_string()
     }
 }
 
@@ -148,18 +153,6 @@ impl DeviceType {
         }
     }
 
-    pub fn from_str(s: &str) -> Result<DeviceType, SpicyError> {
-        let mut chars = s.chars();
-        let Some(first) = chars.next() else {
-            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
-        };
-        // Device types are a single letter; reject multi-character strings.
-        if chars.next().is_some() {
-            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
-        }
-        Self::from_char(first)
-    }
-
     pub fn to_char(&self) -> char {
         match self {
             DeviceType::Resistor => 'R',
@@ -171,6 +164,22 @@ impl DeviceType {
             DeviceType::CurrentSource => 'I',
             DeviceType::Subcircuit => 'X',
         }
+    }
+}
+
+impl FromStr for DeviceType {
+    type Err = SpicyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut chars = s.chars();
+        let Some(first) = chars.next() else {
+            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
+        };
+        // Device types are a single letter; reject multi-character strings.
+        if chars.next().is_some() {
+            return Err(ParserError::InvalidDeviceType { s: s.to_string() }.into());
+        }
+        Self::from_char(first)
     }
 }
 
@@ -202,25 +211,11 @@ pub enum ValueSuffix {
     Pico,
     Femto,
     Atto,
+    Degree,
+    Radian,
 }
 
 impl ValueSuffix {
-    pub fn from_str(s: &str) -> Option<ValueSuffix> {
-        match s {
-            s if s.starts_with("T") => Some(ValueSuffix::Tera),
-            s if s.starts_with("G") => Some(ValueSuffix::Giga),
-            s if s.starts_with("Meg") => Some(ValueSuffix::Mega),
-            s if s.starts_with("K") || s.starts_with("k") => Some(ValueSuffix::Kilo),
-            s if s.starts_with("m") || s.starts_with("M") => Some(ValueSuffix::Milli),
-            s if s.starts_with("u") || s.starts_with("U") => Some(ValueSuffix::Micro),
-            s if s.starts_with("n") => Some(ValueSuffix::Nano),
-            s if s.starts_with("p") => Some(ValueSuffix::Pico),
-            s if s.starts_with("f") => Some(ValueSuffix::Femto),
-            s if s.starts_with("a") => Some(ValueSuffix::Atto),
-            // TODO: should probalby panic?
-            _ => None,
-        }
-    }
     pub fn scale(&self) -> f64 {
         match self {
             ValueSuffix::Tera => 1e12,
@@ -233,6 +228,30 @@ impl ValueSuffix {
             ValueSuffix::Pico => 1e-12,
             ValueSuffix::Femto => 1e-15,
             ValueSuffix::Atto => 1e-18,
+            ValueSuffix::Degree => 1.0,
+            ValueSuffix::Radian => 1.0,
+        }
+    }
+}
+
+impl FromStr for ValueSuffix {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            s if s.starts_with("T") => Ok(ValueSuffix::Tera),
+            s if s.starts_with("G") => Ok(ValueSuffix::Giga),
+            s if s.starts_with("Meg") => Ok(ValueSuffix::Mega),
+            s if s.starts_with("K") || s.starts_with("k") => Ok(ValueSuffix::Kilo),
+            s if s.starts_with("m") || s.starts_with("M") => Ok(ValueSuffix::Milli),
+            s if s.starts_with("u") || s.starts_with("U") => Ok(ValueSuffix::Micro),
+            s if s.starts_with("n") => Ok(ValueSuffix::Nano),
+            s if s.starts_with("p") => Ok(ValueSuffix::Pico),
+            s if s.starts_with("f") => Ok(ValueSuffix::Femto),
+            s if s.starts_with("a") => Ok(ValueSuffix::Atto),
+            s if s.eq_ignore_ascii_case("deg") => Ok(ValueSuffix::Degree),
+            s if s.eq_ignore_ascii_case("rad") => Ok(ValueSuffix::Radian),
+            _ => Err(()),
         }
     }
 }

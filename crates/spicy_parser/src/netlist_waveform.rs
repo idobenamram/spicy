@@ -33,7 +33,7 @@ pub enum WaveForm {
         delay: Option<Value>,
         // THETA (1/second)
         damping_factor: Option<Value>,
-        // PHASE (degrees)
+        // PHASE (degrees by default; use deg/rad suffix to override)
         phase: Option<Value>,
     },
     Exponential {
@@ -136,7 +136,10 @@ impl WaveForm {
                     .as_ref()
                     .unwrap_or(&Value::zero())
                     .get_value();
-                let ph = phase.as_ref().unwrap_or(&Value::zero()).get_value();
+                let ph = phase
+                    .as_ref()
+                    .map(|value| value.angle_radians(true))
+                    .unwrap_or(0.0);
 
                 if t < td {
                     return v0;

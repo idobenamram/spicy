@@ -183,8 +183,7 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             app.scroll = app.scroll.saturating_sub(1);
         }
         KeyCode::Char('g')
-            if app.left_pane_active()
-                && k.modifiers.contains(KeyModifiers::SHIFT) =>
+            if app.left_pane_active() && k.modifiers.contains(KeyModifiers::SHIFT) =>
         {
             app.scroll = app.netlist_line_count().saturating_sub(1)
         }

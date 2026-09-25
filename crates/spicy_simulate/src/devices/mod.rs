@@ -1,19 +1,19 @@
+pub(crate) mod bjt;
 pub(crate) mod capacitor;
 pub(crate) mod diode;
 pub(crate) mod inductor;
 pub(crate) mod resistor;
 pub(crate) mod sources;
 pub(crate) mod stamp;
-pub(crate) mod bjt;
 
 use spicy_parser::devices::Devices as DevicesSpec;
 
+pub(crate) use bjt::Bjt;
 pub(crate) use capacitor::Capacitor;
 pub(crate) use diode::Diode;
 pub(crate) use inductor::Inductor;
 pub(crate) use resistor::Resistor;
 pub(crate) use sources::IndependentSource;
-pub(crate) use bjt::Bjt;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Devices {

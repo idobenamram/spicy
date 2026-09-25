@@ -27,9 +27,9 @@ pub use dump::{
 };
 pub use error::{KluError, KluResult};
 // TODO: might be more correct to move this outside of klu module
-pub use btf::btf;
-pub use analyze::{allocate_symbolic, analyze};
 pub use amd::amd;
+pub use analyze::{allocate_symbolic, analyze};
+pub use btf::btf;
 pub use factor::factor;
 pub use refactor::refactor;
 pub use solve::solve;

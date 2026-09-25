@@ -157,7 +157,8 @@ impl<'a> StmtCursor<'a> {
         if self.consume(TokenKind::Dot).is_some()
             && let Some(kind) = self.consume(TokenKind::Ident)
         {
-            let found_command = token_text(input, kind).parse::<CommandType>().ok() == Some(command);
+            let found_command =
+                token_text(input, kind).parse::<CommandType>().ok() == Some(command);
             if found_command {
                 return true;
             }

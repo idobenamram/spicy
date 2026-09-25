@@ -68,8 +68,7 @@ pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    let titles: Vec<Line<'static>> =
-        available_tabs.iter().copied().map(tab_title).collect();
+    let titles: Vec<Line<'static>> = available_tabs.iter().copied().map(tab_title).collect();
 
     let tabs = Tabs::new(titles)
         .select(app.selected_tab_index(&available_tabs))

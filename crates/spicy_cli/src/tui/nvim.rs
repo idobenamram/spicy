@@ -361,11 +361,7 @@ impl NvimGrid {
                 continue;
             }
             let text = value_to_string(&parts[0]).unwrap_or_else(|| " ".to_string());
-            let repeat = parts
-                .get(2)
-                .and_then(Value::as_i64)
-                .unwrap_or(1)
-                .max(1) as usize;
+            let repeat = parts.get(2).and_then(Value::as_i64).unwrap_or(1).max(1) as usize;
             for _ in 0..repeat {
                 for ch in text.chars() {
                     if x >= self.width as usize {
@@ -385,15 +381,7 @@ impl NvimGrid {
         }
     }
 
-    fn scroll(
-        &mut self,
-        top: usize,
-        bot: usize,
-        left: usize,
-        right: usize,
-        rows: i64,
-        _cols: i64,
-    ) {
+    fn scroll(&mut self, top: usize, bot: usize, left: usize, right: usize, rows: i64, _cols: i64) {
         if top >= bot || left >= right {
             return;
         }

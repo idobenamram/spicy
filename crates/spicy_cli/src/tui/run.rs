@@ -84,10 +84,7 @@ pub fn run_tui(path: &str) -> Result<()> {
             .as_mut()
             .map(|nvim| nvim.poll_events())
             .unwrap_or_default();
-        let nvim_dead = app
-            .nvim
-            .as_ref()
-            .is_some_and(|nvim| !nvim.is_alive());
+        let nvim_dead = app.nvim.as_ref().is_some_and(|nvim| !nvim.is_alive());
         for event in events {
             match event {
                 NvimEvent::Saved(path) => saved_paths.push(path),

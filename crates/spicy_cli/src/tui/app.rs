@@ -11,7 +11,6 @@ pub enum Tab {
     Trans,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigField {
     Solver,
@@ -44,19 +43,13 @@ pub(crate) const CONFIG_FIELDS: [ConfigField; 5] = [
 
 impl ConfigField {
     pub fn next(self) -> ConfigField {
-        let idx = CONFIG_FIELDS
-            .iter()
-            .position(|f| *f == self)
-            .unwrap_or(0);
+        let idx = CONFIG_FIELDS.iter().position(|f| *f == self).unwrap_or(0);
         let next_idx = (idx + 1) % CONFIG_FIELDS.len();
         CONFIG_FIELDS[next_idx]
     }
 
     pub fn prev(self) -> ConfigField {
-        let idx = CONFIG_FIELDS
-            .iter()
-            .position(|f| *f == self)
-            .unwrap_or(0);
+        let idx = CONFIG_FIELDS.iter().position(|f| *f == self).unwrap_or(0);
         let prev_idx = (idx + CONFIG_FIELDS.len() - 1) % CONFIG_FIELDS.len();
         CONFIG_FIELDS[prev_idx]
     }

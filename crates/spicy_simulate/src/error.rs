@@ -23,8 +23,5 @@ pub enum SimulationError {
     BlasLUNotFactorized,
 
     #[error("Newton iteration did not converge (time={time:?}, iters={iters})")]
-    NonConvergence {
-        time: Option<f64>,
-        iters: usize,
-    },
+    NonConvergence { time: Option<f64>, iters: usize },
 }

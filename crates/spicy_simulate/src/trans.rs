@@ -291,10 +291,9 @@ fn simulation_step<'a>(
     time: f64,
 ) -> Result<(Vec<f64>, usize), SimulationError> {
     let initial_guess = integrator.get_previous_output().to_vec();
-    let (solution, iters) =
-        newton_solve(matrix, newton, initial_guess, Some(time), |m, guess| {
-            stamp_transient(m, devices, config, integrator, guess)
-        })?;
+    let (solution, iters) = newton_solve(matrix, newton, initial_guess, Some(time), |m, guess| {
+        stamp_transient(m, devices, config, integrator, guess)
+    })?;
 
     if matches!(&*integrator, Integrator::Trapezoidal { .. }) {
         for c in &devices.capacitors {
@@ -408,19 +407,10 @@ pub fn simulate_trans(
 mod tests {
     use super::*;
     use crate::solver::klu::KluConfig;
+    use crate::test_util::round_sig;
     use crate::{LinearSolver, SimulationConfig};
     use spicy_parser::{ParseOptions, SourceMap, netlist_types::Command, parse};
     use std::path::PathBuf;
-
-    fn round_sig(x: f64, sig: i32) -> f64 {
-        if x == 0.0 || !x.is_finite() {
-            return x;
-        }
-        let exp10 = x.abs().log10().floor() as i32;
-        let digits = sig - 1 - exp10;
-        let scale = 10f64.powi(digits);
-        (x * scale).round() / scale
-    }
 
     #[test]
     fn trans_klu_and_blas_are_similar() {

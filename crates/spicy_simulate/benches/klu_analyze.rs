@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-use std::{fs, hint::black_box, path::{Path, PathBuf}, sync::OnceLock};
+use std::{
+    fs,
+    hint::black_box,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use spicy_simulate::solver::{
     btf_max_transversal::btf_max_transversal,
     btf_scc::btf_scc,
@@ -37,7 +42,6 @@ fn load_matrix(path: &Path) -> CscMatrix {
         .unwrap_or_else(|e| panic!("invalid CSC after parsing {}: {e}", path.display()));
     a
 }
-
 
 fn load_cases() -> &'static Vec<Case> {
     static CASES: OnceLock<Vec<Case>> = OnceLock::new();
@@ -142,8 +146,7 @@ fn bench_btf_scc_after_max_transversal(c: &mut Criterion) {
             let mut base_col_perm = vec![-1isize; n];
             let structural_rank = btf_max_transversal(&case.a, &mut base_col_perm);
             assert_eq!(
-                structural_rank,
-                n,
+                structural_rank, n,
                 "Matrix {} is structurally singular (rank {structural_rank} < n={n})",
                 case.name
             );
@@ -164,7 +167,6 @@ fn bench_btf_scc_after_max_transversal(c: &mut Criterion) {
 
     group.finish();
 }
-
 
 fn bench_full_analyze(c: &mut Criterion) {
     let cases = load_cases();
@@ -199,4 +201,3 @@ criterion_group!(
     bench_full_analyze
 );
 criterion_main!(klu_analyze);
-

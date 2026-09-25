@@ -47,18 +47,8 @@ impl Diode {
             .as_ref()
             .map(|v| v.get_value())
             .unwrap_or(1e-14);
-        let emission_coeff = spec
-            .model
-            .n
-            .as_ref()
-            .map(|v| v.get_value())
-            .unwrap_or(1.0);
-        let series_resistance = spec
-            .model
-            .rs
-            .as_ref()
-            .map(|v| v.get_value())
-            .unwrap_or(0.0);
+        let emission_coeff = spec.model.n.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
+        let series_resistance = spec.model.rs.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
 
         let area = spec.area.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
         let m = spec.m.as_ref().map(|v| v.get_value()).unwrap_or(1.0);

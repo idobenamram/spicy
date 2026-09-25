@@ -6,7 +6,7 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table};
 use spicy_simulate::{LinearSolver, TransientIntegrator};
 
-use crate::tui::app::{App, ConfigField, CONFIG_FIELDS};
+use crate::tui::app::{App, CONFIG_FIELDS, ConfigField};
 
 use super::utils::centered_rect;
 
@@ -55,7 +55,11 @@ fn config_help_text(app: &App) -> Text<'static> {
             Line::from("Esc or c: close config"),
         ]
     };
-    if let Some(err) = app.config_edit.as_ref().and_then(|edit| edit.error.as_ref()) {
+    if let Some(err) = app
+        .config_edit
+        .as_ref()
+        .and_then(|edit| edit.error.as_ref())
+    {
         lines.extend([
             Line::from(""),
             Line::from(UiSpan::styled(

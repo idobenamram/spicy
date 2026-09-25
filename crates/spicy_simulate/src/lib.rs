@@ -13,14 +13,16 @@ pub mod dc;
 mod devices;
 mod error;
 mod matrix;
-mod util;
 pub(crate) mod raw_writer;
 mod setup_pattern;
 pub mod solver;
+#[cfg(test)]
+mod test_util;
 pub mod trans;
+mod util;
 pub use dc::{DcSweepResult, OperatingPointResult};
-pub use trans::TransientResult;
 pub use error::SimulationError;
+pub use trans::TransientResult;
 
 #[derive(Debug, Clone)]
 pub enum LinearSolver {
@@ -155,6 +157,7 @@ pub fn simulate(deck: Deck, sim_config: SimulationConfig) -> Result<(), Simulati
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::assert_numeric_snapshot;
     use rstest::rstest;
     use spicy_parser::netlist_types::{NodeIndex, NodeName};
     use spicy_parser::node_mapping::NodeMapping;
@@ -207,7 +210,7 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, output);
+        assert_numeric_snapshot(&name, &output);
     }
 
     #[rstest]
@@ -237,7 +240,7 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, output);
+        assert_numeric_snapshot(&name, &output);
     }
 
     #[rstest]
@@ -269,7 +272,7 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, output);
+        assert_numeric_snapshot(&name, &output);
     }
 
     #[rstest]
@@ -301,6 +304,6 @@ mod tests {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string())
         );
-        insta::assert_debug_snapshot!(name, output);
+        assert_numeric_snapshot(&name, &output);
     }
 }

@@ -79,9 +79,10 @@ fn setup_inductors(
         let pos = node_mapping.mna_node_index(i.positive);
         let neg = node_mapping.mna_node_index(i.negative);
         let branch_index = node_mapping.mna_branch_index(i.current_branch);
-        i.stamp.set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
-            builder.push(col, row, 0.0)
-        })?;
+        i.stamp
+            .set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
+                builder.push(col, row, 0.0)
+            })?;
     }
     Ok(())
 }
@@ -95,9 +96,10 @@ fn setup_voltage_sources(
         let pos = node_mapping.mna_node_index(v.positive);
         let neg = node_mapping.mna_node_index(v.negative);
         let branch_index = node_mapping.mna_branch_index(v.current_branch);
-        v.stamp.set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
-            builder.push(col, row, 0.0)
-        })?;
+        v.stamp
+            .set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
+                builder.push(col, row, 0.0)
+            })?;
     }
     Ok(())
 }
@@ -208,7 +210,8 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
         let ec = dense_entry(e, c);
         let ee = dense_entry(e, e);
 
-        bjt.stamp.set_temp_indices(bb, bc, be, cb, cc, ce, eb, ec, ee);
+        bjt.stamp
+            .set_temp_indices(bb, bc, be, cb, cc, ce, eb, ec, ee);
     }
 
     for ind in &mut devices.inductors {

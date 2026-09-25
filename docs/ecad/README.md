@@ -1,0 +1,34 @@
+# ECAD Editor Design Docs
+
+Design documents for the AI-native schematic and simulation editor built on spicy.
+
+## Reading order
+
+1. **[vision.md](vision.md)**: what we're building and why.
+2. **[walkthrough.md](walkthrough.md)**: one amplifier followed through the whole engine, with real numbers. The best introduction to how the engine thinks.
+3. **[engine.md](engine.md)**: the engine design (current: v3).
+4. **[language.md](language.md)**: the circuit language (v0.1).
+5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
+6. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
+
+## Reference
+
+- **[bibliography.md](bibliography.md)**: verified references. Other docs cite keys like `[AGW94]`.
+- **[research/](research/)**: the research round behind engine v3 and language v0.1.
+  - [research/synthesis.md](research/synthesis.md): the merged findings. Start here.
+  - Engine stress tests:
+    - [engine_power.md](research/engine_power.md)
+    - [engine_precision_analog.md](research/engine_precision_analog.md)
+    - [engine_mixed_signal.md](research/engine_mixed_signal.md)
+    - [engine_method_redteam.md](research/engine_method_redteam.md)
+  - Language proposals:
+    - [language_core.md](research/language_core.md)
+    - [language_specs.md](research/language_specs.md)
+    - [language_editor_mapping.md](research/language_editor_mapping.md)
+- **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md)).
+
+## Conventions
+
+- Paths to code (`crates/spicy_simulate/src/…`) are relative to the repository root.
+- Paths to other docs are relative to the doc they appear in.
+- Section references look like `engine.md §5.2`.

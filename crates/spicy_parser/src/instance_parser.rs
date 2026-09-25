@@ -168,9 +168,10 @@ impl<'s> Iterator for ParamParser<'s> {
                             if is_ident != p.is_ident {
                                 self.current_param += 1;
                                 match self.params_order.get(self.current_param) {
-                                    Some(p) => {
-                                        Some(Ok(ParsedParam { name: p.canonical, cursor }))
-                                    }
+                                    Some(p) => Some(Ok(ParsedParam {
+                                        name: p.canonical,
+                                        cursor,
+                                    })),
                                     None => Some(Err(ParserError::TooManyParameters {
                                         index: self.current_param,
                                         span: cursor.span,
@@ -178,7 +179,10 @@ impl<'s> Iterator for ParamParser<'s> {
                                     .into())),
                                 }
                             } else {
-                                Some(Ok(ParsedParam { name: p.canonical, cursor }))
+                                Some(Ok(ParsedParam {
+                                    name: p.canonical,
+                                    cursor,
+                                }))
                             }
                         }
                         None => Some(Err(ParserError::TooManyParameters {
@@ -1029,9 +1033,11 @@ impl<'s> InstanceParser<'s> {
                     .diodes
                     .push(self.parse_diode(name, &mut cursor, scope, node_mapping)?)
             }
-            DeviceType::Bjt => devices
-                .bjts
-                .push(self.parse_bjt(name, &mut cursor, scope, node_mapping)?),
+            DeviceType::Bjt => {
+                devices
+                    .bjts
+                    .push(self.parse_bjt(name, &mut cursor, scope, node_mapping)?)
+            }
             DeviceType::VoltageSource => devices.voltage_sources.push(
                 self.parse_independent_source(name, &mut cursor, scope, node_mapping, true)?,
             ),
@@ -1276,8 +1282,7 @@ mod tests {
     #[test]
     fn test_param_parser_positional_flag_and_named() {
         let input = "1 2 off ic=0.7\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("area"),
@@ -1287,33 +1292,33 @@ mod tests {
         ];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("area").expect("area ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("area").expect("area ok");
         assert_eq!(name, "area");
-        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("area value")
+                .get_value(),
+            1.0
+        );
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("m").expect("m ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("m").expect("m ok");
         assert_eq!(name, "m");
-        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("m value")
+                .get_value(),
+            2.0
+        );
 
-        let ParsedParam {
-            name,
-            cursor: _,
-        } = params.next().expect("off").expect("off ok");
+        let ParsedParam { name, cursor: _ } = params.next().expect("off").expect("off ok");
         assert_eq!(name, "off");
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("ic").expect("ic ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("ic").expect("ic ok");
         assert_eq!(name, "ic");
         assert_eq!(
-            parse_value(&mut cursor, input).expect("ic value").get_value(),
+            parse_value(&mut cursor, input)
+                .expect("ic value")
+                .get_value(),
             0.7
         );
 
@@ -1323,8 +1328,7 @@ mod tests {
     #[test]
     fn test_param_parser_named_flag_rejects_value() {
         let input = "off=0 area=2\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);
@@ -1342,18 +1346,19 @@ mod tests {
     #[test]
     fn test_param_parser_named_flag_after_named() {
         let input = "area=2 off\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("area").expect("area ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("area").expect("area ok");
         assert_eq!(name, "area");
-        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 2.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("area value")
+                .get_value(),
+            2.0
+        );
 
         let ParsedParam { name, cursor: _ } = params.next().expect("off").expect("off ok");
         assert_eq!(name, "off");
@@ -1364,8 +1369,7 @@ mod tests {
     #[test]
     fn test_param_parser_ident_slot_skip() {
         let input = "1 2\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("resistance"),
@@ -1374,10 +1378,8 @@ mod tests {
         ];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("resistance").expect("resistance ok");
+        let ParsedParam { name, mut cursor } =
+            params.next().expect("resistance").expect("resistance ok");
         assert_eq!(name, "resistance");
         assert_eq!(
             parse_value(&mut cursor, input)
@@ -1386,12 +1388,14 @@ mod tests {
             1.0
         );
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("m").expect("m ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("m").expect("m ok");
         assert_eq!(name, "m");
-        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("m value")
+                .get_value(),
+            2.0
+        );
 
         assert!(params.next().is_none());
     }
@@ -1399,8 +1403,7 @@ mod tests {
     #[test]
     fn test_param_parser_ident_slot_value() {
         let input = "1 modelX 2\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![
             ParamSlot::other("resistance"),
@@ -1409,10 +1412,8 @@ mod tests {
         ];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("resistance").expect("resistance ok");
+        let ParsedParam { name, mut cursor } =
+            params.next().expect("resistance").expect("resistance ok");
         assert_eq!(name, "resistance");
         assert_eq!(
             parse_value(&mut cursor, input)
@@ -1421,24 +1422,21 @@ mod tests {
             1.0
         );
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("mname").expect("mname ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("mname").expect("mname ok");
         assert_eq!(name, "mname");
         assert_eq!(
-            parse_ident(&mut cursor, input)
-                .expect("mname ident")
-                .text,
+            parse_ident(&mut cursor, input).expect("mname ident").text,
             "modelX"
         );
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("m").expect("m ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("m").expect("m ok");
         assert_eq!(name, "m");
-        assert_eq!(parse_value(&mut cursor, input).expect("m value").get_value(), 2.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("m value")
+                .get_value(),
+            2.0
+        );
 
         assert!(params.next().is_none());
     }
@@ -1446,18 +1444,19 @@ mod tests {
     #[test]
     fn test_param_parser_named_missing_equal() {
         let input = "area=1 m 2\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("area").expect("area ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("area").expect("area ok");
         assert_eq!(name, "area");
-        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("area value")
+                .get_value(),
+            1.0
+        );
 
         let err = params.next().expect("m").expect_err("m should need '='");
         match err {
@@ -1471,16 +1470,12 @@ mod tests {
     #[test]
     fn test_param_parser_named_missing_value() {
         let input = "area=\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("area").expect("area ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("area").expect("area ok");
         assert_eq!(name, "area");
         assert!(parse_value(&mut cursor, input).is_err());
         assert!(params.next().is_none());
@@ -1489,8 +1484,7 @@ mod tests {
     #[test]
     fn test_param_parser_named_invalid_param() {
         let input = "bad=1\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area")];
         let mut params = ParamParser::new(input, params_order, &cursor);
@@ -1507,20 +1501,24 @@ mod tests {
     #[test]
     fn test_param_parser_named_rejects_positional() {
         let input = "area=1 2\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("area"), ParamSlot::other("m")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("area").expect("area ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("area").expect("area ok");
         assert_eq!(name, "area");
-        assert_eq!(parse_value(&mut cursor, input).expect("area value").get_value(), 1.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("area value")
+                .get_value(),
+            1.0
+        );
 
-        let err = params.next().expect("m").expect_err("positional not allowed");
+        let err = params
+            .next()
+            .expect("m")
+            .expect_err("positional not allowed");
         match err {
             SpicyError::Parser(ParserError::MissingToken { message, .. }) => {
                 assert_eq!(message, "ident");
@@ -1532,25 +1530,28 @@ mod tests {
     #[test]
     fn test_param_parser_too_many_parameters() {
         let input = "1 2 3\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::other("a"), ParamSlot::other("b")];
         let mut params = ParamParser::new(input, params_order, &cursor);
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("a").expect("a ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("a").expect("a ok");
         assert_eq!(name, "a");
-        assert_eq!(parse_value(&mut cursor, input).expect("a value").get_value(), 1.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("a value")
+                .get_value(),
+            1.0
+        );
 
-        let ParsedParam {
-            name,
-            mut cursor,
-        } = params.next().expect("b").expect("b ok");
+        let ParsedParam { name, mut cursor } = params.next().expect("b").expect("b ok");
         assert_eq!(name, "b");
-        assert_eq!(parse_value(&mut cursor, input).expect("b value").get_value(), 2.0);
+        assert_eq!(
+            parse_value(&mut cursor, input)
+                .expect("b value")
+                .get_value(),
+            2.0
+        );
 
         let err = params.next().expect("extra").expect_err("too many params");
         match err {
@@ -1564,8 +1565,7 @@ mod tests {
     #[test]
     fn test_param_parser_flag_only_positional() {
         let input = "off\n";
-        let statements =
-            Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
+        let statements = Statements::new(input, SourceFileId::new(0)).expect("non-empty statement");
         let cursor = statements.statements[0].as_cursor();
         let params_order = vec![ParamSlot::flag("off")];
         let mut params = ParamParser::new(input, params_order, &cursor);

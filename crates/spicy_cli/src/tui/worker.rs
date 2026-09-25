@@ -48,7 +48,8 @@ fn format_parse_error(error: &SpicyError, source_map: &SourceMap) -> String {
     if let Some(span) = error.error_span() {
         let path = source_map.get_path(span.source_index);
         out.push_str(&format!("\n--> {}", path.display()));
-        if let Some(snippet) = format_error_snippet(source_map.get_content(span.source_index), span) {
+        if let Some(snippet) = format_error_snippet(source_map.get_content(span.source_index), span)
+        {
             out.push('\n');
             out.push_str(&snippet);
         }

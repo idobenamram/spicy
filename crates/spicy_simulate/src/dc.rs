@@ -92,13 +92,9 @@ pub(crate) fn simulate_op_inner(
     state: &mut NewtonState,
 ) -> Result<(), SimulationError> {
     let initial_guess = vec![0.0; m.rhs().len()];
-    let _ = newton_solve(
-        m,
-        state,
-        initial_guess,
-        None,
-        |matrix, guess| stamp_dc(matrix, devices, guess),
-    )?;
+    let _ = newton_solve(m, state, initial_guess, None, |matrix, guess| {
+        stamp_dc(matrix, devices, guess)
+    })?;
 
     Ok(())
 }
@@ -166,14 +162,11 @@ pub fn simulate_dc(
     for v in sweep_values {
         set_sweep_value(&mut devices, sweep_target, v);
         let mut state = NewtonState::new(sim_config.newton, NewtonMode::InitOp);
-        let (solution, _iters) = newton_solve(
-            &mut matrix,
-            &mut state,
-            guess,
-            None,
-            |matrix, guess| stamp_dc(matrix, &devices, guess),
-        )
-        .expect("simulate_dc newton solve");
+        let (solution, _iters) =
+            newton_solve(&mut matrix, &mut state, guess, None, |matrix, guess| {
+                stamp_dc(matrix, &devices, guess)
+            })
+            .expect("simulate_dc newton solve");
 
         let mut voltages = Vec::with_capacity(node_names.len());
         let mut currents = Vec::with_capacity(branch_names.len());

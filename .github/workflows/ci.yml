@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -23,13 +23,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libopenblas-dev
 
-      - name: Install Rust (stable) with clippy
+      - name: Install Rust (stable) with clippy and rustfmt
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: |
+          cargo fmt --all --check
 
       - name: Run Clippy (warnings only)
         run: |

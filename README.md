@@ -32,6 +32,13 @@ we use cargo-insta for snapshot testing in a lot of the parser tests. to update 
 cargo insta review
 ```
 
+The simulation result snapshots (`spicy_simulate`) keep full precision but compare numbers
+with a small tolerance, so last-digit differences between machines don't fail them. When one
+fails, the actual output is written next to it as `.snap.new`; to accept it use:
+```bash
+SPICY_UPDATE_SNAPSHOTS=1 cargo test -p spicy_simulate
+```
+
 Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
 ### Vibe Coding

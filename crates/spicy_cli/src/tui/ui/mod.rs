@@ -30,7 +30,11 @@ pub fn main_layout(area: Rect) -> [Rect; 2] {
 pub fn netlist_layout(left: Rect) -> NetlistLayout {
     let [header, body] = utils::split_v(left, 3);
     let inner = Block::default().borders(Borders::ALL).inner(body);
-    NetlistLayout { header, body, inner }
+    NetlistLayout {
+        header,
+        body,
+        inner,
+    }
 }
 
 pub fn ui(f: &mut Frame, app: &App) {

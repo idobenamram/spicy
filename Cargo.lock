@@ -2286,6 +2286,7 @@ name = "spicy_cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "crossbeam-channel",
  "crossterm",
@@ -2320,7 +2321,6 @@ dependencies = [
 name = "spicy_simulate"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "clap",
  "criterion",
  "insta",

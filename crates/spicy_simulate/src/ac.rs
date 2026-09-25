@@ -122,11 +122,11 @@ fn assemble_ac_real_expansion(
     (m, s_vec)
 }
 
-pub fn simulate_ac(
-    deck: &Deck,
-    cmd: &AcCommand,
-    _sim_config: &SimulationConfig,
-) -> Vec<(f64, Array1<f64>, Array1<f64>)> {
+/// AC results, one entry per frequency: (frequency in Hz, real parts, imaginary
+/// parts). The vectors hold node voltages then branch currents, in MNA order.
+pub type AcResult = Vec<(f64, Array1<f64>, Array1<f64>)>;
+
+pub fn simulate_ac(deck: &Deck, cmd: &AcCommand, _sim_config: &SimulationConfig) -> AcResult {
     let freqs = ac_frequencies(cmd);
     let devices = Devices::from_spec(&deck.devices);
     let node_mapping = &deck.node_mapping;
@@ -144,20 +144,6 @@ pub fn simulate_ac(
         let dim = n + k;
         let xr = x.slice(s![0..dim]).to_owned();
         let xi = x.slice(s![dim..2 * dim]).to_owned();
-
-        // Optional: print node phasors
-        let node_names = node_mapping.node_names_mna_order();
-        for i in 0..n {
-            let vr = xr[i];
-            let vi = xi[i];
-            let mag = (vr * vr + vi * vi).sqrt();
-            let phase = vi.atan2(vr) * 180.0 / PI;
-            println!(
-                "f={:.6} Hz  {}: {:.6} ∠ {:.3}°",
-                f, node_names[i], mag, phase
-            );
-        }
-
         out.push((f, xr, xi));
     }
 

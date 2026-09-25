@@ -1,11 +1,11 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Local;
 use spicy_parser::instance_parser::Deck;
 
-use crate::{DcSweepResult, OperatingPointResult, TransientResult};
+use spicy_simulate::{AcResult, DcSweepResult, OperatingPointResult, TransientResult};
 
 // TODO: kinda vibe coded this so it can definitly be improved
 
@@ -23,6 +23,11 @@ fn sanitize_filename(input: &str) -> String {
     } else {
         out
     }
+}
+
+/// Path of the raw file for `stem` in `dir`, e.g. `<dir>/amp.raw`.
+pub(crate) fn raw_file_path(dir: &Path, stem: &str) -> PathBuf {
+    dir.join(format!("{}.raw", sanitize_filename(stem)))
 }
 
 fn build_trace_variables_from_names(
@@ -98,11 +103,9 @@ fn write_binary_series_real_f32(
 pub(crate) fn write_transient_raw(
     deck: &Deck,
     result: &TransientResult,
-    output_base: &str,
-) -> std::io::Result<PathBuf> {
-    let filename = format!("{}.raw", sanitize_filename(output_base));
-    let path = PathBuf::from(filename);
-    let file = File::create(&path)?;
+    path: &Path,
+) -> std::io::Result<()> {
+    let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     let traces = build_trace_variables_from_names(&result.node_names, &result.source_names);
@@ -121,18 +124,15 @@ pub(crate) fn write_transient_raw(
     write_variables_with_offset(&mut writer, &traces, 1)?;
     write_binary_series_real_f32(&mut writer, &result.times, &result.samples)?;
 
-    writer.flush()?;
-    Ok(path)
+    writer.flush()
 }
 
 pub(crate) fn write_operating_point_raw(
     deck: &Deck,
     op: &OperatingPointResult,
-    output_base: &str,
-) -> std::io::Result<PathBuf> {
-    let filename = format!("{}.raw", sanitize_filename(output_base));
-    let path = PathBuf::from(filename);
-    let file = File::create(&path)?;
+    path: &Path,
+) -> std::io::Result<()> {
+    let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     // Build variable names from the provided result ordering
@@ -163,20 +163,17 @@ pub(crate) fn write_operating_point_raw(
     for (_, i) in &op.currents {
         writer.write_all(&(*i as f32).to_le_bytes())?;
     }
-    writer.flush()?;
-    Ok(path)
+    writer.flush()
 }
 
 pub(crate) fn write_dc_raw(
     deck: &Deck,
     dc: &DcSweepResult,
-    output_base: &str,
+    path: &Path,
     sweep_name: &str,
     is_voltage_source: bool,
-) -> std::io::Result<PathBuf> {
-    let filename = format!("{}.raw", sanitize_filename(output_base));
-    let path = PathBuf::from(filename);
-    let file = File::create(&path)?;
+) -> std::io::Result<()> {
+    let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     // Assume non-empty results
@@ -227,18 +224,11 @@ pub(crate) fn write_dc_raw(
             writer.write_all(&(*i as f32).to_le_bytes())?;
         }
     }
-    writer.flush()?;
-    Ok(path)
+    writer.flush()
 }
 
-pub(crate) fn write_ac_raw(
-    deck: &Deck,
-    ac: &Vec<(f64, ndarray::Array1<f64>, ndarray::Array1<f64>)>,
-    output_base: &str,
-) -> std::io::Result<PathBuf> {
-    let filename = format!("{}.raw", sanitize_filename(output_base));
-    let path = PathBuf::from(filename);
-    let file = File::create(&path)?;
+pub(crate) fn write_ac_raw(deck: &Deck, ac: &AcResult, path: &Path) -> std::io::Result<()> {
+    let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     // Rebuild names
@@ -280,6 +270,5 @@ pub(crate) fn write_ac_raw(
             writer.write_all(&im.to_le_bytes())?;
         }
     }
-    writer.flush()?;
-    Ok(path)
+    writer.flush()
 }

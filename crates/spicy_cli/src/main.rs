@@ -1,11 +1,17 @@
 use std::fs;
+use std::path::Path;
 
 use clap::Parser;
 use spicy_parser::{ParseOptions, parse};
-use spicy_simulate::{SimulationConfig, simulate};
+use spicy_simulate::SimulationConfig;
 
+use crate::batch::RawOutput;
 use crate::tui::ui::format_error_snippet; // kept for non-TUI mode
 
+mod batch;
+mod raw;
+#[cfg(test)]
+mod test_utils;
 mod tui;
 
 #[derive(Parser, Debug)]
@@ -52,20 +58,25 @@ fn main() {
         eprintln!("Failed to read {}: {}", path, e);
         std::process::exit(1);
     });
-    let mut parser_options = ParseOptions::new_with_source(std::path::Path::new(&path), input);
+    let mut parser_options = ParseOptions::new_with_source(Path::new(&path), input);
 
     match parse(&mut parser_options) {
         Ok(deck) => {
-            let base = std::path::Path::new(&path)
+            let base = Path::new(&path)
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "spicy".to_string());
-            let sim_config = SimulationConfig {
-                write_raw: args.raw,
-                output_base: Some(base),
-                ..Default::default()
-            };
-            if let Err(e) = simulate(deck, sim_config) {
+            let raw = args.raw.then(|| RawOutput {
+                dir: Path::new("."),
+                stem: &base,
+            });
+            let result = batch::run(
+                &deck,
+                &SimulationConfig::default(),
+                &mut std::io::stdout().lock(),
+                raw.as_ref(),
+            );
+            if let Err(e) = result {
                 eprintln!("Simulation error: {}", e);
                 std::process::exit(3);
             }

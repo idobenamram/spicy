@@ -1,25 +1,16 @@
-use spicy_parser::instance_parser::Deck;
-use spicy_parser::netlist_types::Command;
-
-use crate::{
-    ac::simulate_ac,
-    dc::{simulate_dc, simulate_op},
-    trans::simulate_trans,
-};
-
 pub mod ac;
 pub mod dc;
 // mod nodes;
 mod devices;
 mod error;
 mod matrix;
-pub(crate) mod raw_writer;
 mod setup_pattern;
 pub mod solver;
 #[cfg(test)]
 mod test_util;
 pub mod trans;
 mod util;
+pub use ac::AcResult;
 pub use dc::{DcSweepResult, OperatingPointResult};
 pub use error::SimulationError;
 pub use trans::TransientResult;
@@ -77,10 +68,6 @@ pub struct SimulationConfig {
     pub solver: LinearSolver,
     pub integrator: TransientIntegrator,
     pub newton: NewtonConfig,
-    /// if true, write raw files
-    pub write_raw: bool,
-    /// optional output base path (without extension). If None, use deck.title in CWD
-    pub output_base: Option<String>,
 }
 
 impl Default for SimulationConfig {
@@ -91,75 +78,19 @@ impl Default for SimulationConfig {
             },
             integrator: TransientIntegrator::BackwardEuler,
             newton: NewtonConfig::default(),
-            write_raw: false,
-            output_base: None,
         }
     }
-}
-
-impl SimulationConfig {
-    pub fn get_output_base(&self, deck: &Deck, extension: &str) -> String {
-        self.output_base
-            .clone()
-            .unwrap_or_else(|| format!("{}-{}", deck.title.clone(), extension))
-    }
-}
-
-pub fn simulate(deck: Deck, sim_config: SimulationConfig) -> Result<(), SimulationError> {
-    for command in &deck.commands {
-        match command {
-            Command::Op(_) => {
-                let op = simulate_op(&deck, &sim_config)?;
-                if sim_config.write_raw {
-                    let base = sim_config.get_output_base(&deck, "op");
-                    let _ = raw_writer::write_operating_point_raw(&deck, &op, &base);
-                }
-            }
-            Command::Dc(command_params) => {
-                let dc = simulate_dc(&deck, command_params, &sim_config);
-                if sim_config.write_raw {
-                    let base = sim_config.get_output_base(&deck, "dc");
-                    // detect if sweep is a voltage source by scanning devices
-                    let is_voltage = deck
-                        .devices
-                        .voltage_sources
-                        .iter()
-                        .any(|v| v.name == command_params.srcnam);
-                    let _ = raw_writer::write_dc_raw(
-                        &deck,
-                        &dc,
-                        &base,
-                        &command_params.srcnam,
-                        is_voltage,
-                    );
-                }
-            }
-            Command::Ac(command_params) => {
-                let ac = simulate_ac(&deck, command_params, &sim_config);
-                if sim_config.write_raw {
-                    let base = sim_config.get_output_base(&deck, "ac");
-                    let _ = raw_writer::write_ac_raw(&deck, &ac, &base);
-                }
-            }
-            Command::Tran(command_params) => {
-                let result = simulate_trans(&deck, command_params, &sim_config)?;
-                if sim_config.write_raw {
-                    let base = sim_config.get_output_base(&deck, "tran");
-                    let _ = raw_writer::write_transient_raw(&deck, &result, &base);
-                }
-            }
-            Command::End => break,
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ac::simulate_ac;
+    use crate::dc::{simulate_dc, simulate_op};
     use crate::test_util::assert_numeric_snapshot;
+    use crate::trans::simulate_trans;
     use rstest::rstest;
-    use spicy_parser::netlist_types::{NodeIndex, NodeName};
+    use spicy_parser::netlist_types::{Command, NodeIndex, NodeName};
     use spicy_parser::node_mapping::NodeMapping;
 
     use spicy_parser::parse;

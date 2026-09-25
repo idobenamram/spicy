@@ -24,7 +24,7 @@ pub struct Bjt {
     pub base: NodeIndex,
     pub emitter: NodeIndex,
     pub polarity: BjtPolarity,
-    /// Saturation current (A).
+    /// Effective saturation current (A): the model's IS scaled by `area` and `m`.
     pub saturation_current: f64,
     /// Forward beta - approximate relation between I_c and I_e in active region.
     /// in ebers-moll model beta_forward is usually converted to alpha gains.
@@ -40,10 +40,6 @@ pub struct Bjt {
     pub emission_coeff_forward: f64,
     /// Reverse emission coefficient (ideality factor), dimensionless.
     pub emission_coeff_reverse: f64,
-    #[allow(dead_code)]
-    pub area: f64,
-    #[allow(dead_code)]
-    pub m: f64,
     /// Thermal voltage (Vt) used in exp(V / (n * Vt)).
     pub thermal_voltage: f64,
     /// Clamp limit for V/Vt to keep exp() bounded.
@@ -75,12 +71,13 @@ struct LinearizedBjt {
 
 impl Bjt {
     pub fn from_spec(spec: &BjtSpec) -> Self {
+        // Defaults follow ngspice (bjtsetup.c): IS = 1e-16, BF = 100, BR = 1, NF = NR = 1.
         let saturation_current = spec
             .model
             .is
             .as_ref()
             .map(|v| v.get_value())
-            .unwrap_or(1e-14);
+            .unwrap_or(1e-16);
 
         let beta_forward = spec
             .model
@@ -105,13 +102,14 @@ impl Bjt {
             base: spec.base,
             emitter: spec.emitter,
             polarity: spec.model.polarity,
-            saturation_current,
+            // ngspice scales IS by `area` (bjttemp.c) and every contribution by `m`
+            // (bjtload.c). In this Ebers-Moll model all currents are proportional to
+            // IS, so both fold into the saturation current.
+            saturation_current: saturation_current * area * m,
             beta_forward,
             beta_reverse,
             emission_coeff_forward,
             emission_coeff_reverse,
-            area,
-            m,
             thermal_voltage: DEFAULT_THERMAL_VOLTAGE,
             exp_limit: DEFAULT_EXP_LIMIT,
             off,
@@ -293,5 +291,53 @@ impl Bjt {
         if let Some(emitter) = emitter {
             *m.get_mut_rhs(emitter) -= linearized.i_eq_e;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::parse_netlist;
+
+    fn bjt(instance_params: &str, model_params: &str) -> Bjt {
+        let deck = parse_netlist(&format!(
+            "bjt\nQ1 c b 0 QN {instance_params}\n.MODEL QN NPN {model_params}\n.end\n"
+        ));
+        Bjt::from_spec(&deck.devices.bjts[0])
+    }
+
+    // ngspice scales IS by area (bjttemp.c) and every contribution by m
+    // (bjtload.c). In this Ebers-Moll model both fold into IS.
+
+    #[test]
+    fn area_scales_the_saturation_current() {
+        let plain = bjt("", "is=1e-16");
+        let q = bjt("area=2", "is=1e-16");
+        assert_eq!(q.saturation_current, plain.saturation_current * 2.0);
+    }
+
+    #[test]
+    fn m_scales_the_saturation_current() {
+        let plain = bjt("", "is=1e-16");
+        let q = bjt("m=3", "is=1e-16");
+        assert_eq!(q.saturation_current, plain.saturation_current * 3.0);
+    }
+
+    #[test]
+    fn area_and_m_combine() {
+        let plain = bjt("", "is=1e-16");
+        let q = bjt("area=2 m=3", "is=1e-16");
+        assert_eq!(q.saturation_current, plain.saturation_current * 2.0 * 3.0);
+    }
+
+    #[test]
+    fn defaults_match_ngspice() {
+        // bjtsetup.c: IS = 1e-16, BF = 100, BR = 1, NF = 1, NR = 1.
+        let q = bjt("", "");
+        assert_eq!(q.saturation_current, 1e-16);
+        assert_eq!(q.beta_forward, 100.0);
+        assert_eq!(q.beta_reverse, 1.0);
+        assert_eq!(q.emission_coeff_forward, 1.0);
+        assert_eq!(q.emission_coeff_reverse, 1.0);
     }
 }

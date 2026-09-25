@@ -238,22 +238,7 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
 mod tests {
     use super::*;
     use crate::devices::Devices as SimDevices;
-    use spicy_parser::{ParseOptions, SourceMap, parse};
-    use std::path::PathBuf;
-
-    fn parse_inline_deck(netlist: &str) -> spicy_parser::instance_parser::Deck {
-        let source_map = SourceMap::new(
-            PathBuf::from("inline_setup_pattern.spicy"),
-            netlist.to_string(),
-        );
-        let mut options = ParseOptions {
-            work_dir: PathBuf::from("."),
-            source_path: PathBuf::from("."),
-            source_map,
-            max_include_depth: 10,
-        };
-        parse(&mut options).expect("parse")
-    }
+    use crate::test_util::parse_netlist;
 
     /// Return the CSC nnz index for a given (col, row) coordinate.
     ///
@@ -268,7 +253,7 @@ mod tests {
 
     #[test]
     fn setup_pattern_populates_device_stamps_with_final_nnz_indices() {
-        let deck = parse_inline_deck(
+        let deck = parse_netlist(
             r#"setup_pattern stamp test
 V1 in 0 1
 R1 in out 2k

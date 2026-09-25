@@ -15,16 +15,11 @@ pub struct Resistor {
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
-    /// Resistor value (Ohms) resolved from instance/model/default.
+    /// Effective resistance (Ohms): instance/model/default value, with `scale`
+    /// and `m` applied.
     pub resistance: f64,
-    /// Optional AC override value (Ohms). If not provided, defaults to `resistance`.
+    /// Effective AC resistance (Ohms). Defaults to the DC value; `scale` and `m` applied.
     pub ac: f64,
-    /// Multiplier; replicates the resistor in parallel.
-    #[allow(dead_code)]
-    pub m: f64,
-    /// Scaling factor applied to the resistance value.
-    #[allow(dead_code)]
-    pub scale: f64,
     /// Instance temperature (typically in °C).
     #[allow(dead_code)]
     pub temp: f64,
@@ -100,10 +95,10 @@ impl Resistor {
             span: spec.span,
             positive: spec.positive,
             negative: spec.negative,
-            resistance,
-            ac,
-            m,
-            scale,
+            // `scale` multiplies the resistance and `m` puts m copies in parallel,
+            // so the conductance is m / (R * scale), as in ngspice (restemp.c).
+            resistance: resistance * scale / m,
+            ac: ac * scale / m,
             temp,
             dtemp,
             tc1,
@@ -145,5 +140,42 @@ impl Resistor {
             ar[[n1, n2]] -= g;
             ar[[n2, n1]] -= g;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::parse_netlist;
+
+    fn resistor(line: &str) -> Resistor {
+        let deck = parse_netlist(&format!("resistor\n{line}\n.end\n"));
+        Resistor::from_spec(&deck.devices.resistors[0])
+    }
+
+    // ngspice restemp.c: the conductance is m / (R * scale), for DC and AC.
+
+    #[test]
+    fn m_puts_copies_in_parallel() {
+        let plain = resistor("R1 a 0 1k");
+        let r = resistor("R1 a 0 1k m=2");
+        assert_eq!(r.resistance, plain.resistance / 2.0);
+        assert_eq!(r.ac, plain.ac / 2.0);
+    }
+
+    #[test]
+    fn scale_multiplies_the_resistance() {
+        let plain = resistor("R1 a 0 1k");
+        let r = resistor("R1 a 0 1k scale=3");
+        assert_eq!(r.resistance, plain.resistance * 3.0);
+        assert_eq!(r.ac, plain.ac * 3.0);
+    }
+
+    #[test]
+    fn m_and_scale_combine() {
+        let plain = resistor("R1 a 0 1k");
+        let r = resistor("R1 a 0 1k m=2 scale=3");
+        assert_eq!(r.resistance, plain.resistance * 3.0 / 2.0);
+        assert_eq!(r.ac, plain.ac * 3.0 / 2.0);
     }
 }

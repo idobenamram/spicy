@@ -22,6 +22,14 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 
+use spicy_parser::{ParseOptions, instance_parser::Deck, parse};
+
+/// Parse a netlist given as text.
+pub(crate) fn parse_netlist(netlist: &str) -> Deck {
+    let mut options = ParseOptions::new_with_source("inline.spicy", netlist.to_string());
+    parse(&mut options).expect("parse netlist")
+}
+
 /// Round `x` to `sig` significant digits.
 pub(crate) fn round_sig(x: f64, sig: i32) -> f64 {
     if x == 0.0 || !x.is_finite() {

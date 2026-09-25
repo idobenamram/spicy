@@ -16,13 +16,10 @@ pub struct Inductor {
     pub positive: NodeIndex,
     pub negative: NodeIndex,
     pub current_branch: CurrentBranchIndex,
+    /// Effective inductance (H), with `scale` and `m` applied.
     pub inductance: f64,
     #[allow(dead_code)]
     pub nt: f64,
-    #[allow(dead_code)]
-    pub m: f64,
-    #[allow(dead_code)]
-    pub scale: f64,
     #[allow(dead_code)]
     pub temp: f64,
     #[allow(dead_code)]
@@ -86,10 +83,10 @@ impl Inductor {
             positive: spec.positive,
             negative: spec.negative,
             current_branch: spec.current_branch,
-            inductance,
+            // `scale` multiplies the inductance and `m` puts m copies in
+            // parallel, as in ngspice (indtemp.c, indload.c).
+            inductance: inductance * scale / m,
             nt,
-            m,
-            scale,
             temp,
             dtemp,
             tc1,
@@ -172,5 +169,40 @@ impl Inductor {
         }
 
         *m.get_mut_rhs(branch_index) = v_hist;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::parse_netlist;
+
+    fn inductor(line: &str) -> Inductor {
+        let deck = parse_netlist(&format!("inductor\n{line}\n.end\n"));
+        Inductor::from_spec(&deck.devices.inductors[0])
+    }
+
+    // ngspice indtemp.c, indload.c: the inductance is L * scale / m.
+
+    #[test]
+    fn m_puts_copies_in_parallel() {
+        let plain = inductor("L1 a 0 1m");
+        assert_eq!(inductor("L1 a 0 1m m=2").inductance, plain.inductance / 2.0);
+    }
+
+    #[test]
+    fn scale_multiplies_the_inductance() {
+        let plain = inductor("L1 a 0 1m");
+        assert_eq!(
+            inductor("L1 a 0 1m scale=3").inductance,
+            plain.inductance * 3.0
+        );
+    }
+
+    #[test]
+    fn m_and_scale_combine() {
+        let plain = inductor("L1 a 0 1m");
+        let l = inductor("L1 a 0 1m m=2 scale=3");
+        assert_eq!(l.inductance, plain.inductance * 3.0 / 2.0);
     }
 }

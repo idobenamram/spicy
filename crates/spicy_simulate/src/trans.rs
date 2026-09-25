@@ -407,10 +407,9 @@ pub fn simulate_trans(
 mod tests {
     use super::*;
     use crate::solver::klu::KluConfig;
-    use crate::test_util::round_sig;
+    use crate::test_util::{parse_netlist, round_sig};
     use crate::{LinearSolver, SimulationConfig};
-    use spicy_parser::{ParseOptions, SourceMap, netlist_types::Command, parse};
-    use std::path::PathBuf;
+    use spicy_parser::netlist_types::Command;
 
     #[test]
     fn trans_klu_and_blas_are_similar() {
@@ -422,15 +421,7 @@ C1 out 0 1u\n\
 .TRAN 0.001 0.01\n\
 .END";
 
-        let source_path = PathBuf::from("trans_klu_vs_blas.spicy");
-        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
-        let mut parse_options = ParseOptions {
-            source_map,
-            work_dir: PathBuf::from("."),
-            source_path,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut parse_options).expect("parse");
+        let deck = parse_netlist(netlist);
 
         let tran_cmd = deck
             .commands
@@ -509,15 +500,7 @@ R1 in out 1k\n\
 C1 out 0 1u\n\
 .END";
 
-        let source_path = PathBuf::from("trans_trapezoidal_cap_current.spicy");
-        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
-        let mut parse_options = ParseOptions {
-            source_map,
-            work_dir: PathBuf::from("."),
-            source_path,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut parse_options).expect("parse");
+        let deck = parse_netlist(netlist);
 
         let sim_cfg = SimulationConfig {
             solver: LinearSolver::Blas,
@@ -592,15 +575,7 @@ R1 n1 0 1\n\
 L1 n1 0 1\n\
 .END";
 
-        let source_path = PathBuf::from("trans_inductor_be_one_step.spicy");
-        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
-        let mut parse_options = ParseOptions {
-            source_map,
-            work_dir: PathBuf::from("."),
-            source_path,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut parse_options).expect("parse");
+        let deck = parse_netlist(netlist);
 
         let sim_cfg = SimulationConfig {
             solver: LinearSolver::Blas,
@@ -668,15 +643,7 @@ R1 n1 0 1\n\
 L1 n1 0 1\n\
 .END";
 
-        let source_path = PathBuf::from("trans_inductor_trap_one_step.spicy");
-        let source_map = SourceMap::new(source_path.clone(), netlist.to_string());
-        let mut parse_options = ParseOptions {
-            source_map,
-            work_dir: PathBuf::from("."),
-            source_path,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut parse_options).expect("parse");
+        let deck = parse_netlist(netlist);
 
         let sim_cfg = SimulationConfig {
             solver: LinearSolver::Blas,

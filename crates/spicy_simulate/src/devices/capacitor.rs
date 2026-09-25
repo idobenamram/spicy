@@ -14,11 +14,8 @@ pub struct Capacitor {
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
+    /// Effective capacitance (F), with `scale` and `m` applied.
     pub capacitance: f64,
-    #[allow(dead_code)]
-    pub m: f64,
-    #[allow(dead_code)]
-    pub scale: f64,
     #[allow(dead_code)]
     pub temp: f64,
     #[allow(dead_code)]
@@ -79,9 +76,9 @@ impl Capacitor {
             span: spec.span,
             positive: spec.positive,
             negative: spec.negative,
-            capacitance,
-            m,
-            scale,
+            // `scale` multiplies the capacitance and `m` puts m copies in
+            // parallel, as in ngspice (captemp.c, capload.c).
+            capacitance: capacitance * scale * m,
             temp,
             dtemp,
             tc1,
@@ -132,5 +129,43 @@ impl Capacitor {
             ai[[n1, n2]] -= yc;
             ai[[n2, n1]] -= yc;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::parse_netlist;
+
+    fn capacitor(line: &str) -> Capacitor {
+        let deck = parse_netlist(&format!("capacitor\n{line}\n.end\n"));
+        Capacitor::from_spec(&deck.devices.capacitors[0])
+    }
+
+    // ngspice captemp.c, capload.c: the capacitance is C * scale, loaded m times.
+
+    #[test]
+    fn m_puts_copies_in_parallel() {
+        let plain = capacitor("C1 a 0 1u");
+        assert_eq!(
+            capacitor("C1 a 0 1u m=2").capacitance,
+            plain.capacitance * 2.0
+        );
+    }
+
+    #[test]
+    fn scale_multiplies_the_capacitance() {
+        let plain = capacitor("C1 a 0 1u");
+        assert_eq!(
+            capacitor("C1 a 0 1u scale=3").capacitance,
+            plain.capacitance * 3.0
+        );
+    }
+
+    #[test]
+    fn m_and_scale_combine() {
+        let plain = capacitor("C1 a 0 1u");
+        let c = capacitor("C1 a 0 1u m=2 scale=3");
+        assert_eq!(c.capacitance, plain.capacitance * 3.0 * 2.0);
     }
 }

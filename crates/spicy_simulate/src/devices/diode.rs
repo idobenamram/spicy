@@ -17,14 +17,10 @@ pub struct Diode {
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
-    // saturation current (A)
+    /// Effective saturation current (A): the model's IS scaled by `area` and `m`.
     pub saturation_current: f64,
     // emission coefficient (dimensionless)
     pub emission_coeff: f64,
-    #[allow(dead_code)]
-    pub area: f64,
-    #[allow(dead_code)]
-    pub m: f64,
     /// Thermal voltage (Vt) used in exp(Vd / (n * Vt)).
     pub thermal_voltage: f64,
     /// Clamp limit for Vd/(n*Vt) to keep exp() bounded.
@@ -60,10 +56,10 @@ impl Diode {
             span: spec.span,
             positive: spec.positive,
             negative: spec.negative,
-            saturation_current,
+            // `area` scales the junction and `m` puts m copies in parallel, as in
+            // ngspice (diotemp.c). Every current in this model is proportional to IS.
+            saturation_current: saturation_current * area * m,
             emission_coeff,
-            area,
-            m,
             thermal_voltage: DEFAULT_THERMAL_VOLTAGE,
             exp_limit: DEFAULT_EXP_LIMIT,
             off,
@@ -132,5 +128,50 @@ impl Diode {
         if let Some(neg) = neg {
             *m.get_mut_rhs(neg) += i_eq;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::parse_netlist;
+
+    fn diode(instance_params: &str, model_params: &str) -> Diode {
+        let deck = parse_netlist(&format!(
+            "diode\nD1 a 0 DMOD {instance_params}\n.MODEL DMOD D {model_params}\n.end\n"
+        ));
+        Diode::from_spec(&deck.devices.diodes[0])
+    }
+
+    // ngspice diotemp.c: IS is scaled by area * m. Every current in this model
+    // is proportional to IS.
+
+    #[test]
+    fn area_scales_the_saturation_current() {
+        let plain = diode("", "is=1e-14");
+        let d = diode("area=2", "is=1e-14");
+        assert_eq!(d.saturation_current, plain.saturation_current * 2.0);
+    }
+
+    #[test]
+    fn m_scales_the_saturation_current() {
+        let plain = diode("", "is=1e-14");
+        let d = diode("m=3", "is=1e-14");
+        assert_eq!(d.saturation_current, plain.saturation_current * 3.0);
+    }
+
+    #[test]
+    fn area_and_m_combine() {
+        let plain = diode("", "is=1e-14");
+        let d = diode("area=2 m=3", "is=1e-14");
+        assert_eq!(d.saturation_current, plain.saturation_current * 2.0 * 3.0);
+    }
+
+    #[test]
+    fn defaults_match_ngspice() {
+        // diosetup.c: IS = 1e-14, N = 1.
+        let d = diode("", "");
+        assert_eq!(d.saturation_current, 1e-14);
+        assert_eq!(d.emission_coeff, 1.0);
     }
 }

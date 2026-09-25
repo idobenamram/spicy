@@ -1,7 +1,7 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) done except two open questions (§6, M0). M1 starts after review.
+> **Status:** M0 (housekeeping) committed. Now working through the simulator steps in `pipeline.md` §9, one at a time. **Step 1 (cleanup: bug fixes, ngspice defaults, CLI concerns out of the simulator) is done and awaiting review.** The language front-end (M1) follows.
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 
@@ -311,6 +311,8 @@ It has 8 knobs:
 **Done when:** `ce_amp.spl` elaborates to exactly the 8 knobs and 3 specs of §4.2, and every error case has a snapshot-tested diagnostic.
 
 ### M2: Native simulator input and simulator readiness
+
+> **Superseded ordering:** `pipeline.md` §9 now defines the order of this work, as smaller steps each reviewed on its own: (1) cleanup, (2) stamp locations out of devices, (3) `spicy_circuit`, (4) one plan per circuit, (5) temperature. The items below stay as the list of what must eventually be done.
 
 - **M2a: Extract `spicy_circuit`.**
   - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_parser`.

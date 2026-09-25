@@ -227,3 +227,17 @@ MNA with tolerances is exactly this problem.
 - Spade: https://gitlab.com/spade-lang/spade (cloned in `externals/spade`).
 - kv library (Kashiwagi): the AA implementation reference for [R&K15].
 - IBEX: https://github.com/ibex-team/ibex-lib. dReal4: https://github.com/dreal/dreal4.
+
+## 14. Compiler and simulator architecture
+
+Used by `pipeline.md`. Details and file-level citations are in `research/staged_ir_survey.md`.
+
+- **[MLIR20]** Lattner, Amini, Bondhugula, Cohen, Davis, Pienaar, Riddle, Shpeisman, Vasilache & Zinenko, "MLIR: A Compiler Infrastructure for the End of Moore's Law," arXiv:2002.11054, 2020. Progressive lowering through dialects. "The loss of structure is then conscious and happens only where the structure is no longer needed."
+- **[RDG]** The rustc dev guide (rustc-dev-guide.rust-lang.org): the overview, HIR, THIR, MIR passes, and memory chapters. The AST → HIR → THIR → MIR → LLVM chain; side tables (`TypeckResults`) instead of annotating HIR; per-statement `SourceInfo`.
+- **[RA-ARCH]** rust-analyzer architecture docs (`docs/book/src/contributing/architecture.md`). The syntax tree is a value with no semantic info; semantic crates work with raw IDs; source maps are kept apart from bodies.
+- **[CLIF]** Cranelift `cranelift-entity` (`cranelift/entity/src/lib.rs`). `u32` entity references, `PrimaryMap`/`SecondaryMap` side tables, and source locations preserved in a side table.
+- **[OSDI03]** OpenVAF, *OSDI 0.3 specification* (openvaf.semimod.de/osdi/osdi_v0p3.pdf) and `openvaf/osdi/header/osdi_0_3.h`. The explicit device stages: parameter access with "set" flags → `setup_model` / `setup_instance(temperature)` → matrix and state offsets → `eval` + `load` per iteration.
+- **[NGSPICE]** ngspice source: `src/include/ngspice/devdefs.h` (the per-device-type function table), `src/spicelib/devices/res/` (`resdefs.h`, `ressetup.c`, `restemp.c`, `resload.c`), `cktdefs.h` (`CKTstates`).
+- **[XYCE]** Xyce source: `N_DEV_DeviceMaster.h`, `N_DEV_DeviceBlock.h`, `OpenModels/N_DEV_Resistor.C`, `N_ANP_SweepParam.C`. Per-type masters, generic netlist records, parameter changes without rebuilding topology.
+- **[GNUCAP]** Gnucap source: `include/e_card.h` (elaboration and simulation stage functions), `lib/e_compon.cc` (shared parameter blocks).
+- **[VACASK]** VACASK simulator (codeberg.org/arpadbuermen/VACASK): `lib/osdiinstance.cpp`, `docs/cir-elaboration.md`. Re-runs setup only for changed instances; rebuilds equations only if node collapsing changed.

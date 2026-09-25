@@ -9,7 +9,8 @@ Design documents for the AI-native schematic and simulation editor built on spic
 3. **[engine.md](engine.md)**: the engine design (current: v3).
 4. **[language.md](language.md)**: the circuit language (v0.1).
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
-6. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
+6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
+7. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
 
 ## Reference
 
@@ -21,6 +22,9 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [engine_precision_analog.md](research/engine_precision_analog.md)
     - [engine_mixed_signal.md](research/engine_mixed_signal.md)
     - [engine_method_redteam.md](research/engine_method_redteam.md)
+  - Data pipeline:
+    - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
+    - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured
   - Language proposals:
     - [language_core.md](research/language_core.md)
     - [language_specs.md](research/language_specs.md)

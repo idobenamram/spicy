@@ -46,7 +46,7 @@ impl NodeMapping {
         let mut node_mapping = HashMap::new();
         let branch_mapping = HashMap::new();
         // always insert ground node at index 0
-        node_mapping.insert(NodeName("0".to_string()), NodeIndex(0));
+        node_mapping.insert(NodeName(NodeName::GROUND.to_string()), NodeIndex(0));
         Self {
             node_mapping,
             node_counter: 1,

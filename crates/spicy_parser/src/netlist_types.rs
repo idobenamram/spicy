@@ -12,6 +12,15 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeName(pub String);
 
+impl NodeName {
+    /// Name of the ground (reference) node.
+    pub const GROUND: &'static str = "0";
+
+    pub fn is_ground(&self) -> bool {
+        self.0 == Self::GROUND
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeIndex(pub usize);
 

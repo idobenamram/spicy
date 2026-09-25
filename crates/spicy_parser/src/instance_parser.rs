@@ -354,12 +354,7 @@ impl<'s> InstanceParser<'s> {
     fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<NodeName, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let node = parse_node(cursor, input)?;
-
-        if let Some(node) = scope.node_mapping.get(&node) {
-            Ok(node.clone())
-        } else {
-            Ok(node)
-        }
+        Ok(scope.get_node_name(node))
     }
 
     fn parse_bool(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<bool, SpicyError> {
@@ -1277,6 +1272,32 @@ mod tests {
                 .unwrap_or_else(|| "unknown".to_string())
         );
         insta::assert_debug_snapshot!(name, deck);
+    }
+
+    #[test]
+    fn subcircuit_instances_get_their_own_internal_nodes() {
+        let netlist = "two dividers
+.SUBCKT DIV top bot
+R1 top mid 1k
+R2 mid bot 1k
+.ENDS
+V1 a 0 DC 10
+V2 b 0 DC 4
+X1 a 0 DIV
+X2 b 0 DIV
+.END
+";
+        let mut options = ParseOptions::new_with_source("two_dividers.spicy", netlist.into());
+        let deck = crate::parse(&mut options).expect("parse");
+
+        let resistors = &deck.devices.resistors;
+        let names: Vec<&str> = resistors.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["X1.R1", "X1.R2", "X2.R1", "X2.R2"]);
+
+        // R1 of each instance runs from its `top` port to its own `mid`.
+        assert_ne!(resistors[0].negative, resistors[2].negative);
+        let nodes = deck.node_mapping.node_names_mna_order();
+        assert_eq!(nodes, ["a", "b", "X1.mid", "X2.mid"]);
     }
 
     #[test]

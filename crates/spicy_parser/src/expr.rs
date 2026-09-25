@@ -299,11 +299,31 @@ impl Scope {
         self.parent = Some(parent);
     }
 
+    /// Name of a device written as `name` inside this scope, e.g. `R1` in
+    /// instance `X1` becomes `X1.R1`.
     pub(crate) fn get_device_name(&self, name: &str) -> String {
         if let Some(instance_name) = &self.instance_name {
-            return format!("{}_{}", instance_name, name);
+            return format!("{}.{}", instance_name, name);
         }
         name.to_string()
+    }
+
+    /// Circuit node for a node written as `node` inside this scope.
+    ///
+    /// A subcircuit port maps to the node the instance connects it to. Ground
+    /// stays global. Any other node is internal to this instance and gets the
+    /// instance name as a prefix (`mid` in `X1` becomes `X1.mid`, as in ngspice),
+    /// so two instances never share an internal node.
+    pub(crate) fn get_node_name(&self, node: NodeName) -> NodeName {
+        if let Some(actual) = self.node_mapping.get(&node) {
+            return actual.clone();
+        }
+        match &self.instance_name {
+            Some(instance_name) if !node.is_ground() => {
+                NodeName(format!("{}.{}", instance_name, node.0))
+            }
+            _ => node,
+        }
     }
 }
 
@@ -496,5 +516,47 @@ impl<'s> ExpressionParser<'s> {
         }
 
         Ok(lhs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The scope of subcircuit instance `X1` whose port `top` is wired to `a`.
+    fn instance_scope() -> Scope {
+        let ports = HashMap::from([(NodeName("top".into()), NodeName("a".into()))]);
+        Scope::new(Some("X1".into()), Params::new(), ports)
+    }
+
+    fn node(name: &str) -> NodeName {
+        NodeName(name.into())
+    }
+
+    #[test]
+    fn port_maps_to_the_connected_node() {
+        assert_eq!(instance_scope().get_node_name(node("top")), node("a"));
+    }
+
+    #[test]
+    fn internal_node_gets_the_instance_prefix() {
+        assert_eq!(instance_scope().get_node_name(node("mid")), node("X1.mid"));
+    }
+
+    #[test]
+    fn ground_stays_global_inside_an_instance() {
+        assert_eq!(instance_scope().get_node_name(node("0")), node("0"));
+    }
+
+    #[test]
+    fn top_level_names_are_unchanged() {
+        let root = Scope::new(None, Params::new(), HashMap::new());
+        assert_eq!(root.get_node_name(node("mid")), node("mid"));
+        assert_eq!(root.get_device_name("R1"), "R1");
+    }
+
+    #[test]
+    fn device_gets_the_instance_prefix() {
+        assert_eq!(instance_scope().get_device_name("R1"), "X1.R1");
     }
 }

@@ -29,7 +29,7 @@ Deck {
         },
         node_counter: 4,
         branch_mapping: {
-            "1_V1": CurrentBranchIndex(
+            "X1.V1": CurrentBranchIndex(
                 1,
             ),
         },
@@ -39,7 +39,7 @@ Deck {
     devices: Devices {
         resistors: [
             ResistorSpec {
-                name: "1_R1",
+                name: "X1.R1",
                 span: Span {
                     start: 57,
                     end: 68,
@@ -75,7 +75,7 @@ Deck {
         ],
         capacitors: [
             CapacitorSpec {
-                name: "1_C2",
+                name: "X1.C2",
                 span: Span {
                     start: 70,
                     end: 84,
@@ -113,7 +113,7 @@ Deck {
         diodes: [],
         voltage_sources: [
             IndependentSourceSpec {
-                name: "1_V1",
+                name: "X1.V1",
                 positive: NodeIndex(
                     1,
                 ),

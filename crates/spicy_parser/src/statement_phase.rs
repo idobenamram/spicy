@@ -188,6 +188,8 @@ impl<'a> StmtCursor<'a> {
         None
     }
 
+    /// If the statement starts with a `device` instance (e.g. `X1` for a
+    /// subcircuit), consume it and return its full name (`X1`).
     pub(crate) fn consume_if_device(
         &mut self,
         input: &'a str,
@@ -198,16 +200,14 @@ impl<'a> StmtCursor<'a> {
         if let Some(t) = self.consume(TokenKind::Ident) {
             let ident_string = token_text(input, t);
             // Identifiers can be UTF-8; don't use byte offsets.
-            let mut chars = ident_string.chars();
-            let Some(first) = chars.next() else {
+            let Some(first) = ident_string.chars().next() else {
                 self.rewind(checkpoint);
                 return None;
             };
-            let name = chars.as_str();
             // TODO: not sure this is correct
             let found_device = DeviceType::from_char(first).ok() == Some(device);
             if found_device {
-                return Some(name);
+                return Some(ident_string);
             }
         }
         self.rewind(checkpoint);

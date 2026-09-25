@@ -87,7 +87,7 @@ mod tests {
     use super::*;
     use crate::ac::simulate_ac;
     use crate::dc::{simulate_dc, simulate_op};
-    use crate::test_util::assert_numeric_snapshot;
+    use crate::test_util::{assert_numeric_snapshot, parse_netlist};
     use crate::trans::simulate_trans;
     use rstest::rstest;
     use spicy_parser::netlist_types::{Command, NodeIndex, NodeName};
@@ -118,6 +118,32 @@ mod tests {
         assert_eq!(
             mapping.node_names_mna_order(),
             vec!["n1".to_string(), "n2".to_string()]
+        );
+    }
+
+    #[test]
+    fn subcircuit_instances_have_separate_internal_nodes() {
+        // Two identical dividers on different supplies: each midpoint is half its own supply.
+        let deck = parse_netlist(
+            "two dividers
+.SUBCKT DIV top bot
+R1 top mid 1k
+R2 mid bot 1k
+.ENDS
+V1 a 0 DC 10
+V2 b 0 DC 4
+X1 a 0 DIV
+X2 b 0 DIV
+.op
+.END
+",
+        );
+        let op = simulate_op(&deck, &SimulationConfig::default()).expect("simulate_op");
+        let voltages: Vec<(&str, f64)> =
+            op.voltages.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+        assert_eq!(
+            voltages,
+            [("a", 10.0), ("b", 4.0), ("X1.mid", 5.0), ("X2.mid", 2.0)]
         );
     }
 

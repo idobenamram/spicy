@@ -74,7 +74,7 @@ Deck {
                 noisy: None,
             },
             ResistorSpec {
-                name: "1_R1",
+                name: "X1.R1",
                 span: Span {
                     start: 118,
                     end: 139,

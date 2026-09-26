@@ -2,11 +2,12 @@ use crate::error::{ExpressionError, SpicyError};
 use crate::{
     lexer::{Span, Token, TokenKind, token_text},
     netlist_types::ValueSuffix,
-    netlist_types::{NameKey, NodeName},
+    netlist_types::{Name, NoCase, NodeName},
     parser_utils::parse_value,
     statement_phase::StmtCursor,
 };
 use serde::Serialize;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
@@ -191,18 +192,19 @@ impl PlaceholderMap {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Params(
-    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))] HashMap<NameKey, Expr>,
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))] HashMap<Name, Expr>,
 );
 
 impl Params {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn get(&self, name: &NameKey) -> Option<&Expr> {
-        self.0.get(name)
+    /// The parameter named `name`, with its name as defined.
+    pub fn lookup(&self, name: &NoCase) -> Option<(&Name, &Expr)> {
+        self.0.get_key_value(name)
     }
     pub fn set_param(&mut self, name: &str, value: Expr) {
-        self.0.insert(NameKey::new(name), value);
+        self.0.insert(Name::new(name), value);
     }
     pub fn merge(&mut self, other: Params) {
         self.0.extend(other.0);
@@ -219,14 +221,14 @@ pub struct Scope {
     pub param_map: Params, // store Expr; evaluation is later
     /// The instance's ports, by name, and the nodes they connect to.
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub node_mapping: HashMap<NameKey, NodeName>,
+    pub node_mapping: HashMap<Name, NodeName>,
 }
 
 impl Scope {
     pub fn new(
         instance_name: Option<String>,
         param_map: Params,
-        node_mapping: HashMap<NameKey, NodeName>,
+        node_mapping: HashMap<Name, NodeName>,
     ) -> Self {
         Self {
             parent: None,
@@ -256,7 +258,7 @@ impl Scope {
     /// instance name as a prefix (`mid` in `X1` becomes `X1.mid`, as in ngspice),
     /// so two instances never share an internal node.
     pub(crate) fn get_node_name(&self, node: NodeName) -> NodeName {
-        if let Some(actual) = self.node_mapping.get(&NameKey::new(&node.0)) {
+        if let Some(actual) = self.node_mapping.get(NoCase::new(&node.0)) {
             return actual.clone();
         }
         match &self.instance_name {
@@ -365,7 +367,7 @@ struct Evaluation<'a> {
     /// it skip that scope meanwhile: in an instance, `rt={rt}` reads the `rt`
     /// of the scope that placed it (ngspice evaluates an instance's parameters
     /// in its new scope, xpressn.c, `nupa_subcktcall`).
-    defining: Vec<(ScopeId, NameKey)>,
+    defining: Vec<(ScopeId, &'a NoCase)>,
 }
 
 impl Evaluation<'_> {
@@ -412,14 +414,14 @@ impl Evaluation<'_> {
 
     /// The value of parameter `name` as seen from `scope`.
     fn param(&mut self, name: &str, scope: ScopeId, span: Span) -> Result<Value, SpicyError> {
-        let key = NameKey::new(name);
+        let wanted = NoCase::new(name);
         let arena = self.arena;
         let mut skipped_own_definition = false;
         let mut current = Some(scope);
         while let Some(id) = current {
             let candidate = arena.get(id);
-            if let Some(definition) = candidate.param_map.get(&key) {
-                let entry = (id, key.clone());
+            if let Some((defined, definition)) = candidate.param_map.lookup(wanted) {
+                let entry: (ScopeId, &NoCase) = (id, defined.borrow());
                 if self.defining.contains(&entry) {
                     skipped_own_definition = true;
                 } else {
@@ -584,7 +586,7 @@ mod tests {
 
     /// The scope of subcircuit instance `X1` whose port `top` is wired to `a`.
     fn instance_scope() -> Scope {
-        let ports = HashMap::from([(NameKey::new("top"), NodeName("a".into()))]);
+        let ports = HashMap::from([(Name::new("top"), NodeName("a".into()))]);
         Scope::new(Some("X1".into()), Params::new(), ports)
     }
 

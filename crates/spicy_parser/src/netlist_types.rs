@@ -1,6 +1,9 @@
 // https://ngspice.sourceforge.io/docs/ngspice-manual.pdf
 
 use serde::Serialize;
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::{fmt, str::FromStr};
 
 use crate::{
@@ -9,36 +12,146 @@ use crate::{
     lexer::Span,
 };
 
-// SPICE ignores case in keywords and names: ngspice lowercases its whole input
-// before parsing (inpcom.c, `inp_casefix`). We keep the spelling for display
-// and fold case wherever text is matched: keywords through `keyword`, names
-// through `NameKey`.
+// SPICE ignores case in keywords and names. ngspice lowercases its whole
+// input (inpcom.c, `inp_casefix`); like Xyce (`HashNoCase`, `EqualNoCase`) we
+// keep the spelling and compare without regard to case instead, without
+// copying: keywords through `keyword`, names through `Name` and `NoCase`.
 
-/// A keyword in the one spelling it's matched against: lowercase.
-pub(crate) fn keyword(text: &str) -> String {
-    fold_case(text)
+/// A word as keywords are matched: lowercased, in a buffer on the stack.
+pub(crate) struct Keyword {
+    bytes: [u8; Keyword::CAPACITY],
+    len: usize,
 }
 
-/// A name as a table key, so `QN`, `qn` and `Qn` name the same model. Tables
-/// that show names keep the original spelling separately.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
-pub struct NameKey(String);
+impl Keyword {
+    /// More than the longest keyword (`capacitance`). A longer word can't be
+    /// a keyword, so it folds to the empty string, which matches none.
+    // TODO: nothing checks this limit: a keyword longer than `CAPACITY` added
+    // later would fold to "" and never match. Replace this buffer with keyword
+    // tables (name → meaning, matched with `eq_ignore_ascii_case`), the way
+    // ngspice declares device parameters as data (`bjt.c`, `BJTmPTable`).
+    // Tracked in docs/ecad/roadmap.md ("Parser follow-ups").
+    const CAPACITY: usize = 16;
 
-impl NameKey {
-    pub fn new(name: &str) -> Self {
-        Self(fold_case(name))
+    pub(crate) fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.bytes[..self.len]).expect("ASCII folding keeps UTF-8 valid")
     }
 }
 
-impl fmt::Debug for NameKey {
+pub(crate) fn keyword(text: &str) -> Keyword {
+    let mut bytes = [0; Keyword::CAPACITY];
+    let len = if text.len() <= Keyword::CAPACITY {
+        bytes[..text.len()].copy_from_slice(text.as_bytes());
+        bytes[..text.len()].make_ascii_lowercase();
+        text.len()
+    } else {
+        0
+    };
+    Keyword { bytes, len }
+}
+
+/// A name, compared, hashed and ordered without regard to (ASCII) case.
+#[repr(transparent)]
+pub struct NoCase(str);
+
+impl NoCase {
+    pub fn new(name: &str) -> &NoCase {
+        // SAFETY: `NoCase` is `repr(transparent)` over `str`, so a `&str` is a
+        // valid `&NoCase`. std's `Path::new` casts `&OsStr` to `&Path` this way.
+        unsafe { &*(name as *const str as *const NoCase) }
+    }
+
+    fn folded_bytes(&self) -> impl Iterator<Item = u8> + '_ {
+        self.0.bytes().map(|b| b.to_ascii_lowercase())
+    }
+}
+
+impl PartialEq for NoCase {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq_ignore_ascii_case(&other.0)
+    }
+}
+
+impl Eq for NoCase {}
+
+impl Hash for NoCase {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Hash the lowercased bytes a chunk at a time, without allocating.
+        let mut chunk = [0; 32];
+        for bytes in self.0.as_bytes().chunks(chunk.len()) {
+            let folded = &mut chunk[..bytes.len()];
+            folded.copy_from_slice(bytes);
+            folded.make_ascii_lowercase();
+            state.write(folded);
+        }
+        state.write_u8(0xff);
+    }
+}
+
+impl PartialOrd for NoCase {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for NoCase {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.folded_bytes().cmp(other.folded_bytes())
+    }
+}
+
+/// An owned name, as a table key: keeps its spelling, and compares, hashes
+/// and orders like [`NoCase`], so a table can be searched with a `&NoCase`
+/// without allocating.
+#[derive(Clone, Serialize)]
+pub struct Name(String);
+
+impl Name {
+    pub fn new(name: &str) -> Self {
+        Self(name.to_string())
+    }
+
+    fn no_case(&self) -> &NoCase {
+        NoCase::new(&self.0)
+    }
+}
+
+impl Borrow<NoCase> for Name {
+    fn borrow(&self) -> &NoCase {
+        self.no_case()
+    }
+}
+
+impl PartialEq for Name {
+    fn eq(&self, other: &Self) -> bool {
+        self.no_case() == other.no_case()
+    }
+}
+
+impl Eq for Name {}
+
+impl Hash for Name {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.no_case().hash(state);
+    }
+}
+
+impl PartialOrd for Name {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Name {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.no_case().cmp(other.no_case())
+    }
+}
+
+impl fmt::Debug for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
-}
-
-/// ASCII case folding, as ngspice does; other characters are kept as written.
-fn fold_case(text: &str) -> String {
-    text.to_ascii_lowercase()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -276,22 +389,29 @@ impl FromStr for ValueSuffix {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // A scale factor may be followed by a unit (`10kOhm`, `1uF`), so match
-        // prefixes. `meg` is checked before `m` (milli).
-        let s = keyword(s);
-        match s.as_str() {
-            "deg" => Ok(ValueSuffix::Degree),
-            "rad" => Ok(ValueSuffix::Radian),
-            s if s.starts_with("meg") => Ok(ValueSuffix::Mega),
-            s if s.starts_with('t') => Ok(ValueSuffix::Tera),
-            s if s.starts_with('g') => Ok(ValueSuffix::Giga),
-            s if s.starts_with('k') => Ok(ValueSuffix::Kilo),
-            s if s.starts_with('m') => Ok(ValueSuffix::Milli),
-            s if s.starts_with('u') => Ok(ValueSuffix::Micro),
-            s if s.starts_with('n') => Ok(ValueSuffix::Nano),
-            s if s.starts_with('p') => Ok(ValueSuffix::Pico),
-            s if s.starts_with('f') => Ok(ValueSuffix::Femto),
-            s if s.starts_with('a') => Ok(ValueSuffix::Atto),
+        // A scale factor may be followed by a unit (`10kOhm`, `1uF`), so only
+        // its first letters count. `meg` is checked before `m` (milli).
+        if s.eq_ignore_ascii_case("deg") {
+            return Ok(ValueSuffix::Degree);
+        }
+        if s.eq_ignore_ascii_case("rad") {
+            return Ok(ValueSuffix::Radian);
+        }
+        if s.get(..3)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("meg"))
+        {
+            return Ok(ValueSuffix::Mega);
+        }
+        match s.as_bytes().first().map(u8::to_ascii_lowercase) {
+            Some(b't') => Ok(ValueSuffix::Tera),
+            Some(b'g') => Ok(ValueSuffix::Giga),
+            Some(b'k') => Ok(ValueSuffix::Kilo),
+            Some(b'm') => Ok(ValueSuffix::Milli),
+            Some(b'u') => Ok(ValueSuffix::Micro),
+            Some(b'n') => Ok(ValueSuffix::Nano),
+            Some(b'p') => Ok(ValueSuffix::Pico),
+            Some(b'f') => Ok(ValueSuffix::Femto),
+            Some(b'a') => Ok(ValueSuffix::Atto),
             _ => Err(()),
         }
     }

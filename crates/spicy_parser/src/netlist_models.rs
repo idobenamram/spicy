@@ -8,7 +8,7 @@ use crate::{
     error::{ParserError, SpicyError, SubcircuitError},
     expr::ScopeRef,
     lexer::TokenKind,
-    netlist_types::{NameKey, keyword},
+    netlist_types::{Name, NoCase, keyword},
     parser_utils::{Ident, parse_expr_into_value, parse_ident},
     statement_phase::{Statement, StmtCursor},
 };
@@ -16,32 +16,32 @@ use crate::{
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct ModelTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<NameKey, DeviceModel>,
+    pub(crate) map: HashMap<Name, DeviceModel>,
 }
 
 impl ModelTable {
     pub(crate) fn get(&self, model: &str) -> Option<&DeviceModel> {
-        self.map.get(&NameKey::new(model))
+        self.map.get(NoCase::new(model))
     }
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct ModelStatementTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<NameKey, ModelStatement>,
+    pub(crate) map: HashMap<Name, ModelStatement>,
 }
 
 impl ModelStatementTable {
     pub(crate) fn insert(&mut self, model_statement: ModelStatement) -> Result<(), SpicyError> {
-        let key = NameKey::new(&model_statement.name);
-        if self.map.contains_key(&key) {
+        if self.map.contains_key(NoCase::new(&model_statement.name)) {
             return Err(SubcircuitError::ModelAlreadyExists {
                 name: model_statement.name.clone(),
                 span: model_statement.statement.span, // TODO: would have been nice to have both the first place and the second place we see the ident name
             }
             .into());
         } else {
-            self.map.insert(key, model_statement);
+            self.map
+                .insert(Name::new(&model_statement.name), model_statement);
         }
 
         Ok(())
@@ -59,7 +59,7 @@ impl ModelStatementTable {
                 model_statement_to_device_model(model_statement, source_map, scope)
                     .map(|device_model| (name, device_model))
             })
-            .collect::<Result<HashMap<NameKey, DeviceModel>, SpicyError>>()?;
+            .collect::<Result<HashMap<Name, DeviceModel>, SpicyError>>()?;
 
         Ok(ModelTable { map })
     }

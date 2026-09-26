@@ -4,7 +4,7 @@ expression: json
 ---
 {
   "map": {
-    "cfast": {
+    "Cfast": {
       "Capacitor": {
         "cap": {
           "value": 1.0,
@@ -23,7 +23,7 @@ expression: json
         }
       }
     },
-    "lslow": {
+    "Lslow": {
       "Inductor": {
         "inductance": {
           "value": 0.01,
@@ -107,7 +107,7 @@ expression: json
         "l": null
       }
     },
-    "r1": {
+    "R1": {
       "Resistor": {
         "resistance": {
           "value": 100.0,

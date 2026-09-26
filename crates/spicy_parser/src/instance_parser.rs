@@ -106,7 +106,11 @@ impl<'s> ParamParser<'s> {
         let ident_str = token_text(self.input, ident);
 
         let name = keyword(ident_str);
-        let Some(param) = self.params_order.iter().find(|p| p.canonical == name) else {
+        let Some(param) = self
+            .params_order
+            .iter()
+            .find(|p| p.canonical == name.as_str())
+        else {
             return Err(ParserError::InvalidParam {
                 param: ident_str.to_string(),
                 span: cursor.span,
@@ -1105,7 +1109,7 @@ impl<'s> InstanceParser<'s> {
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
-                if keyword(ident.text) == "uic" {
+                if keyword(ident.text).as_str() == "uic" {
                     uic = true;
                 } else {
                     return Err(ParserError::UnexpectedToken {

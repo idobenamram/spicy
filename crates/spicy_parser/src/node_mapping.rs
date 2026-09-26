@@ -1,4 +1,4 @@
-use crate::netlist_types::{NameKey, NodeIndex, NodeName};
+use crate::netlist_types::{Name, NoCase, NodeIndex, NodeName};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -7,7 +7,7 @@ use std::fmt;
 /// written.
 #[derive(Clone)]
 pub struct NodeMapping {
-    indices: HashMap<NameKey, NodeIndex>,
+    indices: HashMap<Name, NodeIndex>,
     /// Each node's name as first written, by index.
     names: Vec<NodeName>,
 }
@@ -24,18 +24,17 @@ impl NodeMapping {
     pub fn new() -> Self {
         let ground = NodeName(NodeName::GROUND.to_string());
         Self {
-            indices: HashMap::from([(NameKey::new(&ground.0), NodeIndex(0))]),
+            indices: HashMap::from([(Name::new(&ground.0), NodeIndex(0))]),
             names: vec![ground],
         }
     }
 
     pub fn insert_node(&mut self, node_name: NodeName) -> NodeIndex {
-        let key = NameKey::new(&node_name.0);
-        if let Some(&index) = self.indices.get(&key) {
+        if let Some(&index) = self.indices.get(NoCase::new(&node_name.0)) {
             return index;
         }
         let index = NodeIndex(self.names.len());
-        self.indices.insert(key, index);
+        self.indices.insert(Name::new(&node_name.0), index);
         self.names.push(node_name);
         index
     }

@@ -9,7 +9,7 @@ use crate::expr::{PlaceholderMap, ScopeArena};
 use crate::netlist_models::partial_parse_model_command;
 use crate::netlist_models::{ModelStatementTable, ModelTable};
 use crate::netlist_types::{CommandType, DeviceType};
-use crate::netlist_types::{NameKey, NodeName};
+use crate::netlist_types::{Name, NoCase, NodeName};
 use crate::parser_utils::{
     parse_dot_param, parse_equal_expr, parse_ident, parse_node, parse_value_or_placeholder,
 };
@@ -40,16 +40,16 @@ pub(crate) struct SubcktDecl {
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct SubcktTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    map: HashMap<NameKey, SubcktDecl>,
+    map: HashMap<Name, SubcktDecl>,
 }
 
 impl SubcktTable {
     fn insert(&mut self, subckt: SubcktDecl) {
-        self.map.insert(NameKey::new(&subckt.name), subckt);
+        self.map.insert(Name::new(&subckt.name), subckt);
     }
 
     fn get(&self, name: &str) -> Option<&SubcktDecl> {
-        self.map.get(&NameKey::new(name))
+        self.map.get(NoCase::new(name))
     }
 }
 
@@ -297,8 +297,8 @@ impl<'a> Expansion<'a> {
             }
             .into());
         }
-        let key = NameKey::new(&subckt.name);
-        if self.stack.iter().any(|name| NameKey::new(name) == key) {
+        let placed = NoCase::new(&subckt.name);
+        if self.stack.iter().any(|name| NoCase::new(name) == placed) {
             return Err(SubcircuitError::PlacesItself {
                 name: subckt.name.clone(),
                 span: stmt.span,
@@ -315,7 +315,7 @@ impl<'a> Expansion<'a> {
             .nodes
             .iter()
             .zip(nodes)
-            .map(|(port, node)| (NameKey::new(&port.0), parent.get_node_name(node)))
+            .map(|(port, node)| (Name::new(&port.0), parent.get_node_name(node)))
             .collect();
 
         let mut params = subckt.default_params.clone();

@@ -8,6 +8,8 @@ Design documents for the AI-native schematic and simulation editor built on spic
 2. **[walkthrough.md](walkthrough.md)**: one amplifier followed through the whole engine, with real numbers. The best introduction to how the engine thinks.
 3. **[engine.md](engine.md)**: the engine design (current: v3).
 4. **[language.md](language.md)**: the circuit language (v0.1).
+   - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
+   - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
    - **[circuit.md](circuit.md)**: the circuit data model (`spicy_circuit`): today's flow traced through the code, and each design choice checked against ngspice, Xyce, Gnucap, OSDI/VACASK and compilers.
@@ -31,6 +33,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [language_core.md](research/language_core.md)
     - [language_specs.md](research/language_specs.md)
     - [language_editor_mapping.md](research/language_editor_mapping.md)
+    - These reports are kept as written. Where they disagree with the main docs, the main docs win. One known case: they propose a `logos` lexer and a lossless `rowan` tree; we chose a hand-written lexer and a typed AST with spans plus the full token list (roadmap.md §4.4).
 - **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md)).
 
 ## Conventions

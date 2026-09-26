@@ -1,0 +1,2 @@
+assume vcc.v in 12V +- 5%;
+let x = --y;

@@ -286,6 +286,7 @@ Every instance and net has a path: `board.amp.r1`, `board.amp.base`, `prot.r_s[3
 
 - **Tolerance:** `47k ± 1%`, or ASCII `47k +/- 1%`. Also absolute: `3.3V ± 50mV`.
 - **Ranges** are closed and use Rust's `..=`: `100..=300`, `4.5V..=6.5V`, `..=100mV` (up to), `10kΩ..` (at least). Rust's `..` stays the half-open integer range, for loops.
+- **Precedence:** `in` and comparisons bind loosest, then `..=`, then `±`, then arithmetic. An unparenthesized `+ - * /` expression as an operand of `±` is an error, because `capacity / 2h ± 10%` has two plausible readings (grammar.md §4).
 - **A tolerance is its own type,** `Tol<Ohm>`, distinct from an exact `Ohm`. That's how a param like `r: Tol<Ohm> = 1k ± 1%` says "each part built from this gets its own independent spread".
 
 ### 5.3 Where a range appears decides what it means (⊆ vs ⊇)
@@ -761,6 +762,7 @@ error[E-part]: part is looser than the design budget
   - *Edit mode* edits the **block** (parts, nets, values).
   - *Simulate mode* edits the **contract** (probes, specs, assumptions, benches).
 - **Every gesture is a named statement edit.** Drawing, the `:` command line, paste and AI edits all become the same edits to the text, so the text is always the truth.
+  - **How an edit reaches the text:** the parser keeps every token (comments and whitespace included) and a byte span on every syntax node. Changing r1's value replaces the bytes of that one value expression; the formatter then re-prints only that statement, so the rest of the file is untouched. No lossless syntax tree is needed for this (roadmap §4.4).
 - **Results never live in the source.** Verdicts appear:
   - as badges on the schematic,
   - in the spec table,

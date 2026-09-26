@@ -1,0 +1,28 @@
+// grammar.md §5.2, one literal per line.
+47k
+4k7
+1kHz
+100nF
+1F
+1f
+1m
+1M
+1K
+5%
+// Spellings accepted both ways (grammar.md §8).
+1uF
+1µF
+1μF
+10kΩ
+10kΩ
+10kohm
+1_000
+1000
+// Decimals, exponents and units.
+4.7k
+1.5e-3V
+1e3
+2.2mH
+10°C
+-3dB
+4k7Ω

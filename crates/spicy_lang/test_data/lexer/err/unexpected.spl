@@ -1,0 +1,5 @@
+let a = b § c;
+let a = "text";
+let a = b @ c;
+let a = !b;
+let a = b;

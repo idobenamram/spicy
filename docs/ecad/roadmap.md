@@ -1,7 +1,7 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed, as are three fixes to the SPICE parser: nested subcircuits, parameter scoping, and case-insensitivity. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
+> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed, as are three fixes to the SPICE parser: nested subcircuits, parameter scoping, and case-insensitivity. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next:** the language front-end (M1, now six small steps ending in a SPICE export; the grammar note `grammar.md` awaits review); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 
@@ -243,9 +243,10 @@ It has 8 knobs:
 
 | Choice | Recommendation | Why |
 |---|---|---|
-| Lexer and parser | **Hand-written** lexer + recursive-descent/Pratt parser | Same style as `spicy_parser` and Spade. Full control over unit literals (`4k7`, `°C`, `±`) and error recovery |
-| Syntax tree | **Lossless** (keeps every character, including comments and whitespace), with a typed layer on top. Probably via `rowan`, as in rust-analyzer | The editor and the AI will edit files as text. A formatter and precise edits need it, and retrofitting it means rewriting the parser |
-| Diagnostics | **`codespan-reporting`**, see the comparison below | |
+| Lexer | **Hand-written**, like `spicy_parser`'s (std only, or the tiny `unscanny` it already uses). **No `logos`** | §4.4 |
+| Parser | **Hand-written** recursive descent, with a Pratt loop for expressions. Design borrowed from Spade (§4.5), code written from scratch | §4.4, §4.5 |
+| Syntax tree | **A typed AST with byte spans on every node, plus the lexer's full token list (whitespace and comments included).** No lossless tree, no `rowan` | §4.4 |
+| Diagnostics | **`codespan-reporting`**, see the comparison below | The only new crate the front-end adds |
 | Tests | Snapshot tests: syntax trees, rendered diagnostics, the elaborated model, lowered circuits. Numeric outputs use the tolerance-based snapshots from M0 | The project's style; full precision is stored, but last-digit noise across machines doesn't fail tests |
 
 **Diagnostics libraries compared** (current versions: codespan-reporting 0.13, ariadne 0.6, miette 7):
@@ -260,6 +261,66 @@ It has 8 knobs:
 | **Fit for us** | ✅ A compiler's diagnostics, rustc-familiar, low churn | Good if appearance matters most | Better suited to app errors than to a compiler |
 
 **Recommendation: codespan-reporting.** Later, the SPICE parser's hand-rolled error snippets (`format_error_snippet` in the CLI) could move to it too, so both front-ends report errors the same way.
+
+### 4.4 Why an AST and a hand-written lexer (decided 2026-09-26)
+
+**The goals:** fast, modern, and as few crates as possible. The front-end ends up with **zero parsing dependencies**; its only new crate is `codespan-reporting`.
+
+**The two kinds of syntax tree, on one line:**
+
+```rust
+    let r1 = Resistor { value: 47k ± 1% };  // top
+```
+
+- **AST (abstract syntax tree).** Keeps the meaning, with byte ranges ("spans") pointing back into the file:
+  ```
+  Let { name: "r1" @8..10,
+        value: StructLit { path: "Resistor" @13..21,
+                           fields: [value: Tol(47k, 1%) @31..40] },
+        span: 4..43 }
+  ```
+  Spaces and the `// top` comment aren't in the tree. They stay in the token list.
+- **CST (concrete syntax tree, "lossless").** Every character is a leaf: `WHITESPACE "    "`, `LET_KW "let"`, `WHITESPACE " "`, `IDENT "r1"`, … `SEMI ";"`, `WHITESPACE "  "`, `COMMENT "// top"`. Joining the leaves gives back the file. The nodes are untyped, so a typed layer (`LetStmt::name()`) is written on top. `rowan` is the library rust-analyzer uses for this.
+
+**What we chose:** an AST with a span on every node, **plus the lexer's full token list**, whitespace and comments included, exactly as `spicy_parser`'s lexer already keeps whitespace and newline tokens. The file is always reproducible byte for byte from the tokens. This is Zig's design: `zig fmt` formats from the AST plus the token list. Go's `gofmt` works from an AST plus a comment list.
+
+`spicy_parser` is the same kind: a hand-written lexer, then phases that build typed structures (`Deck`) directly. It has no syntax-tree layer that keeps the source.
+
+| | **AST + spans + token list** (chosen) | **CST with `rowan`** |
+|---|---|---|
+| Crates | None | `rowan` 0.16 + 4 (countme, hashbrown, rustc-hash, text-size) |
+| Code to write | The parser builds typed nodes directly | The parser emits start/finish events, plus a hand-written typed layer: roughly twice the code |
+| Speed | Faster (no trivia nodes). Both are far faster than our file sizes need | Slower, but it wouldn't matter |
+| Editor and AI edits ("change r1's value") | Replace the bytes at the node's span | Patch the tree |
+| Canonical formatter | From AST + tokens (Zig, Go) | Easier comment placement |
+| Formatting one statement without reflowing others (language_editor_mapping R14) | Format only the edited statement's span | Same |
+| Moving code together with its comments, keeping odd hand formatting | Harder | Its real strength |
+| Incremental reparsing on every keystroke | Not needed: a design file reparses from scratch in far less time than a keystroke | Its other strength, for very large codebases |
+| Used by | rustc, Go, Zig, Spade, `spicy_parser` | rust-analyzer, Roslyn (C#), Swift |
+
+**Why this replaces the earlier "lossless from day one":** the three things lossless was meant for (precise edits, a formatter, error recovery) all work from spans plus the token list. The fear was that retrofitting would mean rewriting the parser. The MVP grammar is about 15 rules, so a rewrite would cost days, not a redesign. And if we ever need a CST, it doesn't require `rowan`: a plain `Node { kind, children }` over our tokens is a small amount of our own code.
+
+**Why no `logos`.** logos (Spade's lexer) turns regexes on an enum into a lexer at compile time. It saves typing for many simple tokens, but:
+- **Our hard tokens are the ones it doesn't help with.** Unit literals (`47k`, `4k7`, `10kΩ`, `1µF`, `5%`), `100..=300` (the lexer must not read `100.` as a decimal), `±` and `+/-`, and nested `/* */` comments all need hand-written code either way. Even Spade handles block comments outside logos, in its parser.
+- **It's a proc-macro crate**, so it pulls a compile-time stack (syn, quote, regex-syntax, …) into the build.
+- **A hand lexer for about 40 token kinds is a few hundred lines,** in the same style as `spicy_parser`'s (`crates/spicy_parser/src/lexer.rs`).
+
+### 4.5 What we take from Spade, and what we don't
+
+Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours is structured. **Its code is not copied or ported:** Spade's compiler crates are EUPL-1.2, a copyleft licence that isn't compatible with our MIT licence, and its README explicitly refuses LLM-generated contributions.
+
+**We take:**
+- Parse functions return `Result<Option<T>>`: `Ok(None)` means "not mine, nothing consumed", `Ok(Some)` means parsed, `Err` is a diagnostic.
+- A statement loop that dispatches on the leading keyword (`let`, `net`, `port`, `assume`, `spec`, `#[…]`).
+- **Recovery:** after an error, skip to a token that can restart a statement, so one broken statement gives one error and the next parses normally. A missing `;` is reported with an insert-`;` fix and parsing just continues. Ours is tighter than Spade's in one way: since every statement ends in `;`, recovery also skips *past* the next `;`.
+- A Pratt loop for expressions, with an ordered enum of binding powers.
+- Brace-named arguments (`Resistor { a: vcc, … }`), with a flag that forbids them where a `{` opens a body (`for i in 0..N {`, later), as in Rust.
+- A diagnostic builder (error, primary and secondary labels, help, suggested replacement), rendered by codespan-reporting.
+- Snapshot tests of rendered errors (Spade has about 800).
+
+**We leave:**
+- Splitting `>>` into `> >` for nested generics. Spade needs it because it has shift operators. We have none, so there's no `>>` token and `Tol<Ohm>` inside `Foo<…>` just works.
+- Pipelines, registers, macros, and the parse-trace machinery.
 
 ---
 
@@ -294,21 +355,61 @@ It has 8 knobs:
 | 7 | Lesson crate | ✅ `crates/spicy_bounds` removed; `Cargo.toml` and `Cargo.lock` are back to their committed state. The affine math will be written inside `spicy_engine` in M3 |
 | — | Clippy warnings | Left for now: 86 warnings from the newer clippy (1.98) in existing code. CI reports them without failing |
 
-### M1: Language front-end
+### M1: Language front-end, up to a SPICE export
 
-- **M1a: Grammar note + scaffolding.**
-  - One page: the exact MVP grammar (§4.1) in EBNF, the token list, and the keywords.
-  - Create `spicy_model` and `spicy_lang`, empty, with READMEs stating their responsibility (§2.3). 🔍
-- **M1b: Lexer + parser + diagnostics.**
-  - Lossless syntax tree, error recovery, codespan-reporting.
-  - Tests for every construct in §4.1, and ~20 error cases (missing `;`, `+-`, unknown unit prefix, …).
-  - A fuzz target. 🔍
-- **M1c: `spicy_model` + elaboration.**
-  - Name resolution, unit checking, role checks (one source per `Power` net, every pin bound).
-  - Flattening hierarchy, extracting knobs and the contract.
-  - `spicy check --dump-model circuits/ce_amp.spl`. 🔍
+**Goal:** `spicy export circuits/ce_amp.spl` writes a SPICE netlist of the amplifier. That tests the whole block side of the language end to end, without the engine. (The contract side, specs and measures, is tested in M3.)
 
-**Done when:** `ce_amp.spl` elaborates to exactly the 8 knobs and 3 specs of §4.2, and every error case has a snapshot-tested diagnostic.
+**Why this order** (agreed 2026-09-26):
+- Each step has its own tests and review.
+- The export gives two checks that need neither ngspice nor the engine:
+  - the exported text, parsed back by `spicy_parser`, must give the same `Circuit` + `Params`;
+  - simulating it must give VC ≈ 5.52 V (§1).
+
+**Steps:**
+
+- **M1a: Grammar note.** `grammar.md`: tokens, keywords, EBNF, operator precedence (agreed), unit literals, the list of syntax errors. Drafted, awaiting review. 🔍
+- **M1b: Lexer.** Creates `spicy_lang`.
+  - Every token of `grammar.md` §2, whitespace and comments kept.
+  - Unit suffixes split into prefix and unit (§5).
+  - Lexer diagnostics through codespan-reporting.
+  - **Done when:**
+    - joining the tokens' text rebuilds every input byte for byte (`ce_amp.spl`, every test file, and a fuzz target);
+    - a snapshot of `ce_amp.spl`'s token list;
+    - a snapshot per lexer error (`grammar.md` §7: #2–3, #9–15, #22–24).
+  - Design: `lexer.md` (two passes, data layout, errors, tests).
+  - **Done 2026-09-26:** `crates/spicy_lang` (lexer), 17 case files plus `circuits/ce_amp.spl`, the fuzz target `fuzz_spicy_lang_lexer`. 🔍
+- **M1c: Parser → AST.**
+  - The grammar of §3, the precedence and the `±` rule of §4, and recovery (§6).
+  - **Done when:**
+    - a snapshot of `ce_amp.spl`'s AST;
+    - a snapshot per remaining syntax error in §7;
+    - a fuzz target that never panics and always returns a tree or diagnostics. 🔍
+- **M1d: Elaboration → `spicy_model`.** Creates `spicy_model`.
+  - Name resolution, pin binding (every pin exactly once) and unit checking.
+  - Role checks (one source per `Power` net).
+  - Flattening the hierarchy, and extracting the knobs and the contract.
+  - `spicy check --dump-model`.
+  - **Done when:** `ce_amp.spl` elaborates to exactly the 8 knobs and 3 specs of §4.2, and every semantic error has a snapshot-tested diagnostic. 🔍
+- **M1e: Lowering → `spicy_circuit`** (formerly M2b).
+  - A flat design at a knob point becomes a `Circuit` + `Params`, with origins set to model paths.
+  - The default bench (language §8.5): a DC source on each `Power<In>` port at its assumed nominal, and an AC source on `Analog<In>`.
+  - Two decisions, in the step's design note:
+    - what "nominal" means for a range knob (the midpoint gives β = 200, as in the walkthrough);
+    - the default model for a bare `Npn`.
+  - **Done when:**
+    - a snapshot of the lowered circuit;
+    - simulated natively, the operating point gives VC ≈ 5.52 V. 🔍
+- **M1f: SPICE export** (formerly the first half of M4).
+  - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R_amp_r1`).
+  - `spicy export`.
+  - **Done when:**
+    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params`;
+    - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`);
+    - the exported amplifier simulates to the same VC. 🔍
+
+  This step only depends on `spicy_circuit`, not on M1b–M1e, so it could also be built earlier or in parallel and tested on the existing `.spicy` files.
+
+**Done when:** `spicy export circuits/ce_amp.spl` writes a netlist that round-trips and simulates to the walkthrough's operating point.
 
 ### M2: Native simulator input and simulator readiness
 
@@ -318,7 +419,7 @@ It has 8 knobs:
   - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_parser`.
   - `spicy_simulate` then reads only `spicy_circuit`.
   - Behavior-preserving: **every existing snapshot stays byte-identical.** 🔍
-- **M2b: Model → Circuit lowering** (in `spicy_backends`). A flat design + a knob point → `Circuit`, with origins set to model paths. Snapshot tests per knob point. 🔍
+- **M2b: Model → Circuit lowering.** Moved to M1e.
 - **M2c: Temperature.**
   - Standard SPICE temperature equations for the BJT (VT = kT/q; IS with XTI/EG; BF with XTB) and for resistors (TC1/TC2).
   - Temperature as a simulation setting, plus `.temp` in the SPICE parser.
@@ -365,7 +466,7 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 
 ### M4 and after (planned in detail once the MVP works)
 
-- **M4:** SPICE netlist export + ngspice backend + cross-checking (§3).
+- **M4:** ngspice backend + cross-checking (§3). The SPICE export itself moved to M1f.
 - **M5:** Part records and `part:` pinning; the datasheet-arithmetic engine (engine v3 §4.1).
 - **M6:** Aging links and `life`; lots; the rest of the knob model (engine v3 §2).
 - **M7:** Statistics: board yield, importance sampling (engine v3 §4.4).
@@ -381,7 +482,8 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 | 1 | Crate layout (§2.2), now with `spicy_circuit` for native simulator input | **Agreed:** the `spicy_circuit` data model is in `circuit.md` |
 | 2 | Our simulator for the MVP; ngspice right after | Agreed |
 | 3 | MVP language subset (§4.1) | To confirm |
-| 4 | Lossless syntax tree from day one | To confirm |
+| 4 | Syntax tree: typed AST with spans + the full token list; no lossless tree, no `rowan` (§4.4) | **Agreed** 2026-09-26 |
+| 4b | Lexer and parser hand-written, no `logos`; Spade as a design reference only, never copied (§4.4, §4.5) | **Agreed** 2026-09-26 |
 | 5 | Diagnostics: codespan-reporting | Agreed |
 | 6 | Stale snapshot | Done: reverted to `V1` |
 | 7 | Docs in `docs/ecad/` | Done |
@@ -411,5 +513,5 @@ At every 🔍:
 | BJT convergence at extreme corners (no junction limiting) | The amplifier converged at the worst corner; add SPICE-style limiting if a corner fails |
 | Nudged slopes drown in solver noise | M2e: tighter tolerances + a two-step-size consistency test |
 | AC-at-operating-point bugs give plausible but wrong gains | Formula-based tests in M2d; cross-check with ngspice in M4 |
-| The lossless syntax tree slows M1 down | Keep the typed layer thin; the MVP grammar is small |
+| The AST turns out too lossy for the editor (e.g. moving code with its comments) | The full token list keeps every character, so a small CST of our own can be added over the same lexer without changing the language (§4.4) |
 | Scope creep | §4.1 is the contract for the MVP. Anything outside it goes to M4+ |

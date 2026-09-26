@@ -1,0 +1,31 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/percent.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "x"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "a"
+Whitespace " "
+Unknown "%"
+Whitespace " "
+Quantity "3"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-percent LonePercent 10..11 "%"
+
+--- rendered ---
+error[E-percent]: `%` only means percent, glued to a number
+  --> percent.spl:1:11
+  |
+1 | let x = a % 3;
+  |           ^ not attached to a number
+  |
+  = help: write `5%`; there is no modulo operator

@@ -1,0 +1,81 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/number.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1e"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "b"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1e400"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "c"
+Whitespace " "
+Eq "="
+Whitespace " "
+Dot "."
+Quantity "5"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "d"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1"
+Dot "."
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-number MissingExponentDigits 9..10 "e"
+E-number TooLarge 20..25 "1e400"
+E-number LeadingDecimalPoint 35..37 ".5" fix "0.5"
+E-number TrailingDecimalPoint 47..49 "1." fix "1.0"
+
+--- rendered ---
+error[E-number]: missing digits after the exponent
+  --> number.spl:1:10
+  |
+1 | let a = 1e;
+  |          ^ expected digits after `e`
+  |
+  = help: for example `1e3` or `1e-3`
+
+error[E-number]: number is too large
+  --> number.spl:2:9
+  |
+2 | let b = 1e400;
+  |         ^^^^^ beyond the largest representable value
+
+error[E-number]: a number can't start with `.`
+  --> number.spl:3:9
+  |
+3 | let c = .5;
+  |         ^^ add a leading zero
+  |
+  = help: write `0.5`
+
+error[E-number]: a number can't end with `.`
+  --> number.spl:4:9
+  |
+4 | let d = 1.;
+  |         ^^ add a digit after the point
+  |
+  = help: write `1.0`

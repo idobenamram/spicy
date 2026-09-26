@@ -1,0 +1,4 @@
+let a = 1e;
+let b = 1e400;
+let c = .5;
+let d = 1.;

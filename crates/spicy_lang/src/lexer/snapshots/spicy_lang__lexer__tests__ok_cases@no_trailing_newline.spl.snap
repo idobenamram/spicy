@@ -1,0 +1,13 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/ok/no_trailing_newline.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "x"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "47k"
+Eof ""

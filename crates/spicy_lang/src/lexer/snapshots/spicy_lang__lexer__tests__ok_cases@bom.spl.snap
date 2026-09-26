@@ -1,0 +1,14 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/ok/bom.spl
+---
+Whitespace "\u{feff}"
+KwBlock "block"
+Whitespace " "
+Ident "A"
+Whitespace " "
+LBrace "{"
+RBrace "}"
+Whitespace "\n"
+Eof ""

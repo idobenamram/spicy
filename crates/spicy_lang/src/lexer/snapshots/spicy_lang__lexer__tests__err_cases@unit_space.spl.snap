@@ -1,0 +1,134 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unit_space.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10"
+Whitespace " "
+Ident "V"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "b"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10"
+Whitespace " "
+IdentNonAscii "kΩ"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "c"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10"
+Whitespace " "
+Unknown "°"
+Ident "C"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "d"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10"
+Unknown "\u{2009}"
+IdentNonAscii "kΩ"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "e"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "47k"
+Whitespace " "
+IdentNonAscii "Ω"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "f"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "47k"
+Whitespace " "
+PlusMinus "±"
+Whitespace " "
+Quantity "1"
+Whitespace " "
+Unknown "%"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-unit-space UnitSpace 8..12 "10 V" fix "10V"
+E-unit-space UnitSpace 22..28 "10 kΩ" fix "10kΩ"
+E-unit-space UnitSpace 38..44 "10 °C" fix "10°C"
+E-unit-space UnitSpace 54..62 "10\u{2009}kΩ" fix "10kΩ"
+E-unit-space UnitSpace 72..78 "47k Ω" fix "47kΩ"
+E-unit-space UnitSpace 95..98 "1 %" fix "1%"
+
+--- rendered ---
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:1:9
+  |
+1 | let a = 10 V;
+  |         ^^^^ `V` reads as a separate word
+  |
+  = help: remove the space: `10V`
+
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:2:9
+  |
+2 | let b = 10 kΩ;
+  |         ^^^^^ `kΩ` reads as a separate word
+  |
+  = help: remove the space: `10kΩ`
+
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:3:9
+  |
+3 | let c = 10 °C;
+  |         ^^^^^ `°C` reads as a separate word
+  |
+  = help: remove the space: `10°C`
+
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:4:9
+  |
+4 | let d = 10 kΩ;
+  |         ^^^^^ `kΩ` reads as a separate word
+  |
+  = help: remove the space: `10kΩ`
+
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:5:9
+  |
+5 | let e = 47k Ω;
+  |         ^^^^^ `Ω` reads as a separate word
+  |
+  = help: remove the space: `47kΩ`
+
+error[E-unit-space]: a unit must touch its number
+  --> unit_space.spl:6:15
+  |
+6 | let f = 47k ± 1 %;
+  |               ^^^ `%` reads as a separate word
+  |
+  = help: remove the space: `1%`

@@ -1,0 +1,10 @@
+// a line comment
+//// also a plain comment, as in Rust
+/// a doc comment
+///
+/* a block comment */
+/**/
+/* outer /* nested */ still outer */
+let x = 1; // trailing
+/* multi
+   line */

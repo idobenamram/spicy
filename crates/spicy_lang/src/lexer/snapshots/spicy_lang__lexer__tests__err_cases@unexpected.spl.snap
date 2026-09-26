@@ -1,0 +1,108 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unexpected.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "b"
+Whitespace " "
+Unknown "§"
+Whitespace " "
+Ident "c"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Unknown "\""
+Ident "text"
+Unknown "\""
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "b"
+Whitespace " "
+Unknown "@"
+Whitespace " "
+Ident "c"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Unknown "!"
+Ident "b"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "b"
+Unknown "\u{1}"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-unexpected-char UnexpectedChar 10..12 "§"
+E-unexpected-char UnexpectedChar 24..25 "\""
+E-unexpected-char UnexpectedChar 29..30 "\""
+E-unexpected-char UnexpectedChar 42..43 "@"
+E-unexpected-char UnexpectedChar 55..56 "!"
+E-unexpected-char UnexpectedChar 68..69 "\u{1}"
+
+--- rendered ---
+error[E-unexpected-char]: unexpected character `§` (U+00A7)
+  --> unexpected.spl:1:11
+  |
+1 | let a = b § c;
+  |           ^ not part of the language
+
+error[E-unexpected-char]: unexpected character `\"` (U+0022)
+  --> unexpected.spl:2:9
+  |
+2 | let a = "text";
+  |         ^ not part of the language
+
+error[E-unexpected-char]: unexpected character `\"` (U+0022)
+  --> unexpected.spl:2:14
+  |
+2 | let a = "text";
+  |              ^ not part of the language
+
+error[E-unexpected-char]: unexpected character `@` (U+0040)
+  --> unexpected.spl:3:11
+  |
+3 | let a = b @ c;
+  |           ^ not part of the language
+
+error[E-unexpected-char]: unexpected character `!` (U+0021)
+  --> unexpected.spl:4:9
+  |
+4 | let a = !b;
+  |         ^ not part of the language
+
+error[E-unexpected-char]: unexpected character `\u{1}` (U+0001)
+  --> unexpected.spl:5:10
+  |
+5 | let a = b;
+  |           not part of the language

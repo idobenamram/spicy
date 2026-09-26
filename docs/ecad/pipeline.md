@@ -44,7 +44,7 @@ Two more rules from the same sources:
 
 ```
           ┌──── spicy_lang ──────┐   ┌──────── spicy_model ─────────────┐
-.spl ───► │ SyntaxTree (lossless) ├──►│ Design ──elaborate──► FlatDesign  │
+.spl ───► │ Tokens + Ast (spans)  ├──►│ Design ──elaborate──► FlatDesign  │
           └───────────────────────┘   └───────────────────────┬──────────┘
                                                               │ spicy_backends::lower   (once per design)
                                                               ▼
@@ -75,7 +75,7 @@ Read it top to bottom:
 | Struct | Crate | Built by, when | Lives | Its job, which nothing else can do |
 |---|---|---|---|---|
 | `Deck` (`*Spec`, `Command`) | `spicy_parser` | parse, per SPICE file | until lowered (the CLI keeps it for error snippets) | What the netlist literally said. It holds SPICE's precedence ("instance beats `.model` beats default") and which values were given. **Only SPICE needs this, so SPICE-specific duplication lives here** |
-| `SyntaxTree` | `spicy_lang` | parse, per edit | until the next edit | Reproduce the text exactly, for the formatter, editor/AI edits and error recovery |
+| `Tokens` + `Ast` | `spicy_lang` | lex + parse, per edit | until the next edit | What the text said. `Tokens` holds every token, whitespace and comments included, so the file is reproducible byte for byte; `Ast` is typed, with a byte span on every node. Together they serve the formatter, editor/AI edits (replace a node's span) and error recovery. Spans live on AST nodes because this layer *is* syntax; from `Design` down they move to side tables (§10 #9). Why not a lossless tree: roadmap §4.4 |
 | `Design` + `DesignSourceMap` | `spicy_model` | after parse, per edit | per design revision | Blocks as written (defined once, placed many times), values with spreads, names resolved, units checked. Spans go in a side table |
 | `FlatDesign` + `KnobTable` | `spicy_model` | elaboration, per edit | per design revision | Hierarchy flattened. The one place that says which knob feeds which field. Holds no knob values |
 | `Circuit` | `spicy_circuit` | lowering (either front-end), once per design | shared (`Arc`) by every run | The simulator's vocabulary: nodes, per-kind device wiring, each instance's model id. **Wiring only, no numbers.** Names and origins go in a `CircuitNames` side table the simulator never reads (`circuit.md` §4.9) |

@@ -1,0 +1,32 @@
+/// Common-emitter audio stage (walkthrough §1).
+block CeAmp {
+    port vcc: Power<In>;
+    port gnd: Ground;
+    port input: Analog<In>;
+    port output: Analog<Out>;
+
+    net base;
+    net emitter;
+
+    /// Divider holds the base near 2.1 V.
+    let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };
+    let r2 = Resistor { a: base, b: gnd, value: 10k ± 1% };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k ± 1% };
+    let re = Resistor { a: emitter, b: gnd, value: 1k ± 1% };
+    let c_in = Electrolytic { p: base, n: input, value: 1uF ± 20% };
+    let q1 = Npn { c: output, b: base, e: emitter, beta: 100..=300 };
+}
+
+contract CeAmp {
+    assume temp in -10°C..=60°C;
+    assume vcc.v in 12V ± 5%;
+
+    let h = ac(output.v / input.v);
+
+    /// Room for the output to swing ±1 V without clipping.
+    spec bias: dc(output.v) in 4.5V..=6.5V;
+    /// The next stage expects this level.
+    spec gain: h.at(1kHz).mag() in 4.6 ± 5%;
+    /// Don't cut the bass.
+    spec bass: h.f_low(-3dB) <= 30Hz;
+}

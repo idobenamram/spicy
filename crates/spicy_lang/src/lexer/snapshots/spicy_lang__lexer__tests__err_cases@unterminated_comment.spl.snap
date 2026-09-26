@@ -1,0 +1,28 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unterminated_comment.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1"
+Semi ";"
+Whitespace "\n"
+UnterminatedBlockComment "/* open /* nested */ never closed\nlet b = 2;\n"
+Eof ""
+
+--- errors ---
+E-unterminated-comment UnterminatedBlockComment 11..13 "/*"
+
+--- rendered ---
+error[E-unterminated-comment]: unterminated block comment
+  --> unterminated_comment.spl:2:1
+  |
+2 | /* open /* nested */ never closed
+  | ^^ this comment is never closed
+  |
+  = help: add `*/` (block comments nest, so each `/*` needs one)

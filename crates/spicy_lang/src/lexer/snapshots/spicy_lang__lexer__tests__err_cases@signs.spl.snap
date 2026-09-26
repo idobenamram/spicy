@@ -1,0 +1,54 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/signs.spl
+---
+KwAssume "assume"
+Whitespace " "
+Ident "vcc"
+Dot "."
+Ident "v"
+Whitespace " "
+KwIn "in"
+Whitespace " "
+Quantity "12V"
+Whitespace " "
+Plus "+"
+Minus "-"
+Whitespace " "
+Quantity "5%"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "x"
+Whitespace " "
+Eq "="
+Whitespace " "
+Minus "-"
+Minus "-"
+Ident "y"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-plus-minus PlusMinusTypo 20..22 "+-" fix "±"
+E-double-minus DoubleMinus 35..37 "--"
+
+--- rendered ---
+error[E-plus-minus]: `+-` means `+ (-…)` in Rust
+  --> signs.spl:1:21
+  |
+1 | assume vcc.v in 12V +- 5%;
+  |                     ^^ not a tolerance
+  |
+  = help: for a tolerance write `±` or `+/-`
+
+error[E-double-minus]: `--` means `-(-…)` in Rust
+  --> signs.spl:2:9
+  |
+2 | let x = --y;
+  |         ^^ two minus signs
+  |
+  = help: write `x`, or `-(-x)` if that's really meant

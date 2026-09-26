@@ -1,0 +1,63 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/non_ascii_ident.spl
+---
+KwLet "let"
+Whitespace " "
+IdentNonAscii "r1_α"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+IdentNonAscii "µ"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "2"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+IdentNonAscii "straße"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "3"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-ascii-ident NonAsciiIdent 4..9 "r1_α"
+E-ascii-ident NonAsciiIdent 19..21 "µ"
+E-ascii-ident NonAsciiIdent 31..38 "straße"
+
+--- rendered ---
+error[E-ascii-ident]: identifiers must be ASCII
+  --> non_ascii_ident.spl:1:5
+  |
+1 | let r1_α = 1;
+  |     ^^^^ `r1_α` contains `α` (U+03B1)
+  |
+  = help: use ASCII letters, digits and `_`
+
+error[E-ascii-ident]: identifiers must be ASCII
+  --> non_ascii_ident.spl:2:5
+  |
+2 | let µ = 2;
+  |     ^ `µ` contains `µ` (U+00B5)
+  |
+  = help: use ASCII letters, digits and `_`
+
+error[E-ascii-ident]: identifiers must be ASCII
+  --> non_ascii_ident.spl:3:5
+  |
+3 | let straße = 3;
+  |     ^^^^^^ `straße` contains `ß` (U+00DF)
+  |
+  = help: use ASCII letters, digits and `_`

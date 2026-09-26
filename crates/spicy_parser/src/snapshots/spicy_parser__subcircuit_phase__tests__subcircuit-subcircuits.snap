@@ -9,7 +9,7 @@ expression: json
         "parent": null,
         "instance_name": null,
         "param_map": {
-          "C": {
+          "c": {
             "span": {
               "start": 64,
               "end": 64,
@@ -23,7 +23,7 @@ expression: json
               }
             }
           },
-          "Rg": {
+          "rg": {
             "span": {
               "start": 51,
               "end": 53,
@@ -44,7 +44,7 @@ expression: json
         "parent": 0,
         "instance_name": "X1",
         "param_map": {
-          "C": {
+          "c": {
             "span": {
               "start": 128,
               "end": 129,
@@ -58,7 +58,7 @@ expression: json
               }
             }
           },
-          "R": {
+          "r": {
             "span": {
               "start": 141,
               "end": 141,
@@ -82,7 +82,7 @@ expression: json
         "parent": 0,
         "instance_name": "X2",
         "param_map": {
-          "C": {
+          "c": {
             "span": {
               "start": 128,
               "end": 129,
@@ -96,7 +96,7 @@ expression: json
               }
             }
           },
-          "R": {
+          "r": {
             "span": {
               "start": 141,
               "end": 141,
@@ -120,7 +120,7 @@ expression: json
         "parent": 0,
         "instance_name": "X3",
         "param_map": {
-          "C": {
+          "c": {
             "span": {
               "start": 245,
               "end": 246,
@@ -134,7 +134,7 @@ expression: json
               }
             }
           },
-          "R": {
+          "r": {
             "span": {
               "start": 141,
               "end": 141,
@@ -162,14 +162,14 @@ expression: json
   "global_params": 0,
   "subckt_table": {
     "map": {
-      "LP": {
+      "lp": {
         "name": "LP",
         "nodes": [
           "in",
           "out"
         ],
         "default_params": {
-          "C": {
+          "c": {
             "span": {
               "start": 128,
               "end": 129,
@@ -183,7 +183,7 @@ expression: json
               }
             }
           },
-          "R": {
+          "r": {
             "span": {
               "start": 120,
               "end": 123,
@@ -195,7 +195,7 @@ expression: json
           }
         },
         "local_params": {
-          "R": {
+          "r": {
             "span": {
               "start": 141,
               "end": 141,

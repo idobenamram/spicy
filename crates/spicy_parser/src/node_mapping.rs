@@ -1,73 +1,53 @@
-use crate::netlist_types::{NodeIndex, NodeName};
+use crate::netlist_types::{NameKey, NodeIndex, NodeName};
 use std::collections::HashMap;
 use std::fmt;
 
+/// Numbers the circuit's nodes in order of first appearance; ground is 0.
+/// Names ignore case (`OUT` and `out` are one node) and are shown as first
+/// written.
 #[derive(Clone)]
 pub struct NodeMapping {
-    node_mapping: HashMap<NodeName, NodeIndex>,
-    node_counter: usize,
+    indices: HashMap<NameKey, NodeIndex>,
+    /// Each node's name as first written, by index.
+    names: Vec<NodeName>,
 }
 
-// NOTE: We use `assert_debug_snapshot!` on parsed decks. `HashMap`'s iteration order is not
-// deterministic, so we provide a stable `Debug` implementation for snapshot (and log) sanity.
 impl fmt::Debug for NodeMapping {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut node_entries: Vec<_> = self.node_mapping.iter().collect();
-        node_entries.sort_by_key(|(_name, node_index)| node_index.0);
-
-        let mut ds = f.debug_struct("NodeMapping");
-        ds.field("node_mapping", &SortedDebugMap(&node_entries));
-        ds.field("node_counter", &self.node_counter);
-        ds.finish()
-    }
-}
-
-struct SortedDebugMap<'a, K: 'a, V: 'a>(&'a [(&'a K, &'a V)]);
-
-impl<'a, K: fmt::Debug, V: fmt::Debug> fmt::Debug for SortedDebugMap<'a, K, V> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut m = f.debug_map();
-        for (k, v) in self.0 {
-            m.entry(k, v);
-        }
-        m.finish()
+        f.debug_struct("NodeMapping")
+            .field("nodes", &self.names)
+            .finish()
     }
 }
 
 impl NodeMapping {
     pub fn new() -> Self {
-        let mut node_mapping = HashMap::new();
-        // always insert ground node at index 0
-        node_mapping.insert(NodeName(NodeName::GROUND.to_string()), NodeIndex(0));
+        let ground = NodeName(NodeName::GROUND.to_string());
         Self {
-            node_mapping,
-            node_counter: 1,
+            indices: HashMap::from([(NameKey::new(&ground.0), NodeIndex(0))]),
+            names: vec![ground],
         }
     }
 
     pub fn insert_node(&mut self, node_name: NodeName) -> NodeIndex {
-        let node_counter = &mut self.node_counter;
-        *self.node_mapping.entry(node_name).or_insert_with(|| {
-            let node = NodeIndex(*node_counter);
-            *node_counter += 1;
-            node
-        })
+        let key = NameKey::new(&node_name.0);
+        if let Some(&index) = self.indices.get(&key) {
+            return index;
+        }
+        let index = NodeIndex(self.names.len());
+        self.indices.insert(key, index);
+        self.names.push(node_name);
+        index
     }
 
     /// Number of nodes, ground excluded.
     pub fn nodes_len(&self) -> usize {
-        self.node_counter - 1 // -1 for the ground node
+        self.names.len() - 1
     }
 
     /// Names of the nodes other than ground, in index order: entry `i` is node `i + 1`.
     pub fn node_names(&self) -> Vec<String> {
-        let mut names = vec![String::new(); self.nodes_len()];
-        for (name, node_index) in &self.node_mapping {
-            if let Some(i) = node_index.0.checked_sub(1) {
-                names[i] = name.0.clone();
-            }
-        }
-        names
+        self.names[1..].iter().map(|name| name.0.clone()).collect()
     }
 }
 
@@ -112,6 +92,19 @@ mod tests {
         let n1_again = m.insert_node(NodeName("n1".to_string()));
         assert_eq!(n1_again, n1);
         assert_eq!(m.nodes_len(), 2);
+    }
+
+    #[test]
+    fn node_names_ignore_case() {
+        let mut m = NodeMapping::new();
+        let first = m.insert_node(NodeName("OUT".to_string()));
+        let again = m.insert_node(NodeName("out".to_string()));
+        assert_eq!(first, again);
+        assert_eq!(
+            m.node_names(),
+            vec!["OUT".to_string()],
+            "shown as first written"
+        );
     }
 
     #[test]

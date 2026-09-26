@@ -5,19 +5,14 @@ expression: deck
 Deck {
     title: "AC test with voltage source DC and AC",
     node_mapping: NodeMapping {
-        node_mapping: {
+        nodes: [
             NodeName(
                 "0",
-            ): NodeIndex(
-                0,
             ),
             NodeName(
                 "out",
-            ): NodeIndex(
-                1,
             ),
-        },
-        node_counter: 2,
+        ],
     },
     commands: [
         Ac(

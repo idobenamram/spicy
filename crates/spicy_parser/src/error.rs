@@ -55,8 +55,8 @@ impl SpicyError {
             SpicyError::Expression(ee) => match ee {
                 ExpressionError::UnexpectedToken { span, .. }
                 | ExpressionError::BadPrefixOperator { span, .. }
-                | ExpressionError::UnevaluatablePlaceholder { span, .. }
                 | ExpressionError::UnknownIdentifier { span, .. }
+                | ExpressionError::CyclicParameter { span, .. }
                 | ExpressionError::UnsupportedUnaryOperator { span, .. }
                 | ExpressionError::UnsupportedBinaryOperator { span, .. } => Some(*span),
                 ExpressionError::MissingToken { .. } => None,
@@ -67,6 +67,7 @@ impl SpicyError {
                 SubcircuitError::NoNodes { span, .. } => Some(*span),
                 SubcircuitError::NotFound { .. } | SubcircuitError::ArityMismatch { .. } => None,
                 SubcircuitError::ModelAlreadyExists { span, .. } => Some(*span),
+                SubcircuitError::PlacesItself { span, .. } => Some(*span),
             },
             SpicyError::Include(ie) => match ie {
                 IncludeError::ExpectedPath { span }
@@ -188,14 +189,11 @@ pub enum ExpressionError {
         span: Span,
     },
 
-    #[error("placeholder not evaluatable: {id:?}")]
-    UnevaluatablePlaceholder {
-        id: crate::expr::PlaceholderId,
-        span: Span,
-    },
-
     #[error("unknown identifier '{name}'")]
     UnknownIdentifier { name: String, span: Span },
+
+    #[error("parameter '{name}' is defined in terms of itself")]
+    CyclicParameter { name: String, span: Span },
 
     #[error("unsupported unary operator {op:?}")]
     UnsupportedUnaryOperator {
@@ -227,6 +225,9 @@ pub enum SubcircuitError {
 
     #[error("subcircuit {name} has no nodes")]
     NoNodes { name: String, span: Span },
+
+    #[error("subcircuit {name} places itself, directly or through other subcircuits")]
+    PlacesItself { name: String, span: Span },
 
     #[error("invalid device model type: {s}")]
     InvalidDeviceModelType { s: String, span: Span },

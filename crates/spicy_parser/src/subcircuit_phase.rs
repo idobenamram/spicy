@@ -4,12 +4,12 @@ use serde::Serialize;
 
 use crate::SourceMap;
 use crate::error::{SpicyError, SubcircuitError};
-use crate::expr::{Params, Scope, ScopeId};
+use crate::expr::{Params, Scope, ScopeId, ScopeRef};
 use crate::expr::{PlaceholderMap, ScopeArena};
 use crate::netlist_models::partial_parse_model_command;
 use crate::netlist_models::{ModelStatementTable, ModelTable};
-use crate::netlist_types::NodeName;
 use crate::netlist_types::{CommandType, DeviceType};
+use crate::netlist_types::{NameKey, NodeName};
 use crate::parser_utils::{
     parse_dot_param, parse_equal_expr, parse_ident, parse_node, parse_value_or_placeholder,
 };
@@ -40,7 +40,17 @@ pub(crate) struct SubcktDecl {
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct SubcktTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub map: HashMap<String, SubcktDecl>,
+    map: HashMap<NameKey, SubcktDecl>,
+}
+
+impl SubcktTable {
+    fn insert(&mut self, subckt: SubcktDecl) {
+        self.map.insert(NameKey::new(&subckt.name), subckt);
+    }
+
+    fn get(&self, name: &str) -> Option<&SubcktDecl> {
+        self.map.get(&NameKey::new(name))
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,7 +109,7 @@ pub(crate) fn collect_subckts(
                 body.push(next);
             }
             subckt.body = body;
-            table.map.insert(subckt.name.clone(), subckt);
+            table.insert(subckt);
 
             continue;
         }
@@ -132,7 +142,7 @@ fn parse_subckt_command(cursor: &mut StmtCursor, src: &str) -> Result<SubcktDecl
         if cursor.consume(TokenKind::Equal).is_some() {
             let param_name = node.0;
             let value = parse_value_or_placeholder(cursor, src)?;
-            default_params.set_param(param_name, value);
+            default_params.set_param(&param_name, value);
         } else {
             // TODO: technically we can't parse nodes after we saw parameters
             nodes.push(node);
@@ -200,7 +210,7 @@ fn parse_x_device(
         }
 
         let (param_name, value) = parse_equal_expr(cursor, src)?;
-        param_overrides.set_param(param_name.text.to_string(), value);
+        param_overrides.set_param(param_name.text, value);
     }
 
     Ok((nodes, subcircuit_name, param_overrides))
@@ -215,85 +225,115 @@ pub(crate) struct ExpandedDeck {
     pub statements: Vec<ScopedStmt>,
 }
 
-/// Expand `X...` instances. For now assume: Xname n1 n2 subcktName [param=value ...]
+/// Expand every `X` instance, including instances inside subcircuit bodies.
+/// Each statement comes out paired with the scope it's parsed in.
 pub(crate) fn expand_subckts(
-    mut unexpanded_deck: UnexpandedDeck,
+    unexpanded_deck: UnexpandedDeck,
     source_map: &SourceMap,
     placeholder_map: &PlaceholderMap,
 ) -> Result<ExpandedDeck, SpicyError> {
-    let mut out = Vec::new();
+    let UnexpandedDeck {
+        mut scope_arena,
+        global_params,
+        model_table,
+        subckt_table,
+        statements,
+    } = unexpanded_deck;
 
-    let root_scope_id = unexpanded_deck.global_params;
-    for s in unexpanded_deck.statements.into_iter() {
-        let mut cursor = s.as_cursor();
-
-        let src = source_map.get_content(s.span.source_index);
-        if let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) {
-            let instance_name = instance_name.to_string();
-            let (nodes, instance_subckt, param_overrides) = parse_x_device(&mut cursor, src)?;
-
-            let Some(subckt_def) = unexpanded_deck.subckt_table.map.get(&instance_subckt) else {
-                return Err(SubcircuitError::NotFound {
-                    name: instance_subckt,
-                }
-                .into());
-            };
-
-            // arity check
-            if nodes.len() != subckt_def.nodes.len() {
-                return Err(SubcircuitError::ArityMismatch {
-                    name: instance_subckt,
-                    found: nodes.len(),
-                    expected: subckt_def.nodes.len(),
-                }
-                .into());
-            }
-
-            let mut instance_params = subckt_def.default_params.clone();
-            // will override any default params
-            instance_params.merge(param_overrides);
-            // will override any instance params
-            instance_params.merge(subckt_def.local_params.clone());
-            // pin map
-            let mut node_mapping = HashMap::new();
-            for (f, a) in subckt_def.nodes.iter().cloned().zip(nodes.into_iter()) {
-                node_mapping.insert(f, a);
-            }
-
-            let child_scope = Scope::new(Some(instance_name), instance_params, node_mapping);
-            let child_scope_id = unexpanded_deck
-                .scope_arena
-                .new_child(root_scope_id, child_scope);
-
-            for stmt in subckt_def.body.iter() {
-                out.push(ScopedStmt {
-                    stmt: stmt.clone(),
-                    scope: child_scope_id,
-                });
-            }
-            continue;
-        }
-        out.push(ScopedStmt {
-            stmt: s,
-            scope: root_scope_id,
-        });
-    }
-
-    let models = unexpanded_deck.model_table.into_model_table(
+    let mut expansion = Expansion {
+        subckts: &subckt_table,
+        scopes: &mut scope_arena,
         source_map,
-        placeholder_map,
-        unexpanded_deck
-            .scope_arena
-            .get(unexpanded_deck.global_params),
-    )?;
+        stack: Vec::new(),
+        out: Vec::new(),
+    };
+    for stmt in statements {
+        expansion.expand(stmt, global_params)?;
+    }
+    let statements = expansion.out;
+
+    let global_scope = ScopeRef::new(&scope_arena, placeholder_map, global_params);
+    let models = model_table.into_model_table(source_map, global_scope)?;
 
     Ok(ExpandedDeck {
-        scope_arena: unexpanded_deck.scope_arena,
-        global_params: unexpanded_deck.global_params,
-        subckt_table: unexpanded_deck.subckt_table,
+        scope_arena,
+        global_params,
+        subckt_table,
         model_table: models,
-        statements: out,
+        statements,
     })
+}
+
+struct Expansion<'a> {
+    subckts: &'a SubcktTable,
+    scopes: &'a mut ScopeArena,
+    source_map: &'a SourceMap,
+    /// The subcircuits being expanded, outermost first.
+    stack: Vec<&'a str>,
+    out: Vec<ScopedStmt>,
+}
+
+impl<'a> Expansion<'a> {
+    /// Expand `stmt`, written in `scope`: an `X` line becomes its subcircuit's
+    /// body in a new child scope; any other statement is kept as it is.
+    fn expand(&mut self, stmt: Statement, scope: ScopeId) -> Result<(), SpicyError> {
+        let mut cursor = stmt.as_cursor();
+        let src = self.source_map.get_content(stmt.span.source_index);
+        let Some(instance_name) = cursor.consume_if_device(src, DeviceType::Subcircuit) else {
+            self.out.push(ScopedStmt { stmt, scope });
+            return Ok(());
+        };
+        let (nodes, subckt_name, param_overrides) = parse_x_device(&mut cursor, src)?;
+
+        let subckts = self.subckts;
+        let Some(subckt) = subckts.get(&subckt_name) else {
+            return Err(SubcircuitError::NotFound { name: subckt_name }.into());
+        };
+        if nodes.len() != subckt.nodes.len() {
+            return Err(SubcircuitError::ArityMismatch {
+                name: subckt_name,
+                found: nodes.len(),
+                expected: subckt.nodes.len(),
+            }
+            .into());
+        }
+        let key = NameKey::new(&subckt.name);
+        if self.stack.iter().any(|name| NameKey::new(name) == key) {
+            return Err(SubcircuitError::PlacesItself {
+                name: subckt.name.clone(),
+                span: stmt.span,
+            }
+            .into());
+        }
+
+        // The instance's name and the nodes its ports connect to are written
+        // in the scope that places it: `X1` inside `XA` is `XA.X1`, and a node
+        // `m` there is `XA.m`.
+        let parent = self.scopes.get(scope);
+        let name = parent.get_device_name(instance_name);
+        let ports = subckt
+            .nodes
+            .iter()
+            .zip(nodes)
+            .map(|(port, node)| (NameKey::new(&port.0), parent.get_node_name(node)))
+            .collect();
+
+        let mut params = subckt.default_params.clone();
+        // will override any default params
+        params.merge(param_overrides);
+        // will override any instance params
+        params.merge(subckt.local_params.clone());
+
+        let child = self
+            .scopes
+            .new_child(scope, Scope::new(Some(name), params, ports));
+        self.stack.push(&subckt.name);
+        for body_stmt in &subckt.body {
+            self.expand(body_stmt.clone(), child)?;
+        }
+        self.stack.pop();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -360,13 +400,15 @@ mod tests {
         let unexpanded_deck = collect_subckts(statements, &input_options.source_map)
             .expect("collect subckts and models");
 
-        let global_scope = unexpanded_deck
-            .scope_arena
-            .get(unexpanded_deck.global_params);
+        let global_scope = ScopeRef::new(
+            &unexpanded_deck.scope_arena,
+            &placeholders_map,
+            unexpanded_deck.global_params,
+        );
 
         let model_table = unexpanded_deck
             .model_table
-            .into_model_table(&input_options.source_map, &placeholders_map, global_scope)
+            .into_model_table(&input_options.source_map, global_scope)
             .expect("build model table");
 
         let name = format!(

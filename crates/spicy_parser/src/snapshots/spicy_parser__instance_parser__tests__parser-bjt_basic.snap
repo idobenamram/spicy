@@ -5,29 +5,20 @@ expression: deck
 Deck {
     title: "basic bjt",
     node_mapping: NodeMapping {
-        node_mapping: {
+        nodes: [
             NodeName(
                 "0",
-            ): NodeIndex(
-                0,
             ),
             NodeName(
                 "c",
-            ): NodeIndex(
-                1,
             ),
             NodeName(
                 "b",
-            ): NodeIndex(
-                2,
             ),
             NodeName(
                 "e",
-            ): NodeIndex(
-                3,
             ),
-        },
-        node_counter: 4,
+        ],
     },
     commands: [],
     devices: Devices {

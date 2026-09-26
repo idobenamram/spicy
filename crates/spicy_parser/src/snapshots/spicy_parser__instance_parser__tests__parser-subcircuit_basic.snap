@@ -5,29 +5,20 @@ expression: deck
 Deck {
     title: "basic subcircuit",
     node_mapping: NodeMapping {
-        node_mapping: {
+        nodes: [
             NodeName(
                 "0",
-            ): NodeIndex(
-                0,
             ),
             NodeName(
                 "vcc",
-            ): NodeIndex(
-                1,
             ),
             NodeName(
                 "in",
-            ): NodeIndex(
-                2,
             ),
             NodeName(
                 "out",
-            ): NodeIndex(
-                3,
             ),
-        },
-        node_counter: 4,
+        ],
     },
     commands: [],
     devices: Devices {

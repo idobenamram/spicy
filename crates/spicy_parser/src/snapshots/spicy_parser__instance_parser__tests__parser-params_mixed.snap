@@ -5,39 +5,26 @@ expression: deck
 Deck {
     title: "params mixing",
     node_mapping: NodeMapping {
-        node_mapping: {
+        nodes: [
             NodeName(
                 "0",
-            ): NodeIndex(
-                0,
             ),
             NodeName(
                 "n1",
-            ): NodeIndex(
-                1,
             ),
             NodeName(
                 "n0",
-            ): NodeIndex(
-                2,
             ),
             NodeName(
                 "n2",
-            ): NodeIndex(
-                3,
             ),
             NodeName(
                 "n3",
-            ): NodeIndex(
-                4,
             ),
             NodeName(
                 "n4",
-            ): NodeIndex(
-                5,
             ),
-        },
-        node_counter: 6,
+        ],
     },
     commands: [
         Op(

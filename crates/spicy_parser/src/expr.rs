@@ -1,8 +1,8 @@
 use crate::error::{ExpressionError, SpicyError};
 use crate::{
     lexer::{Span, Token, TokenKind, token_text},
-    netlist_types::NodeName,
     netlist_types::ValueSuffix,
+    netlist_types::{NameKey, NodeName},
     parser_utils::parse_value,
     statement_phase::StmtCursor,
 };
@@ -164,66 +164,6 @@ impl Expr {
             r#type: self.r#type.clone(),
         }
     }
-
-    pub fn evaluate(self, scope: &Scope) -> Result<Value, SpicyError> {
-        match self.r#type {
-            ExprType::Value(value) => Ok(value),
-            // TODO: support layered expressions with no loops
-            ExprType::Placeholder(id) => Err(ExpressionError::UnevaluatablePlaceholder {
-                id,
-                span: self.span,
-            }
-            .into()),
-            ExprType::Ident(name) => {
-                let Some(expr) = scope.param_map.get_param(&name).cloned() else {
-                    return Err(ExpressionError::UnknownIdentifier {
-                        name,
-                        span: self.span,
-                    }
-                    .into());
-                };
-                expr.evaluate(scope)
-            }
-            ExprType::Unary { op, operand } => match op {
-                TokenKind::Minus => {
-                    let value = operand.evaluate(scope)?;
-                    Ok(Value::new(-value.get_value(), None, None))
-                }
-                _ => Err(ExpressionError::UnsupportedUnaryOperator {
-                    op,
-                    span: self.span,
-                }
-                .into()),
-            },
-            ExprType::Binary { op, left, right } => match op {
-                TokenKind::Plus => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
-                    Ok(left_value + right_value)
-                }
-                TokenKind::Minus => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
-                    Ok(left_value - right_value)
-                }
-                TokenKind::Asterisk => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
-                    Ok(left_value * right_value)
-                }
-                TokenKind::Slash => {
-                    let left_value = left.evaluate(scope)?;
-                    let right_value = right.evaluate(scope)?;
-                    Ok(left_value / right_value)
-                }
-                _ => Err(ExpressionError::UnsupportedBinaryOperator {
-                    op,
-                    span: self.span,
-                }
-                .into()),
-            },
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash, Serialize)]
@@ -251,18 +191,18 @@ impl PlaceholderMap {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Params(
-    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))] HashMap<String, Expr>,
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))] HashMap<NameKey, Expr>,
 );
 
 impl Params {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn get_param(&self, k: &str) -> Option<&Expr> {
-        self.0.get(k)
+    pub fn get(&self, name: &NameKey) -> Option<&Expr> {
+        self.0.get(name)
     }
-    pub fn set_param(&mut self, k: String, v: Expr) {
-        self.0.insert(k, v);
+    pub fn set_param(&mut self, name: &str, value: Expr) {
+        self.0.insert(NameKey::new(name), value);
     }
     pub fn merge(&mut self, other: Params) {
         self.0.extend(other.0);
@@ -277,15 +217,16 @@ pub struct Scope {
     pub parent: Option<ScopeId>,
     pub instance_name: Option<String>,
     pub param_map: Params, // store Expr; evaluation is later
-    #[cfg_attr(test, serde(serialize_with = "crate::test_utils::serialize_node_map"))]
-    pub node_mapping: HashMap<NodeName, NodeName>,
+    /// The instance's ports, by name, and the nodes they connect to.
+    #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
+    pub node_mapping: HashMap<NameKey, NodeName>,
 }
 
 impl Scope {
     pub fn new(
         instance_name: Option<String>,
         param_map: Params,
-        node_mapping: HashMap<NodeName, NodeName>,
+        node_mapping: HashMap<NameKey, NodeName>,
     ) -> Self {
         Self {
             parent: None,
@@ -315,7 +256,7 @@ impl Scope {
     /// instance name as a prefix (`mid` in `X1` becomes `X1.mid`, as in ngspice),
     /// so two instances never share an internal node.
     pub(crate) fn get_node_name(&self, node: NodeName) -> NodeName {
-        if let Some(actual) = self.node_mapping.get(&node) {
+        if let Some(actual) = self.node_mapping.get(&NameKey::new(&node.0)) {
             return actual.clone();
         }
         match &self.instance_name {
@@ -366,19 +307,137 @@ impl ScopeArena {
             .get_mut(id.0)
             .expect("scopeId only created by this arena")
     }
+}
 
-    /// Get by key, walking up parents until found (rootward)
-    #[allow(dead_code)]
-    pub fn get_param_in_scope(&self, id: ScopeId, key: &str) -> Option<&Expr> {
-        let mut cur = Some(id);
-        while let Some(eid) = cur {
-            let scope = self.nodes.get(eid.0)?;
-            if let Some(v) = scope.param_map.0.get(key) {
-                return Some(v);
-            }
-            cur = scope.parent;
+/// A scope, with what's needed to evaluate expressions written in it.
+#[derive(Clone, Copy)]
+pub(crate) struct ScopeRef<'a> {
+    arena: &'a ScopeArena,
+    placeholders: &'a PlaceholderMap,
+    id: ScopeId,
+}
+
+impl<'a> ScopeRef<'a> {
+    pub(crate) fn new(
+        arena: &'a ScopeArena,
+        placeholders: &'a PlaceholderMap,
+        id: ScopeId,
+    ) -> Self {
+        Self {
+            arena,
+            placeholders,
+            id,
         }
-        None
+    }
+
+    /// See [`Scope::get_device_name`].
+    pub(crate) fn get_device_name(&self, name: &str) -> String {
+        self.arena.get(self.id).get_device_name(name)
+    }
+
+    /// See [`Scope::get_node_name`].
+    pub(crate) fn get_node_name(&self, node: NodeName) -> NodeName {
+        self.arena.get(self.id).get_node_name(node)
+    }
+
+    /// The value of `expr`, written in this scope.
+    pub(crate) fn evaluate(&self, expr: &Expr) -> Result<Value, SpicyError> {
+        let mut evaluation = Evaluation {
+            arena: self.arena,
+            placeholders: self.placeholders,
+            defining: Vec::new(),
+        };
+        evaluation.eval(expr, self.id)
+    }
+}
+
+/// One expression evaluation.
+///
+/// A parameter is looked up in the scope the expression is written in, then
+/// outward through the scopes that placed it, up to the globals, as ngspice
+/// does (xpressn.c, `entrynb`). Its definition is evaluated in the scope that
+/// defines it.
+struct Evaluation<'a> {
+    arena: &'a ScopeArena,
+    placeholders: &'a PlaceholderMap,
+    /// The parameter definitions being evaluated, innermost last. A name isn't
+    /// defined in a scope until its own definition is evaluated, so lookups of
+    /// it skip that scope meanwhile: in an instance, `rt={rt}` reads the `rt`
+    /// of the scope that placed it (ngspice evaluates an instance's parameters
+    /// in its new scope, xpressn.c, `nupa_subcktcall`).
+    defining: Vec<(ScopeId, NameKey)>,
+}
+
+impl Evaluation<'_> {
+    fn eval(&mut self, expr: &Expr, scope: ScopeId) -> Result<Value, SpicyError> {
+        match &expr.r#type {
+            ExprType::Value(value) => Ok(value.clone()),
+            // A placeholder stands for the expression that was in braces.
+            ExprType::Placeholder(id) => {
+                let placeholders = self.placeholders;
+                self.eval(placeholders.get(*id), scope)
+            }
+            ExprType::Ident(name) => self.param(name, scope, expr.span),
+            ExprType::Unary { op, operand } => match op {
+                TokenKind::Minus => {
+                    let value = self.eval(operand, scope)?;
+                    Ok(Value::new(-value.get_value(), None, None))
+                }
+                _ => Err(ExpressionError::UnsupportedUnaryOperator {
+                    op: *op,
+                    span: expr.span,
+                }
+                .into()),
+            },
+            ExprType::Binary { op, left, right } => {
+                let combine: fn(Value, Value) -> Value = match op {
+                    TokenKind::Plus => |a, b| a + b,
+                    TokenKind::Minus => |a, b| a - b,
+                    TokenKind::Asterisk => |a, b| a * b,
+                    TokenKind::Slash => |a, b| a / b,
+                    _ => {
+                        return Err(ExpressionError::UnsupportedBinaryOperator {
+                            op: *op,
+                            span: expr.span,
+                        }
+                        .into());
+                    }
+                };
+                let left = self.eval(left, scope)?;
+                let right = self.eval(right, scope)?;
+                Ok(combine(left, right))
+            }
+        }
+    }
+
+    /// The value of parameter `name` as seen from `scope`.
+    fn param(&mut self, name: &str, scope: ScopeId, span: Span) -> Result<Value, SpicyError> {
+        let key = NameKey::new(name);
+        let arena = self.arena;
+        let mut skipped_own_definition = false;
+        let mut current = Some(scope);
+        while let Some(id) = current {
+            let candidate = arena.get(id);
+            if let Some(definition) = candidate.param_map.get(&key) {
+                let entry = (id, key.clone());
+                if self.defining.contains(&entry) {
+                    skipped_own_definition = true;
+                } else {
+                    self.defining.push(entry);
+                    let value = self.eval(definition, id);
+                    self.defining.pop();
+                    return value;
+                }
+            }
+            current = candidate.parent;
+        }
+        let name = name.to_string();
+        Err(if skipped_own_definition {
+            ExpressionError::CyclicParameter { name, span }
+        } else {
+            ExpressionError::UnknownIdentifier { name, span }
+        }
+        .into())
     }
 }
 
@@ -525,7 +584,7 @@ mod tests {
 
     /// The scope of subcircuit instance `X1` whose port `top` is wired to `a`.
     fn instance_scope() -> Scope {
-        let ports = HashMap::from([(NodeName("top".into()), NodeName("a".into()))]);
+        let ports = HashMap::from([(NameKey::new("top"), NodeName("a".into()))]);
         Scope::new(Some("X1".into()), Params::new(), ports)
     }
 

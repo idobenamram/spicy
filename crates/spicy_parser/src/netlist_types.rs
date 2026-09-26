@@ -9,6 +9,38 @@ use crate::{
     lexer::Span,
 };
 
+// SPICE ignores case in keywords and names: ngspice lowercases its whole input
+// before parsing (inpcom.c, `inp_casefix`). We keep the spelling for display
+// and fold case wherever text is matched: keywords through `keyword`, names
+// through `NameKey`.
+
+/// A keyword in the one spelling it's matched against: lowercase.
+pub(crate) fn keyword(text: &str) -> String {
+    fold_case(text)
+}
+
+/// A name as a table key, so `QN`, `qn` and `Qn` name the same model. Tables
+/// that show names keep the original spelling separately.
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub struct NameKey(String);
+
+impl NameKey {
+    pub fn new(name: &str) -> Self {
+        Self(fold_case(name))
+    }
+}
+
+impl fmt::Debug for NameKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// ASCII case folding, as ngspice does; other characters are kept as written.
+fn fold_case(text: &str) -> String {
+    text.to_ascii_lowercase()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeName(pub String);
 
@@ -64,19 +96,19 @@ impl FromStr for CommandType {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "AC" | "ac" => Ok(CommandType::AC),
-            "DC" | "dc" => Ok(CommandType::DC),
-            "OP" | "op" => Ok(CommandType::Op),
-            "TRAN" | "tran" => Ok(CommandType::Tran),
-            "LIB" | "lib" => Ok(CommandType::Lib),
-            "ENDL" | "endl" => Ok(CommandType::Endl),
-            "INCLUDE" | "include" => Ok(CommandType::Include),
-            "MODEL" | "model" => Ok(CommandType::Model),
-            "SUBCKT" | "subckt" => Ok(CommandType::Subcircuit),
-            "ENDS" | "ends" => Ok(CommandType::Ends),
-            "PARAM" | "param" => Ok(CommandType::Param),
-            "END" | "end" => Ok(CommandType::End),
+        match keyword(s).as_str() {
+            "ac" => Ok(CommandType::AC),
+            "dc" => Ok(CommandType::DC),
+            "op" => Ok(CommandType::Op),
+            "tran" => Ok(CommandType::Tran),
+            "lib" => Ok(CommandType::Lib),
+            "endl" => Ok(CommandType::Endl),
+            "include" => Ok(CommandType::Include),
+            "model" => Ok(CommandType::Model),
+            "subckt" => Ok(CommandType::Subcircuit),
+            "ends" => Ok(CommandType::Ends),
+            "param" => Ok(CommandType::Param),
+            "end" => Ok(CommandType::End),
             _ => Err(()),
         }
     }
@@ -244,19 +276,22 @@ impl FromStr for ValueSuffix {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            s if s.starts_with("T") => Ok(ValueSuffix::Tera),
-            s if s.starts_with("G") => Ok(ValueSuffix::Giga),
-            s if s.starts_with("Meg") => Ok(ValueSuffix::Mega),
-            s if s.starts_with("K") || s.starts_with("k") => Ok(ValueSuffix::Kilo),
-            s if s.starts_with("m") || s.starts_with("M") => Ok(ValueSuffix::Milli),
-            s if s.starts_with("u") || s.starts_with("U") => Ok(ValueSuffix::Micro),
-            s if s.starts_with("n") => Ok(ValueSuffix::Nano),
-            s if s.starts_with("p") => Ok(ValueSuffix::Pico),
-            s if s.starts_with("f") => Ok(ValueSuffix::Femto),
-            s if s.starts_with("a") => Ok(ValueSuffix::Atto),
-            s if s.eq_ignore_ascii_case("deg") => Ok(ValueSuffix::Degree),
-            s if s.eq_ignore_ascii_case("rad") => Ok(ValueSuffix::Radian),
+        // A scale factor may be followed by a unit (`10kOhm`, `1uF`), so match
+        // prefixes. `meg` is checked before `m` (milli).
+        let s = keyword(s);
+        match s.as_str() {
+            "deg" => Ok(ValueSuffix::Degree),
+            "rad" => Ok(ValueSuffix::Radian),
+            s if s.starts_with("meg") => Ok(ValueSuffix::Mega),
+            s if s.starts_with('t') => Ok(ValueSuffix::Tera),
+            s if s.starts_with('g') => Ok(ValueSuffix::Giga),
+            s if s.starts_with('k') => Ok(ValueSuffix::Kilo),
+            s if s.starts_with('m') => Ok(ValueSuffix::Milli),
+            s if s.starts_with('u') => Ok(ValueSuffix::Micro),
+            s if s.starts_with('n') => Ok(ValueSuffix::Nano),
+            s if s.starts_with('p') => Ok(ValueSuffix::Pico),
+            s if s.starts_with('f') => Ok(ValueSuffix::Femto),
+            s if s.starts_with('a') => Ok(ValueSuffix::Atto),
             _ => Err(()),
         }
     }

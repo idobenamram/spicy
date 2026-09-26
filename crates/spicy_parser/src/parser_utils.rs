@@ -1,7 +1,6 @@
 use crate::Span;
 use crate::error::{ParserError, SpicyError};
-use crate::expr::{Expr, Params};
-use crate::expr::{PlaceholderMap, Scope, Value};
+use crate::expr::{Expr, Params, ScopeRef, Value};
 use crate::lexer::{TokenKind, token_text};
 use crate::netlist_types::NodeName;
 use crate::netlist_types::ValueSuffix;
@@ -225,16 +224,12 @@ pub(crate) fn parse_ident<'a>(
 pub(crate) fn parse_expr_into_value(
     cursor: &mut StmtCursor,
     src: &str,
-    placeholder_map: &PlaceholderMap,
-    scope: &Scope,
+    scope: ScopeRef,
 ) -> Result<Value, SpicyError> {
     cursor.skip_ws();
     if let Some(token) = cursor.consume(TokenKind::Placeholder) {
         let id = token.id.expect("must have a placeholder id");
-        // TODO: maybe we can change the expression to only evaluate once
-        let expr = placeholder_map.get(id).clone();
-        let evaluated = expr.evaluate(scope)?;
-        return Ok(evaluated);
+        return scope.evaluate(&Expr::placeholder(id, token.span));
     }
     parse_value(cursor, src)
 }
@@ -277,7 +272,7 @@ pub(crate) fn parse_dot_param(
             break;
         }
         let (ident, value) = parse_equal_expr(cursor, src)?;
-        env.set_param(ident.text.to_string(), value);
+        env.set_param(ident.text, value);
     }
     assert!(cursor.done(), "Expected end of statement");
     Ok(())

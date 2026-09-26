@@ -3,12 +3,12 @@ use crate::devices::{
     BjtSpec, CapacitorSpec, Devices, DiodeSpec, IndependentSourceSpec, InductorSpec, ResistorSpec,
 };
 use crate::error::{ParserError, SpicyError};
-use crate::expr::{PlaceholderMap, Scope, Value};
+use crate::expr::{Expr, PlaceholderMap, ScopeId, ScopeRef, Value};
 use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
     AcCommand, AcSweepType, Command, CommandType, DcCommand, DeviceType, NodeName, OpCommand,
-    Phasor, TranCommand,
+    Phasor, TranCommand, keyword,
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
@@ -105,7 +105,8 @@ impl<'s> ParamParser<'s> {
         };
         let ident_str = token_text(self.input, ident);
 
-        let Some(param) = self.params_order.iter().find(|p| p.canonical == ident_str) else {
+        let name = keyword(ident_str);
+        let Some(param) = self.params_order.iter().find(|p| p.canonical == name) else {
             return Err(ParserError::InvalidParam {
                 param: ident_str.to_string(),
                 span: cursor.span,
@@ -122,7 +123,7 @@ impl<'s> ParamParser<'s> {
                 .into());
             };
             return Ok(ParsedParam {
-                name: ident_str,
+                name: param.canonical,
                 cursor,
             });
         }
@@ -135,7 +136,7 @@ impl<'s> ParamParser<'s> {
             .into());
         }
         Ok(ParsedParam {
-            name: ident_str,
+            name: param.canonical,
             cursor,
         })
     }
@@ -224,6 +225,10 @@ impl<'s> InstanceParser<'s> {
         }
     }
 
+    fn scope(&self, id: ScopeId) -> ScopeRef<'_> {
+        ScopeRef::new(&self.expanded_deck.scope_arena, &self.placeholder_map, id)
+    }
+
     fn parse_title(&self, statement: &ScopedStmt) -> String {
         let input = self
             .source_map
@@ -239,15 +244,15 @@ impl<'s> InstanceParser<'s> {
         input[statement.stmt.span.start..=statement.stmt.span.end].to_string()
     }
 
-    fn parse_value(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<Value, SpicyError> {
+    fn parse_value(&self, cursor: &mut StmtCursor, scope: ScopeRef) -> Result<Value, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
-        parse_expr_into_value(cursor, input, &self.placeholder_map, scope)
+        parse_expr_into_value(cursor, input, scope)
     }
 
     fn parse_in_parentheses(
         &self,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<Vec<Value>, SpicyError> {
         cursor.expect(TokenKind::LeftParen)?;
         let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
@@ -266,13 +271,13 @@ impl<'s> InstanceParser<'s> {
         &self,
         ident_token: &Token,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<WaveForm, SpicyError> {
         let input = self.source_map.get_content(ident_token.span.source_index);
         let ident = token_text(input, ident_token);
         let waveform =
-            match ident.to_uppercase().as_str() {
-                "SIN" => {
+            match keyword(ident).as_str() {
+                "sin" => {
                     let values = self.parse_in_parentheses(cursor, scope)?;
                     WaveForm::Sinusoidal {
                         offset: values.first().cloned().ok_or_else(|| {
@@ -293,7 +298,7 @@ impl<'s> InstanceParser<'s> {
                         phase: values.get(5).cloned(),
                     }
                 }
-                "EXP" => {
+                "exp" => {
                     let values = self.parse_in_parentheses(cursor, scope)?;
                     WaveForm::Exponential {
                         initial_value: values.first().cloned().ok_or_else(|| {
@@ -314,7 +319,7 @@ impl<'s> InstanceParser<'s> {
                         fall_time_constant: values.get(5).cloned(),
                     }
                 }
-                "PULSE" => {
+                "pulse" => {
                     // TODO: the right thing to do here for type safety is probably something like we did
                     // with ParamParser, then we don't need to cast the number of pulses to a u64
                     let values = self.parse_in_parentheses(cursor, scope)?;
@@ -351,18 +356,16 @@ impl<'s> InstanceParser<'s> {
         Ok(waveform)
     }
 
-    fn parse_node(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<NodeName, SpicyError> {
+    fn parse_node(&self, cursor: &mut StmtCursor, scope: ScopeRef) -> Result<NodeName, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let node = parse_node(cursor, input)?;
         Ok(scope.get_node_name(node))
     }
 
-    fn parse_bool(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<bool, SpicyError> {
+    fn parse_bool(&self, cursor: &mut StmtCursor, scope: ScopeRef) -> Result<bool, SpicyError> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
-            // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self.placeholder_map.get(id).clone();
-            let evaluated = expr.evaluate(scope)?;
+            let evaluated = scope.evaluate(&Expr::placeholder(id, token.span))?;
             // TODO: kinda ugly
             if evaluated.get_value() == 0.0 {
                 return Ok(false);
@@ -376,12 +379,10 @@ impl<'s> InstanceParser<'s> {
         parse_bool(cursor, input)
     }
 
-    fn parse_usize(&self, cursor: &mut StmtCursor, scope: &Scope) -> Result<usize, SpicyError> {
+    fn parse_usize(&self, cursor: &mut StmtCursor, scope: ScopeRef) -> Result<usize, SpicyError> {
         if let Some(token) = cursor.consume(TokenKind::Placeholder) {
             let id = token.id.expect("must have a placeholder id");
-            // TOOD: maybe we can change the expresion to only evalute once
-            let expr = self.placeholder_map.get(id).clone();
-            let evaluated = expr.evaluate(scope)?;
+            let evaluated = scope.evaluate(&Expr::placeholder(id, token.span))?;
             let value = evaluated.get_value();
             // TODO: baba
             // Check if value is an integer (no fractional part)
@@ -415,7 +416,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<ResistorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
@@ -520,7 +521,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<CapacitorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
@@ -623,7 +624,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<InductorSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
@@ -731,7 +732,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<DiodeSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
@@ -817,7 +818,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<BjtSpec, SpicyError> {
         let collector = self.parse_node(cursor, scope)?;
@@ -897,7 +898,7 @@ impl<'s> InstanceParser<'s> {
     fn parse_source_value(
         &self,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         independent_source: &mut IndependentSourceSpec,
     ) -> Result<(), SpicyError> {
         cursor.skip_ws();
@@ -906,11 +907,11 @@ impl<'s> InstanceParser<'s> {
 
             let operation = token_text(input, token);
 
-            match operation {
-                "DC" => {
+            match keyword(operation).as_str() {
+                "dc" => {
                     independent_source.set_dc(WaveForm::Constant(self.parse_value(cursor, scope)?))
                 }
-                "AC" => {
+                "ac" => {
                     let mag = self.parse_value(cursor, scope)?;
                     let mut phasor = Phasor::new(mag);
                     if cursor.peek_non_whitespace().is_some() {
@@ -937,7 +938,7 @@ impl<'s> InstanceParser<'s> {
         &self,
         name: String,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
         node_mapping: &mut NodeMapping,
     ) -> Result<IndependentSourceSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
@@ -986,7 +987,7 @@ impl<'s> InstanceParser<'s> {
             .next()
             .expect("lexer produced an Ident token, so it must be non-empty");
         let element_type = DeviceType::from_char(first)?;
-        let scope = self.expanded_deck.scope_arena.get(statement.scope);
+        let scope = self.scope(statement.scope);
 
         let name = scope.get_device_name(&ident_string);
 
@@ -1040,7 +1041,7 @@ impl<'s> InstanceParser<'s> {
     fn parse_dc_command(
         &self,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<DcCommand, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let srcnam = parse_ident(cursor, input)?;
@@ -1060,15 +1061,15 @@ impl<'s> InstanceParser<'s> {
     fn parse_ac_command(
         &self,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<AcCommand, SpicyError> {
         let input = self.source_map.get_content(cursor.span.source_index);
         let ac_sweep_type = parse_ident(cursor, input)?;
         let points_per_sweep = self.parse_usize(cursor, scope)?;
-        let ac_sweep_type = match ac_sweep_type.text {
-            "DEC" | "dec" => AcSweepType::Dec(points_per_sweep),
-            "OCT" | "oct" => AcSweepType::Oct(points_per_sweep),
-            "LIN" | "lin" => AcSweepType::Lin(points_per_sweep),
+        let ac_sweep_type = match keyword(ac_sweep_type.text).as_str() {
+            "dec" => AcSweepType::Dec(points_per_sweep),
+            "oct" => AcSweepType::Oct(points_per_sweep),
+            "lin" => AcSweepType::Lin(points_per_sweep),
             _ => {
                 return Err(ParserError::InvalidOperation {
                     operation: ac_sweep_type.text.to_string(),
@@ -1091,7 +1092,7 @@ impl<'s> InstanceParser<'s> {
     fn parse_trans_command(
         &self,
         cursor: &mut StmtCursor,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<TranCommand, SpicyError> {
         let tstep = self.parse_value(cursor, scope)?;
         let tstop = self.parse_value(cursor, scope)?;
@@ -1104,7 +1105,7 @@ impl<'s> InstanceParser<'s> {
             Some(t) if t.kind == TokenKind::Ident => {
                 let input = self.source_map.get_content(t.span.source_index);
                 let ident = parse_ident(cursor, input)?;
-                if ident.text.to_uppercase() == "UIC" {
+                if keyword(ident.text) == "uic" {
                     uic = true;
                 } else {
                     return Err(ParserError::UnexpectedToken {
@@ -1143,7 +1144,7 @@ impl<'s> InstanceParser<'s> {
                     span: cursor.span,
                 })?;
 
-        let scope = self.expanded_deck.scope_arena.get(statement.scope);
+        let scope = self.scope(statement.scope);
 
         let command = match command_type {
             CommandType::DC => Command::Dc(self.parse_dc_command(&mut cursor, scope)?),
@@ -1225,10 +1226,12 @@ impl<'s> InstanceParser<'s> {
 mod tests {
     use rstest::rstest;
 
-    use super::{ParamParser, ParamSlot, ParsedParam};
+    use super::{Deck, ParamParser, ParamSlot, ParsedParam};
+    use crate::Value;
+    use crate::test_utils::parse_netlist;
     use crate::{
         ParseOptions,
-        error::{ParserError, SpicyError},
+        error::{ExpressionError, ParserError, SpicyError, SubcircuitError},
         libs_phase::{SourceFileId, SourceMap},
         parser_utils::{parse_ident, parse_value},
         statement_phase::Statements,
@@ -1284,6 +1287,185 @@ X2 b 0 DIV
         assert_ne!(resistors[0].negative, resistors[2].negative);
         let nodes = deck.node_mapping.node_names();
         assert_eq!(nodes, ["a", "b", "X1.mid", "X2.mid"]);
+    }
+
+    /// The resistance of the resistor named `name`.
+    fn resistance(deck: &Deck, name: &str) -> f64 {
+        let resistor = deck
+            .devices
+            .resistors
+            .iter()
+            .find(|r| r.name == name)
+            .unwrap_or_else(|| panic!("no resistor named {name}"));
+        resistor
+            .resistance
+            .as_ref()
+            .expect("resistance")
+            .get_value()
+    }
+
+    #[test]
+    fn nested_subcircuit_instances_get_hierarchical_names_and_nodes() {
+        // XA divides `in` twice: X1 down to XA's internal `m`, X2 from there to ground.
+        let deck = parse_netlist(
+            "nested dividers
+.SUBCKT HALF a b
+R1 a mid 1k
+R2 mid b 1k
+.ENDS
+.SUBCKT QUARTER top bot
+X1 top m HALF
+X2 m bot HALF
+.ENDS
+V1 in 0 DC 8
+XA in 0 QUARTER
+.END
+",
+        );
+        let resistors = &deck.devices.resistors;
+        let names: Vec<&str> = resistors.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["XA.X1.R1", "XA.X1.R2", "XA.X2.R1", "XA.X2.R2"]);
+        let mut nodes = deck.node_mapping.node_names();
+        nodes.sort();
+        assert_eq!(nodes, ["XA.X1.mid", "XA.X2.mid", "XA.m", "in"]);
+        // X1's lower end and X2's upper end are both XA's `m`.
+        assert_eq!(resistors[1].negative, resistors[2].positive);
+    }
+
+    #[test]
+    fn a_subcircuit_that_places_itself_is_an_error() {
+        let netlist = "loop
+.SUBCKT A x y
+X1 x y B
+.ENDS
+.SUBCKT B x y
+X1 x y A
+.ENDS
+X1 a 0 A
+.END
+";
+        let mut options = ParseOptions::new_with_source("loop.spicy", netlist.into());
+        let error = crate::parse(&mut options).expect_err("A places itself through B");
+        assert!(
+            matches!(
+                error,
+                SpicyError::Subcircuit(SubcircuitError::PlacesItself { ref name, .. }) if name == "A"
+            ),
+            "got {error:?}"
+        );
+    }
+
+    #[test]
+    fn subcircuit_bodies_see_global_params() {
+        let deck = parse_netlist(
+            "global param
+.param Rg=2k
+.SUBCKT DIV top bot
+R1 top mid {Rg}
+R2 mid bot 1k
+.ENDS
+X1 a 0 DIV
+.END
+",
+        );
+        assert_eq!(resistance(&deck, "X1.R1"), 2e3);
+    }
+
+    #[test]
+    fn subcircuit_parameters_can_be_expressions() {
+        let deck = parse_netlist(
+            "expression params
+.SUBCKT DIV top bot rt={2*1000}
+R1 top mid {rt}
+R2 mid bot 1k
+.ENDS
+X1 a 0 DIV
+X2 b 0 DIV rt={3*1000}
+.END
+",
+        );
+        assert_eq!(resistance(&deck, "X1.R1"), 2e3, "expression default");
+        assert_eq!(resistance(&deck, "X2.R1"), 3e3, "expression override");
+    }
+
+    #[test]
+    fn parameters_pass_down_through_nested_subcircuits() {
+        // WRAP hands its own `rt` on to DIV: the usual `rt={rt}` idiom.
+        let deck = parse_netlist(
+            "nested params
+.SUBCKT DIV top bot rt=1k
+R1 top mid {rt}
+R2 mid bot 1k
+.ENDS
+.SUBCKT WRAP a b rt=1k
+X1 a b DIV rt={rt}
+.ENDS
+XA in 0 WRAP
+XB in 0 WRAP rt=2k
+.END
+",
+        );
+        assert_eq!(resistance(&deck, "XA.X1.R1"), 1e3, "WRAP's default");
+        assert_eq!(resistance(&deck, "XB.X1.R1"), 2e3, "XB's override");
+    }
+
+    #[test]
+    fn a_parameter_defined_in_terms_of_itself_is_an_error() {
+        let netlist = "cycle
+.param a={b}
+.param b={a}
+R1 x 0 {a}
+.END
+";
+        let mut options = ParseOptions::new_with_source("cycle.spicy", netlist.into());
+        let error = crate::parse(&mut options).expect_err("a and b refer to each other");
+        assert!(
+            matches!(
+                error,
+                SpicyError::Expression(ExpressionError::CyclicParameter { .. })
+            ),
+            "got {error:?}"
+        );
+    }
+
+    #[test]
+    fn parameter_names_are_case_insensitive() {
+        // SPICE ignores case, and vendor model files are usually uppercase.
+        let deck = parse_netlist(
+            "uppercase
+.MODEL QN NPN BF=200 IS=1e-15
+Q1 c b 0 QN AREA=2
+R1 a 0 1k M=2
+.END
+",
+        );
+        let value = |v: &Option<Value>| v.as_ref().map(Value::get_value);
+        let q = &deck.devices.bjts[0];
+        assert_eq!(value(&q.model.bf), Some(200.0));
+        assert_eq!(value(&q.model.is), Some(1e-15));
+        assert_eq!(value(&q.area), Some(2.0));
+        assert_eq!(value(&deck.devices.resistors[0].m), Some(2.0));
+    }
+
+    #[test]
+    fn value_suffixes_ignore_case() {
+        // `MEG` is mega in any case; a lone `m` or `M` is milli, as in SPICE.
+        let deck = parse_netlist(
+            "suffixes
+R1 a 0 10MEG
+R2 a 0 10meg
+R3 a 0 10Meg
+R4 a 0 3t
+R5 a 0 1g
+R6 a 0 5M
+R7 a 0 2K
+.END
+",
+        );
+        let values: Vec<f64> = (1..=7)
+            .map(|i| resistance(&deck, &format!("R{i}")))
+            .collect();
+        assert_eq!(values, [10e6, 10e6, 10e6, 3e12, 1e9, 5e-3, 2e3]);
     }
 
     #[test]

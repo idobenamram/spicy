@@ -142,6 +142,51 @@ X2 b 0 DIV
     }
 
     #[test]
+    fn nested_subcircuits_solve_to_the_expected_voltages() {
+        // XA divides 8 V twice: X1 down to XA's internal `m`, X2 from there to ground.
+        let lowered = lower_netlist(
+            "nested dividers
+.SUBCKT HALF a b
+R1 a mid 1k
+R2 mid b 1k
+.ENDS
+.SUBCKT QUARTER top bot
+X1 top m HALF
+X2 m bot HALF
+.ENDS
+V1 in 0 DC 8
+XA in 0 QUARTER
+.op
+.END
+",
+        );
+        let op = simulate_op(
+            &lowered.circuit,
+            &lowered.params,
+            &SimulationConfig::default(),
+        )
+        .expect("simulate_op");
+        let expected = [
+            ("in", 8.0),
+            ("XA.X1.mid", 6.0),
+            ("XA.m", 4.0),
+            ("XA.X2.mid", 2.0),
+        ];
+        let unknowns = unknowns(&lowered.circuit);
+        for (name, volts) in expected {
+            let (_, &value) = unknowns
+                .iter()
+                .zip(&op.solution)
+                .find(|(unknown, _)| unknown.name(&lowered.names) == name)
+                .unwrap_or_else(|| panic!("no unknown named {name}"));
+            assert!(
+                (value - volts).abs() < 1e-9,
+                "V({name}) = {value}, expected {volts}"
+            );
+        }
+    }
+
+    #[test]
     fn operating_point_uses_each_waveforms_value_at_time_zero() {
         // ngspice evaluates transient sources at t = 0 in DC analyses (vsrcload.c):
         // PULSE and EXP give V1, SIN gives VO + VA·sin(phase), whatever its delay.

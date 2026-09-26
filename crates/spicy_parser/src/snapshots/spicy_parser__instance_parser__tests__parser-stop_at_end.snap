@@ -5,24 +5,17 @@ expression: deck
 Deck {
     title: "stop after end",
     node_mapping: NodeMapping {
-        node_mapping: {
+        nodes: [
             NodeName(
                 "0",
-            ): NodeIndex(
-                0,
             ),
             NodeName(
                 "in",
-            ): NodeIndex(
-                1,
             ),
             NodeName(
                 "out",
-            ): NodeIndex(
-                2,
             ),
-        },
-        node_counter: 3,
+        ],
     },
     commands: [
         Op(

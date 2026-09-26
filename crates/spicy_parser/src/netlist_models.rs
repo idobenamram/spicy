@@ -6,8 +6,9 @@ use crate::test_utils::serialize_sorted_map;
 use crate::{
     SourceMap, Span, Value,
     error::{ParserError, SpicyError, SubcircuitError},
-    expr::{PlaceholderMap, Scope},
+    expr::ScopeRef,
     lexer::TokenKind,
+    netlist_types::{NameKey, keyword},
     parser_utils::{Ident, parse_expr_into_value, parse_ident},
     statement_phase::{Statement, StmtCursor},
 };
@@ -15,32 +16,32 @@ use crate::{
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct ModelTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<String, DeviceModel>,
+    pub(crate) map: HashMap<NameKey, DeviceModel>,
 }
 
 impl ModelTable {
     pub(crate) fn get(&self, model: &str) -> Option<&DeviceModel> {
-        self.map.get(model)
+        self.map.get(&NameKey::new(model))
     }
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub(crate) struct ModelStatementTable {
     #[cfg_attr(test, serde(serialize_with = "serialize_sorted_map"))]
-    pub(crate) map: HashMap<String, ModelStatement>,
+    pub(crate) map: HashMap<NameKey, ModelStatement>,
 }
 
 impl ModelStatementTable {
     pub(crate) fn insert(&mut self, model_statement: ModelStatement) -> Result<(), SpicyError> {
-        if self.map.contains_key(&model_statement.name) {
+        let key = NameKey::new(&model_statement.name);
+        if self.map.contains_key(&key) {
             return Err(SubcircuitError::ModelAlreadyExists {
                 name: model_statement.name.clone(),
                 span: model_statement.statement.span, // TODO: would have been nice to have both the first place and the second place we see the ident name
             }
             .into());
         } else {
-            self.map
-                .insert(model_statement.name.clone(), model_statement);
+            self.map.insert(key, model_statement);
         }
 
         Ok(())
@@ -49,17 +50,16 @@ impl ModelStatementTable {
     pub(crate) fn into_model_table(
         self,
         source_map: &SourceMap,
-        placeholder_map: &PlaceholderMap,
-        scope: &Scope,
+        scope: ScopeRef,
     ) -> Result<ModelTable, SpicyError> {
         let map = self
             .map
             .into_iter()
             .map(|(name, model_statement)| {
-                model_statement_to_device_model(model_statement, source_map, placeholder_map, scope)
+                model_statement_to_device_model(model_statement, source_map, scope)
                     .map(|device_model| (name, device_model))
             })
-            .collect::<Result<HashMap<String, DeviceModel>, SpicyError>>()?;
+            .collect::<Result<HashMap<NameKey, DeviceModel>, SpicyError>>()?;
 
         Ok(ModelTable { map })
     }
@@ -95,13 +95,13 @@ pub(crate) enum DeviceModelType {
 
 impl DeviceModelType {
     pub fn from_str(s: &str, span: Span) -> Result<DeviceModelType, SpicyError> {
-        match s.to_uppercase().as_str() {
-            "R" => Ok(DeviceModelType::Resistor),
-            "C" => Ok(DeviceModelType::Capacitor),
-            "L" => Ok(DeviceModelType::Inductor),
-            "D" => Ok(DeviceModelType::Diode),
-            "NPN" => Ok(DeviceModelType::Bjt(BjtPolarity::Npn)),
-            "PNP" => Ok(DeviceModelType::Bjt(BjtPolarity::Pnp)),
+        match keyword(s).as_str() {
+            "r" => Ok(DeviceModelType::Resistor),
+            "c" => Ok(DeviceModelType::Capacitor),
+            "l" => Ok(DeviceModelType::Inductor),
+            "d" => Ok(DeviceModelType::Diode),
+            "npn" => Ok(DeviceModelType::Bjt(BjtPolarity::Npn)),
+            "pnp" => Ok(DeviceModelType::Bjt(BjtPolarity::Pnp)),
             _ => Err(SubcircuitError::InvalidDeviceModelType {
                 s: s.to_string(),
                 span,
@@ -132,8 +132,7 @@ pub(crate) fn partial_parse_model_command(
 fn model_statement_to_device_model(
     model_statement: ModelStatement,
     source_map: &SourceMap,
-    placeholder_map: &PlaceholderMap,
-    scope: &Scope,
+    scope: ScopeRef,
 ) -> Result<DeviceModel, SpicyError> {
     let input = source_map.get_content(model_statement.statement.span.source_index);
 
@@ -152,7 +151,7 @@ fn model_statement_to_device_model(
     for mut param in params_cursors {
         let ident = parse_ident(&mut param, input)?;
         param.expect(TokenKind::Equal)?;
-        let value = parse_expr_into_value(&mut param, input, placeholder_map, scope)?;
+        let value = parse_expr_into_value(&mut param, input, scope)?;
 
         params.push((ident, value));
     }
@@ -180,7 +179,7 @@ impl ResistorModel {
         let mut model = Self::default();
 
         for (ident, value) in params {
-            match ident.text {
+            match keyword(ident.text).as_str() {
                 "resistance" => model.resistance = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
@@ -211,7 +210,7 @@ impl CapacitorModel {
         let mut model = Self::default();
 
         for (ident, value) in params {
-            match ident.text {
+            match keyword(ident.text).as_str() {
                 "cap" => model.cap = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
@@ -240,7 +239,7 @@ impl InductorModel {
         let mut model = Self::default();
 
         for (ident, value) in params {
-            match ident.text {
+            match keyword(ident.text).as_str() {
                 "ind" => model.inductance = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
@@ -269,7 +268,7 @@ impl DiodeModel {
         let mut model = Self::default();
 
         for (ident, value) in params {
-            match ident.text {
+            match keyword(ident.text).as_str() {
                 "is" => model.is = Some(value),
                 "n" => model.n = Some(value),
                 "rs" => model.rs = Some(value),
@@ -307,7 +306,7 @@ impl BjtModel {
         };
 
         for (ident, value) in params {
-            match ident.text {
+            match keyword(ident.text).as_str() {
                 "is" => model.is = Some(value),
                 "bf" => model.bf = Some(value),
                 "br" => model.br = Some(value),

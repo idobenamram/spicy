@@ -24,9 +24,6 @@ impl NodeName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeIndex(pub usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CurrentBranchIndex(pub usize);
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CommandType {
     AC,

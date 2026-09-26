@@ -7,8 +7,8 @@ use crate::expr::{PlaceholderMap, Scope, Value};
 use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
-    AcCommand, AcSweepType, Command, CommandType, CurrentBranchIndex, DcCommand, DeviceType,
-    NodeName, OpCommand, Phasor, TranCommand,
+    AcCommand, AcSweepType, Command, CommandType, DcCommand, DeviceType, NodeName, OpCommand,
+    Phasor, TranCommand,
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
@@ -631,15 +631,8 @@ impl<'s> InstanceParser<'s> {
 
         let positive_node = node_mapping.insert_node(positive);
         let negative_node = node_mapping.insert_node(negative);
-        let current_branch = node_mapping.insert_branch(name.clone());
 
-        let mut inductor = InductorSpec::new(
-            name,
-            cursor.span,
-            positive_node,
-            negative_node,
-            current_branch,
-        );
+        let mut inductor = InductorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
             ParamSlot::other("inductance"),
@@ -946,21 +939,14 @@ impl<'s> InstanceParser<'s> {
         cursor: &mut StmtCursor,
         scope: &Scope,
         node_mapping: &mut NodeMapping,
-        alloc_branch: bool,
     ) -> Result<IndependentSourceSpec, SpicyError> {
         let positive = self.parse_node(cursor, scope)?;
         let negative = self.parse_node(cursor, scope)?;
 
         let positive_node = node_mapping.insert_node(positive);
         let negative_node = node_mapping.insert_node(negative);
-        let current_branch = if alloc_branch {
-            node_mapping.insert_branch(name.clone())
-        } else {
-            CurrentBranchIndex(0)
-        };
 
-        let mut independent_source =
-            IndependentSourceSpec::new(name, positive_node, negative_node, current_branch);
+        let mut independent_source = IndependentSourceSpec::new(name, positive_node, negative_node);
 
         self.parse_source_value(cursor, scope, &mut independent_source)?;
         let next_token = cursor.peek_non_whitespace();
@@ -1033,12 +1019,12 @@ impl<'s> InstanceParser<'s> {
                     .bjts
                     .push(self.parse_bjt(name, &mut cursor, scope, node_mapping)?)
             }
-            DeviceType::VoltageSource => devices.voltage_sources.push(
-                self.parse_independent_source(name, &mut cursor, scope, node_mapping, true)?,
-            ),
-            DeviceType::CurrentSource => devices.current_sources.push(
-                self.parse_independent_source(name, &mut cursor, scope, node_mapping, false)?,
-            ),
+            DeviceType::VoltageSource => devices
+                .voltage_sources
+                .push(self.parse_independent_source(name, &mut cursor, scope, node_mapping)?),
+            DeviceType::CurrentSource => devices
+                .current_sources
+                .push(self.parse_independent_source(name, &mut cursor, scope, node_mapping)?),
             _ => {
                 return Err(ParserError::InvalidDeviceType {
                     s: element_type.to_char().to_string(),
@@ -1296,7 +1282,7 @@ X2 b 0 DIV
 
         // R1 of each instance runs from its `top` port to its own `mid`.
         assert_ne!(resistors[0].negative, resistors[2].negative);
-        let nodes = deck.node_mapping.node_names_mna_order();
+        let nodes = deck.node_mapping.node_names();
         assert_eq!(nodes, ["a", "b", "X1.mid", "X2.mid"]);
     }
 

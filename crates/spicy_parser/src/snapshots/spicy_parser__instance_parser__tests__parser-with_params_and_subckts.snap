@@ -23,8 +23,6 @@ Deck {
             ),
         },
         node_counter: 3,
-        branch_mapping: {},
-        branch_counter: 1,
     },
     commands: [
         Op(

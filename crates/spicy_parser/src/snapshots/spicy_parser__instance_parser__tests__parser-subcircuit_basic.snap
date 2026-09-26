@@ -28,12 +28,6 @@ Deck {
             ),
         },
         node_counter: 4,
-        branch_mapping: {
-            "X1.V1": CurrentBranchIndex(
-                1,
-            ),
-        },
-        branch_counter: 2,
     },
     commands: [],
     devices: Devices {
@@ -119,9 +113,6 @@ Deck {
                 ),
                 negative: NodeIndex(
                     0,
-                ),
-                current_branch: CurrentBranchIndex(
-                    1,
                 ),
                 dc: Some(
                     Constant(

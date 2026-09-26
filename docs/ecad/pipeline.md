@@ -226,7 +226,7 @@ We go one step at a time and review each.
 |---|---|---|
 | **1. Cleanup** | Fix the subcircuit bug (§11), apply `m`/`scale`, align defaults with ngspice, and move CLI concerns (the `simulate()` dispatcher, raw-file config, AC printing) out of `spicy_simulate`, with tests guarding the behavior. Each fix starts from a failing test | ✅ Done, committed |
 | 2. Stamp locations out of devices | Stamp indices move into parallel arrays owned by a `Plan`; transient history becomes indexed. No snapshot changes | Deferred: a speed-up that matters once the engine runs many simulations |
-| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Conditions`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | In progress (design: `circuit.md`): 3a `spicy_circuit` + lowering ✅; 3b the simulator reads it ✅ (results bit-identical, checked on every test netlist); 3c the parser stops allocating branch rows, next |
+| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Conditions`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | ✅ Done (design: `circuit.md`): 3a `spicy_circuit` + lowering; 3b the simulator reads it (results bit-identical on every test netlist); 3c the parser no longer allocates branch rows |
 | 4. One `Plan` + `Workspace` per circuit | Shared by all analyses of a circuit; reused across runs | Deferred, with step 2 |
 | 5. Temperature | Adds `Derived`. The first deliberate result changes: thermal voltage becomes kT/q | To discuss |
 

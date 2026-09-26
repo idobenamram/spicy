@@ -1,7 +1,7 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) and simulator step 1 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator) are committed. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP needs (`spicy_circuit`, temperature, AC at the operating point, accuracy) can follow it.
+> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 

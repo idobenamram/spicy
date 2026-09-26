@@ -18,12 +18,6 @@ Deck {
             ),
         },
         node_counter: 2,
-        branch_mapping: {
-            "V1": CurrentBranchIndex(
-                1,
-            ),
-        },
-        branch_counter: 2,
     },
     commands: [
         Ac(
@@ -99,9 +93,6 @@ Deck {
                 ),
                 negative: NodeIndex(
                     0,
-                ),
-                current_branch: CurrentBranchIndex(
-                    1,
                 ),
                 dc: Some(
                     Constant(

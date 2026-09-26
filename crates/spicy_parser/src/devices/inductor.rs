@@ -1,9 +1,5 @@
 use crate::netlist_models::InductorModel;
-use crate::{
-    Span,
-    expr::Value,
-    netlist_types::{CurrentBranchIndex, NodeIndex},
-};
+use crate::{Span, expr::Value, netlist_types::NodeIndex};
 
 #[derive(Debug, Clone)]
 pub struct InductorSpec {
@@ -11,7 +7,6 @@ pub struct InductorSpec {
     pub span: Span,
     pub positive: NodeIndex,
     pub negative: NodeIndex,
-    pub current_branch: CurrentBranchIndex,
     pub inductance: Option<Value>,
     pub model: Option<InductorModel>,
     pub nt: Option<Value>,
@@ -25,19 +20,12 @@ pub struct InductorSpec {
 }
 
 impl InductorSpec {
-    pub fn new(
-        name: String,
-        span: Span,
-        positive: NodeIndex,
-        negative: NodeIndex,
-        current_branch: CurrentBranchIndex,
-    ) -> Self {
+    pub fn new(name: String, span: Span, positive: NodeIndex, negative: NodeIndex) -> Self {
         Self {
             name,
             span,
             positive,
             negative,
-            current_branch,
             inductance: None,
             model: None,
             nt: None,

@@ -28,8 +28,6 @@ Deck {
             ),
         },
         node_counter: 4,
-        branch_mapping: {},
-        branch_counter: 1,
     },
     commands: [],
     devices: Devices {

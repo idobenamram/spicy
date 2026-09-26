@@ -38,15 +38,6 @@ Deck {
             ),
         },
         node_counter: 6,
-        branch_mapping: {
-            "V1": CurrentBranchIndex(
-                1,
-            ),
-            "V2": CurrentBranchIndex(
-                2,
-            ),
-        },
-        branch_counter: 3,
     },
     commands: [
         Op(
@@ -601,9 +592,6 @@ Deck {
                 negative: NodeIndex(
                     0,
                 ),
-                current_branch: CurrentBranchIndex(
-                    1,
-                ),
                 dc: Some(
                     Constant(
                         Value {
@@ -622,9 +610,6 @@ Deck {
                 ),
                 negative: NodeIndex(
                     5,
-                ),
-                current_branch: CurrentBranchIndex(
-                    2,
                 ),
                 dc: Some(
                     Constant(

@@ -23,8 +23,6 @@ Deck {
             ),
         },
         node_counter: 3,
-        branch_mapping: {},
-        branch_counter: 1,
     },
     commands: [
         Op(
@@ -122,9 +120,6 @@ Deck {
                     2,
                 ),
                 negative: NodeIndex(
-                    0,
-                ),
-                current_branch: CurrentBranchIndex(
                     0,
                 ),
                 dc: Some(

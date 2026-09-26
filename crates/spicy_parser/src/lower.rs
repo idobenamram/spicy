@@ -222,7 +222,7 @@ fn bjt_model_key(model: &BjtModel) -> (Polarity, [u64; 5]) {
 
 fn node_names(deck: &Deck) -> Vec<String> {
     let mut names = vec![NodeName::GROUND.to_string()];
-    names.extend(deck.node_mapping.node_names_mna_order());
+    names.extend(deck.node_mapping.node_names());
     names
 }
 

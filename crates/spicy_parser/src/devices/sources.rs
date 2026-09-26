@@ -1,8 +1,4 @@
-use crate::{
-    netlist_types::Phasor,
-    netlist_types::{CurrentBranchIndex, NodeIndex},
-    netlist_waveform::WaveForm,
-};
+use crate::{netlist_types::NodeIndex, netlist_types::Phasor, netlist_waveform::WaveForm};
 
 #[derive(Debug, Clone)]
 pub struct IndependentSourceSpec {
@@ -10,23 +6,16 @@ pub struct IndependentSourceSpec {
     // TODO: where span?
     pub positive: NodeIndex,
     pub negative: NodeIndex,
-    pub current_branch: CurrentBranchIndex,
     pub dc: Option<WaveForm>,
     pub ac: Option<Phasor>,
 }
 
 impl IndependentSourceSpec {
-    pub fn new(
-        name: String,
-        positive: NodeIndex,
-        negative: NodeIndex,
-        current_branch: CurrentBranchIndex,
-    ) -> Self {
+    pub fn new(name: String, positive: NodeIndex, negative: NodeIndex) -> Self {
         Self {
             name,
             positive,
             negative,
-            current_branch,
             dc: None,
             ac: None,
         }

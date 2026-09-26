@@ -1,7 +1,7 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
+> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed, as are three fixes to the SPICE parser: nested subcircuits, parameter scoping, and case-insensitivity. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 
@@ -72,7 +72,7 @@ It has no knobs and no analyses. Analyses are requests to the simulator's API.
 
 ```
 crates/
-  spicy_circuit/    (new)     simulator-ready circuit form: nodes, devices, origins
+  spicy_circuit/    (exists)  simulator-ready circuit form: nodes, devices, origins
   spicy_parser/     (exists)  SPICE netlists → spicy_circuit (plus the analysis commands in the file)
   spicy_simulate/   (exists)  our simulator; reads spicy_circuit only
   spicy_cli/        (exists)  CLI + TUI; gains a `check` command
@@ -290,7 +290,7 @@ It has 8 knobs:
 | 3 | CI + formatting | ✅ Push trigger `main` → `master`. `cargo fmt --all` run once (19 files, formatting only). CI now also runs `cargo fmt --all --check` |
 | 4 | Docs | ✅ Moved to `docs/ecad/` (+ `research/`, `archive/`), renamed, 97 cross-references rewritten and verified, `README.md` index added |
 | 5 | Commits | ✅ You commit |
-| 6 | Crate scaffolding | → Moved to M1a. `spicy_circuit` gets its own detailed design note before anything changes |
+| 6 | Crate scaffolding | → Moved to M1a. `spicy_circuit` got its own design note before anything changed: ✅ `circuit.md` |
 | 7 | Lesson crate | ✅ `crates/spicy_bounds` removed; `Cargo.toml` and `Cargo.lock` are back to their committed state. The affine math will be written inside `spicy_engine` in M3 |
 | — | Clippy warnings | Left for now: 86 warnings from the newer clippy (1.98) in existing code. CI reports them without failing |
 
@@ -314,7 +314,7 @@ It has 8 knobs:
 
 > **Superseded ordering:** `pipeline.md` §9 now defines the order of this work, as smaller steps each reviewed on its own: (1) cleanup, (2) stamp locations out of devices, (3) `spicy_circuit`, (4) one plan per circuit, (5) temperature. Steps 2 and 4 are deferred: they're a speed-up that matters once the engine runs many simulations. The items below stay as the list of what must eventually be done.
 
-- **M2a: Extract `spicy_circuit`.**
+- **M2a: Extract `spicy_circuit`.** ✅ Done as pipeline step 3 (`circuit.md`); results stayed bit-identical.
   - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_parser`.
   - `spicy_simulate` then reads only `spicy_circuit`.
   - Behavior-preserving: **every existing snapshot stays byte-identical.** 🔍
@@ -334,6 +334,17 @@ It has 8 knobs:
 **Done when:** the amplifier's nominal VC, gain and f_L, run from the `.spl` file through our simulator natively, match the small-signal formulas and are reproducible to high precision.
 
 **Decision point:** if M2c/M2d turn out much harder than expected, M4 (ngspice) moves ahead of M3, and our simulator catches up later. 🔍
+
+### Parser follow-ups (tracked, not scheduled)
+
+Found while fixing the SPICE parser. None is needed for the MVP; each gets done when it starts to matter.
+
+| Item | Why it matters | Where |
+|---|---|---|
+| **Keyword tables** instead of the 16-byte keyword buffer | Nothing checks the buffer's limit: a keyword longer than 16 characters, added later, would never match. Tables (name → meaning, matched case-insensitively) remove the limit and list every supported keyword in one place, the way ngspice declares device parameters (`bjt.c`, `BJTmPTable`) | TODO in `spicy_parser/src/netlist_types.rs` (`Keyword`) |
+| **Model coverage** | We accept 5 BJT and 3 diode model parameters; ngspice's parameter tables have 154 and 104 entries. Real vendor models (`VAF`, `IKF`, `CJE`, …) are rejected with `invalid param`. Support them, or accept and ignore them with a warning | `spicy_parser/src/netlist_models.rs` |
+| **Subcircuit scoping gaps** | `.model` cards inside a subcircuit are global; nested `.SUBCKT` definitions and `.global` aren't supported | `subcircuit_phase.rs`; `pipeline.md` §11 |
+| **Parse allocations** | Parsing a 10,000-line netlist allocates 44.5 MB (about 4.4 KB per line): e.g. parameter lists rebuilt per device, a token vector per statement, subcircuit bodies cloned per instance. Profile before optimizing | parser |
 
 ### M3: The loop MVP (`spicy_engine`)
 
@@ -396,7 +407,7 @@ At every 🔍:
 
 | Risk | Mitigation |
 |---|---|
-| The `spicy_circuit` refactor subtly changes simulator behavior | Byte-identical snapshots as the gate (M2a); done as its own step |
+| The `spicy_circuit` refactor subtly changes simulator behavior | Byte-identical snapshots as the gate (M2a); done as its own step. ✅ Passed: results stayed bit-identical |
 | BJT convergence at extreme corners (no junction limiting) | The amplifier converged at the worst corner; add SPICE-style limiting if a corner fails |
 | Nudged slopes drown in solver noise | M2e: tighter tolerances + a two-step-size consistency test |
 | AC-at-operating-point bugs give plausible but wrong gains | Formula-based tests in M2d; cross-check with ngspice in M4 |

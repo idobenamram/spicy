@@ -43,3 +43,9 @@ where
     }
     map.end()
 }
+
+/// Parse a netlist given as text.
+pub(crate) fn parse_netlist(netlist: &str) -> crate::instance_parser::Deck {
+    let mut options = crate::ParseOptions::new_with_source("inline.spicy", netlist.to_string());
+    crate::parse(&mut options).expect("parse netlist")
+}

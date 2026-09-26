@@ -320,7 +320,7 @@ pub enum Analysis {
 ## 7. What step 3 builds, and what waits
 
 **Step 3:**
-- The `spicy_circuit` crate: ids, `Circuit`, `Params` (model and instance tables for today's kinds), `CircuitNames`, `Analysis`.
+- The `spicy_circuit` crate: ids, `Circuit`, `Params`, `CircuitNames`, `Analysis`. Model tables exist for diodes and BJTs, the kinds whose model parameters the solver reads today. R, C and L get theirs when they gain a model-level parameter (`tc1` and `tc2` with temperature).
 - `spicy_parser::lower(&Deck)`: SPICE precedence and defaults, merged model cards, `scale` folded, names resolved (the DC sweep source) with span errors. The parser stops allocating branch rows.
 - The simulator builds its devices from `Circuit` + `Params` (its derive step applies `m`, `area`, `1/r`) and drops its parser dependency. It assigns branch rows itself. Matrix positions stay inside its devices for now (step 2 is deferred).
 - Snapshots stay identical, except the reviewed reordering of branch currents (§4.4).

@@ -16,6 +16,8 @@ pub enum SpicyError {
     Subcircuit(#[from] SubcircuitError),
     #[error(transparent)]
     Include(#[from] IncludeError),
+    #[error(transparent)]
+    Lower(#[from] LowerError),
 }
 
 impl SpicyError {
@@ -73,6 +75,9 @@ impl SpicyError {
                 | IncludeError::MaxDepthExceeded { span, .. }
                 | IncludeError::CycleDetected { span, .. }
                 | IncludeError::LibSectionNotFound { span, .. } => Some(*span),
+            },
+            SpicyError::Lower(le) => match le {
+                LowerError::UnknownSweepSource { span, .. } => Some(*span),
             },
         }
     }
@@ -261,4 +266,11 @@ pub enum IncludeError {
         lib: String,
         path: PathBuf,
     },
+}
+
+/// Errors from lowering a parsed deck to the simulator-ready form.
+#[derive(Debug, Error)]
+pub enum LowerError {
+    #[error("`.dc` sweeps '{name}', which isn't a voltage or current source")]
+    UnknownSweepSource { name: String, span: Span },
 }

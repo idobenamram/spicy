@@ -1,0 +1,215 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 6,
+        resistors: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+        ],
+        capacitors: [
+            TwoTerminal {
+                positive: NodeId(
+                    3,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    3,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    3,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            TwoTerminal {
+                positive: NodeId(
+                    4,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    4,
+                ),
+                negative: NodeId(
+                    5,
+                ),
+            },
+        ],
+        isources: [],
+    },
+    params: Params {
+        resistors: [
+            ResistorParams {
+                r: 4000.0,
+                r_ac: Some(
+                    8.0,
+                ),
+                m: 3.0,
+            },
+            ResistorParams {
+                r: 560000.0,
+                r_ac: Some(
+                    280.0,
+                ),
+                m: 5.0,
+            },
+            ResistorParams {
+                r: 30000.0,
+                r_ac: Some(
+                    70.0,
+                ),
+                m: 9.0,
+            },
+            ResistorParams {
+                r: 2000.0,
+                r_ac: Some(
+                    1.0,
+                ),
+                m: 5.0,
+            },
+            ResistorParams {
+                r: 0.001,
+                r_ac: Some(
+                    1.0,
+                ),
+                m: 5.0,
+            },
+        ],
+        capacitors: [
+            CapacitorParams {
+                c: 3e-6,
+                m: 2.0,
+                ic: 0.5,
+            },
+            CapacitorParams {
+                c: 9.999999999999999e-6,
+                m: 4.0,
+                ic: 0.1,
+            },
+            CapacitorParams {
+                c: 3e-5,
+                m: 1.0,
+                ic: 0.3,
+            },
+        ],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [
+            SourceParams {
+                waveform: Dc(
+                    5.0,
+                ),
+                ac: Phasor {
+                    magnitude: 0.0,
+                    phase: 0.0,
+                },
+            },
+            SourceParams {
+                waveform: Dc(
+                    1200.0,
+                ),
+                ac: Phasor {
+                    magnitude: 0.0,
+                    phase: 0.0,
+                },
+            },
+        ],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "params mixing",
+        nodes: [
+            "0",
+            "n1",
+            "n0",
+            "n2",
+            "n3",
+            "n4",
+        ],
+        resistors: [
+            "R1",
+            "R2",
+            "R3",
+            "R3",
+            "R4",
+        ],
+        capacitors: [
+            "C1",
+            "C2",
+            "C3",
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            "V1",
+            "V2",
+        ],
+        isources: [],
+    },
+    analyses: [
+        Op,
+    ],
+}

@@ -5,6 +5,7 @@ mod expression_phase;
 pub mod instance_parser;
 mod lexer;
 pub mod libs_phase;
+mod lower;
 mod netlist_models;
 pub mod netlist_types;
 pub mod netlist_waveform;
@@ -17,6 +18,7 @@ use std::path::{Path, PathBuf};
 pub use expr::Value;
 pub use lexer::Span;
 pub use libs_phase::SourceMap;
+pub use lower::lower;
 pub use netlist_models::BjtPolarity;
 
 use crate::{

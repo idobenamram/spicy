@@ -1,0 +1,67 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 3,
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [
+            Diode {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+                model: DiodeModelId(
+                    0,
+                ),
+            },
+        ],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    params: Params {
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diode_models: [
+            DiodeModel {
+                is: 1e-14,
+                n: 1.0,
+            },
+        ],
+        diodes: [
+            DiodeParams {
+                area: 2.0,
+                m: 3.0,
+            },
+        ],
+        bjt_models: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic diode",
+        nodes: [
+            "0",
+            "in",
+            "out",
+        ],
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [
+            "D1",
+        ],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    analyses: [],
+}

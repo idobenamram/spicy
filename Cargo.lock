@@ -2282,6 +2282,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
+name = "spicy_circuit"
+version = "0.1.0"
+
+[[package]]
 name = "spicy_cli"
 version = "0.1.0"
 dependencies = [
@@ -2305,6 +2309,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "spicy_circuit",
  "thiserror 2.0.16",
  "unscanny",
 ]

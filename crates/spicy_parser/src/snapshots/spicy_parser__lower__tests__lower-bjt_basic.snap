@@ -1,0 +1,75 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 4,
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [
+            Bjt {
+                collector: NodeId(
+                    1,
+                ),
+                base: NodeId(
+                    2,
+                ),
+                emitter: NodeId(
+                    3,
+                ),
+                model: BjtModelId(
+                    0,
+                ),
+            },
+        ],
+        vsources: [],
+        isources: [],
+    },
+    params: Params {
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [
+            BjtModel {
+                polarity: Npn,
+                is: 1e-16,
+                bf: 100.0,
+                br: 1.0,
+                nf: 1.0,
+                nr: 1.0,
+            },
+        ],
+        bjts: [
+            BjtParams {
+                area: 2.0,
+                m: 5.0,
+            },
+        ],
+        vsources: [],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic bjt",
+        nodes: [
+            "0",
+            "c",
+            "b",
+            "e",
+        ],
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [
+            "Q1",
+        ],
+        vsources: [],
+        isources: [],
+    },
+    analyses: [],
+}

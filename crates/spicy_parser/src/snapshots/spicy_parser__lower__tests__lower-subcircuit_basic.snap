@@ -1,0 +1,99 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 4,
+        resistors: [
+            TwoTerminal {
+                positive: NodeId(
+                    2,
+                ),
+                negative: NodeId(
+                    3,
+                ),
+            },
+        ],
+        capacitors: [
+            TwoTerminal {
+                positive: NodeId(
+                    3,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+        ],
+        isources: [],
+    },
+    params: Params {
+        resistors: [
+            ResistorParams {
+                r: 1000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+        ],
+        capacitors: [
+            CapacitorParams {
+                c: 1e-7,
+                m: 1.0,
+                ic: 0.0,
+            },
+        ],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [
+            SourceParams {
+                waveform: Dc(
+                    5.0,
+                ),
+                ac: Phasor {
+                    magnitude: 0.0,
+                    phase: 0.0,
+                },
+            },
+        ],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic subcircuit",
+        nodes: [
+            "0",
+            "vcc",
+            "in",
+            "out",
+        ],
+        resistors: [
+            "X1.R1",
+        ],
+        capacitors: [
+            "X1.C2",
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            "X1.V1",
+        ],
+        isources: [],
+    },
+    analyses: [],
+}

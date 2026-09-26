@@ -1,0 +1,326 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 3,
+        resistors: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    params: Params {
+        resistors: [
+            ResistorParams {
+                r: 1000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 1123400000000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: -10.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 0.5,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 1.25,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 2500.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 2500.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 0.0025,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: -3000000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 10000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 47000000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 0.001,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 0.00021999999999999998,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 3.3000000000000004e-8,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 4.7e-12,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 8e-15,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 1e-18,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 0.0012,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: 123000000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+            ResistorParams {
+                r: -990000000000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic resistor",
+        nodes: [
+            "0",
+            "in",
+            "out",
+        ],
+        resistors: [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6",
+            "R6",
+            "R7",
+            "R8",
+            "R9",
+            "R10",
+            "R11",
+            "R12",
+            "R13",
+            "R14",
+            "R15",
+            "R16",
+            "R17",
+            "R18",
+            "R19",
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    analyses: [],
+}

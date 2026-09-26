@@ -1,0 +1,62 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 3,
+        resistors: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    params: Params {
+        resistors: [
+            ResistorParams {
+                r: 1000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "stop after end",
+        nodes: [
+            "0",
+            "in",
+            "out",
+        ],
+        resistors: [
+            "R1",
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    analyses: [
+        Op,
+    ],
+}

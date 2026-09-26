@@ -1,0 +1,90 @@
+---
+source: crates/spicy_parser/src/lower.rs
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 2,
+        resistors: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+        ],
+        isources: [],
+    },
+    params: Params {
+        resistors: [
+            ResistorParams {
+                r: 1000.0,
+                r_ac: None,
+                m: 1.0,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [
+            SourceParams {
+                waveform: Dc(
+                    5.0,
+                ),
+                ac: Phasor {
+                    magnitude: 1.5,
+                    phase: 0.7853981633974483,
+                },
+            },
+        ],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "AC test with voltage source DC and AC",
+        nodes: [
+            "0",
+            "out",
+        ],
+        resistors: [
+            "R1",
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            "V1",
+        ],
+        isources: [],
+    },
+    analyses: [
+        Ac(
+            AcSweep {
+                spacing: Linear(
+                    3,
+                ),
+                start: 10.0,
+                stop: 100.0,
+            },
+        ),
+    ],
+}

@@ -1,97 +1,38 @@
 use super::stamp::NodeBranchPairStamp;
 use crate::matrix::SolverMatrix;
+use crate::unknowns::Layout;
 use ndarray::Array2;
-use spicy_parser::Span;
-use spicy_parser::devices::InductorSpec;
-use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex};
-use spicy_parser::node_mapping::NodeMapping;
+use spicy_circuit::{self as circuit, InductorParams};
 
 #[derive(Debug, Clone)]
 pub struct Inductor {
-    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
-    #[allow(dead_code)]
-    pub name: String,
-    #[allow(dead_code)]
-    pub span: Span,
-    pub positive: NodeIndex,
-    pub negative: NodeIndex,
-    pub current_branch: CurrentBranchIndex,
-    /// Effective inductance (H), with `scale` and `m` applied.
+    /// MNA row of the positive terminal; `None` for ground.
+    pub positive: Option<usize>,
+    /// MNA row of the negative terminal; `None` for ground.
+    pub negative: Option<usize>,
+    /// MNA row of the inductor's current.
+    pub branch: usize,
+    /// Effective inductance (H) of the `m` devices in parallel.
     pub inductance: f64,
-    #[allow(dead_code)]
-    pub nt: f64,
-    #[allow(dead_code)]
-    pub temp: f64,
-    #[allow(dead_code)]
-    pub dtemp: f64,
-    #[allow(dead_code)]
-    pub tc1: f64,
-    #[allow(dead_code)]
-    pub tc2: f64,
-    #[allow(dead_code)]
+    /// Initial current (A), used when the transient skips the operating point.
     pub ic: f64,
     pub stamp: NodeBranchPairStamp,
 }
 
 impl Inductor {
-    pub fn from_spec(spec: &InductorSpec) -> Self {
-        let inductance = spec
-            .inductance
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.inductance.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-
-        let nt = spec.nt.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let m = spec.m.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let scale = spec.scale.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-
-        let tc1 = spec
-            .tc1
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.tc1.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-        let tc2 = spec
-            .tc2
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.tc2.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-
-        // TODO: get this from the deck config
-        let temp = spec.temp.as_ref().map(|v| v.get_value()).unwrap_or(27.0);
-        let dtemp = spec.dtemp.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
-        let ic = spec.ic.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
+    pub fn new(
+        pins: &circuit::Inductor,
+        params: &InductorParams,
+        branch: usize,
+        layout: &Layout,
+    ) -> Self {
         Self {
-            name: spec.name.clone(),
-            span: spec.span,
-            positive: spec.positive,
-            negative: spec.negative,
-            current_branch: spec.current_branch,
-            // `scale` multiplies the inductance and `m` puts m copies in
-            // parallel, as in ngspice (indtemp.c, indload.c).
-            inductance: inductance * scale / m,
-            nt,
-            temp,
-            dtemp,
-            tc1,
-            tc2,
-            ic,
+            positive: layout.node(pins.positive),
+            negative: layout.node(pins.negative),
+            branch,
+            // `m` devices in parallel divide the inductance, as in ngspice (indload.c).
+            inductance: params.l / params.m,
+            ic: params.ic,
             stamp: NodeBranchPairStamp::uninitialized(),
         }
     }
@@ -101,7 +42,7 @@ impl Inductor {
     /// In DC, an ideal inductor is a short circuit enforced via a branch current unknown and a
     /// KVL equation with zero RHS (similar to a 0V voltage source).
     pub(crate) fn stamp_dc(&self, m: &mut SolverMatrix) {
-        let src_index = m.mna_branch_index(self.current_branch);
+        let src_index = self.branch;
 
         if let Some((pos_branch, branch_pos)) = self.stamp.pos_branch {
             // stamp in voltage incidence matrix (B)
@@ -122,16 +63,10 @@ impl Inductor {
     }
 
     /// Stamp AC small-signal contributions for an inductor into the real/imag MNA matrices.
-    pub(crate) fn stamp_ac(
-        &self,
-        ar: &mut Array2<f64>,
-        ai: &mut Array2<f64>,
-        node_mapping: &NodeMapping,
-        w: f64,
-    ) {
-        let node1 = node_mapping.mna_node_index(self.positive);
-        let node2 = node_mapping.mna_node_index(self.negative);
-        let k = node_mapping.mna_branch_index(self.current_branch);
+    pub(crate) fn stamp_ac(&self, ar: &mut Array2<f64>, ai: &mut Array2<f64>, w: f64) {
+        let node1 = self.positive;
+        let node2 = self.negative;
+        let k = self.branch;
 
         // Incidence (real part): same as DC B and B^T
         if let Some(n1) = node1 {
@@ -152,7 +87,7 @@ impl Inductor {
     ///
     /// KVL form: Vpos - Vneg - r_eq * I = v_hist
     pub(crate) fn stamp_trans(&self, m: &mut SolverMatrix, r_eq: f64, v_hist: f64) {
-        let branch_index = m.mna_branch_index(self.current_branch);
+        let branch_index = self.branch;
 
         if let Some((pos_branch, branch_pos)) = self.stamp.pos_branch {
             *m.get_mut_nnz(pos_branch) = 1.0;
@@ -175,11 +110,12 @@ impl Inductor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::parse_netlist;
+    use crate::test_util::build_devices;
 
     fn inductor(line: &str) -> Inductor {
-        let deck = parse_netlist(&format!("inductor\n{line}\n.end\n"));
-        Inductor::from_spec(&deck.devices.inductors[0])
+        build_devices(&format!("inductor\n{line}\n.end\n"))
+            .inductors
+            .remove(0)
     }
 
     // ngspice indtemp.c, indload.c: the inductance is L * scale / m.

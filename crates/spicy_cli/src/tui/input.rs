@@ -216,12 +216,9 @@ pub fn handle_key(k: KeyEvent, app: &mut App, tx: &Sender<SimCmd>) -> Result<boo
             app.trans_list_index = app.trans_list_index.saturating_sub(1);
         }
         KeyCode::Enter if app.focus_right && matches!(app.tab, Tab::Trans) => {
-            if let Some(tr) = &app.trans
-                && !tr.node_names.is_empty()
-            {
-                let idx = app
-                    .trans_list_index
-                    .min(tr.node_names.len().saturating_sub(1));
+            let node_count = app.result_names.voltages.len();
+            if app.trans.is_some() && node_count > 0 {
+                let idx = app.trans_list_index.min(node_count - 1);
                 if let Some(pos) = app.trans_selected_nodes.iter().position(|&i| i == idx) {
                     app.trans_selected_nodes.remove(pos);
                 } else {

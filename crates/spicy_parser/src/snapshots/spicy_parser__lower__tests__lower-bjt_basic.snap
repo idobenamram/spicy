@@ -29,8 +29,11 @@ Lowered {
         isources: [],
     },
     params: Params {
+        resistor_models: [],
         resistors: [],
+        capacitor_models: [],
         capacitors: [],
+        inductor_models: [],
         inductors: [],
         diode_models: [],
         diodes: [],
@@ -48,6 +51,9 @@ Lowered {
             BjtParams {
                 area: 2.0,
                 m: 5.0,
+                off: true,
+                ic_vbe: 0.7,
+                ic_vce: 1.2,
             },
         ],
         vsources: [],

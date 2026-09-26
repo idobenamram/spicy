@@ -226,7 +226,7 @@ We go one step at a time and review each.
 |---|---|---|
 | **1. Cleanup** | Fix the subcircuit bug (§11), apply `m`/`scale`, align defaults with ngspice, and move CLI concerns (the `simulate()` dispatcher, raw-file config, AC printing) out of `spicy_simulate`, with tests guarding the behavior. Each fix starts from a failing test | ✅ Done, committed |
 | 2. Stamp locations out of devices | Stamp indices move into parallel arrays owned by a `Plan`; transient history becomes indexed. No snapshot changes | Deferred: a speed-up that matters once the engine runs many simulations |
-| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Conditions`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | To discuss: design note `circuit.md` |
+| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Conditions`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | In progress (design: `circuit.md`): 3a `spicy_circuit` + lowering ✅; 3b the simulator reads it ✅ (results bit-identical, checked on every test netlist); 3c the parser stops allocating branch rows, next |
 | 4. One `Plan` + `Workspace` per circuit | Shared by all analyses of a circuit; reused across runs | Deferred, with step 2 |
 | 5. Temperature | Adds `Derived`. The first deliberate result changes: thermal voltage becomes kT/q | To discuss |
 
@@ -265,8 +265,10 @@ These replace roadmap M2a–M2c's ordering. The roadmap links here.
 | **New:** a node named `gnd` isn't ground. ngspice rewrites `gnd` to `0` everywhere (`inp_fix_gnd_name`, `inpcom.c`) | `spicy_parser` | Not planned: we don't need `gnd` support |
 | **New:** with `--raw`, every analysis writes to the same `<file>.raw`, so a netlist with `.op` and `.dc` keeps only the last result | `spicy_cli/src/batch.rs` | Later: not important for now |
 | **New:** the raw writer silently ignores write errors (`let _ = …`) | `spicy_cli/src/batch.rs` | Later: not important for now |
+| **New:** a source's DC value came from evaluating its waveform at t = 0 with a zero step and stop time: a SIN without a frequency divided by zero and the operating point diverged; a PULSE with an explicit zero rise time gave V2 instead of V1 | `devices/waveform.rs` | ✅ Fixed in step 3b, test-first: the DC value follows ngspice (`vsrcload.c`): V1 for PULSE and EXP, VO + VA·sin(phase) for SIN |
+| **New:** the transient waveforms differ from ngspice at the edges: `<` vs `≤` at the delay, a rise or fall time ≤ 0 isn't replaced by the step, a PULSE given only TR and TF gets PW = stop time instead of 0, and there are no breakpoints at pulse edges | `devices/waveform.rs` | Open |
 | **New:** `.ac lin 1 1k 1k` (a single frequency) panics on an assertion that `fstop > fstart`; ngspice accepts it | `ac.rs` | Later, with the AC work (roadmap M2d) |
-| `spicy_simulate` still depends on `spicy_parser` (it reads `Deck`), and on `clap` (for its two helper binaries) | `spicy_simulate/Cargo.toml` | `clap` ✅ fixed: optional, behind the `klu-tools` feature that the KLU binaries require. Step 3 (`spicy_circuit`) removes the parser dependency |
+| `spicy_simulate` still depends on `spicy_parser` (it reads `Deck`), and on `clap` (for its two helper binaries) | `spicy_simulate/Cargo.toml` | ✅ Fixed. `clap` is optional, behind the `klu-tools` feature the KLU binaries require. Since step 3b the simulator reads `spicy_circuit`; the parser is only a test dependency |
 | Topology is rebuilt for every analysis | `dc.rs`, `ac.rs`, `trans.rs` | Steps 2 and 4 (deferred) |
 | AC is dense, allocates per frequency, and ignores transistors | `ac.rs` | Roadmap M2d |
-| Transient history is keyed by device name | `trans.rs` | Step 2 (deferred) |
+| Transient history is keyed by device name | `trans.rs` | ✅ Fixed in step 3b: indexed by capacitor, since names left the simulator |

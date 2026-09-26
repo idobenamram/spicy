@@ -1,5 +1,8 @@
+use spicy_circuit::Lowered;
 use spicy_parser::error::SpicyError;
-use spicy_simulate::{DcSweepResult, OperatingPointResult, SimulationConfig, TransientResult};
+use spicy_simulate::{
+    DcSweepResult, OperatingPointResult, SimulationConfig, TransientResult, Unknown, unknowns,
+};
 
 use crate::tui::nvim::NvimState;
 
@@ -67,6 +70,8 @@ pub struct App {
 
     // Right pane
     pub tab: Tab,
+    /// Names for the entries of the results below.
+    pub result_names: ResultNames,
     pub op: Option<OperatingPointResult>,
     pub dc: Option<DcSweepResult>,
     pub trans: Option<TransientResult>,
@@ -82,6 +87,30 @@ pub struct App {
     pub config_edit: Option<ConfigEditState>,
 }
 
+/// Names for a solution's entries, which hold the node voltages first, then
+/// the branch currents.
+#[derive(Debug, Default)]
+pub struct ResultNames {
+    /// Node names, one per voltage.
+    pub voltages: Vec<String>,
+    /// Device names, one per branch current.
+    pub currents: Vec<String>,
+}
+
+impl ResultNames {
+    pub fn new(lowered: &Lowered) -> Self {
+        let mut names = Self::default();
+        for unknown in unknowns(&lowered.circuit) {
+            let name = unknown.name(&lowered.names).to_string();
+            match unknown {
+                Unknown::Voltage(_) => names.voltages.push(name),
+                Unknown::Current(_) => names.currents.push(name),
+            }
+        }
+        names
+    }
+}
+
 impl App {
     pub fn new(path: String, netlist_text: String) -> Self {
         Self {
@@ -92,6 +121,7 @@ impl App {
             nvim: None,
             nvim_warning: None,
             tab: Tab::Op,
+            result_names: ResultNames::default(),
             op: None,
             dc: None,
             trans: None,

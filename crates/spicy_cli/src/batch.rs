@@ -5,13 +5,13 @@ use std::f64::consts::PI;
 use std::io::Write;
 use std::path::Path;
 
-use spicy_parser::instance_parser::Deck;
-use spicy_parser::netlist_types::Command;
+use spicy_circuit::{Analysis, Lowered};
 use spicy_simulate::{
-    AcResult, SimulationConfig, SimulationError,
+    AcResult, SimulationConfig, SimulationError, Unknown,
     ac::simulate_ac,
     dc::{simulate_dc, simulate_op},
     trans::simulate_trans,
+    unknowns,
 };
 
 use crate::raw;
@@ -28,46 +28,40 @@ pub struct RawOutput<'a> {
 /// writes to the same file, so only the last one is kept (a known issue, see
 /// docs/ecad/pipeline.md §11).
 pub fn run(
-    deck: &Deck,
+    lowered: &Lowered,
     config: &SimulationConfig,
     out: &mut impl Write,
     raw: Option<&RawOutput>,
 ) -> Result<(), SimulationError> {
+    let (circuit, params) = (&lowered.circuit, &lowered.params);
     let raw_path = raw.map(|raw| raw::raw_file_path(raw.dir, raw.stem));
-    for command in &deck.commands {
-        match command {
-            Command::Op(_) => {
-                let op = simulate_op(deck, config)?;
+    for analysis in &lowered.analyses {
+        match analysis {
+            Analysis::Op => {
+                let op = simulate_op(circuit, params, config)?;
                 if let Some(path) = &raw_path {
-                    let _ = raw::write_operating_point_raw(deck, &op, path);
+                    let _ = raw::write_operating_point_raw(lowered, &op, path);
                 }
             }
-            Command::Dc(params) => {
-                let dc = simulate_dc(deck, params, config);
+            Analysis::Dc(sweep) => {
+                let dc = simulate_dc(circuit, params, sweep, config);
                 if let Some(path) = &raw_path {
-                    // The sweep variable is a voltage when it names a voltage source.
-                    let is_voltage = deck
-                        .devices
-                        .voltage_sources
-                        .iter()
-                        .any(|v| v.name == params.srcnam);
-                    let _ = raw::write_dc_raw(deck, &dc, path, &params.srcnam, is_voltage);
+                    let _ = raw::write_dc_raw(lowered, &dc, sweep.source, path);
                 }
             }
-            Command::Ac(params) => {
-                let ac = simulate_ac(deck, params, config);
-                print_ac(out, deck, &ac);
+            Analysis::Ac(sweep) => {
+                let ac = simulate_ac(circuit, params, sweep, config);
+                print_ac(out, lowered, &ac);
                 if let Some(path) = &raw_path {
-                    let _ = raw::write_ac_raw(deck, &ac, path);
+                    let _ = raw::write_ac_raw(lowered, &ac, path);
                 }
             }
-            Command::Tran(params) => {
-                let tran = simulate_trans(deck, params, config)?;
+            Analysis::Tran(tran) => {
+                let tran = simulate_trans(circuit, params, tran, config)?;
                 if let Some(path) = &raw_path {
-                    let _ = raw::write_transient_raw(deck, &tran, path);
+                    let _ = raw::write_transient_raw(lowered, &tran, path);
                 }
             }
-            Command::End => break,
         }
     }
     Ok(())
@@ -75,13 +69,17 @@ pub fn run(
 
 /// Print every node's phasor at every frequency. Panics if `out` can't be
 /// written, like `println!`.
-fn print_ac(out: &mut impl Write, deck: &Deck, ac: &AcResult) {
-    let node_names = deck.node_mapping.node_names_mna_order();
+fn print_ac(out: &mut impl Write, lowered: &Lowered, ac: &AcResult) {
+    let unknowns = unknowns(&lowered.circuit);
     for (f, xr, xi) in ac {
-        for (i, name) in node_names.iter().enumerate() {
+        for (i, unknown) in unknowns.iter().enumerate() {
+            if !matches!(unknown, Unknown::Voltage(_)) {
+                continue;
+            }
             let (vr, vi) = (xr[i], xi[i]);
             let mag = (vr * vr + vi * vi).sqrt();
             let phase = vi.atan2(vr) * 180.0 / PI;
+            let name = unknown.name(&lowered.names);
             writeln!(out, "f={:.6} Hz  {}: {:.6} ∠ {:.3}°", f, name, mag, phase)
                 .expect("write AC results");
         }
@@ -91,7 +89,7 @@ fn print_ac(out: &mut impl Write, deck: &Deck, ac: &AcResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{RawFile, TestDir, parse_deck, simulate_ac_points};
+    use crate::test_utils::{RawFile, TestDir, lower_netlist, simulate_ac_points};
 
     const DIVIDER_OP: &str = "divider\nV1 in 0 DC 5\nR1 in out 1k\nR2 out 0 2k\n.op\n.end\n";
     const DIVIDER_DC: &str =
@@ -101,14 +99,14 @@ mod tests {
         "rc filter\nV1 in 0 AC 1\nR1 in out 1k\nC1 out 0 1u\n.ac dec 1 10 1k\n.end\n";
 
     /// Run `deck` with raw output into a fresh directory and read the raw file back.
-    fn run_to_raw_file(name: &str, deck: &Deck) -> RawFile {
+    fn run_to_raw_file(name: &str, lowered: &Lowered) -> RawFile {
         let dir = TestDir::new(name);
         let raw = RawOutput {
             dir: dir.path(),
             stem: name,
         };
         run(
-            deck,
+            lowered,
             &SimulationConfig::default(),
             &mut std::io::sink(),
             Some(&raw),
@@ -119,14 +117,10 @@ mod tests {
 
     #[test]
     fn op_raw_file() {
-        let deck = parse_deck(DIVIDER_OP);
-        let op = simulate_op(&deck, &SimulationConfig::default()).unwrap();
-        let values = op
-            .voltages
-            .iter()
-            .chain(&op.currents)
-            .map(|&(_, v)| v as f32 as f64)
-            .collect();
+        let lowered = lower_netlist(DIVIDER_OP);
+        let (circuit, params) = (&lowered.circuit, &lowered.params);
+        let op = simulate_op(circuit, params, &SimulationConfig::default()).unwrap();
+        let values = op.solution.iter().map(|&v| v as f32 as f64).collect();
         let expected = RawFile::new(
             "Title: *divider\n\
              Plotname: Operation Point\n\
@@ -140,25 +134,21 @@ mod tests {
              \t2\tI(V1)\tdevice_current",
             values,
         );
-        assert_eq!(run_to_raw_file("divider_op", &deck), expected);
+        assert_eq!(run_to_raw_file("divider_op", &lowered), expected);
     }
 
     #[test]
     fn dc_raw_file() {
-        let deck = parse_deck(DIVIDER_DC);
-        let Command::Dc(params) = &deck.commands[0] else {
+        let lowered = lower_netlist(DIVIDER_DC);
+        let Analysis::Dc(sweep) = lowered.analyses[0] else {
             panic!("expected .dc")
         };
-        let sweep = simulate_dc(&deck, params, &SimulationConfig::default());
+        let (circuit, params) = (&lowered.circuit, &lowered.params);
+        let dc = simulate_dc(circuit, params, &sweep, &SimulationConfig::default());
         let mut values = Vec::new();
-        for (op, sweep_value) in &sweep.results {
+        for (op, sweep_value) in &dc.results {
             values.push(*sweep_value);
-            values.extend(
-                op.voltages
-                    .iter()
-                    .chain(&op.currents)
-                    .map(|&(_, v)| v as f32 as f64),
-            );
+            values.extend(op.solution.iter().map(|&v| v as f32 as f64));
         }
         let expected = RawFile::new(
             "Title: *divider\n\
@@ -174,16 +164,17 @@ mod tests {
              \t3\tI(V1)\tdevice_current",
             values,
         );
-        assert_eq!(run_to_raw_file("divider_dc", &deck), expected);
+        assert_eq!(run_to_raw_file("divider_dc", &lowered), expected);
     }
 
     #[test]
     fn transient_raw_file() {
-        let deck = parse_deck(RC_TRAN);
-        let Command::Tran(params) = &deck.commands[0] else {
+        let lowered = lower_netlist(RC_TRAN);
+        let Analysis::Tran(tran) = lowered.analyses[0] else {
             panic!("expected .tran")
         };
-        let tran = simulate_trans(&deck, params, &SimulationConfig::default()).unwrap();
+        let (circuit, params) = (&lowered.circuit, &lowered.params);
+        let tran = simulate_trans(circuit, params, &tran, &SimulationConfig::default()).unwrap();
         let mut values = Vec::new();
         for (time, sample) in tran.times.iter().zip(&tran.samples) {
             values.push(*time);
@@ -203,14 +194,14 @@ mod tests {
              \t3\tI(V1)\tdevice_current",
             values,
         );
-        assert_eq!(run_to_raw_file("rc_tran", &deck), expected);
+        assert_eq!(run_to_raw_file("rc_tran", &lowered), expected);
     }
 
     #[test]
     fn ac_raw_file() {
-        let deck = parse_deck(RC_AC);
+        let lowered = lower_netlist(RC_AC);
         let mut values = Vec::new();
-        for (freq, real, imag) in simulate_ac_points(&deck) {
+        for (freq, real, imag) in simulate_ac_points(&lowered) {
             values.push(freq);
             for (re, im) in real.into_iter().zip(imag) {
                 values.push(re);
@@ -231,18 +222,19 @@ mod tests {
              \t3\tI(V1)\tdevice_current",
             values,
         );
-        assert_eq!(run_to_raw_file("rc_ac", &deck), expected);
+        assert_eq!(run_to_raw_file("rc_ac", &lowered), expected);
     }
 
     #[test]
     fn ac_results_are_printed() {
-        let deck = parse_deck(RC_AC);
+        let lowered = lower_netlist(RC_AC);
         let mut out = Vec::new();
-        run(&deck, &SimulationConfig::default(), &mut out, None).unwrap();
+        run(&lowered, &SimulationConfig::default(), &mut out, None).unwrap();
 
-        let names = deck.node_mapping.node_names_mna_order();
+        // Node voltages come first in a solution, in node order (0 is ground).
+        let names = &lowered.names.nodes[1..];
         let mut expected = String::new();
-        for (freq, real, imag) in simulate_ac_points(&deck) {
+        for (freq, real, imag) in simulate_ac_points(&lowered) {
             for (i, name) in names.iter().enumerate() {
                 let (re, im) = (real[i], imag[i]);
                 let mag = (re * re + im * im).sqrt();

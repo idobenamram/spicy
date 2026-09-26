@@ -1,7 +1,5 @@
 use ndarray::{Array1, Array2, OwnedRepr};
 use ndarray_linalg::{Factorize, LUFactorized, Solve};
-use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex};
-use spicy_parser::node_mapping::NodeMapping;
 
 use crate::{
     LinearSolver, SimulationConfig,
@@ -15,14 +13,13 @@ use crate::{
 };
 
 pub struct BlasMatrix {
-    node_mapping: NodeMapping,
     lu: Option<LUFactorized<OwnedRepr<f64>>>,
     m: ndarray::Array2<f64>,
     s: ndarray::Array1<f64>,
 }
 
 impl BlasMatrix {
-    pub fn new(n: usize, node_mapping: NodeMapping) -> Self {
+    pub fn new(n: usize) -> Self {
         // Modified nodal analysis matrix
         // [G, B]
         // [B^T, 0]
@@ -32,12 +29,7 @@ impl BlasMatrix {
         // [E] source voltages
         // current and voltage source vectors
         let s = Array1::<f64>::zeros(n);
-        Self {
-            node_mapping,
-            lu: None,
-            m,
-            s,
-        }
+        Self { lu: None, m, s }
     }
 }
 
@@ -46,25 +38,18 @@ pub struct KluMatrix {
     // TODO: kinda sucks that its an option
     symbolic: Option<KluSymbolic>,
     numeric: Option<KluNumeric>,
-    node_mapping: NodeMapping,
     matrix: CscMatrix,
     s: Vec<f64>,
 }
 
 impl KluMatrix {
-    pub fn new(
-        matrix: CscMatrix,
-        s: Vec<f64>,
-        node_mapping: NodeMapping,
-        config: KluConfig,
-    ) -> Self {
+    pub fn new(matrix: CscMatrix, s: Vec<f64>, config: KluConfig) -> Self {
         Self {
             config,
             symbolic: None,
             numeric: None,
             matrix,
             s,
-            node_mapping,
         }
     }
 }
@@ -79,25 +64,18 @@ pub enum SolverMatrix {
 impl SolverMatrix {
     pub fn create_matrix(
         devices: &mut Devices,
-        node_mapping: NodeMapping,
+        matrix_dim: usize,
         sim_config: &SimulationConfig,
     ) -> Result<SolverMatrix, SimulationError> {
-        let matrix_dim = node_mapping.mna_matrix_dim();
-
         let sm = match sim_config.solver {
             LinearSolver::Klu { config } => {
-                let matrix = setup_pattern(devices, &node_mapping)?;
+                let matrix = setup_pattern(devices, matrix_dim)?;
                 // KLU solve overwrites RHS in-place, so we allocate it up-front.
-                Self::Klu(KluMatrix::new(
-                    matrix,
-                    vec![0.0; matrix_dim],
-                    node_mapping,
-                    config,
-                ))
+                Self::Klu(KluMatrix::new(matrix, vec![0.0; matrix_dim], config))
             }
             LinearSolver::Blas => {
-                setup_dense_stamps(devices, &node_mapping);
-                Self::Blas(BlasMatrix::new(matrix_dim, node_mapping))
+                setup_dense_stamps(devices, matrix_dim);
+                Self::Blas(BlasMatrix::new(matrix_dim))
             }
         };
 
@@ -143,19 +121,6 @@ impl SolverMatrix {
         match self {
             Self::Klu(matrix) => matrix.s.as_slice(),
             Self::Blas(matrix) => matrix.s.as_slice().expect("BLAS RHS should be contiguous"),
-        }
-    }
-
-    pub fn mna_node_index(&self, node_index: NodeIndex) -> Option<usize> {
-        match self {
-            Self::Klu(matrix) => matrix.node_mapping.mna_node_index(node_index),
-            Self::Blas(matrix) => matrix.node_mapping.mna_node_index(node_index),
-        }
-    }
-    pub fn mna_branch_index(&self, branch_index: CurrentBranchIndex) -> usize {
-        match self {
-            Self::Klu(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
-            Self::Blas(matrix) => matrix.node_mapping.mna_branch_index(branch_index),
         }
     }
 

@@ -1,44 +1,47 @@
 use super::stamp::NodeVoltageSourceStamp;
+use super::waveform::{dc_value, value_at};
 use crate::matrix::SolverMatrix;
+use crate::unknowns::Layout;
 use ndarray::{Array1, Array2};
-use spicy_parser::Value;
-use spicy_parser::devices::IndependentSourceSpec;
-use spicy_parser::netlist_types::{CurrentBranchIndex, NodeIndex, Phasor};
-use spicy_parser::netlist_waveform::WaveForm;
-use spicy_parser::node_mapping::NodeMapping;
+use spicy_circuit::{Phasor, SourceParams, TwoTerminal, Waveform};
 
-// TODO: should probably be split to voltage source and current source
 #[derive(Debug, Clone)]
-pub struct IndependentSource {
-    pub name: String,
-    pub positive: NodeIndex,
-    pub negative: NodeIndex,
-    pub current_branch: CurrentBranchIndex,
-    pub dc: WaveForm,
-    pub ac: Option<Phasor>,
+pub struct VoltageSource {
+    /// MNA row of the positive terminal; `None` for ground.
+    pub positive: Option<usize>,
+    /// MNA row of the negative terminal; `None` for ground.
+    pub negative: Option<usize>,
+    /// MNA row of the source's current.
+    pub branch: usize,
+    pub waveform: Waveform,
+    pub ac: Phasor,
     pub stamp: NodeVoltageSourceStamp,
 }
 
-impl IndependentSource {
-    pub fn from_spec(spec: &IndependentSourceSpec) -> Self {
-        let dc = spec
-            .dc
-            .clone()
-            .unwrap_or_else(|| WaveForm::Constant(Value::zero()));
+#[derive(Debug, Clone)]
+pub struct CurrentSource {
+    /// MNA row of the positive terminal; `None` for ground.
+    pub positive: Option<usize>,
+    /// MNA row of the negative terminal; `None` for ground.
+    pub negative: Option<usize>,
+    pub waveform: Waveform,
+    pub ac: Phasor,
+}
 
+impl VoltageSource {
+    pub fn new(pins: &TwoTerminal, params: &SourceParams, branch: usize, layout: &Layout) -> Self {
         Self {
-            name: spec.name.clone(),
-            positive: spec.positive,
-            negative: spec.negative,
-            current_branch: spec.current_branch,
-            dc,
-            ac: spec.ac.clone(),
+            positive: layout.node(pins.positive),
+            negative: layout.node(pins.negative),
+            branch,
+            waveform: params.waveform,
+            ac: params.ac,
             stamp: NodeVoltageSourceStamp::uninitialized(),
         }
     }
 
     /// Stamp the B / B^T incidence entries for a voltage-defined element.
-    pub(crate) fn stamp_voltage_incidence(&self, m: &mut SolverMatrix) {
+    fn stamp_incidence(&self, m: &mut SolverMatrix) {
         if let Some((pos_branch, branch_pos)) = self.stamp.pos_branch {
             // stamp in voltage incidence matrix (B)
             *m.get_mut_nnz(pos_branch) = 1.0;
@@ -54,134 +57,88 @@ impl IndependentSource {
         }
     }
 
-    /// Stamp the DC value of a voltage source into the RHS (E vector).
-    pub(crate) fn stamp_voltage_value_dc(&self, m: &mut SolverMatrix) {
-        let src_index = m.mna_branch_index(self.current_branch);
-        let value = self.dc.compute(0.0, 0.0, 0.0);
-        *m.get_mut_rhs(src_index) = value;
+    /// Stamp a DC voltage source: incidence + DC value (E vector).
+    pub(crate) fn stamp_dc(&self, m: &mut SolverMatrix) {
+        self.stamp_incidence(m);
+        *m.get_mut_rhs(self.branch) = dc_value(&self.waveform);
     }
 
-    /// Stamp a full DC voltage source: incidence + DC value.
-    pub(crate) fn stamp_voltage_source_dc(&self, m: &mut SolverMatrix) {
-        self.stamp_voltage_incidence(m);
-        self.stamp_voltage_value_dc(m);
+    /// Stamp the source at time `t` with step `dt` and stop time `tstop`.
+    pub(crate) fn stamp_trans(&self, m: &mut SolverMatrix, t: f64, dt: f64, tstop: f64) {
+        self.stamp_incidence(m);
+        *m.get_mut_rhs(self.branch) = value_at(&self.waveform, t, dt, tstop);
     }
 
-    /// Stamp the DC value of a current source into the RHS (I vector).
-    pub(crate) fn stamp_current_source_dc(&self, m: &mut SolverMatrix) {
-        let pos = m.mna_node_index(self.positive);
-        let neg = m.mna_node_index(self.negative);
-
-        let value = self.dc.compute(0.0, 0.0, 0.0);
-
-        if let Some(pos) = pos {
-            *m.get_mut_rhs(pos) += value;
-        }
-        if let Some(neg) = neg {
-            *m.get_mut_rhs(neg) -= value;
-        }
-    }
-
-    /// Stamp a transient current source at time `t` with step `dt` and stop `tstop`.
-    pub(crate) fn stamp_current_source_trans(
-        &self,
-        m: &mut SolverMatrix,
-        t: f64,
-        dt: f64,
-        tstop: f64,
-    ) {
-        let pos = m.mna_node_index(self.positive);
-        let neg = m.mna_node_index(self.negative);
-
-        let value = self.dc.compute(t, dt, tstop);
-
-        if let Some(pos) = pos {
-            *m.get_mut_rhs(pos) += value;
-        }
-        if let Some(neg) = neg {
-            *m.get_mut_rhs(neg) -= value;
-        }
-    }
-
-    /// Stamp a transient voltage source at time `t` with step `dt` and stop `tstop`.
-    pub(crate) fn stamp_voltage_source_trans(
-        &self,
-        m: &mut SolverMatrix,
-        t: f64,
-        dt: f64,
-        tstop: f64,
-    ) {
-        self.stamp_voltage_incidence(m);
-        let src_index = m.mna_branch_index(self.current_branch);
-        let value = self.dc.compute(t, dt, tstop);
-        *m.get_mut_rhs(src_index) = value;
-    }
-
-    /// Stamp AC small-signal contributions for a *voltage source*:
-    /// - incidence into `ar`
-    /// - phasor into `(br, bi)`
-    pub(crate) fn stamp_ac_voltage_source(
+    /// Stamp AC small-signal contributions: incidence into `ar`, phasor into `(br, bi)`.
+    pub(crate) fn stamp_ac(
         &self,
         ar: &mut Array2<f64>,
         br: &mut Array1<f64>,
         bi: &mut Array1<f64>,
-        node_mapping: &NodeMapping,
     ) {
-        let n1 = node_mapping.mna_node_index(self.positive);
-        let n2 = node_mapping.mna_node_index(self.negative);
-        let k = node_mapping.mna_branch_index(self.current_branch);
-
-        if let Some(n1) = n1 {
+        let k = self.branch;
+        if let Some(n1) = self.positive {
             ar[[n1, k]] += 1.0;
             ar[[k, n1]] += 1.0;
         }
-        if let Some(n2) = n2 {
+        if let Some(n2) = self.negative {
             ar[[n2, k]] += -1.0;
             ar[[k, n2]] += -1.0;
         }
 
-        if let Some(phasor) = &self.ac {
-            let mag = phasor.mag.get_value();
-            let ph = phasor
-                .phase
-                .as_ref()
-                .map(|v| v.angle_radians(true))
-                .unwrap_or(0.0);
-            let re = mag * ph.cos();
-            let im = mag * ph.sin();
-            br[k] += re;
-            bi[k] += im;
+        let (re, im) = rectangular(&self.ac);
+        br[k] += re;
+        bi[k] += im;
+    }
+}
+
+impl CurrentSource {
+    pub fn new(pins: &TwoTerminal, params: &SourceParams, layout: &Layout) -> Self {
+        Self {
+            positive: layout.node(pins.positive),
+            negative: layout.node(pins.negative),
+            waveform: params.waveform,
+            ac: params.ac,
         }
     }
 
-    /// Stamp AC small-signal contributions for a *current source* (phasor only, into RHS).
-    pub(crate) fn stamp_ac_current_source(
-        &self,
-        br: &mut Array1<f64>,
-        bi: &mut Array1<f64>,
-        node_mapping: &NodeMapping,
-    ) {
-        if let Some(ac) = &self.ac {
-            let mag = ac.mag.get_value();
-            let ph = ac
-                .phase
-                .as_ref()
-                .map(|v| v.angle_radians(true))
-                .unwrap_or(0.0);
-            let re = mag * ph.cos();
-            let im = mag * ph.sin();
+    /// Stamp the DC value into the RHS (I vector).
+    pub(crate) fn stamp_dc(&self, m: &mut SolverMatrix) {
+        self.stamp_value(m, dc_value(&self.waveform));
+    }
 
-            let n1 = node_mapping.mna_node_index(self.positive);
-            let n2 = node_mapping.mna_node_index(self.negative);
+    /// Stamp the source at time `t` with step `dt` and stop time `tstop`.
+    pub(crate) fn stamp_trans(&self, m: &mut SolverMatrix, t: f64, dt: f64, tstop: f64) {
+        self.stamp_value(m, value_at(&self.waveform, t, dt, tstop));
+    }
 
-            if let Some(n1) = n1 {
-                br[n1] -= re;
-                bi[n1] -= im;
-            }
-            if let Some(n2) = n2 {
-                br[n2] += re;
-                bi[n2] += im;
-            }
+    fn stamp_value(&self, m: &mut SolverMatrix, value: f64) {
+        if let Some(pos) = self.positive {
+            *m.get_mut_rhs(pos) += value;
+        }
+        if let Some(neg) = self.negative {
+            *m.get_mut_rhs(neg) -= value;
         }
     }
+
+    /// Stamp AC small-signal contributions (phasor only, into the RHS).
+    pub(crate) fn stamp_ac(&self, br: &mut Array1<f64>, bi: &mut Array1<f64>) {
+        let (re, im) = rectangular(&self.ac);
+        if let Some(n1) = self.positive {
+            br[n1] -= re;
+            bi[n1] -= im;
+        }
+        if let Some(n2) = self.negative {
+            br[n2] += re;
+            bi[n2] += im;
+        }
+    }
+}
+
+/// A phasor as (real, imaginary).
+fn rectangular(phasor: &Phasor) -> (f64, f64) {
+    (
+        phasor.magnitude * phasor.phase.cos(),
+        phasor.magnitude * phasor.phase.sin(),
+    )
 }

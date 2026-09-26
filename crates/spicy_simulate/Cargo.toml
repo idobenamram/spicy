@@ -6,12 +6,13 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5", features = ["derive"], optional = true }
 ndarray = "0.16.1"
-spicy_parser = { path = "../spicy_parser" }
+spicy_circuit = { path = "../spicy_circuit" }
 thiserror = "2.0.16"
 # Use system OpenBLAS to avoid building static OpenBLAS locally
 ndarray-linalg = { version = "0.17", features = ["openblas-system"] }
 
 [dev-dependencies]
+spicy_parser = { path = "../spicy_parser" }
 rstest = "0.23.0"
 insta = "1.42.1"
 criterion = { workspace = true }

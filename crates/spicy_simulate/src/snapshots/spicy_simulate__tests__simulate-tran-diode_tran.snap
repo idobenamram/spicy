@@ -2,7 +2,7 @@
 source: crates/spicy_simulate/src/lib.rs
 expression: output
 ---
-TransientResult {
+TranSnapshot {
     times: [
         0.0,
         0.0005,

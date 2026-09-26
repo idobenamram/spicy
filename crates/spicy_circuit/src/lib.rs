@@ -18,8 +18,9 @@ mod params;
 
 pub use analysis::{AcSpacing, AcSweep, Analysis, DcSweep, SourceRef, Transient};
 pub use params::{
-    BjtModel, BjtParams, CapacitorParams, DiodeModel, DiodeParams, InductorParams, Params, Phasor,
-    Polarity, ResistorParams, SourceParams, Waveform,
+    BjtModel, BjtParams, CapacitorModel, CapacitorParams, DeviceTemperature, DiodeModel,
+    DiodeParams, InductorModel, InductorParams, Params, Phasor, Polarity, ResistorModel,
+    ResistorParams, SourceParams, Waveform,
 };
 
 /// Defines a `u32` index newtype.
@@ -46,12 +47,28 @@ id!(
     NodeId
 );
 id!(
+    /// Index into [`Params::resistor_models`].
+    ResistorModelId
+);
+id!(
+    /// Index into [`Params::capacitor_models`].
+    CapacitorModelId
+);
+id!(
+    /// Index into [`Params::inductor_models`].
+    InductorModelId
+);
+id!(
     /// Index into [`Params::diode_models`].
     DiodeModelId
 );
 id!(
     /// Index into [`Params::bjt_models`].
     BjtModelId
+);
+id!(
+    /// Index into [`Circuit::inductors`].
+    InductorId
 );
 id!(
     /// Index into [`Circuit::vsources`].
@@ -85,21 +102,42 @@ pub struct Lowered {
 pub struct Circuit {
     /// Number of nodes, ground included. Node ids run from 0 to `node_count - 1`.
     pub node_count: usize,
-    pub resistors: Vec<TwoTerminal>,
-    pub capacitors: Vec<TwoTerminal>,
-    pub inductors: Vec<TwoTerminal>,
+    pub resistors: Vec<Resistor>,
+    pub capacitors: Vec<Capacitor>,
+    pub inductors: Vec<Inductor>,
     pub diodes: Vec<Diode>,
     pub bjts: Vec<Bjt>,
     pub vsources: Vec<TwoTerminal>,
     pub isources: Vec<TwoTerminal>,
 }
 
-/// A two-terminal device. Current is positive flowing from `positive`
-/// through the device to `negative`.
+/// A source's terminals. Current is positive flowing from `positive`
+/// through the source to `negative`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TwoTerminal {
     pub positive: NodeId,
     pub negative: NodeId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Resistor {
+    pub positive: NodeId,
+    pub negative: NodeId,
+    pub model: ResistorModelId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Capacitor {
+    pub positive: NodeId,
+    pub negative: NodeId,
+    pub model: CapacitorModelId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Inductor {
+    pub positive: NodeId,
+    pub negative: NodeId,
+    pub model: InductorModelId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,9 +1,8 @@
 use crate::{
-    devices::{Bjt, Capacitor, Devices, Diode, IndependentSource, Inductor, Resistor},
+    devices::{Bjt, Capacitor, Devices, Diode, Inductor, Resistor, VoltageSource},
     error::SimulationError,
     solver::matrix::csc::CscMatrix,
 };
-use spicy_parser::node_mapping::NodeMapping;
 
 use crate::solver::matrix::builder::MatrixBuilder;
 
@@ -15,12 +14,11 @@ fn dense_index(row: usize, col: usize, dim: usize) -> usize {
 
 fn setup_resistors(
     resistors: &mut [Resistor],
-    node_mapping: &NodeMapping,
     builder: &mut MatrixBuilder,
 ) -> Result<(), SimulationError> {
     for r in resistors {
-        let pos = node_mapping.mna_node_index(r.positive);
-        let neg = node_mapping.mna_node_index(r.negative);
+        let pos = r.positive;
+        let neg = r.negative;
         r.stamp
             .set_temp_indices_from_nodes(pos, neg, |col, row| builder.push(col, row, 0.0))?;
     }
@@ -29,41 +27,32 @@ fn setup_resistors(
 
 fn setup_capacitors(
     capacitors: &mut [Capacitor],
-    node_mapping: &NodeMapping,
     builder: &mut MatrixBuilder,
 ) -> Result<(), SimulationError> {
     for c in capacitors {
-        let pos = node_mapping.mna_node_index(c.positive);
-        let neg = node_mapping.mna_node_index(c.negative);
+        let pos = c.positive;
+        let neg = c.negative;
         c.stamp
             .set_temp_indices_from_nodes(pos, neg, |col, row| builder.push(col, row, 0.0))?;
     }
     Ok(())
 }
 
-fn setup_diodes(
-    diodes: &mut [Diode],
-    node_mapping: &NodeMapping,
-    builder: &mut MatrixBuilder,
-) -> Result<(), SimulationError> {
+fn setup_diodes(diodes: &mut [Diode], builder: &mut MatrixBuilder) -> Result<(), SimulationError> {
     for d in diodes {
-        let pos = node_mapping.mna_node_index(d.positive);
-        let neg = node_mapping.mna_node_index(d.negative);
+        let pos = d.positive;
+        let neg = d.negative;
         d.stamp
             .set_temp_indices_from_nodes(pos, neg, |col, row| builder.push(col, row, 0.0))?;
     }
     Ok(())
 }
 
-fn setup_bjts(
-    bjts: &mut [Bjt],
-    node_mapping: &NodeMapping,
-    builder: &mut MatrixBuilder,
-) -> Result<(), SimulationError> {
+fn setup_bjts(bjts: &mut [Bjt], builder: &mut MatrixBuilder) -> Result<(), SimulationError> {
     for bjt in bjts {
-        let b = node_mapping.mna_node_index(bjt.base);
-        let c = node_mapping.mna_node_index(bjt.collector);
-        let e = node_mapping.mna_node_index(bjt.emitter);
+        let b = bjt.base;
+        let c = bjt.collector;
+        let e = bjt.emitter;
         bjt.stamp
             .set_temp_indices_from_nodes(b, c, e, |row, col| builder.push(col, row, 0.0))?;
     }
@@ -72,13 +61,12 @@ fn setup_bjts(
 
 fn setup_inductors(
     inductors: &mut [Inductor],
-    node_mapping: &NodeMapping,
     builder: &mut MatrixBuilder,
 ) -> Result<(), SimulationError> {
     for i in inductors {
-        let pos = node_mapping.mna_node_index(i.positive);
-        let neg = node_mapping.mna_node_index(i.negative);
-        let branch_index = node_mapping.mna_branch_index(i.current_branch);
+        let pos = i.positive;
+        let neg = i.negative;
+        let branch_index = i.branch;
         i.stamp
             .set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
                 builder.push(col, row, 0.0)
@@ -88,14 +76,13 @@ fn setup_inductors(
 }
 
 fn setup_voltage_sources(
-    voltage_sources: &mut [IndependentSource],
-    node_mapping: &NodeMapping,
+    voltage_sources: &mut [VoltageSource],
     builder: &mut MatrixBuilder,
 ) -> Result<(), SimulationError> {
     for v in voltage_sources {
-        let pos = node_mapping.mna_node_index(v.positive);
-        let neg = node_mapping.mna_node_index(v.negative);
-        let branch_index = node_mapping.mna_branch_index(v.current_branch);
+        let pos = v.positive;
+        let neg = v.negative;
+        let branch_index = v.branch;
         v.stamp
             .set_temp_indices_from_nodes(pos, neg, branch_index, |col, row| {
                 builder.push(col, row, 0.0)
@@ -106,17 +93,16 @@ fn setup_voltage_sources(
 
 pub fn setup_pattern(
     devices: &mut Devices,
-    node_mapping: &NodeMapping,
+    matrix_dim: usize,
 ) -> Result<CscMatrix, SimulationError> {
-    let matrix_dim = node_mapping.mna_matrix_dim();
     let mut builder = MatrixBuilder::new(matrix_dim, matrix_dim);
 
-    setup_resistors(&mut devices.resistors, node_mapping, &mut builder)?;
-    setup_capacitors(&mut devices.capacitors, node_mapping, &mut builder)?;
-    setup_inductors(&mut devices.inductors, node_mapping, &mut builder)?;
-    setup_diodes(&mut devices.diodes, node_mapping, &mut builder)?;
-    setup_bjts(&mut devices.bjts, node_mapping, &mut builder)?;
-    setup_voltage_sources(&mut devices.voltage_sources, node_mapping, &mut builder)?;
+    setup_resistors(&mut devices.resistors, &mut builder)?;
+    setup_capacitors(&mut devices.capacitors, &mut builder)?;
+    setup_inductors(&mut devices.inductors, &mut builder)?;
+    setup_diodes(&mut devices.diodes, &mut builder)?;
+    setup_bjts(&mut devices.bjts, &mut builder)?;
+    setup_voltage_sources(&mut devices.voltage_sources, &mut builder)?;
     // we do not need to setup current sources as they don't effect the matrix structure (only the right hand side)
 
     let (matrix, mapping) = builder.build_csc_pattern()?;
@@ -148,12 +134,10 @@ pub fn setup_pattern(
 /// For BLAS we store a *dense linear index* into the MNA matrix buffer in each stamp field:
 /// `idx = row * dim + col` (row-major). This avoids building a sparse CSC pattern just to
 /// compute per-device stamp locations.
-pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
-    let dim = node_mapping.mna_matrix_dim();
-
+pub fn setup_dense_stamps(devices: &mut Devices, dim: usize) {
     for r in &mut devices.resistors {
-        let pos = node_mapping.mna_node_index(r.positive);
-        let neg = node_mapping.mna_node_index(r.negative);
+        let pos = r.positive;
+        let neg = r.negative;
         let pos_pos = pos.map(|p| dense_index(p, p, dim));
         let neg_neg = neg.map(|n| dense_index(n, n, dim));
         let off = if let (Some(p), Some(n)) = (pos, neg) {
@@ -165,8 +149,8 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
     }
 
     for c in &mut devices.capacitors {
-        let pos = node_mapping.mna_node_index(c.positive);
-        let neg = node_mapping.mna_node_index(c.negative);
+        let pos = c.positive;
+        let neg = c.negative;
         let pos_pos = pos.map(|p| dense_index(p, p, dim));
         let neg_neg = neg.map(|n| dense_index(n, n, dim));
         let off = if let (Some(p), Some(n)) = (pos, neg) {
@@ -178,8 +162,8 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
     }
 
     for d in &mut devices.diodes {
-        let pos = node_mapping.mna_node_index(d.positive);
-        let neg = node_mapping.mna_node_index(d.negative);
+        let pos = d.positive;
+        let neg = d.negative;
         let pos_pos = pos.map(|p| dense_index(p, p, dim));
         let neg_neg = neg.map(|n| dense_index(n, n, dim));
         let off = if let (Some(p), Some(n)) = (pos, neg) {
@@ -191,9 +175,9 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
     }
 
     for bjt in &mut devices.bjts {
-        let b = node_mapping.mna_node_index(bjt.base);
-        let c = node_mapping.mna_node_index(bjt.collector);
-        let e = node_mapping.mna_node_index(bjt.emitter);
+        let b = bjt.base;
+        let c = bjt.collector;
+        let e = bjt.emitter;
 
         let dense_entry = |row: Option<usize>, col: Option<usize>| match (row, col) {
             (Some(r), Some(c)) => Some(dense_index(r, c, dim)),
@@ -215,9 +199,9 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
     }
 
     for ind in &mut devices.inductors {
-        let pos = node_mapping.mna_node_index(ind.positive);
-        let neg = node_mapping.mna_node_index(ind.negative);
-        let b = node_mapping.mna_branch_index(ind.current_branch);
+        let pos = ind.positive;
+        let neg = ind.negative;
+        let b = ind.branch;
         let pos_branch = pos.map(|p| (dense_index(p, b, dim), dense_index(b, p, dim)));
         let neg_branch = neg.map(|n| (dense_index(n, b, dim), dense_index(b, n, dim)));
         let bb = dense_index(b, b, dim);
@@ -225,9 +209,9 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
     }
 
     for v in &mut devices.voltage_sources {
-        let pos = node_mapping.mna_node_index(v.positive);
-        let neg = node_mapping.mna_node_index(v.negative);
-        let b = node_mapping.mna_branch_index(v.current_branch);
+        let pos = v.positive;
+        let neg = v.negative;
+        let b = v.branch;
         let pos_branch = pos.map(|p| (dense_index(p, b, dim), dense_index(b, p, dim)));
         let neg_branch = neg.map(|n| (dense_index(n, b, dim), dense_index(b, n, dim)));
         v.stamp.set_temp_indices(pos_branch, neg_branch);
@@ -237,8 +221,7 @@ pub fn setup_dense_stamps(devices: &mut Devices, node_mapping: &NodeMapping) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::devices::Devices as SimDevices;
-    use crate::test_util::parse_netlist;
+    use crate::test_util::build_devices;
 
     /// Return the CSC nnz index for a given (col, row) coordinate.
     ///
@@ -253,7 +236,7 @@ mod tests {
 
     #[test]
     fn setup_pattern_populates_device_stamps_with_final_nnz_indices() {
-        let deck = parse_netlist(
+        let mut devices = build_devices(
             r#"setup_pattern stamp test
 V1 in 0 1
 R1 in out 2k
@@ -264,45 +247,22 @@ L1 out 0 1m
 "#,
         );
 
-        let mut sim_devices = SimDevices::from_spec(&deck.devices);
-        let matrix =
-            super::setup_pattern(&mut sim_devices, &deck.node_mapping).expect("setup_pattern");
+        // Nodes `in` and `out`, plus the currents of V1 and L1.
+        let dim = 4;
+        let matrix = super::setup_pattern(&mut devices, dim).expect("setup_pattern");
         debug_assert!(matrix.check_invariants().is_ok());
-
-        let dim = deck.node_mapping.mna_matrix_dim();
         assert_eq!(matrix.dim.nrows, dim);
         assert_eq!(matrix.dim.ncols, dim);
 
-        let r1 = sim_devices
-            .resistors
-            .iter()
-            .find(|r| r.name == "R1")
-            .expect("R1");
-        let r2 = sim_devices
-            .resistors
-            .iter()
-            .find(|r| r.name == "R2")
-            .expect("R2");
-        let v1 = sim_devices
-            .voltage_sources
-            .iter()
-            .find(|v| v.name == "V1")
-            .expect("V1");
-        let l1 = sim_devices
-            .inductors
-            .iter()
-            .find(|l| l.name == "L1")
-            .expect("L1");
+        let [r1, r2] = &devices.resistors[..] else {
+            panic!("expected R1 and R2");
+        };
+        let v1 = &devices.voltage_sources[0];
+        let l1 = &devices.inductors[0];
 
         // Node-voltage unknown indices (ground excluded).
-        let in_mna = deck
-            .node_mapping
-            .mna_node_index(r1.positive)
-            .expect("in is non-ground");
-        let out_mna = deck
-            .node_mapping
-            .mna_node_index(r1.negative)
-            .expect("out is non-ground");
+        let in_mna = r1.positive.expect("in is non-ground");
+        let out_mna = r1.negative.expect("out is non-ground");
 
         // --- R1: between two non-ground nodes => full stamp (diag + off-diagonals).
         let r1_pos_pos = r1.stamp.pos_pos.expect("R1 pos_pos");
@@ -325,11 +285,8 @@ L1 out 0 1m
         // --- V1: to ground => only pos/branch entries.
         let (v1_pos_branch, v1_branch_pos) = v1.stamp.pos_branch.expect("V1 pos_branch");
         assert_eq!(v1.stamp.neg_branch, None);
-        let v1_pos = deck
-            .node_mapping
-            .mna_node_index(v1.positive)
-            .expect("V1 pos");
-        let v1_branch = deck.node_mapping.mna_branch_index(v1.current_branch);
+        let v1_pos = v1.positive.expect("V1 pos");
+        let v1_branch = v1.branch;
         assert_eq!(v1_pos_branch, nnz_at(&matrix, v1_pos, v1_branch));
         assert_eq!(v1_branch_pos, nnz_at(&matrix, v1_branch, v1_pos));
 
@@ -337,11 +294,8 @@ L1 out 0 1m
         let (l1_pos_branch, l1_branch_pos) = l1.stamp.pos_branch.expect("L1 pos_branch");
         assert_eq!(l1.stamp.neg_branch, None);
         assert_ne!(l1.stamp.branch_branch, usize::MAX);
-        let l1_pos = deck
-            .node_mapping
-            .mna_node_index(l1.positive)
-            .expect("L1 pos");
-        let l1_branch = deck.node_mapping.mna_branch_index(l1.current_branch);
+        let l1_pos = l1.positive.expect("L1 pos");
+        let l1_branch = l1.branch;
         assert_eq!(l1_pos_branch, nnz_at(&matrix, l1_pos, l1_branch));
         assert_eq!(l1_branch_pos, nnz_at(&matrix, l1_branch, l1_pos));
         assert_eq!(

@@ -26,19 +26,33 @@ Lowered {
         isources: [],
     },
     params: Params {
+        resistor_models: [],
         resistors: [],
+        capacitor_models: [],
         capacitors: [],
+        inductor_models: [],
         inductors: [],
         diode_models: [
             DiodeModel {
                 is: 1e-14,
                 n: 1.0,
+                rs: 2.0,
             },
         ],
         diodes: [
             DiodeParams {
                 area: 2.0,
                 m: 3.0,
+                pj: 4.0,
+                lm: 1.0,
+                wm: 2.0,
+                lp: 3.0,
+                wp: 4.0,
+                off: true,
+                ic: 0.7,
+                temperature: Fixed(
+                    298.15,
+                ),
             },
         ],
         bjt_models: [],

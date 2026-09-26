@@ -6,7 +6,7 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs};
 use spicy_simulate::{DcSweepResult, OperatingPointResult};
 
-use crate::tui::app::{App, Tab};
+use crate::tui::app::{App, ResultNames, Tab};
 use crate::tui::graph::{Graph, Series, compute_y_bounds};
 
 use super::utils::split_v;
@@ -86,7 +86,7 @@ pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
     match app.selected_tab(&available_tabs) {
         Some(Tab::Op) => {
             if let Some(op) = &app.op {
-                draw_op(f, body, op);
+                draw_op(f, body, op, &app.result_names);
             }
         }
         Some(Tab::DC) => {
@@ -108,19 +108,23 @@ pub(super) fn draw_outputs(f: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn draw_op(f: &mut Frame, area: Rect, op: &OperatingPointResult) {
+fn draw_op(f: &mut Frame, area: Rect, op: &OperatingPointResult, result_names: &ResultNames) {
     use std::collections::{BTreeSet, HashMap};
 
-    let mut names: BTreeSet<String> = BTreeSet::new();
-    for (n, _) in &op.voltages {
-        names.insert(n.clone());
-    }
-    for (n, _) in &op.currents {
-        names.insert(n.clone());
-    }
-
-    let vmap: HashMap<&str, f64> = op.voltages.iter().map(|(n, v)| (n.as_str(), *v)).collect();
-    let imap: HashMap<&str, f64> = op.currents.iter().map(|(n, i)| (n.as_str(), *i)).collect();
+    let (voltages, currents) = op.solution.split_at(result_names.voltages.len());
+    let vmap: HashMap<&str, f64> = result_names
+        .voltages
+        .iter()
+        .map(String::as_str)
+        .zip(voltages.iter().copied())
+        .collect();
+    let imap: HashMap<&str, f64> = result_names
+        .currents
+        .iter()
+        .map(String::as_str)
+        .zip(currents.iter().copied())
+        .collect();
+    let names: BTreeSet<&str> = vmap.keys().chain(imap.keys()).copied().collect();
 
     let header = Row::new(vec![
         Cell::from("node"),
@@ -130,11 +134,11 @@ fn draw_op(f: &mut Frame, area: Rect, op: &OperatingPointResult) {
     .style(Style::default().add_modifier(Modifier::BOLD));
 
     let rows = names.into_iter().map(|name| {
-        let v_str = match vmap.get(name.as_str()) {
+        let v_str = match vmap.get(name) {
             Some(v) => format!("{:.6}", v),
             None => "-".to_string(),
         };
-        let i_str = match imap.get(name.as_str()) {
+        let i_str = match imap.get(name) {
             Some(i) => format!("{:.6}", i),
             None => "-".to_string(),
         };
@@ -199,8 +203,9 @@ fn draw_tran(
             })
             .collect();
 
-        let name = tr
-            .node_names
+        let name = app
+            .result_names
+            .voltages
             .get(*output_index)
             .cloned()
             .unwrap_or_else(|| format!("n{}", output_index));
@@ -231,20 +236,14 @@ fn draw_tran(
     };
     g.render(f, chunks[0]);
 
-    draw_tran_node_list(f, chunks[1], app, tr);
+    draw_tran_node_list(f, chunks[1], app);
 }
 
-fn draw_tran_node_list(
-    f: &mut Frame,
-    area: Rect,
-    app: &crate::tui::app::App,
-    tr: &spicy_simulate::trans::TransientResult,
-) {
+fn draw_tran_node_list(f: &mut Frame, area: Rect, app: &crate::tui::app::App) {
     let mut rows: Vec<Row> = Vec::new();
-    let current = app
-        .trans_list_index
-        .min(tr.node_names.len().saturating_sub(1));
-    for (i, name) in tr.node_names.iter().enumerate() {
+    let node_names = &app.result_names.voltages;
+    let current = app.trans_list_index.min(node_names.len().saturating_sub(1));
+    for (i, name) in node_names.iter().enumerate() {
         let selected = app.trans_selected_nodes.contains(&i);
         let is_current = i == current;
         let marker = if selected { "[x]" } else { "[ ]" };

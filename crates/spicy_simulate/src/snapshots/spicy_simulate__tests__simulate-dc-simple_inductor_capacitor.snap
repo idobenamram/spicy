@@ -2,10 +2,10 @@
 source: crates/spicy_simulate/src/lib.rs
 expression: output
 ---
-DcSweepResult {
+DcSnapshot {
     results: [
         (
-            OperatingPointResult {
+            OpSnapshot {
                 voltages: [
                     (
                         "n001",
@@ -26,7 +26,7 @@ DcSweepResult {
             0.001,
         ),
         (
-            OperatingPointResult {
+            OpSnapshot {
                 voltages: [
                     (
                         "n001",
@@ -47,7 +47,7 @@ DcSweepResult {
             0.002,
         ),
         (
-            OperatingPointResult {
+            OpSnapshot {
                 voltages: [
                     (
                         "n001",
@@ -68,7 +68,7 @@ DcSweepResult {
             0.003,
         ),
         (
-            OperatingPointResult {
+            OpSnapshot {
                 voltages: [
                     (
                         "n001",
@@ -89,7 +89,7 @@ DcSweepResult {
             0.004,
         ),
         (
-            OperatingPointResult {
+            OpSnapshot {
                 voltages: [
                     (
                         "n001",

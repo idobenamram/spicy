@@ -1,22 +1,18 @@
 use super::stamp::NodePairStamp;
 use crate::matrix::SolverMatrix;
+use crate::unknowns::Layout;
 use crate::util::get_voltage_diff;
-use spicy_parser::Span;
-use spicy_parser::devices::DiodeSpec;
-use spicy_parser::netlist_types::NodeIndex;
+use spicy_circuit::{self as circuit, DiodeModel, DiodeParams};
 
 const DEFAULT_THERMAL_VOLTAGE: f64 = 0.02585;
 const DEFAULT_EXP_LIMIT: f64 = 40.0;
 
 #[derive(Debug, Clone)]
 pub struct Diode {
-    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
-    #[allow(dead_code)]
-    pub name: String,
-    #[allow(dead_code)]
-    pub span: Span,
-    pub positive: NodeIndex,
-    pub negative: NodeIndex,
+    /// MNA row of the anode; `None` for ground.
+    pub positive: Option<usize>,
+    /// MNA row of the cathode; `None` for ground.
+    pub negative: Option<usize>,
     /// Effective saturation current (A): the model's IS scaled by `area` and `m`.
     pub saturation_current: f64,
     // emission coefficient (dimensionless)
@@ -25,46 +21,25 @@ pub struct Diode {
     pub thermal_voltage: f64,
     /// Clamp limit for Vd/(n*Vt) to keep exp() bounded.
     pub exp_limit: f64,
-    #[allow(dead_code)]
-    pub off: bool,
-    #[allow(dead_code)]
-    pub ic: f64,
-    /// Series resistance (Ohms) parsed but not used yet.
-    #[allow(dead_code)]
-    pub series_resistance: f64,
     pub stamp: NodePairStamp,
 }
 
 impl Diode {
-    pub fn from_spec(spec: &DiodeSpec) -> Self {
-        let saturation_current = spec
-            .model
-            .is
-            .as_ref()
-            .map(|v| v.get_value())
-            .unwrap_or(1e-14);
-        let emission_coeff = spec.model.n.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let series_resistance = spec.model.rs.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
-        let area = spec.area.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let m = spec.m.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let off = spec.off.unwrap_or(false);
-        let ic = spec.ic.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
+    pub fn new(
+        pins: &circuit::Diode,
+        model: &DiodeModel,
+        params: &DiodeParams,
+        layout: &Layout,
+    ) -> Self {
         Self {
-            name: spec.name.clone(),
-            span: spec.span,
-            positive: spec.positive,
-            negative: spec.negative,
-            // `area` scales the junction and `m` puts m copies in parallel, as in
-            // ngspice (diotemp.c). Every current in this model is proportional to IS.
-            saturation_current: saturation_current * area * m,
-            emission_coeff,
+            positive: layout.node(pins.positive),
+            negative: layout.node(pins.negative),
+            // Every current in this model is proportional to IS, so `area` and
+            // `m` scale it once, as in ngspice (diotemp.c).
+            saturation_current: model.is * params.area * params.m,
+            emission_coeff: model.n,
             thermal_voltage: DEFAULT_THERMAL_VOLTAGE,
             exp_limit: DEFAULT_EXP_LIMIT,
-            off,
-            ic,
-            series_resistance,
             stamp: NodePairStamp::uninitialized(),
         }
     }
@@ -103,8 +78,8 @@ impl Diode {
     }
 
     pub(crate) fn stamp_nonlinear(&self, m: &mut SolverMatrix, guess: &[f64]) {
-        let pos = m.mna_node_index(self.positive);
-        let neg = m.mna_node_index(self.negative);
+        let pos = self.positive;
+        let neg = self.negative;
         // Step 1: get the voltage diff across the diode
         let v_d = get_voltage_diff(guess, pos, neg);
 
@@ -134,13 +109,14 @@ impl Diode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::parse_netlist;
+    use crate::test_util::build_devices;
 
     fn diode(instance_params: &str, model_params: &str) -> Diode {
-        let deck = parse_netlist(&format!(
+        build_devices(&format!(
             "diode\nD1 a 0 DMOD {instance_params}\n.MODEL DMOD D {model_params}\n.end\n"
-        ));
-        Diode::from_spec(&deck.devices.diodes[0])
+        ))
+        .diodes
+        .remove(0)
     }
 
     // ngspice diotemp.c: IS is scaled by area * m. Every current in this model

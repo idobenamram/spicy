@@ -6,11 +6,14 @@ Lowered {
     circuit: Circuit {
         node_count: 2,
         resistors: [
-            TwoTerminal {
+            Resistor {
                 positive: NodeId(
                     1,
                 ),
                 negative: NodeId(
+                    0,
+                ),
+                model: ResistorModelId(
                     0,
                 ),
             },
@@ -32,14 +35,28 @@ Lowered {
         isources: [],
     },
     params: Params {
+        resistor_models: [
+            ResistorModel {
+                tc1: 0.0,
+                tc2: 0.0,
+                default_width: 1e-5,
+                default_length: 1e-5,
+            },
+        ],
         resistors: [
             ResistorParams {
                 r: 1000.0,
                 r_ac: None,
                 m: 1.0,
+                temperature: Offset(
+                    0.0,
+                ),
+                noisy: true,
             },
         ],
+        capacitor_models: [],
         capacitors: [],
+        inductor_models: [],
         inductors: [],
         diode_models: [],
         diodes: [],

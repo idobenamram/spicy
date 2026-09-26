@@ -9,11 +9,13 @@ pub mod solver;
 #[cfg(test)]
 mod test_util;
 pub mod trans;
+mod unknowns;
 mod util;
 pub use ac::AcResult;
 pub use dc::{DcSweepResult, OperatingPointResult};
 pub use error::SimulationError;
 pub use trans::TransientResult;
+pub use unknowns::{Branch, Unknown, unknowns};
 
 #[derive(Debug, Clone)]
 pub enum LinearSolver {
@@ -87,44 +89,27 @@ mod tests {
     use super::*;
     use crate::ac::simulate_ac;
     use crate::dc::{simulate_dc, simulate_op};
-    use crate::test_util::{assert_numeric_snapshot, parse_netlist};
+    use crate::test_util::{
+        DcSnapshot, OpSnapshot, TranSnapshot, assert_numeric_snapshot, lower_netlist,
+    };
     use crate::trans::simulate_trans;
     use rstest::rstest;
-    use spicy_parser::netlist_types::{Command, NodeIndex, NodeName};
-    use spicy_parser::node_mapping::NodeMapping;
+    use spicy_circuit::{Analysis, Lowered};
+    use std::path::{Path, PathBuf};
 
-    use spicy_parser::parse;
-    use spicy_parser::{ParseOptions, SourceMap};
-
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_node_mapping_mna_indices() {
-        let mut mapping = NodeMapping::new();
-        let n1 = mapping.insert_node(NodeName("n1".to_string()));
-        let n2 = mapping.insert_node(NodeName("n2".to_string()));
-
-        assert_eq!(mapping.mna_node_index(NodeIndex(0)), None);
-        assert_eq!(mapping.mna_node_index(n1), Some(0));
-        assert_eq!(mapping.mna_node_index(n2), Some(1));
+    fn lower_file(path: &Path) -> Lowered {
+        lower_netlist(&std::fs::read_to_string(path).expect("failed to read input file"))
     }
 
-    #[test]
-    fn test_node_mapping_names_mna_order() {
-        let mut mapping = NodeMapping::new();
-        mapping.insert_node(NodeName("n1".to_string()));
-        mapping.insert_node(NodeName("n2".to_string()));
-
-        assert_eq!(
-            mapping.node_names_mna_order(),
-            vec!["n1".to_string(), "n2".to_string()]
-        );
+    fn snapshot_name(analysis: &str, input: &Path) -> String {
+        let stem = input.file_stem().expect("file name").to_string_lossy();
+        format!("simulate-{analysis}-{stem}")
     }
 
     #[test]
     fn subcircuit_instances_have_separate_internal_nodes() {
         // Two identical dividers on different supplies: each midpoint is half its own supply.
-        let deck = parse_netlist(
+        let lowered = lower_netlist(
             "two dividers
 .SUBCKT DIV top bot
 R1 top mid 1k
@@ -138,129 +123,125 @@ X2 b 0 DIV
 .END
 ",
         );
-        let op = simulate_op(&deck, &SimulationConfig::default()).expect("simulate_op");
-        let voltages: Vec<(&str, f64)> =
-            op.voltages.iter().map(|(n, v)| (n.as_str(), *v)).collect();
+        let op = simulate_op(
+            &lowered.circuit,
+            &lowered.params,
+            &SimulationConfig::default(),
+        )
+        .expect("simulate_op");
+        let voltages: Vec<(&str, f64)> = unknowns(&lowered.circuit)
+            .iter()
+            .zip(&op.solution)
+            .filter(|(unknown, _)| matches!(unknown, Unknown::Voltage(_)))
+            .map(|(unknown, &v)| (unknown.name(&lowered.names), v))
+            .collect();
         assert_eq!(
             voltages,
             [("a", 10.0), ("b", 4.0), ("X1.mid", 5.0), ("X2.mid", 2.0)]
         );
     }
 
+    #[test]
+    fn operating_point_uses_each_waveforms_value_at_time_zero() {
+        // ngspice evaluates transient sources at t = 0 in DC analyses (vsrcload.c):
+        // PULSE and EXP give V1, SIN gives VO + VA·sin(phase), whatever its delay.
+        let lowered = lower_netlist(
+            "sources at t = 0
+V1 a 0 SIN(1 2)
+R1 a 0 1k
+V2 b 0 SIN(1 2 1k 1m 0 90)
+R2 b 0 1k
+V3 c 0 PULSE(0.5 5 0 0 0 1u 2u)
+R3 c 0 1k
+V4 d 0 EXP(0.25 5)
+R4 d 0 1k
+.op
+.end
+",
+        );
+        let op = simulate_op(
+            &lowered.circuit,
+            &lowered.params,
+            &SimulationConfig::default(),
+        )
+        .expect("simulate_op");
+        assert_eq!(op.solution[..4], [1.0, 3.0, 0.5, 0.25]);
+    }
+
     #[rstest]
     fn test_simulate_op(#[files("tests/op_dc/*.spicy")] input: PathBuf) {
-        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let source_map = SourceMap::new(input.clone(), input_content);
-        let mut input_options = ParseOptions {
-            work_dir: PathBuf::from("."),
-            source_path: PathBuf::from("."),
-            source_map,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut input_options).expect("parse");
-        let sim_config = SimulationConfig::default();
-        let output = simulate_op(&deck, &sim_config).expect("simulate_op");
-        let name = format!(
-            "simulate-op-{}",
-            input
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unknown".to_string())
-        );
-        assert_numeric_snapshot(&name, &output);
+        let lowered = lower_file(&input);
+        let op = simulate_op(
+            &lowered.circuit,
+            &lowered.params,
+            &SimulationConfig::default(),
+        )
+        .expect("simulate_op");
+        let snapshot = OpSnapshot::new(&lowered, &op.solution);
+        assert_numeric_snapshot(&snapshot_name("op", &input), &snapshot);
     }
 
     #[rstest]
     fn test_simulate_dc(#[files("tests/op_dc/simple_inductor_capacitor.spicy")] input: PathBuf) {
-        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let source_map = SourceMap::new(input.clone(), input_content);
-        let mut input_options = ParseOptions {
-            work_dir: PathBuf::from("."),
-            source_path: PathBuf::from("."),
-            source_map,
-            max_include_depth: 10,
+        let lowered = lower_file(&input);
+        let Analysis::Dc(sweep) = lowered.analyses[1] else {
+            panic!("expected .dc, got {:?}", lowered.analyses[1]);
         };
-        let deck = parse(&mut input_options).expect("parse");
-        let command = deck.commands[1].clone();
-        let output = match command {
-            Command::Dc(command) => {
-                let sim_config = SimulationConfig::default();
-                simulate_dc(&deck, &command, &sim_config)
-            }
-            _ => panic!("Unsupported command: {:?}", command),
-        };
-
-        let name = format!(
-            "simulate-dc-{}",
-            input
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unknown".to_string())
+        let dc = simulate_dc(
+            &lowered.circuit,
+            &lowered.params,
+            &sweep,
+            &SimulationConfig::default(),
         );
-        assert_numeric_snapshot(&name, &output);
+        let snapshot = DcSnapshot {
+            results: dc
+                .results
+                .iter()
+                .map(|(op, value)| (OpSnapshot::new(&lowered, &op.solution), *value))
+                .collect(),
+        };
+        assert_numeric_snapshot(&snapshot_name("dc", &input), &snapshot);
     }
 
     #[rstest]
     fn test_simulate_ac(#[files("tests/ac/*.spicy")] input: PathBuf) {
-        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let source_map = SourceMap::new(input.clone(), input_content);
-        let mut input_options = ParseOptions {
-            work_dir: PathBuf::from("."),
-            source_path: PathBuf::from("."),
-            source_map,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut input_options).expect("parse");
-        let command = deck
-            .commands
+        let lowered = lower_file(&input);
+        let sweep = lowered
+            .analyses
             .iter()
-            .find_map(|cmd| match cmd {
-                Command::Ac(ac) => Some(ac),
+            .find_map(|analysis| match analysis {
+                Analysis::Ac(sweep) => Some(sweep),
                 _ => None,
             })
             .expect("expected .AC command");
-        let sim_config = SimulationConfig::default();
-        let output = simulate_ac(&deck, command, &sim_config);
-
-        let name = format!(
-            "simulate-ac-{}",
-            input
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unknown".to_string())
+        let ac = simulate_ac(
+            &lowered.circuit,
+            &lowered.params,
+            sweep,
+            &SimulationConfig::default(),
         );
-        assert_numeric_snapshot(&name, &output);
+        assert_numeric_snapshot(&snapshot_name("ac", &input), &ac);
     }
 
     #[rstest]
     fn test_simulate_tran(#[files("tests/trans/*.spicy")] input: PathBuf) {
-        let input_content = std::fs::read_to_string(&input).expect("failed to read input file");
-        let source_map = SourceMap::new(input.clone(), input_content);
-        let mut input_options = ParseOptions {
-            work_dir: PathBuf::from("."),
-            source_path: PathBuf::from("."),
-            source_map,
-            max_include_depth: 10,
-        };
-        let deck = parse(&mut input_options).expect("parse");
-        let command = deck
-            .commands
+        let lowered = lower_file(&input);
+        let tran = lowered
+            .analyses
             .iter()
-            .find_map(|cmd| match cmd {
-                Command::Tran(tran) => Some(tran),
+            .find_map(|analysis| match analysis {
+                Analysis::Tran(tran) => Some(tran),
                 _ => None,
             })
             .expect("expected .TRAN command");
-        let sim_config = SimulationConfig::default();
-        let output = simulate_trans(&deck, command, &sim_config).expect("simulate_trans");
-
-        let name = format!(
-            "simulate-tran-{}",
-            input
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unknown".to_string())
-        );
-        assert_numeric_snapshot(&name, &output);
+        let result = simulate_trans(
+            &lowered.circuit,
+            &lowered.params,
+            tran,
+            &SimulationConfig::default(),
+        )
+        .expect("simulate_trans");
+        let snapshot = TranSnapshot::new(&lowered, result);
+        assert_numeric_snapshot(&snapshot_name("tran", &input), &snapshot);
     }
 }

@@ -1,89 +1,30 @@
 use super::stamp::NodePairStamp;
 use crate::matrix::SolverMatrix;
+use crate::unknowns::Layout;
 use ndarray::Array2;
-use spicy_parser::Span;
-use spicy_parser::devices::CapacitorSpec;
-use spicy_parser::netlist_types::NodeIndex;
-use spicy_parser::node_mapping::NodeMapping;
+use spicy_circuit::{self as circuit, CapacitorParams};
 
 #[derive(Debug, Clone)]
 pub struct Capacitor {
-    pub name: String,
-    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
-    #[allow(dead_code)]
-    pub span: Span,
-    pub positive: NodeIndex,
-    pub negative: NodeIndex,
-    /// Effective capacitance (F), with `scale` and `m` applied.
+    /// MNA row of the positive terminal; `None` for ground.
+    pub positive: Option<usize>,
+    /// MNA row of the negative terminal; `None` for ground.
+    pub negative: Option<usize>,
+    /// Effective capacitance (F) of the `m` devices in parallel.
     pub capacitance: f64,
-    #[allow(dead_code)]
-    pub temp: f64,
-    #[allow(dead_code)]
-    pub dtemp: f64,
-    #[allow(dead_code)]
-    pub tc1: f64,
-    #[allow(dead_code)]
-    pub tc2: f64,
+    /// Initial voltage (V), used when the transient skips the operating point.
     pub ic: f64,
     pub stamp: NodePairStamp,
 }
 
 impl Capacitor {
-    pub fn from_spec(spec: &CapacitorSpec) -> Self {
-        let capacitance = spec
-            .capacitance
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.cap.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-
-        let m = spec.m.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let scale = spec.scale.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-
-        let tc1 = spec
-            .tc1
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.tc1.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-        let tc2 = spec
-            .tc2
-            .as_ref()
-            .map(|v| v.get_value())
-            .or_else(|| {
-                spec.model
-                    .as_ref()
-                    .and_then(|m| m.tc2.as_ref().map(|v| v.get_value()))
-            })
-            .unwrap_or(0.0);
-
-        // TODO: get this from the deck config
-        let temp = spec.temp.as_ref().map(|v| v.get_value()).unwrap_or(27.0);
-        let dtemp = spec.dtemp.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
-        let ic = spec.ic.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-
+    pub fn new(pins: &circuit::Capacitor, params: &CapacitorParams, layout: &Layout) -> Self {
         Self {
-            name: spec.name.clone(),
-            span: spec.span,
-            positive: spec.positive,
-            negative: spec.negative,
-            // `scale` multiplies the capacitance and `m` puts m copies in
-            // parallel, as in ngspice (captemp.c, capload.c).
-            capacitance: capacitance * scale * m,
-            temp,
-            dtemp,
-            tc1,
-            tc2,
-            ic,
+            positive: layout.node(pins.positive),
+            negative: layout.node(pins.negative),
+            // `m` devices in parallel multiply the capacitance, as in ngspice (capload.c).
+            capacitance: params.c * params.m,
+            ic: params.ic,
             stamp: NodePairStamp::uninitialized(),
         }
     }
@@ -101,21 +42,18 @@ impl Capacitor {
             *m.get_mut_nnz(neg_pos) -= g;
         }
 
-        let pos = m.mna_node_index(self.positive);
-        let neg = m.mna_node_index(self.negative);
-
-        if let Some(p) = pos {
+        if let Some(p) = self.positive {
             *m.get_mut_rhs(p) += i;
         }
-        if let Some(n) = neg {
+        if let Some(n) = self.negative {
             *m.get_mut_rhs(n) -= i;
         }
     }
 
     /// Stamp AC small-signal admittance for a capacitor into the imaginary part matrix.
-    pub(crate) fn stamp_ac(&self, ai: &mut Array2<f64>, node_mapping: &NodeMapping, w: f64) {
-        let node1 = node_mapping.mna_node_index(self.positive);
-        let node2 = node_mapping.mna_node_index(self.negative);
+    pub(crate) fn stamp_ac(&self, ai: &mut Array2<f64>, w: f64) {
+        let node1 = self.positive;
+        let node2 = self.negative;
         // Yc = j * w * C -> purely imaginary admittance placed on ai
         let yc = w * self.capacitance;
 
@@ -135,11 +73,12 @@ impl Capacitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::parse_netlist;
+    use crate::test_util::build_devices;
 
     fn capacitor(line: &str) -> Capacitor {
-        let deck = parse_netlist(&format!("capacitor\n{line}\n.end\n"));
-        Capacitor::from_spec(&deck.devices.capacitors[0])
+        build_devices(&format!("capacitor\n{line}\n.end\n"))
+            .capacitors
+            .remove(0)
     }
 
     // ngspice captemp.c, capload.c: the capacitance is C * scale, loaded m times.

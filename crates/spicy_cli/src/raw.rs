@@ -3,9 +3,10 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use chrono::Local;
-use spicy_parser::instance_parser::Deck;
-
-use spicy_simulate::{AcResult, DcSweepResult, OperatingPointResult, TransientResult};
+use spicy_circuit::{Lowered, SourceRef};
+use spicy_simulate::{
+    AcResult, DcSweepResult, OperatingPointResult, TransientResult, Unknown, unknowns,
+};
 
 // TODO: kinda vibe coded this so it can definitly be improved
 
@@ -30,26 +31,19 @@ pub(crate) fn raw_file_path(dir: &Path, stem: &str) -> PathBuf {
     dir.join(format!("{}.raw", sanitize_filename(stem)))
 }
 
-fn build_trace_variables_from_names(
-    node_names: &[String],
-    source_names: &[String],
-) -> Vec<(String, String)> {
-    let mut vars = Vec::new();
-    // Node voltages
-    for n in node_names {
-        if n.is_empty() {
-            continue;
-        }
-        vars.push((format!("V({})", n), "voltage".to_string()));
-    }
-    // Source currents
-    for s in source_names {
-        if s.is_empty() {
-            continue;
-        }
-        vars.push((format!("I({})", s), "device_current".to_string()));
-    }
-    vars
+/// The raw-file variable for each entry of a solution vector, in order:
+/// `V(node)` for node voltages, `I(device)` for branch currents.
+fn solution_variables(lowered: &Lowered) -> Vec<(String, &'static str)> {
+    unknowns(&lowered.circuit)
+        .iter()
+        .map(|unknown| {
+            let name = unknown.name(&lowered.names);
+            match unknown {
+                Unknown::Voltage(_) => (format!("V({name})"), "voltage"),
+                Unknown::Current(_) => (format!("I({name})"), "device_current"),
+            }
+        })
+        .collect()
 }
 
 fn write_header(
@@ -74,7 +68,7 @@ fn write_header(
 
 fn write_variables_with_offset(
     mut w: impl Write,
-    variables: &[(String, String)],
+    variables: &[(String, &str)],
     start_index: usize,
 ) -> std::io::Result<()> {
     for (i, (name, kind)) in variables.iter().enumerate() {
@@ -83,189 +77,115 @@ fn write_variables_with_offset(
     Ok(())
 }
 
-fn write_binary_series_real_f32(
+/// Per point: the x value as f64, then each trace as f32.
+fn write_binary_series_real_f32<'a>(
     mut w: impl Write,
-    x_values: &[f64],
-    traces_per_point: &[Vec<f64>],
+    points: impl IntoIterator<Item = (f64, &'a [f64])>,
 ) -> std::io::Result<()> {
     writeln!(w, "Binary:")?;
-    for (idx, &x) in x_values.iter().enumerate() {
-        let _ = idx;
+    for (x, traces) in points {
         w.write_all(&x.to_le_bytes())?;
-        for &v in &traces_per_point[idx] {
-            let f = v as f32;
-            w.write_all(&f.to_le_bytes())?;
+        for &v in traces {
+            w.write_all(&(v as f32).to_le_bytes())?;
         }
     }
     Ok(())
 }
 
 pub(crate) fn write_transient_raw(
-    deck: &Deck,
+    lowered: &Lowered,
     result: &TransientResult,
     path: &Path,
 ) -> std::io::Result<()> {
-    let file = File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    let traces = build_trace_variables_from_names(&result.node_names, &result.source_names);
-    let nvars = 1 + traces.len();
-    let npoints = result.times.len();
-
+    let mut writer = BufWriter::new(File::create(path)?);
+    let traces = solution_variables(lowered);
     write_header(
         &mut writer,
-        &deck.title,
+        &lowered.names.title,
         "Transient Analysis",
         "real forward",
-        nvars,
-        npoints,
+        traces.len() + 1,
+        result.times.len(),
     )?;
     writeln!(&mut writer, "\t0\ttime\ttime")?;
     write_variables_with_offset(&mut writer, &traces, 1)?;
-    write_binary_series_real_f32(&mut writer, &result.times, &result.samples)?;
-
+    let samples = result.samples.iter().map(Vec::as_slice);
+    write_binary_series_real_f32(&mut writer, result.times.iter().copied().zip(samples))?;
     writer.flush()
 }
 
 pub(crate) fn write_operating_point_raw(
-    deck: &Deck,
+    lowered: &Lowered,
     op: &OperatingPointResult,
     path: &Path,
 ) -> std::io::Result<()> {
-    let file = File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    // Build variable names from the provided result ordering
-    let mut variables: Vec<(String, String)> = Vec::new();
-    for (name, _) in &op.voltages {
-        variables.push((format!("V({})", name), "voltage".to_string()));
-    }
-    for (name, _) in &op.currents {
-        variables.push((format!("I({})", name), "device_current".to_string()));
-    }
-    let nvars = variables.len();
-
-    // Preamble: OP has no forward flag
+    let mut writer = BufWriter::new(File::create(path)?);
+    let variables = solution_variables(lowered);
+    // An operating point has no x variable and no `forward` flag.
     write_header(
         &mut writer,
-        &deck.title,
+        &lowered.names.title,
         "Operation Point",
         "real",
-        nvars,
+        variables.len(),
         1,
     )?;
     write_variables_with_offset(&mut writer, &variables, 0)?;
     writeln!(&mut writer, "Binary:")?;
-    // Single point: write f32 for each variable in order
-    for (_, v) in &op.voltages {
-        writer.write_all(&(*v as f32).to_le_bytes())?;
-    }
-    for (_, i) in &op.currents {
-        writer.write_all(&(*i as f32).to_le_bytes())?;
+    for &v in &op.solution {
+        writer.write_all(&(v as f32).to_le_bytes())?;
     }
     writer.flush()
 }
 
 pub(crate) fn write_dc_raw(
-    deck: &Deck,
+    lowered: &Lowered,
     dc: &DcSweepResult,
+    source: SourceRef,
     path: &Path,
-    sweep_name: &str,
-    is_voltage_source: bool,
 ) -> std::io::Result<()> {
-    let file = File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    // Assume non-empty results
-    let (first_op, _) = dc.results.first().expect("dc results not empty");
-    let mut variables: Vec<(String, String)> = Vec::new();
-    // var0: swept value
-    let sweep_var_name = sweep_name.to_string();
-    let sweep_type = if is_voltage_source {
-        "voltage"
-    } else {
-        "device_current"
+    let mut writer = BufWriter::new(File::create(path)?);
+    let traces = solution_variables(lowered);
+    let (sweep_name, sweep_type) = match source {
+        SourceRef::Voltage(v) => (&lowered.names.vsources[v.index()], "voltage"),
+        SourceRef::Current(i) => (&lowered.names.isources[i.index()], "device_current"),
     };
-
-    // Preamble
-    let trace_count = first_op.voltages.len() + first_op.currents.len();
     write_header(
         &mut writer,
-        &deck.title,
+        &lowered.names.title,
         "DC transfer characteristic",
         "real forward",
-        trace_count + 1,
+        traces.len() + 1,
         dc.results.len(),
     )?;
-    // index 0
-    writeln!(&mut writer, "\t0\t{}\t{}", sweep_var_name, sweep_type)?;
-    // Then traces
-    for (idx, (name, _)) in first_op.voltages.iter().enumerate() {
-        variables.push((format!("V({})", name), "voltage".to_string()));
-        writeln!(&mut writer, "\t{}\tV({})\tvoltage", idx + 1, name)?;
-    }
-    for (iidx, (name, _)) in first_op.currents.iter().enumerate() {
-        writeln!(
-            &mut writer,
-            "\t{}\tI({})\tdevice_current",
-            first_op.voltages.len() + 1 + iidx,
-            name
-        )?;
-    }
-
-    // Binary
-    writeln!(&mut writer, "Binary:")?;
-    for (op, sweep) in &dc.results {
-        writer.write_all(&sweep.to_le_bytes())?; // swept value as f64
-        for (_, v) in &op.voltages {
-            writer.write_all(&(*v as f32).to_le_bytes())?;
-        }
-        for (_, i) in &op.currents {
-            writer.write_all(&(*i as f32).to_le_bytes())?;
-        }
-    }
+    writeln!(&mut writer, "\t0\t{sweep_name}\t{sweep_type}")?;
+    write_variables_with_offset(&mut writer, &traces, 1)?;
+    let points = dc
+        .results
+        .iter()
+        .map(|(op, sweep)| (*sweep, op.solution.as_slice()));
+    write_binary_series_real_f32(&mut writer, points)?;
     writer.flush()
 }
 
-pub(crate) fn write_ac_raw(deck: &Deck, ac: &AcResult, path: &Path) -> std::io::Result<()> {
-    let file = File::create(path)?;
-    let mut writer = BufWriter::new(file);
-
-    // Rebuild names
-    let node_names = deck.node_mapping.node_names_mna_order();
-    let source_names = deck.node_mapping.branch_names_mna_order();
-    let traces = build_trace_variables_from_names(&node_names, &source_names);
-    let trace_count = traces.len();
-
-    // Preamble
+pub(crate) fn write_ac_raw(lowered: &Lowered, ac: &AcResult, path: &Path) -> std::io::Result<()> {
+    let mut writer = BufWriter::new(File::create(path)?);
+    let traces = solution_variables(lowered);
     write_header(
         &mut writer,
-        &deck.title,
+        &lowered.names.title,
         "AC Analysis",
         "complex forward",
-        trace_count + 1,
+        traces.len() + 1,
         ac.len(),
     )?;
     writeln!(&mut writer, "\t0\tfrequency\tfrequency")?;
     write_variables_with_offset(&mut writer, &traces, 1)?;
-
-    // Binary: per point -> f64 frequency, then for each trace: f64 re, f64 im
+    // Per point: f64 frequency, then (re, im) as f64 for each trace.
     writeln!(&mut writer, "Binary:")?;
-    let n = node_names.len();
-    let k = source_names.len();
     for (f, xr, xi) in ac {
         writer.write_all(&f.to_le_bytes())?;
-        // node voltages
-        for i in 0..n {
-            let re = xr[i];
-            let im = xi[i];
-            writer.write_all(&re.to_le_bytes())?;
-            writer.write_all(&im.to_le_bytes())?;
-        }
-        // source currents
-        for i in 0..k {
-            let re = xr[n + i];
-            let im = xi[n + i];
+        for (re, im) in xr.iter().zip(xi) {
             writer.write_all(&re.to_le_bytes())?;
             writer.write_all(&im.to_le_bytes())?;
         }

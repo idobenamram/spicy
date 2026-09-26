@@ -22,12 +22,87 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 
-use spicy_parser::{ParseOptions, instance_parser::Deck, parse};
+use spicy_circuit::Lowered;
+use spicy_parser::{ParseOptions, lower, parse};
 
-/// Parse a netlist given as text.
-pub(crate) fn parse_netlist(netlist: &str) -> Deck {
+use crate::devices::Devices;
+use crate::unknowns::{Layout, Unknown, unknowns};
+
+/// Parse and lower a netlist given as text.
+pub(crate) fn lower_netlist(netlist: &str) -> Lowered {
     let mut options = ParseOptions::new_with_source("inline.spicy", netlist.to_string());
-    parse(&mut options).expect("parse netlist")
+    let deck = parse(&mut options).expect("parse netlist");
+    lower(&deck).expect("lower netlist")
+}
+
+/// The simulator's devices for a netlist given as text.
+pub(crate) fn build_devices(netlist: &str) -> Devices {
+    let lowered = lower_netlist(netlist);
+    let layout = Layout::new(&lowered.circuit);
+    Devices::new(&lowered.circuit, &lowered.params, &layout)
+}
+
+/// An operating point with each value named, as stored in snapshots.
+#[derive(Debug)]
+pub(crate) struct OpSnapshot {
+    voltages: Vec<(String, f64)>,
+    currents: Vec<(String, f64)>,
+}
+
+impl OpSnapshot {
+    pub(crate) fn new(lowered: &Lowered, solution: &[f64]) -> Self {
+        let mut snapshot = Self {
+            voltages: Vec::new(),
+            currents: Vec::new(),
+        };
+        for (unknown, &value) in unknowns(&lowered.circuit).iter().zip(solution) {
+            let entry = (unknown.name(&lowered.names).to_string(), value);
+            match unknown {
+                Unknown::Voltage(_) => snapshot.voltages.push(entry),
+                Unknown::Current(_) => snapshot.currents.push(entry),
+            }
+        }
+        snapshot
+    }
+}
+
+/// A DC sweep with each value named, as stored in snapshots.
+#[derive(Debug)]
+#[expect(dead_code, reason = "read through `Debug` when snapshotting")]
+pub(crate) struct DcSnapshot {
+    pub(crate) results: Vec<(OpSnapshot, f64)>,
+}
+
+/// A transient result with the unknowns' names, as stored in snapshots.
+#[derive(Debug)]
+#[expect(dead_code, reason = "read through `Debug` when snapshotting")]
+pub(crate) struct TranSnapshot {
+    times: Vec<f64>,
+    node_names: Vec<String>,
+    source_names: Vec<String>,
+    samples: Vec<Vec<f64>>,
+    newton_iterations: Vec<usize>,
+}
+
+impl TranSnapshot {
+    pub(crate) fn new(lowered: &Lowered, result: crate::TransientResult) -> Self {
+        let mut node_names = Vec::new();
+        let mut source_names = Vec::new();
+        for unknown in unknowns(&lowered.circuit) {
+            let name = unknown.name(&lowered.names).to_string();
+            match unknown {
+                Unknown::Voltage(_) => node_names.push(name),
+                Unknown::Current(_) => source_names.push(name),
+            }
+        }
+        Self {
+            times: result.times,
+            node_names,
+            source_names,
+            samples: result.samples,
+            newton_iterations: result.newton_iterations,
+        }
+    }
 }
 
 /// Round `x` to `sig` significant digits.

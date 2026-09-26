@@ -4,12 +4,18 @@
 //! model tables shared by the instances that use them. `Option` appears only
 //! where a default depends on another value or on the analysis, so it can't
 //! be resolved before the run.
+//!
+//! Every parameter the SPICE front-end accepts is carried here, including
+//! ones the simulator doesn't use yet. Those say "Not simulated yet".
 
 /// All device numbers of a circuit, indexed like [`crate::Circuit`].
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Params {
+    pub resistor_models: Vec<ResistorModel>,
     pub resistors: Vec<ResistorParams>,
+    pub capacitor_models: Vec<CapacitorModel>,
     pub capacitors: Vec<CapacitorParams>,
+    pub inductor_models: Vec<InductorModel>,
     pub inductors: Vec<InductorParams>,
     pub diode_models: Vec<DiodeModel>,
     pub diodes: Vec<DiodeParams>,
@@ -17,6 +23,48 @@ pub struct Params {
     pub bjts: Vec<BjtParams>,
     pub vsources: Vec<SourceParams>,
     pub isources: Vec<SourceParams>,
+}
+
+/// A device's temperature relative to the run's. Not simulated yet: every
+/// device runs at the thermal voltage of 27 °C until temperature support.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DeviceTemperature {
+    /// The run's temperature plus this many kelvin (SPICE `dtemp`).
+    Offset(f64),
+    /// This temperature in kelvin, whatever the run's (SPICE `temp`). When a
+    /// device gives both, `temp` wins and `dtemp` is ignored, as in ngspice.
+    Fixed(f64),
+}
+
+impl Default for DeviceTemperature {
+    fn default() -> Self {
+        Self::Offset(0.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResistorModel {
+    /// First-order temperature coefficient (1/K). Not simulated yet.
+    pub tc1: f64,
+    /// Second-order temperature coefficient (1/K²). Not simulated yet.
+    pub tc2: f64,
+    /// Default width (m) of a geometric resistor. Not simulated yet: it needs
+    /// the sheet resistance, which isn't parsed.
+    pub default_width: f64,
+    /// Default length (m) of a geometric resistor. Not simulated yet.
+    pub default_length: f64,
+}
+
+impl Default for ResistorModel {
+    /// ngspice's defaults (`ressetup.c`).
+    fn default() -> Self {
+        Self {
+            tc1: 0.0,
+            tc2: 0.0,
+            default_width: 10e-6,
+            default_length: 10e-6,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,6 +75,18 @@ pub struct ResistorParams {
     pub r_ac: Option<f64>,
     /// Number of devices in parallel.
     pub m: f64,
+    pub temperature: DeviceTemperature,
+    /// Whether the resistor adds thermal noise. Not simulated yet: there's no
+    /// noise analysis.
+    pub noisy: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CapacitorModel {
+    /// First-order temperature coefficient (1/K). Not simulated yet.
+    pub tc1: f64,
+    /// Second-order temperature coefficient (1/K²). Not simulated yet.
+    pub tc2: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,6 +97,15 @@ pub struct CapacitorParams {
     pub m: f64,
     /// Initial voltage (V), used when the transient skips the operating point.
     pub ic: f64,
+    pub temperature: DeviceTemperature,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct InductorModel {
+    /// First-order temperature coefficient (1/K). Not simulated yet.
+    pub tc1: f64,
+    /// Second-order temperature coefficient (1/K²). Not simulated yet.
+    pub tc2: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -47,6 +116,10 @@ pub struct InductorParams {
     pub m: f64,
     /// Initial current (A), used when the transient skips the operating point.
     pub ic: f64,
+    pub temperature: DeviceTemperature,
+    /// Number of turns. Not simulated yet: it only matters for an inductance
+    /// given per turn by the model, which isn't parsed.
+    pub nt: f64,
 }
 
 /// Shockley diode model.
@@ -56,12 +129,19 @@ pub struct DiodeModel {
     pub is: f64,
     /// Emission coefficient.
     pub n: f64,
+    /// Series resistance (Ω); 0 means none. Not simulated yet: a nonzero
+    /// value adds an internal node (docs/ecad/circuit.md §4.3).
+    pub rs: f64,
 }
 
 impl Default for DiodeModel {
     /// ngspice's defaults (`diosetup.c`).
     fn default() -> Self {
-        Self { is: 1e-14, n: 1.0 }
+        Self {
+            is: 1e-14,
+            n: 1.0,
+            rs: 0.0,
+        }
     }
 }
 
@@ -71,11 +151,37 @@ pub struct DiodeParams {
     pub area: f64,
     /// Number of devices in parallel.
     pub m: f64,
+    /// Perimeter factor: scales the sidewall currents. Not simulated yet: the
+    /// sidewall parameters aren't parsed.
+    pub pj: f64,
+    /// Metal and polysilicon capacitor dimensions (m) of the level 3 diode:
+    /// length and width of each. Not simulated yet.
+    pub lm: f64,
+    pub wm: f64,
+    pub lp: f64,
+    pub wp: f64,
+    /// Start the first DC iteration with the diode off. Not simulated yet.
+    pub off: bool,
+    /// Initial voltage (V) for a transient that skips the operating point.
+    /// Not simulated yet.
+    pub ic: f64,
+    pub temperature: DeviceTemperature,
 }
 
 impl Default for DiodeParams {
     fn default() -> Self {
-        Self { area: 1.0, m: 1.0 }
+        Self {
+            area: 1.0,
+            m: 1.0,
+            pj: 0.0,
+            lm: 0.0,
+            wm: 0.0,
+            lp: 0.0,
+            wp: 0.0,
+            off: false,
+            ic: 0.0,
+            temperature: DeviceTemperature::default(),
+        }
     }
 }
 
@@ -122,11 +228,24 @@ pub struct BjtParams {
     pub area: f64,
     /// Number of devices in parallel.
     pub m: f64,
+    /// Start the first DC iteration with the transistor off. Not simulated yet.
+    pub off: bool,
+    /// Initial base-emitter voltage (V) for a transient that skips the
+    /// operating point. Not simulated yet.
+    pub ic_vbe: f64,
+    /// Initial collector-emitter voltage (V), as `ic_vbe`. Not simulated yet.
+    pub ic_vce: f64,
 }
 
 impl Default for BjtParams {
     fn default() -> Self {
-        Self { area: 1.0, m: 1.0 }
+        Self {
+            area: 1.0,
+            m: 1.0,
+            off: false,
+            ic_vbe: 0.0,
+            ic_vce: 0.0,
+        }
     }
 }
 

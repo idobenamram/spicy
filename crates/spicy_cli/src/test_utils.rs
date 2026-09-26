@@ -3,7 +3,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use spicy_parser::{ParseOptions, instance_parser::Deck, netlist_types::Command, parse};
+use spicy_circuit::{Analysis, Lowered};
+use spicy_parser::{ParseOptions, lower, parse};
 use spicy_simulate::{SimulationConfig, ac::simulate_ac};
 
 /// A fresh temporary directory for one test, removed when dropped.
@@ -28,20 +29,23 @@ impl Drop for TestDir {
     }
 }
 
-pub(crate) fn parse_deck(netlist: &str) -> Deck {
+/// Parse and lower a netlist given as text.
+pub(crate) fn lower_netlist(netlist: &str) -> Lowered {
     let mut options = ParseOptions::new_with_source("inline.spicy", netlist.to_string());
-    parse(&mut options).expect("parse")
+    let deck = parse(&mut options).expect("parse");
+    lower(&deck).expect("lower")
 }
 
 /// AC results per frequency: (frequency, real parts, imaginary parts), in MNA order.
 pub(crate) type AcPoints = Vec<(f64, Vec<f64>, Vec<f64>)>;
 
-/// Run the deck's first analysis, which must be `.ac`.
-pub(crate) fn simulate_ac_points(deck: &Deck) -> AcPoints {
-    let Command::Ac(command) = &deck.commands[0] else {
+/// Run the netlist's first analysis, which must be `.ac`.
+pub(crate) fn simulate_ac_points(lowered: &Lowered) -> AcPoints {
+    let Analysis::Ac(sweep) = &lowered.analyses[0] else {
         panic!("expected .ac")
     };
-    simulate_ac(deck, command, &SimulationConfig::default())
+    let (circuit, params) = (&lowered.circuit, &lowered.params);
+    simulate_ac(circuit, params, sweep, &SimulationConfig::default())
         .into_iter()
         .map(|(freq, real, imag)| (freq, real.to_vec(), imag.to_vec()))
         .collect()

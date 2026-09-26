@@ -2297,6 +2297,7 @@ dependencies = [
  "neovim-lib",
  "ratatui",
  "rmp",
+ "spicy_circuit",
  "spicy_parser",
  "spicy_simulate",
 ]
@@ -2332,6 +2333,7 @@ dependencies = [
  "ndarray",
  "ndarray-linalg",
  "rstest",
+ "spicy_circuit",
  "spicy_parser",
  "thiserror 2.0.16",
 ]

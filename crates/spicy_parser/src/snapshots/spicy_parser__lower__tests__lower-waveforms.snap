@@ -128,8 +128,11 @@ Lowered {
         ],
     },
     params: Params {
+        resistor_models: [],
         resistors: [],
+        capacitor_models: [],
         capacitors: [],
+        inductor_models: [],
         inductors: [],
         diode_models: [],
         diodes: [],

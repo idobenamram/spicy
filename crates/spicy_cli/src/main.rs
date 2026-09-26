@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use spicy_parser::{ParseOptions, parse};
+use spicy_parser::{ParseOptions, lower, parse};
 use spicy_simulate::SimulationConfig;
 
 use crate::batch::RawOutput;
@@ -60,8 +60,8 @@ fn main() {
     });
     let mut parser_options = ParseOptions::new_with_source(Path::new(&path), input);
 
-    match parse(&mut parser_options) {
-        Ok(deck) => {
+    match parse(&mut parser_options).and_then(|deck| lower(&deck)) {
+        Ok(lowered) => {
             let base = Path::new(&path)
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
@@ -71,7 +71,7 @@ fn main() {
                 stem: &base,
             });
             let result = batch::run(
-                &deck,
+                &lowered,
                 &SimulationConfig::default(),
                 &mut std::io::stdout().lock(),
                 raw.as_ref(),

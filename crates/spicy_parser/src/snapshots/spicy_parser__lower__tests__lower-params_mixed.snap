@@ -6,69 +6,93 @@ Lowered {
     circuit: Circuit {
         node_count: 6,
         resistors: [
-            TwoTerminal {
+            Resistor {
                 positive: NodeId(
                     1,
                 ),
                 negative: NodeId(
+                    2,
+                ),
+                model: ResistorModelId(
+                    0,
+                ),
+            },
+            Resistor {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+                model: ResistorModelId(
+                    1,
+                ),
+            },
+            Resistor {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+                model: ResistorModelId(
                     2,
                 ),
             },
-            TwoTerminal {
+            Resistor {
                 positive: NodeId(
                     1,
                 ),
                 negative: NodeId(
                     2,
+                ),
+                model: ResistorModelId(
+                    3,
                 ),
             },
-            TwoTerminal {
+            Resistor {
                 positive: NodeId(
                     1,
                 ),
                 negative: NodeId(
                     2,
                 ),
-            },
-            TwoTerminal {
-                positive: NodeId(
-                    1,
-                ),
-                negative: NodeId(
-                    2,
-                ),
-            },
-            TwoTerminal {
-                positive: NodeId(
-                    1,
-                ),
-                negative: NodeId(
-                    2,
+                model: ResistorModelId(
+                    3,
                 ),
             },
         ],
         capacitors: [
-            TwoTerminal {
+            Capacitor {
                 positive: NodeId(
                     3,
                 ),
                 negative: NodeId(
                     2,
                 ),
+                model: CapacitorModelId(
+                    0,
+                ),
             },
-            TwoTerminal {
+            Capacitor {
                 positive: NodeId(
                     3,
                 ),
                 negative: NodeId(
                     2,
                 ),
+                model: CapacitorModelId(
+                    1,
+                ),
             },
-            TwoTerminal {
+            Capacitor {
                 positive: NodeId(
                     3,
                 ),
                 negative: NodeId(
+                    2,
+                ),
+                model: CapacitorModelId(
                     2,
                 ),
             },
@@ -97,6 +121,32 @@ Lowered {
         isources: [],
     },
     params: Params {
+        resistor_models: [
+            ResistorModel {
+                tc1: 0.1,
+                tc2: 0.01,
+                default_width: 1e-5,
+                default_length: 1e-5,
+            },
+            ResistorModel {
+                tc1: 0.02,
+                tc2: 0.0,
+                default_width: 1e-5,
+                default_length: 1e-5,
+            },
+            ResistorModel {
+                tc1: 0.0,
+                tc2: 0.0,
+                default_width: 1e-5,
+                default_length: 1e-5,
+            },
+            ResistorModel {
+                tc1: 345.0,
+                tc2: 0.0,
+                default_width: 1e-5,
+                default_length: 1e-5,
+            },
+        ],
         resistors: [
             ResistorParams {
                 r: 4000.0,
@@ -104,6 +154,10 @@ Lowered {
                     8.0,
                 ),
                 m: 3.0,
+                temperature: Fixed(
+                    573.15,
+                ),
+                noisy: true,
             },
             ResistorParams {
                 r: 560000.0,
@@ -111,6 +165,10 @@ Lowered {
                     280.0,
                 ),
                 m: 5.0,
+                temperature: Fixed(
+                    279.15,
+                ),
+                noisy: true,
             },
             ResistorParams {
                 r: 30000.0,
@@ -118,6 +176,10 @@ Lowered {
                     70.0,
                 ),
                 m: 9.0,
+                temperature: Offset(
+                    0.0,
+                ),
+                noisy: true,
             },
             ResistorParams {
                 r: 2000.0,
@@ -125,6 +187,10 @@ Lowered {
                     1.0,
                 ),
                 m: 5.0,
+                temperature: Offset(
+                    0.0,
+                ),
+                noisy: true,
             },
             ResistorParams {
                 r: 0.001,
@@ -132,6 +198,24 @@ Lowered {
                     1.0,
                 ),
                 m: 5.0,
+                temperature: Offset(
+                    0.0,
+                ),
+                noisy: true,
+            },
+        ],
+        capacitor_models: [
+            CapacitorModel {
+                tc1: 0.1,
+                tc2: 0.01,
+            },
+            CapacitorModel {
+                tc1: 0.2,
+                tc2: 0.02,
+            },
+            CapacitorModel {
+                tc1: 0.0,
+                tc2: 0.0,
             },
         ],
         capacitors: [
@@ -139,18 +223,28 @@ Lowered {
                 c: 3e-6,
                 m: 2.0,
                 ic: 0.5,
+                temperature: Fixed(
+                    573.15,
+                ),
             },
             CapacitorParams {
                 c: 9.999999999999999e-6,
                 m: 4.0,
                 ic: 0.1,
+                temperature: Fixed(
+                    533.15,
+                ),
             },
             CapacitorParams {
                 c: 3e-5,
                 m: 1.0,
                 ic: 0.3,
+                temperature: Offset(
+                    0.0,
+                ),
             },
         ],
+        inductor_models: [],
         inductors: [],
         diode_models: [],
         diodes: [],

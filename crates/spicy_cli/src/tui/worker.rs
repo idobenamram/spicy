@@ -7,9 +7,10 @@ use spicy_simulate::{
     trans::simulate_trans,
 };
 
-use crate::tui::app::App;
+use crate::tui::app::{App, ResultNames};
 use crate::tui::ui::format_error_snippet;
-use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, netlist_types::Command, parse};
+use spicy_circuit::Analysis;
+use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, lower, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {
@@ -18,7 +19,7 @@ pub enum SimCmd {
 
 #[derive(Debug)]
 pub enum SimMsg {
-    SimulationStarted,
+    SimulationStarted(ResultNames),
     Op(OperatingPointResult),
     Dc(DcSweepResult),
     Transient(TransientResult),
@@ -28,7 +29,8 @@ pub enum SimMsg {
 
 pub fn apply_sim_update(app: &mut App, msg: SimMsg) {
     match msg {
-        SimMsg::SimulationStarted => {
+        SimMsg::SimulationStarted(result_names) => {
+            app.result_names = result_names;
             app.op = None;
             app.dc = None;
             app.trans = None;
@@ -74,8 +76,8 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                 };
                 let mut parse_options = ParseOptions::new_with_source(&netlist_path, input);
 
-                let deck = match parse(&mut parse_options) {
-                    Ok(deck) => deck,
+                let lowered = match parse(&mut parse_options).and_then(|deck| lower(&deck)) {
+                    Ok(lowered) => lowered,
                     Err(e) => {
                         let _ = tx.send(SimMsg::FatalError(format_parse_error(
                             &e,
@@ -85,12 +87,13 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                     }
                 };
 
-                let _ = tx.send(SimMsg::SimulationStarted);
+                let _ = tx.send(SimMsg::SimulationStarted(ResultNames::new(&lowered)));
 
-                for command in &deck.commands {
-                    match command {
-                        Command::Op(_) => {
-                            match simulate_op(&deck, &sim_config) {
+                let (circuit, params) = (&lowered.circuit, &lowered.params);
+                for analysis in &lowered.analyses {
+                    match analysis {
+                        Analysis::Op => {
+                            match simulate_op(circuit, params, &sim_config) {
                                 Ok(op) => {
                                     let _ = tx.send(SimMsg::Op(op));
                                 }
@@ -103,13 +106,13 @@ pub fn worker_loop(netlist_path: PathBuf, rx: Receiver<SimCmd>, tx: Sender<SimMs
                             }
                             continue;
                         }
-                        Command::Dc(command_params) => {
-                            let dc = simulate_dc(&deck, command_params, &sim_config);
+                        Analysis::Dc(sweep) => {
+                            let dc = simulate_dc(circuit, params, sweep, &sim_config);
                             let _ = tx.send(SimMsg::Dc(dc));
                             continue;
                         }
-                        Command::Tran(command_params) => {
-                            match simulate_trans(&deck, command_params, &sim_config) {
+                        Analysis::Tran(tran) => {
+                            match simulate_trans(circuit, params, tran, &sim_config) {
                                 Ok(tr) => {
                                     let _ = tx.send(SimMsg::Transient(tr));
                                 }

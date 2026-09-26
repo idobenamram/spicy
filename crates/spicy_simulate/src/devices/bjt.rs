@@ -4,26 +4,20 @@
 //! linearizes around the current Newton guess for MNA stamping.
 use super::stamp::NodeTripletStamp;
 use crate::matrix::SolverMatrix;
+use crate::unknowns::Layout;
 use crate::util::get_voltage_diff;
-use spicy_parser::BjtPolarity;
-use spicy_parser::Span;
-use spicy_parser::devices::BjtSpec;
-use spicy_parser::netlist_types::NodeIndex;
+use spicy_circuit::{self as circuit, BjtModel, BjtParams, Polarity};
 
 const DEFAULT_THERMAL_VOLTAGE: f64 = 0.02585;
 const DEFAULT_EXP_LIMIT: f64 = 40.0;
 
 #[derive(Debug, Clone)]
 pub struct Bjt {
-    // Stored for diagnostics / SPICE compatibility; not used by the solver yet.
-    #[allow(dead_code)]
-    pub name: String,
-    #[allow(dead_code)]
-    pub span: Span,
-    pub collector: NodeIndex,
-    pub base: NodeIndex,
-    pub emitter: NodeIndex,
-    pub polarity: BjtPolarity,
+    /// MNA rows of the terminals; `None` for ground.
+    pub collector: Option<usize>,
+    pub base: Option<usize>,
+    pub emitter: Option<usize>,
+    pub polarity: Polarity,
     /// Effective saturation current (A): the model's IS scaled by `area` and `m`.
     pub saturation_current: f64,
     /// Forward beta - approximate relation between I_c and I_e in active region.
@@ -44,12 +38,6 @@ pub struct Bjt {
     pub thermal_voltage: f64,
     /// Clamp limit for V/Vt to keep exp() bounded.
     pub exp_limit: f64,
-    #[allow(dead_code)]
-    pub off: bool,
-    #[allow(dead_code)]
-    pub ic_vbe: f64,
-    #[allow(dead_code)]
-    pub ic_vce: Option<f64>,
     pub stamp: NodeTripletStamp,
 }
 
@@ -70,51 +58,22 @@ struct LinearizedBjt {
 }
 
 impl Bjt {
-    pub fn from_spec(spec: &BjtSpec) -> Self {
-        // Defaults follow ngspice (bjtsetup.c): IS = 1e-16, BF = 100, BR = 1, NF = NR = 1.
-        let saturation_current = spec
-            .model
-            .is
-            .as_ref()
-            .map(|v| v.get_value())
-            .unwrap_or(1e-16);
-
-        let beta_forward = spec
-            .model
-            .bf
-            .as_ref()
-            .map(|v| v.get_value())
-            .unwrap_or(100.0);
-        let beta_reverse = spec.model.br.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let emission_coeff_forward = spec.model.nf.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let emission_coeff_reverse = spec.model.nr.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-
-        let area = spec.area.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let m = spec.m.as_ref().map(|v| v.get_value()).unwrap_or(1.0);
-        let off = spec.off.unwrap_or(false);
-        let ic_vbe = spec.ic_vbe.as_ref().map(|v| v.get_value()).unwrap_or(0.0);
-        let ic_vce = spec.ic_vce.as_ref().map(|v| v.get_value());
-
+    pub fn new(pins: &circuit::Bjt, model: &BjtModel, params: &BjtParams, layout: &Layout) -> Self {
         Self {
-            name: spec.name.clone(),
-            span: spec.span,
-            collector: spec.collector,
-            base: spec.base,
-            emitter: spec.emitter,
-            polarity: spec.model.polarity,
-            // ngspice scales IS by `area` (bjttemp.c) and every contribution by `m`
-            // (bjtload.c). In this Ebers-Moll model all currents are proportional to
-            // IS, so both fold into the saturation current.
-            saturation_current: saturation_current * area * m,
-            beta_forward,
-            beta_reverse,
-            emission_coeff_forward,
-            emission_coeff_reverse,
+            collector: layout.node(pins.collector),
+            base: layout.node(pins.base),
+            emitter: layout.node(pins.emitter),
+            polarity: model.polarity,
+            // ngspice scales IS by `area` (bjttemp.c) and every contribution by
+            // `m` (bjtload.c). In this model every current is proportional to
+            // IS, so both fold into it.
+            saturation_current: model.is * params.area * params.m,
+            beta_forward: model.bf,
+            beta_reverse: model.br,
+            emission_coeff_forward: model.nf,
+            emission_coeff_reverse: model.nr,
             thermal_voltage: DEFAULT_THERMAL_VOLTAGE,
             exp_limit: DEFAULT_EXP_LIMIT,
-            off,
-            ic_vbe,
-            ic_vce,
             stamp: NodeTripletStamp::uninitialized(),
         }
     }
@@ -125,8 +84,8 @@ impl Bjt {
     /// reuse the same Ebers-Moll equations for both polarities.
     fn polarity_sign(&self) -> f64 {
         match self.polarity {
-            BjtPolarity::Npn => 1.0,
-            BjtPolarity::Pnp => -1.0,
+            Polarity::Npn => 1.0,
+            Polarity::Pnp => -1.0,
         }
     }
 
@@ -244,9 +203,9 @@ impl Bjt {
 
     /// Stamp the linearized BJT conductance matrix and RHS into MNA.
     pub(crate) fn stamp_nonlinear(&self, m: &mut SolverMatrix, guess: &[f64]) {
-        let base = m.mna_node_index(self.base);
-        let collector = m.mna_node_index(self.collector);
-        let emitter = m.mna_node_index(self.emitter);
+        let base = self.base;
+        let collector = self.collector;
+        let emitter = self.emitter;
 
         // compute the junctions voltage diffs
         let v_be = get_voltage_diff(guess, base, emitter);
@@ -297,13 +256,14 @@ impl Bjt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::parse_netlist;
+    use crate::test_util::build_devices;
 
     fn bjt(instance_params: &str, model_params: &str) -> Bjt {
-        let deck = parse_netlist(&format!(
+        build_devices(&format!(
             "bjt\nQ1 c b 0 QN {instance_params}\n.MODEL QN NPN {model_params}\n.end\n"
-        ));
-        Bjt::from_spec(&deck.devices.bjts[0])
+        ))
+        .bjts
+        .remove(0)
     }
 
     // ngspice scales IS by area (bjttemp.c) and every contribution by m

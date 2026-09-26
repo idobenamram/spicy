@@ -1,13 +1,13 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) committed. Now working through the simulator steps in `pipeline.md` §9, one at a time. **Step 1 (cleanup: bug fixes, ngspice defaults, CLI concerns out of the simulator) is done and awaiting review.** The language front-end (M1) follows.
+> **Status:** M0 (housekeeping) and simulator step 1 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator) are committed. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next, to confirm:** the language front-end (M1); the simulator work the MVP needs (`spicy_circuit`, temperature, AC at the operating point, accuracy) can follow it.
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 
 **How we work:**
 - One milestone at a time. Each starts with a short design note, is built in small steps, and ends with a review (§8) before the next one starts.
-- **You make all commits,** after reviewing and cleaning up the code between milestones.
+- **Nothing is committed before you've reviewed it.** You review and clean up the code between milestones, then commit or ask for the commit.
 
 ---
 
@@ -281,7 +281,7 @@ It has 8 knobs:
 
 **🔍 marks a review point:** we stop and go over the step together, and you review, clean up and commit before the next milestone.
 
-### M0: Housekeeping — done, pending review 🔍
+### M0: Housekeeping — done, committed
 
 | # | Item | Status |
 |---|---|---|
@@ -292,7 +292,7 @@ It has 8 knobs:
 | 5 | Commits | ✅ You commit |
 | 6 | Crate scaffolding | → Moved to M1a. `spicy_circuit` gets its own detailed design note before anything changes |
 | 7 | Lesson crate | ✅ `crates/spicy_bounds` removed; `Cargo.toml` and `Cargo.lock` are back to their committed state. The affine math will be written inside `spicy_engine` in M3 |
-| — | Clippy warnings | ❓ 86 warnings from the newer clippy (1.98) in existing code. Clean up now, later, or leave? |
+| — | Clippy warnings | Left for now: 86 warnings from the newer clippy (1.98) in existing code. CI reports them without failing |
 
 ### M1: Language front-end
 
@@ -312,7 +312,7 @@ It has 8 knobs:
 
 ### M2: Native simulator input and simulator readiness
 
-> **Superseded ordering:** `pipeline.md` §9 now defines the order of this work, as smaller steps each reviewed on its own: (1) cleanup, (2) stamp locations out of devices, (3) `spicy_circuit`, (4) one plan per circuit, (5) temperature. The items below stay as the list of what must eventually be done.
+> **Superseded ordering:** `pipeline.md` §9 now defines the order of this work, as smaller steps each reviewed on its own: (1) cleanup, (2) stamp locations out of devices, (3) `spicy_circuit`, (4) one plan per circuit, (5) temperature. Steps 2 and 4 are deferred: they're a speed-up that matters once the engine runs many simulations. The items below stay as the list of what must eventually be done.
 
 - **M2a: Extract `spicy_circuit`.**
   - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_parser`.
@@ -367,16 +367,16 @@ It has 8 knobs:
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | Crate layout (§2.2), now with `spicy_circuit` for native simulator input | **To discuss:** a detailed `spicy_circuit` design note first |
+| 1 | Crate layout (§2.2), now with `spicy_circuit` for native simulator input | **Agreed:** the `spicy_circuit` data model is in `circuit.md` |
 | 2 | Our simulator for the MVP; ngspice right after | Agreed |
 | 3 | MVP language subset (§4.1) | To confirm |
 | 4 | Lossless syntax tree from day one | To confirm |
 | 5 | Diagnostics: codespan-reporting | Agreed |
 | 6 | Stale snapshot | Done: reverted to `V1` |
 | 7 | Docs in `docs/ecad/` | Done |
-| 8 | Commits | You commit, after reviewing each milestone |
+| 8 | Commits | Only after your review of each milestone |
 | 9 | One-time `cargo fmt --all` + fmt check in CI | Done |
-| 10 | Clippy warnings in existing code | Open (M0) |
+| 10 | Clippy warnings in existing code | Left for now |
 
 ---
 

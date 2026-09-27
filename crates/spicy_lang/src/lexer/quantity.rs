@@ -1,69 +1,32 @@
 //! Reading a `Quantity` token: `47k`, `4k7`, `1uF`, `10°C`, `5%` (grammar.md §2.5, §5).
 //!
-//! The scanner and the decoder share [`scan_mantissa`] and [`is_suffix_char`], so they
-//! can never disagree about where a number ends.
+//! The scanner and the decoder share [`scan_mantissa`], and the scanner and `check`
+//! share [`is_suffix_char`], so they can never disagree about where a number ends.
 
 use std::ops::Range;
 
-/// What a unit spelling means. Only the spelling: dimensions live in `spicy_model`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum UnitSym {
-    Volt,
-    Amp,
-    Ohm,
-    Farad,
-    Henry,
-    Hertz,
-    Second,
-    Watt,
-    Kelvin,
-    Celsius,
-    Percent,
-    Decibel,
-}
+use spicy_model::span::Span;
+use spicy_model::units::Unit;
 
-impl UnitSym {
-    /// The canonical spelling, used in messages.
-    pub fn symbol(self) -> &'static str {
-        match self {
-            UnitSym::Volt => "V",
-            UnitSym::Amp => "A",
-            UnitSym::Ohm => "Ω",
-            UnitSym::Farad => "F",
-            UnitSym::Henry => "H",
-            UnitSym::Hertz => "Hz",
-            UnitSym::Second => "s",
-            UnitSym::Watt => "W",
-            UnitSym::Kelvin => "K",
-            UnitSym::Celsius => "°C",
-            UnitSym::Percent => "%",
-            UnitSym::Decibel => "dB",
-        }
-    }
-
-    /// `k°C`, `m%` and `kdB` make no sense, so these units take no prefix.
-    pub fn accepts_prefix(self) -> bool {
-        !matches!(self, UnitSym::Celsius | UnitSym::Percent | UnitSym::Decibel)
-    }
-}
+use crate::edit_distance::edit_distance;
 
 /// Every accepted unit spelling. `Ω` appears twice: U+03A9 (Greek capital omega) and
 /// U+2126 (ohm sign) look identical, so both are accepted.
-const UNITS: &[(&str, UnitSym)] = &[
-    ("V", UnitSym::Volt),
-    ("A", UnitSym::Amp),
-    ("\u{3A9}", UnitSym::Ohm),
-    ("\u{2126}", UnitSym::Ohm),
-    ("ohm", UnitSym::Ohm),
-    ("F", UnitSym::Farad),
-    ("H", UnitSym::Henry),
-    ("Hz", UnitSym::Hertz),
-    ("s", UnitSym::Second),
-    ("W", UnitSym::Watt),
-    ("K", UnitSym::Kelvin),
-    ("°C", UnitSym::Celsius),
-    ("%", UnitSym::Percent),
-    ("dB", UnitSym::Decibel),
+const UNITS: &[(&str, Unit)] = &[
+    ("V", Unit::Volt),
+    ("A", Unit::Amp),
+    ("\u{3A9}", Unit::Ohm),
+    ("\u{2126}", Unit::Ohm),
+    ("ohm", Unit::Ohm),
+    ("F", Unit::Farad),
+    ("H", Unit::Henry),
+    ("Hz", Unit::Hertz),
+    ("s", Unit::Second),
+    ("W", Unit::Watt),
+    ("K", Unit::Kelvin),
+    ("°C", Unit::Celsius),
+    ("%", Unit::Percent),
+    ("dB", Unit::Decibel),
 ];
 
 /// SI prefixes, case-sensitive. Micro has three spellings: `u`, `µ` (U+00B5, micro sign)
@@ -88,16 +51,15 @@ pub struct QuantityLit {
     /// The value with the prefix applied: `1kHz` → 1000.0, `47k` → 47000.0.
     pub value: f64,
     /// `None` for a bare number (`47k`, `3`); the unit then comes from context.
-    pub unit: Option<UnitSym>,
-    /// A plain integer: no decimal point, exponent, prefix or unit (`3`, `1_000`).
-    pub is_integer: bool,
+    pub unit: Option<Unit>,
 }
 
+/// Why a quantity literal doesn't decode, and where.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuantityError {
     pub kind: QuantityErrorKind,
-    /// Byte range within the token's text.
-    pub range: Range<u32>,
+    /// Where in the token's text (relative to the token's start).
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -111,7 +73,7 @@ pub enum QuantityErrorKind {
     /// `k°C`, `m%`. `infix` for `4k7%`, where the letter stands for the decimal point.
     PrefixNotAllowed {
         prefix: char,
-        unit: UnitSym,
+        unit: Unit,
         infix: bool,
     },
     /// `4k7k`: the infix letter is already the prefix.
@@ -141,16 +103,9 @@ pub(super) struct Mantissa {
 }
 
 impl Mantissa {
-    pub fn point(&self) -> bool {
+    fn has_point(&self) -> bool {
         self.frac.end > self.int_end
     }
-}
-
-fn eat_digits(b: &[u8], mut i: usize) -> usize {
-    while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'_') {
-        i += 1;
-    }
-    i
 }
 
 /// Digits and `_`; then `.` only if a digit follows (so `100..=300` and `0..N` work);
@@ -184,6 +139,13 @@ pub(super) fn scan_mantissa(b: &[u8]) -> Mantissa {
     }
 }
 
+fn eat_digits(b: &[u8], mut i: usize) -> usize {
+    while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'_') {
+        i += 1;
+    }
+    i
+}
+
 /// Characters a quantity's suffix may contain. Deliberately broad (lexer.md L5): `47q`
 /// and `4.7k7` stay one token each and get one precise error each. `º` and `˚` are
 /// look-alikes of `°`, kept so `10ºC` is one token with a "did you mean `°C`" fix.
@@ -195,189 +157,191 @@ pub(super) fn is_suffix_char(c: char) -> bool {
         )
 }
 
-fn unit_exact(s: &str) -> Option<UnitSym> {
+/// Decodes a `Quantity` token's text. Used by `check` (to report errors everywhere) and
+/// by the parser (to get the value). Allocates only on errors and for very long numbers.
+pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
+    let m = scan_mantissa(text.as_bytes());
+    let (frac, suffix) = match infix_prefix(&text[m.len..]) {
+        Some(prefix) => decode_infix(text, &m, prefix)?,
+        None => {
+            let suffix = split_suffix(&text[m.len..]).map_err(|e| e.shifted(m.len))?;
+            (m.frac.clone(), suffix)
+        }
+    };
+
+    let int = &text[..m.int_end];
+    let frac = &text[frac];
+    let written_exp = m.exponent.clone().map_or(0, |e| parse_exponent(&text[e]));
+    let prefix_exp = suffix.prefix.map_or(0, |(_, exp)| exp);
+    let value = decimal_value(int, frac, written_exp.saturating_add(i64::from(prefix_exp)));
+    if value.is_infinite() {
+        return Err(error_at(QuantityErrorKind::TooLarge, 0..text.len()));
+    }
+    let nonzero = |s: &str| s.bytes().any(|b| matches!(b, b'1'..=b'9'));
+    if value == 0.0 && (nonzero(int) || nonzero(frac)) {
+        return Err(error_at(QuantityErrorKind::TooSmall, 0..text.len()));
+    }
+    Ok(QuantityLit {
+        value,
+        unit: suffix.unit,
+    })
+}
+
+/// A suffix split into its parts (grammar.md §5.2): `kHz` is the prefix `k` and the
+/// unit `Hz`.
+struct Suffix {
+    /// The prefix letter and its power of ten.
+    prefix: Option<(char, i32)>,
+    unit: Option<Unit>,
+}
+
+/// The prefix of the infix form `4k7`: a prefix letter directly followed by a digit.
+fn infix_prefix(suffix: &str) -> Option<(char, i32)> {
+    let letter = suffix.chars().next()?;
+    let exp = prefix_of(letter)?;
+    let digit_follows = suffix
+        .as_bytes()
+        .get(letter.len_utf8())
+        .is_some_and(u8::is_ascii_digit);
+    digit_follows.then_some((letter, exp))
+}
+
+/// The infix form, `4k7` = 4.7k: the prefix letter stands for the decimal point, and the
+/// digits after it are the fraction. Returns where those digits are, and the suffix.
+/// Only a unit with no prefix of its own may follow (`4k7Ω`).
+fn decode_infix(
+    text: &str,
+    m: &Mantissa,
+    (letter, exp): (char, i32),
+) -> Result<(Range<usize>, Suffix), QuantityError> {
+    if m.has_point() || m.exponent.is_some() {
+        return Err(error_at(QuantityErrorKind::DecimalAndInfix, 0..text.len()));
+    }
+    let frac_start = m.len + letter.len_utf8();
+    let frac_end = eat_digits(text.as_bytes(), frac_start);
+    let rest = &text[frac_end..];
+    let unit = match split_suffix(rest) {
+        Ok(Suffix { prefix: None, unit }) => unit,
+        // `4k7k`, `4k7kΩ`: the infix letter already is the prefix.
+        Ok(Suffix {
+            prefix: Some((second, _)),
+            ..
+        }) => {
+            return Err(error_at(
+                QuantityErrorKind::SecondPrefix { prefix: second },
+                frac_end..frac_end + second.len_utf8(),
+            ));
+        }
+        Err(_) => {
+            return Err(error_at(
+                QuantityErrorKind::UnknownSuffix {
+                    suffix: rest.to_string(),
+                    after_infix: true,
+                },
+                frac_end..text.len(),
+            ));
+        }
+    };
+    if let Some(unit) = unit
+        && !unit.accepts_prefix()
+    {
+        // `4k7%`: point at the letter, which should have been a `.`.
+        return Err(error_at(
+            QuantityErrorKind::PrefixNotAllowed {
+                prefix: letter,
+                unit,
+                infix: true,
+            },
+            m.len..frac_start,
+        ));
+    }
+    let prefix = Some((letter, exp));
+    Ok((frac_start..frac_end, Suffix { prefix, unit }))
+}
+
+/// Splits a suffix by the rules of grammar.md §5.2, in order: the whole suffix as a
+/// unit, then as a prefix, then prefix + unit. An empty suffix has neither. Error
+/// ranges are within `s`.
+fn split_suffix(s: &str) -> Result<Suffix, QuantityError> {
+    if s.is_empty() {
+        return Ok(Suffix {
+            prefix: None,
+            unit: None,
+        });
+    }
+    if let Some(unit) = unit_exact(s) {
+        return Ok(Suffix {
+            prefix: None,
+            unit: Some(unit),
+        });
+    }
+    let mut chars = s.chars();
+    if let Some(letter) = chars.next()
+        && let Some(exp) = prefix_of(letter)
+    {
+        let prefix = Some((letter, exp));
+        let rest = chars.as_str();
+        if rest.is_empty() {
+            return Ok(Suffix { prefix, unit: None });
+        }
+        if let Some(unit) = unit_exact(rest) {
+            if unit.accepts_prefix() {
+                return Ok(Suffix {
+                    prefix,
+                    unit: Some(unit),
+                });
+            }
+            // Point at the prefix: that's what has to go.
+            return Err(error_at(
+                QuantityErrorKind::PrefixNotAllowed {
+                    prefix: letter,
+                    unit,
+                    infix: false,
+                },
+                0..letter.len_utf8(),
+            ));
+        }
+    }
+    if s.starts_with("Meg") {
+        return Err(error_at(QuantityErrorKind::Meg, 0.."Meg".len()));
+    }
+    let kind = if s == "e" || s == "E" {
+        QuantityErrorKind::MissingExponentDigits
+    } else {
+        QuantityErrorKind::UnknownSuffix {
+            suffix: s.to_string(),
+            after_infix: false,
+        }
+    };
+    Err(error_at(kind, 0..s.len()))
+}
+
+fn unit_exact(s: &str) -> Option<Unit> {
     UNITS
         .iter()
         .find(|(spelling, _)| *spelling == s)
         .map(|&(_, u)| u)
 }
 
-fn prefix_exact(s: &str) -> Option<i32> {
-    let mut chars = s.chars();
-    let c = chars.next()?;
-    if chars.next().is_some() {
-        return None;
-    }
-    prefix_of(c)
-}
-
 fn prefix_of(c: char) -> Option<i32> {
     PREFIXES.iter().find(|&&(p, _)| p == c).map(|&(_, e)| e)
-}
-
-/// Splits a suffix into (power of ten, unit), in the order of grammar.md §5.2:
-/// the whole suffix as a unit, then as a prefix, then prefix + unit.
-fn split_suffix(s: &str) -> Result<(i32, Option<UnitSym>), QuantityErrorKind> {
-    if let Some(unit) = unit_exact(s) {
-        return Ok((0, Some(unit)));
-    }
-    if let Some(exp) = prefix_exact(s) {
-        return Ok((exp, None));
-    }
-    let mut chars = s.chars();
-    if let Some(first) = chars.next()
-        && let Some(exp) = prefix_of(first)
-        && let Some(unit) = unit_exact(chars.as_str())
-    {
-        if unit.accepts_prefix() {
-            return Ok((exp, Some(unit)));
-        }
-        return Err(QuantityErrorKind::PrefixNotAllowed {
-            prefix: first,
-            unit,
-            infix: false,
-        });
-    }
-    if s.starts_with("Meg") {
-        return Err(QuantityErrorKind::Meg);
-    }
-    if s == "e" || s == "E" {
-        return Err(QuantityErrorKind::MissingExponentDigits);
-    }
-    Err(QuantityErrorKind::UnknownSuffix {
-        suffix: s.to_string(),
-        after_infix: false,
-    })
-}
-
-/// Decodes a `Quantity` token's text. Used by `check` (to report errors everywhere) and
-/// by the parser (to get the value). Allocates only on errors and for very long numbers.
-pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
-    let m = scan_mantissa(text.as_bytes());
-    let suffix = &text[m.len..];
-    let parts = if let Some(parts) = infix(text, &m)? {
-        parts
-    } else if suffix.is_empty() {
-        Parts {
-            frac: m.frac.clone(),
-            prefix_exp: 0,
-            unit: None,
-        }
-    } else {
-        let (exp, unit) = split_suffix(suffix).map_err(|kind| {
-            let range = match kind {
-                // Point at the prefix: that's what has to go.
-                QuantityErrorKind::PrefixNotAllowed { prefix, .. } => {
-                    m.len..m.len + prefix.len_utf8()
-                }
-                QuantityErrorKind::Meg => m.len..m.len + 3,
-                _ => m.len..text.len(),
-            };
-            error_at(kind, range)
-        })?;
-        Parts {
-            frac: m.frac.clone(),
-            prefix_exp: exp,
-            unit,
-        }
-    };
-
-    let written_exp = m.exponent.clone().map_or(0, |e| parse_exponent(&text[e]));
-    let frac = &text[parts.frac.clone()];
-    let value = decimal_value(
-        &text[..m.int_end],
-        frac,
-        written_exp.saturating_add(i64::from(parts.prefix_exp)),
-    );
-    if value.is_infinite() {
-        return Err(error_at(QuantityErrorKind::TooLarge, 0..text.len()));
-    }
-    let nonzero = |s: &str| s.bytes().any(|b| matches!(b, b'1'..=b'9'));
-    if value == 0.0 && (nonzero(&text[..m.int_end]) || nonzero(frac)) {
-        return Err(error_at(QuantityErrorKind::TooSmall, 0..text.len()));
-    }
-    Ok(QuantityLit {
-        value,
-        unit: parts.unit,
-        is_integer: !m.point() && m.exponent.is_none() && suffix.is_empty(),
-    })
 }
 
 /// A decoding error at `range` within the token's text.
 fn error_at(kind: QuantityErrorKind, range: Range<usize>) -> QuantityError {
     QuantityError {
         kind,
-        range: range.start as u32..range.end as u32,
+        span: Span::new(range.start as u32, range.end as u32),
     }
 }
 
-/// What the suffix contributes to the value.
-struct Parts {
-    /// The fraction digits: the mantissa's, or the ones after an infix prefix (`4k7`).
-    frac: Range<usize>,
-    prefix_exp: i32,
-    unit: Option<UnitSym>,
-}
-
-/// The infix form, `4k7` = 4.7k: a prefix letter directly followed by digits, which
-/// become the fraction. `None` if the suffix isn't in this form.
-fn infix(text: &str, m: &Mantissa) -> Result<Option<Parts>, QuantityError> {
-    let suffix = &text[m.len..];
-    let Some(prefix) = suffix.chars().next() else {
-        return Ok(None);
-    };
-    let Some(exp) = prefix_of(prefix) else {
-        return Ok(None);
-    };
-    let after_prefix = m.len + prefix.len_utf8();
-    if !text
-        .as_bytes()
-        .get(after_prefix)
-        .is_some_and(u8::is_ascii_digit)
-    {
-        return Ok(None);
+impl QuantityError {
+    /// The same error, for text that starts `offset` bytes into the token.
+    fn shifted(self, offset: usize) -> QuantityError {
+        let offset = offset as u32;
+        let span = Span::new(self.span.start + offset, self.span.end + offset);
+        QuantityError { span, ..self }
     }
-    if m.point() || m.exponent.is_some() {
-        return Err(error_at(QuantityErrorKind::DecimalAndInfix, 0..text.len()));
-    }
-    let digits_end = eat_digits(text.as_bytes(), after_prefix);
-    let rest = &text[digits_end..];
-    let unit = match unit_exact(rest) {
-        _ if rest.is_empty() => None,
-        Some(unit) if unit.accepts_prefix() => Some(unit),
-        Some(unit) => {
-            return Err(error_at(
-                QuantityErrorKind::PrefixNotAllowed {
-                    prefix,
-                    unit,
-                    infix: true,
-                },
-                m.len..after_prefix,
-            ));
-        }
-        // `4k7k`, `4k7kΩ`: the infix letter already is the prefix.
-        None if rest.chars().next().and_then(prefix_of).is_some() && split_suffix(rest).is_ok() => {
-            let second = rest.chars().next().expect("rest is non-empty");
-            return Err(error_at(
-                QuantityErrorKind::SecondPrefix { prefix: second },
-                digits_end..digits_end + second.len_utf8(),
-            ));
-        }
-        None => {
-            return Err(error_at(
-                QuantityErrorKind::UnknownSuffix {
-                    suffix: rest.to_string(),
-                    after_infix: true,
-                },
-                digits_end..text.len(),
-            ));
-        }
-    };
-    Ok(Some(Parts {
-        frac: after_prefix..digits_end,
-        prefix_exp: exp,
-        unit,
-    }))
 }
 
 /// A written exponent (`-3`, `+12`, `1_0`), saturating: `1e99999999999999999999` must
@@ -409,23 +373,18 @@ const POW10: [f64; 23] = [
 /// instead gives 1.0000000000000001e-07. Anything else goes to std's parser, which
 /// runs the full algorithm.
 fn decimal_value(int: &str, frac: &str, exp: i64) -> f64 {
+    let digit_bytes = || int.bytes().chain(frac.bytes()).filter(|&b| b != b'_');
+    // The digits as one integer `w`, while they fit in a `u64` (any 19 digits do).
     let mut w: u64 = 0;
     let mut n_digits = 0u32;
-    let mut frac_digits = 0i64;
-    for (part, b) in int
-        .bytes()
-        .map(|b| (0, b))
-        .chain(frac.bytes().map(|b| (1, b)))
-    {
-        if b == b'_' {
-            continue;
-        }
+    for b in digit_bytes() {
         n_digits += 1;
-        frac_digits += part;
         if n_digits <= 19 {
             w = w * 10 + u64::from(b - b'0');
         }
     }
+    // `4.7e3` is 47 × 10^2: each fraction digit moves the power down by one.
+    let frac_digits = frac.bytes().filter(|&b| b != b'_').count() as i64;
     let e = exp.saturating_sub(frac_digits);
     if n_digits <= 19 && w <= 1 << 53 && (-22..=22).contains(&e) {
         let w = w as f64;
@@ -435,11 +394,7 @@ fn decimal_value(int: &str, frac: &str, exp: i64) -> f64 {
             w / POW10[(-e) as usize]
         };
     }
-    let digits: String = int
-        .chars()
-        .chain(frac.chars())
-        .filter(|&c| c != '_')
-        .collect();
+    let digits: String = digit_bytes().map(char::from).collect();
     format!("{digits}e{e}")
         .parse()
         .expect("digits and an exponent are valid float text")
@@ -450,7 +405,8 @@ fn decimal_value(int: &str, frac: &str, exp: i64) -> f64 {
 /// 2. case-insensitive matches (`KHz` → `kHz`, `mhz` → `mHz`, `MHz`);
 /// 3. one edit away, for suffixes of two to five characters (`Hx` → `Hz`).
 ///
-/// After an infix prefix (`after_infix`, as in `4k7q`) only bare units are offered.
+/// After an infix prefix (`after_infix`, as in `4k7q`) only a unit that takes a prefix
+/// is offered: the infix letter is its prefix, so `4k7dB` would be a new error.
 /// Only called for a quantity that failed to decode, so it never slows a clean file.
 pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
@@ -459,64 +415,61 @@ pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
             out.push(c.to_string());
         }
     };
-    let fits = |c: &Candidate| !after_infix || c.bare_unit;
+    // Whether `c`, written after the number, is a valid suffix.
+    let fits = |c: &str| match split_suffix(c) {
+        Ok(Suffix {
+            prefix: None,
+            unit: Some(unit),
+        }) if after_infix => unit.accepts_prefix(),
+        Ok(_) => !after_infix,
+        Err(_) => false,
+    };
 
     let normalized: String = s
         .chars()
         .map(|c| if matches!(c, 'º' | '˚') { '°' } else { c })
         .collect();
-    if normalized != s && split_suffix(&normalized).is_ok() {
+    if normalized != s && fits(&normalized) {
         push(&normalized, &mut out);
     }
 
     // Bounds keep a pathological suffix (a kilobyte of letters) cheap.
     if s.len() <= 16 {
         let lower = s.to_lowercase();
-        for c in candidates().iter().filter(|c| fits(c) && c.lower == lower) {
-            push(&c.spelling, &mut out);
+        for c in candidates()
+            .iter()
+            .filter(|c| c.to_lowercase() == lower && fits(c))
+        {
+            push(c, &mut out);
         }
     }
     let len = s.chars().count();
     if out.is_empty() && (2..=5).contains(&len) {
         // Same-length substitutions (`Hx` → `Hz`) before insertions and deletions.
-        let mut close: Vec<&Candidate> = candidates()
+        let mut close: Vec<&String> = candidates()
             .iter()
-            .filter(|c| fits(c) && edit_distance(&c.spelling, s) == 1)
+            .filter(|c| edit_distance(c, s) == 1 && fits(c))
             .collect();
-        close.sort_by_key(|c| c.spelling.chars().count().abs_diff(len));
+        close.sort_by_key(|c| c.chars().count().abs_diff(len));
         for c in close {
-            push(&c.spelling, &mut out);
+            push(c, &mut out);
         }
     }
     out
 }
 
-struct Candidate {
-    spelling: String,
-    lower: String,
-    /// A unit with no prefix (`V`, `Hz`), the only thing allowed after `4k7`.
-    bare_unit: bool,
-}
-
 /// Every valid suffix, spelled canonically (`u` for micro, U+03A9 for ohm). Built once.
-fn candidates() -> &'static [Candidate] {
-    static CANDIDATES: std::sync::OnceLock<Vec<Candidate>> = std::sync::OnceLock::new();
+fn candidates() -> &'static [String] {
+    static CANDIDATES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     CANDIDATES.get_or_init(|| {
         let units = || UNITS.iter().filter(|(spelling, _)| *spelling != "\u{2126}");
         let prefixes = || PREFIXES.iter().filter(|&&(p, _)| p.is_ascii());
-        let candidate = |spelling: String, bare_unit| Candidate {
-            lower: spelling.to_lowercase(),
-            spelling,
-            bare_unit,
-        };
-        let mut out: Vec<Candidate> = units()
-            .map(|&(s, _)| candidate(s.to_string(), true))
-            .collect();
-        out.extend(prefixes().map(|&(p, _)| candidate(p.to_string(), false)));
+        let mut out: Vec<String> = units().map(|&(s, _)| s.to_string()).collect();
+        out.extend(prefixes().map(|&(p, _)| p.to_string()));
         for &(p, _) in prefixes() {
             for &(s, u) in units() {
                 if u.accepts_prefix() {
-                    out.push(candidate(format!("{p}{s}"), false));
+                    out.push(format!("{p}{s}"));
                 }
             }
         }
@@ -524,27 +477,12 @@ fn candidates() -> &'static [Candidate] {
     })
 }
 
-fn edit_distance(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.iter().enumerate() {
-        let mut cur = vec![i + 1; b.len() + 1];
-        for (j, cb) in b.iter().enumerate() {
-            let cost = usize::from(ca != cb);
-            cur[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(cur[j] + 1);
-        }
-        prev = cur;
-    }
-    prev[b.len()]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::Rng;
 
-    fn ok(text: &str) -> (f64, Option<UnitSym>) {
+    fn ok(text: &str) -> (f64, Option<Unit>) {
         let q = decode_quantity(text).unwrap_or_else(|e| panic!("{text}: {e:?}"));
         (q.value, q.unit)
     }
@@ -559,7 +497,7 @@ mod tests {
     /// Every row of grammar.md §5.2.
     #[test]
     fn grammar_table() {
-        use UnitSym::*;
+        use Unit::*;
         assert_eq!(ok("47k"), (47_000.0, None));
         assert_eq!(ok("4k7"), (4_700.0, None));
         assert_eq!(ok("1kHz"), (1_000.0, Some(Hertz)));
@@ -575,7 +513,7 @@ mod tests {
             fails("1k°C"),
             QuantityErrorKind::PrefixNotAllowed {
                 prefix: 'k',
-                unit: UnitSym::Celsius,
+                unit: Unit::Celsius,
                 infix: false,
             }
         );
@@ -591,7 +529,7 @@ mod tests {
 
     #[test]
     fn spellings() {
-        use UnitSym::*;
+        use Unit::*;
         assert_eq!(ok("1uF"), (1e-6, Some(Farad)));
         assert_eq!(ok("1\u{B5}F"), (1e-6, Some(Farad)));
         assert_eq!(ok("1\u{3BC}F"), (1e-6, Some(Farad)));
@@ -612,15 +550,6 @@ mod tests {
     }
 
     #[test]
-    fn integers() {
-        assert!(decode_quantity("3").unwrap().is_integer);
-        assert!(decode_quantity("1_000").unwrap().is_integer);
-        for text in ["3.0", "3e0", "3k", "3V", "4k7"] {
-            assert!(!decode_quantity(text).unwrap().is_integer, "{text}");
-        }
-    }
-
-    #[test]
     fn rejections() {
         assert_eq!(fails("4.7k7"), QuantityErrorKind::DecimalAndInfix);
         assert_eq!(fails("1e3k7"), QuantityErrorKind::DecimalAndInfix);
@@ -634,7 +563,7 @@ mod tests {
             fails("4k7%"),
             QuantityErrorKind::PrefixNotAllowed {
                 prefix: 'k',
-                unit: UnitSym::Percent,
+                unit: Unit::Percent,
                 infix: true,
             }
         );
@@ -676,6 +605,14 @@ mod tests {
         assert_eq!(suggest("1KHz"), vec!["kHz"]);
         assert_eq!(suggest("1mhz"), vec!["mHz", "MHz"]);
         assert_eq!(suggest("10ºC"), vec!["°C"]);
+        assert_eq!(suggest("10˚C"), vec!["°C"]);
+        // After an infix prefix, only units that take one: `4k7°C` would be an error.
+        assert_eq!(suggest("4k7ºC"), Vec::<String>::new());
+        assert_eq!(suggest("4k7DB"), Vec::<String>::new());
+        assert_eq!(suggest("4k7ohms"), vec!["ohm"]);
+        assert_eq!(suggest("4k7hz"), vec!["Hz"]);
+        // At most three, same-length substitutions first, in table order.
+        assert_eq!(suggest("1xF"), vec!["fF", "pF", "nF"]);
         assert_eq!(suggest("1Hx"), vec!["Hz", "H"]);
         assert_eq!(suggest("1q"), Vec::<String>::new());
         // After an infix prefix only a bare unit fits (`4k7in` must not suggest `n`).
@@ -690,7 +627,7 @@ mod tests {
 
     #[test]
     fn error_ranges_point_at_the_problem() {
-        let range = |text: &str| decode_quantity(text).unwrap_err().range;
+        let range = |text: &str| decode_quantity(text).unwrap_err().span.range();
         assert_eq!(range("1Meg"), 1..4);
         assert_eq!(range("10k°C"), 2..3);
         assert_eq!(range("47q"), 2..3);
@@ -768,5 +705,87 @@ mod tests {
             }
         }
         assert!(multiplying_would_be_off > 0);
+    }
+
+    #[test]
+    fn mantissa_boundaries() {
+        let parts = |text: &str| {
+            let m = scan_mantissa(text.as_bytes());
+            (m.int_end, m.frac, m.exponent, m.len)
+        };
+        assert_eq!(parts("4.7e-3V"), (1, 2..3, Some(4..6), 6));
+        assert_eq!(parts("1_000"), (5, 5..5, None, 5));
+        // A `.` needs a digit after it: ranges and `1.` stay out of the number.
+        assert_eq!(parts("100..=300"), (3, 3..3, None, 3));
+        assert_eq!(parts("1.e3"), (1, 1..1, None, 1));
+        // An `e` needs a digit after it (or after its sign): `1e+` ends at `1`.
+        assert_eq!(parts("1e+"), (1, 1..1, None, 1));
+        assert_eq!(parts("1E+5"), (1, 1..1, Some(2..4), 4));
+        assert_eq!(parts("2e1_0k"), (1, 1..1, Some(2..5), 5));
+    }
+
+    #[test]
+    fn infix_form() {
+        use Unit::*;
+        assert_eq!(ok("1M5Hz"), (1.5e6, Some(Hertz)));
+        assert_eq!(ok("4\u{B5}7F"), (4.7e-6, Some(Farad)));
+        assert_eq!(ok("0k47"), (470.0, None));
+        assert_eq!(ok("2_2k1_0"), (22_100.0, None));
+        assert_eq!(ok("4k7ohm"), (4_700.0, Some(Ohm)));
+        // A letter that isn't a prefix, or a prefix not followed by a digit, isn't infix.
+        assert!(matches!(
+            fails("4q7"),
+            QuantityErrorKind::UnknownSuffix {
+                after_infix: false,
+                ..
+            }
+        ));
+        // After the infix digits only a bare unit fits: anything else is unknown,
+        // including what would be a `Meg` or an `e` error on its own.
+        for text in ["4k7Meg", "4k7e", "4k7m%", "4k7q"] {
+            assert!(
+                matches!(
+                    fails(text),
+                    QuantityErrorKind::UnknownSuffix {
+                        after_infix: true,
+                        ..
+                    }
+                ),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn exponents() {
+        assert_eq!(ok("1E5"), (1e5, None));
+        assert_eq!(ok("1e+3"), (1e3, None));
+        assert_eq!(ok("2e1_0"), (2e10, None));
+        // The written exponent and the prefix add up before rounding.
+        assert_eq!(ok("1e-3k"), (1.0, None));
+        assert_eq!(ok("1e300k"), (1e303, None));
+        assert_eq!(fails("1e306k"), QuantityErrorKind::TooLarge);
+        assert_eq!(fails("1e-310f"), QuantityErrorKind::TooSmall);
+    }
+
+    #[test]
+    fn more_error_ranges() {
+        let range = |text: &str| decode_quantity(text).unwrap_err().span.range();
+        // `Meg` is three bytes, even when more follows.
+        assert_eq!(range("1Megohm"), 1..4);
+        // A multi-byte prefix is covered whole.
+        assert_eq!(range("1\u{B5}°C"), 1..3);
+        // `4k7%`: the letter that should be a `.`.
+        assert_eq!(range("4k7%"), 1..2);
+        assert_eq!(range("4\u{B5}7%"), 1..3);
+        // `4k7kΩ`: just the second prefix.
+        assert_eq!(range("4k7k\u{3A9}"), 3..4);
+        assert_eq!(range("22k47\u{B5}F"), 5..7);
+        // The whole token when the number itself is the problem.
+        assert_eq!(range("4.7k7"), 0..5);
+        assert_eq!(range("1e3k7"), 0..5);
+        assert_eq!(range("1e400V"), 0..6);
+        assert_eq!(range("1e"), 1..2);
+        assert_eq!(range("10mhz"), 2..5);
     }
 }

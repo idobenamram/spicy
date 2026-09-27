@@ -173,7 +173,7 @@ Lookup goes from the block's body, to the file's items, to the prelude last. A n
 *Why:* grammar.md §3 kept one `let` syntax for all three on purpose. *From:* Spade (an instance is an ordinary call expression, classified by its callee).
 
 **E7. Errors never stop the stage.**
-- `resolve` returns `(Design, Vec<Diagnostic>)`.
+- `resolve` returns the design with its problems, `Vec<ResolveError>` (never a `Result`).
 - A name that doesn't resolve becomes a placeholder holding a `Reported` token, which only the diagnostic sink can create. So a placeholder always proves its error was reported, and later steps skip it without adding cascades.
 - An instance with one bad field keeps its other fields, so its knobs still appear.
 
@@ -239,8 +239,10 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
   - the nominal of `±`;
   - the bound of a relation (`… in 4.6 ± 5%` → the measure's unit).
 - Anywhere else a bare number is dimensionless.
-- In `*` and `/`, a bare number is a plain factor.
-- `r + 5`, where `r` has a unit, is an error with a fix ("write `5k`").
+- Computed values follow the same rule, by tracking whether a sub-expression is still unitless (refined while implementing):
+  - If everything in it is unitless, the result is unitless and takes the expected unit at the end: `2 * 4.7k` and `1k + 2k` in a `value:` are 9.4 kΩ and 3 kΩ.
+  - In `*` and `/`, a unit on one side makes the unitless side a plain factor: `1V / 1mA` is 1 kΩ, `2 * 1V` is 2 V.
+  - In `+` and `-`, a unitless number next to one with a unit is an error, as in F#: `r + 5` where `5k` was meant.
 
 *Why:* the field schema already fixes every unit, so there's nothing to solve.
 
@@ -280,7 +282,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
 - Each resulting group is one `FlatNet`.
 - **Naming** is a separate pass after merging:
   - the name declared highest in the hierarchy wins;
-  - ties go to a port over an internal net, then to declaration order;
+  - ties go to a port over an internal net, then to the name itself (alphabetical), never to declaration order: statement order must not change the meaning (E4, and the shuffle test below);
   - every other name stays an alias.
 
 *Why:*
@@ -424,7 +426,7 @@ pub struct Block {
     pub nets: Vec<Net>,               // NetId   (per block; ports are nets too)
     pub instances: Vec<Instance>,     // InstanceId (per block)
 }
-pub struct Port { pub name: Name, pub signal: SignalType, pub net: NetId }
+pub struct Port { pub signal: Option<SignalType> }  // name and span: its net's (port i is net i)
 pub enum SignalType { Pin, Ground, Power(Role), Analog(Role) }
 pub struct Instance {
     pub name: Name,
@@ -518,6 +520,33 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
    - The no-DC-path case isn't a design error at all: the default bench drives `input`, so the path exists in simulation. If a bench leaves such a node floating, that's for lowering to report (M1e).
 5. **Stable ids for layout:** **deferred.** It needs its own research on how the layout editor works and how a project stores layout data. Paths remain the identity for the MVP (E21).
 
-## 8. Found along the way
+## 8. Implementation notes (resolve, M1d-3)
+
+Where the first implementation differs from the text above, and why:
+- **The prelude's data is in `spicy_model`** (`prelude.rs`), not in `spicy_lang` as roadmap §2.5 had it. Flatten needs the signal roles, and lowering needs the part kinds; neither may depend on the language.
+- **How the code is laid out** (the standard for every stage from here on): `resolve()` reads as the passes, one comment each. Pass 1 builds each block's `Signature` (its ports by name), a read-only table in pass 2. Pass 2 gives each body a `BodyResolver` (as rust-analyzer gives each body an `ExprCollector`) that declares the body's names, then resolves each statement into a value (an instance, a merge) and stores it only if the statement owns its name, so a second definition, even a second block, is checked and dropped. Every name goes through one `Scope::declare` (rustc's `try_plant_decl`), and every part is added to the block together with its span (`BlockBuilder`, as rust-analyzer's `alloc_expr`).
+- **One problem type for every stage:** `Diag<K> { kind, span, related, fix }` in `spicy_lang::diagnostic`, generic over the stage's kind enum; `LexError`, `ParseError` and `ResolveError` are aliases (rustc has one `Diag`, Zig one `ErrorBundle`). Kinds carry typed data where there is some (`UnitMismatch` holds the expected `FieldType` and the found `Quantity`; the text is built when rendering).
+- **No `Reported` token yet (E7):** a name that doesn't resolve becomes `InstanceOf::Error`, an unbound pin `None`. The rule "the error has already been reported" holds by construction in the one place these are created. A token becomes worth it when several stages create placeholders.
+- **The temperature errors (E13) come with contracts (M1d-5).** No part field takes a temperature, so `± 5°C`, `± 5%` on a temperature and a bare temperature can only occur in `assume`. They're added and tested there.
+- **One mistake, one error:**
+  - a misnamed field (`resistance:` where `value:` is missing) is one error with the rename as its fix;
+  - everything an instance is missing (pins, ports and required fields) is one error.
+- **Fixes only when there's one right answer,** as in the lexer:
+  - an unknown name with a single close match (`Resistr` → `Resistor`);
+  - `47K` where ohms are expected → `47k`.
+
+  A test applies every fix and checks that its error goes away and no other error appears (a fix that trades one error for another isn't the right answer). So:
+  - the `k` fix is offered only for a lone literal whose whole suffix is `K` (`47K`), not for `5mK` or `1K + 1K`;
+  - net suggestions list nets only (an instance would give "not a net"), and field suggestions only the pins and fields not given yet whose value fits (a name for a pin, a number for a field);
+  - the shorthand `C { gnd }` is fixed as `gnd: gnd1`, keeping the pin.
+- **Duplicates are checked, not merged (E7):** a second block, port, `net`, `let` or binding (`value: 1k, value: 5V`) of a name is reported and still checked for its own mistakes, but never enters the design or overwrites the first.
+- **An unknown field written twice** (`valu: 1k, valu: 2k`) is one misspelling: both are reported, the rename rule counts it once, and only the first gets the fix (renaming both would give `value` twice).
+- **A port with a wrong type stays a port** (`signal: None`), so its uses resolve and aren't reported again.
+- **A value the parser already flagged isn't typed** (`1k +- 1%`, `a ± b ± c`): what the parser built is a guess.
+- **Spreads can be scaled** by a plain factor: `2 * (1k ± 1%)` and `(10k ± 500) / 2`, as the parser's help for `2 * 1k ± 1%` suggests. Adding to a spread, or dividing by one, is `SpreadInArithmetic`.
+- **A tolerance is relative only when written with `%`:** `± 1%`, `± (1%)` and `± 2 * 0.5%` alike. Anything else is absolute, in the nominal's unit: `47k ± 50` is ±50 Ω, and `± (1V / 1V)` is a plain 1 (±1 on `beta`, a unit mismatch on a resistance), not ±100%.
+- **Suggestions are budgeted** (64 per file): each looks at every name in scope, so thousands of unknown names would be quadratic. Names are looked up by hash.
+
+## 9. Found along the way
 
 - **`spicy_parser` subcircuit parameter precedence** (`subcircuit_phase.rs:321-325`): a subcircuit's local `.param` overrides the value given on the `X` line. Xyce does the opposite, and ngspice is unconfirmed. To check against ngspice when it's installed.

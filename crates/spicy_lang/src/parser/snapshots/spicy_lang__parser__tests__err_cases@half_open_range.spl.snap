@@ -13,7 +13,7 @@ File 0..48
             Quantity 3e2 39..42 "300"
 
 --- errors ---
-E-range HalfOpenRange fix 37..39 "..=" 37..39 ".."
+E-range HalfOpenRange 37..39 ".." fix 37..39 "..="
 
 --- rendered ---
 error[E-range]: a value range is closed

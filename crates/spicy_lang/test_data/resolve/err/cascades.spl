@@ -1,0 +1,13 @@
+// One mistake, one error.
+block A {
+    // A port with a wrong type is still a port: its uses resolve.
+    port vcc: Bus;
+    port vcc: Pin;
+    port gnd: Ground;
+    let r1 = Resistor { a: vcc, b: gnd, value: 1k };
+    // The parser already reported these values; resolve doesn't again.
+    let r2 = Resistor { a: vcc, b: gnd, value: 1k +- 1% };
+    let r3 = Resistor { a: vcc, b: gnd, value: 1k ± 1% ± 1% };
+    let r4 = Resistor { a: vcc, b: gnd, value: 1k / 2 ± 10% };
+    let q1 = Npn { c: vcc, b: gnd, e: gnd, beta: 100 ± 1% ..= 300 };
+}

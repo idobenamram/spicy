@@ -1,24 +1,13 @@
 //! Parser errors (ast.md §3, grammar.md §7). Data first, rendered on demand, like the
 //! lexer's.
 
-use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
+use codespan_reporting::diagnostic::Severity;
 
-use super::ast::BinOp;
-use crate::lexer::{Fix, Span};
+use super::ast::{BinOp, BodyKind};
+use crate::diagnostic::{Diag, DiagKind, Fix, Text};
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
-    pub span: Span,
-    pub fix: Option<Fix>,
-}
-
-/// Which kind of body a statement is in.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BodyKind {
-    Block,
-    Contract,
-}
+/// One problem the parser found.
+pub type ParseError = Diag<ParseErrorKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParseErrorKind {
@@ -30,8 +19,8 @@ pub enum ParseErrorKind {
     },
     /// #1: a statement that isn't closed by `;`.
     MissingSemi,
-    /// #21: `(`, `[` or `{` never closed; `opener` is its span.
-    Unclosed { opener: Span, closer: &'static str },
+    /// #21: `(`, `[` or `{` never closed; the opener is the error's `related` span.
+    Unclosed { closer: &'static str },
     /// Top-level text that isn't `block` or `contract`.
     ExpectedItem { found: String },
     /// #19: `fn`, `for`, … are reserved for later.
@@ -59,35 +48,15 @@ pub enum ParseErrorKind {
     HalfOpenRange,
     /// #25: a `///` with nothing after it.
     UnattachedDoc,
-    /// Expressions nested deeper than the parser allows (a guard against stack
-    /// overflow on pathological input).
+    /// Expressions or types nested deeper, or an expression tree taller, than the parser
+    /// allows (a guard against stack overflow on pathological input).
     TooDeep,
 }
 
+/// The variant names, for the test that every error kind has a case file. Only tests
+/// use them; [`DiagKind::code`] is the identifier users see.
+#[cfg(any(test, fuzzing))]
 impl ParseErrorKind {
-    /// The variant's name, for the test that every error kind has a case file.
-    pub fn name(&self) -> &'static str {
-        match self {
-            ParseErrorKind::Expected { .. } => "Expected",
-            ParseErrorKind::MissingSemi => "MissingSemi",
-            ParseErrorKind::Unclosed { .. } => "Unclosed",
-            ParseErrorKind::ExpectedItem { .. } => "ExpectedItem",
-            ParseErrorKind::Reserved { .. } => "Reserved",
-            ParseErrorKind::KeywordAsName { .. } => "KeywordAsName",
-            ParseErrorKind::WrongBody { .. } => "WrongBody",
-            ParseErrorKind::SpecNeedsName => "SpecNeedsName",
-            ParseErrorKind::FieldEquals => "FieldEquals",
-            ParseErrorKind::NotARelation => "NotARelation",
-            ParseErrorKind::AmbiguousTolerance { .. } => "AmbiguousTolerance",
-            ParseErrorKind::Chained { .. } => "Chained",
-            ParseErrorKind::ToleranceInRange => "ToleranceInRange",
-            ParseErrorKind::RangeInComparison => "RangeInComparison",
-            ParseErrorKind::HalfOpenRange => "HalfOpenRange",
-            ParseErrorKind::UnattachedDoc => "UnattachedDoc",
-            ParseErrorKind::TooDeep => "TooDeep",
-        }
-    }
-
     /// Every value [`name`](Self::name) can return; `name`'s match is exhaustive, so a
     /// new variant won't compile until it has a name. Add it here too.
     pub const ALL_NAMES: &'static [&'static str] = &[
@@ -109,16 +78,41 @@ impl ParseErrorKind {
         "UnattachedDoc",
         "TooDeep",
     ];
+}
+
+impl DiagKind for ParseErrorKind {
+    #[cfg(any(test, fuzzing))]
+    fn name(&self) -> &'static str {
+        match self {
+            ParseErrorKind::Expected { .. } => "Expected",
+            ParseErrorKind::MissingSemi => "MissingSemi",
+            ParseErrorKind::Unclosed { .. } => "Unclosed",
+            ParseErrorKind::ExpectedItem { .. } => "ExpectedItem",
+            ParseErrorKind::Reserved { .. } => "Reserved",
+            ParseErrorKind::KeywordAsName { .. } => "KeywordAsName",
+            ParseErrorKind::WrongBody { .. } => "WrongBody",
+            ParseErrorKind::SpecNeedsName => "SpecNeedsName",
+            ParseErrorKind::FieldEquals => "FieldEquals",
+            ParseErrorKind::NotARelation => "NotARelation",
+            ParseErrorKind::AmbiguousTolerance { .. } => "AmbiguousTolerance",
+            ParseErrorKind::Chained { .. } => "Chained",
+            ParseErrorKind::ToleranceInRange => "ToleranceInRange",
+            ParseErrorKind::RangeInComparison => "RangeInComparison",
+            ParseErrorKind::HalfOpenRange => "HalfOpenRange",
+            ParseErrorKind::UnattachedDoc => "UnattachedDoc",
+            ParseErrorKind::TooDeep => "TooDeep",
+        }
+    }
 
     /// Only an unattached doc comment is a warning: the code still means what it says.
-    pub fn severity(&self) -> Severity {
+    fn severity(&self) -> Severity {
         match self {
             ParseErrorKind::UnattachedDoc => Severity::Warning,
             _ => Severity::Error,
         }
     }
 
-    pub fn code(&self) -> &'static str {
+    fn code(&self) -> &'static str {
         match self {
             ParseErrorKind::Expected { .. }
             | ParseErrorKind::MissingSemi
@@ -138,29 +132,16 @@ impl ParseErrorKind {
             ParseErrorKind::UnattachedDoc => "W-doc",
         }
     }
-}
 
-impl ParseError {
-    pub(super) fn new(kind: ParseErrorKind, span: Span) -> Self {
-        Self {
-            kind,
-            span,
-            fix: None,
+    fn related_label(&self) -> &'static str {
+        match self {
+            ParseErrorKind::Unclosed { .. } => "…to close this",
+            _ => "",
         }
     }
 
-    pub(super) fn with_fix(mut self, span: Span, replacement: impl Into<String>) -> Self {
-        self.fix = Some(Fix {
-            span,
-            replacement: replacement.into(),
-        });
-        self
-    }
-
-    /// The diagnostic the user sees.
-    pub fn diagnostic(&self) -> Diagnostic<()> {
-        let mut labels = vec![Label::primary((), self.span.range())];
-        let (message, label, notes): (String, String, Vec<String>) = match &self.kind {
+    fn text(&self, _fix: Option<&Fix>) -> Text {
+        match self {
             ParseErrorKind::Expected { expected, found } => (
                 format!("expected {expected}, found {found}"),
                 format!("expected {expected}"),
@@ -171,16 +152,11 @@ impl ParseError {
                 "statements end with `;`".to_string(),
                 vec!["help: add `;` at the end of this statement".to_string()],
             ),
-            ParseErrorKind::Unclosed { opener, closer } => {
-                labels.push(
-                    Label::secondary((), opener.range()).with_message("…to close this".to_string()),
-                );
-                (
-                    format!("expected `{closer}`"),
-                    format!("expected `{closer}` here"),
-                    vec![],
-                )
-            }
+            ParseErrorKind::Unclosed { closer, .. } => (
+                format!("expected `{closer}`"),
+                format!("expected `{closer}` here"),
+                vec![],
+            ),
             ParseErrorKind::ExpectedItem { found } => (
                 format!("expected `block` or `contract`, found {found}"),
                 "not an item".to_string(),
@@ -270,12 +246,6 @@ impl ParseError {
                 "nothing follows this doc comment".to_string(),
                 vec!["help: move it before an item or a statement, or use `//`".to_string()],
             ),
-        };
-        labels[0] = labels[0].clone().with_message(label);
-        Diagnostic::new(self.kind.severity())
-            .with_code(self.kind.code())
-            .with_message(message)
-            .with_labels(labels)
-            .with_notes(notes)
+        }
     }
 }

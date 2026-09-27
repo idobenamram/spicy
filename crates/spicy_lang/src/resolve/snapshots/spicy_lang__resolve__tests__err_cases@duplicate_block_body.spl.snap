@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/duplicate_block_body.spl
+---
+block A 6..7
+  port p: Pin 19..20
+
+--- errors ---
+E-duplicate Duplicate 117..118 "A" related 6..7
+E-name UnknownName 170..177 "nowhere"
+
+--- rendered ---
+error[E-duplicate]: block `A` is defined twice
+  --> duplicate_block_body.spl:6:7
+  |
+1 | block A {
+  |       - first defined here
+  .
+6 | block A {
+  |       ^ second definition
+
+error[E-name]: unknown net, port or instance `nowhere`
+  --> duplicate_block_body.spl:8:33
+  |
+8 |     let r = Resistor { a: q, b: nowhere, value: 1k };
+  |                                 ^^^^^^^ not defined

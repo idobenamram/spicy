@@ -1,0 +1,8 @@
+block A {
+    port vcc: Power<In>;
+    net base;
+    let r1 = Resistr { a: vcc, b: base, value: 1k };
+    let r2 = Resistor { a: vcc, b: bas, value: 1k };
+    let r3 = Foo { a: vcc };
+    let r4 = std::Resistor { a: vcc, b: base, value: 1k };
+}

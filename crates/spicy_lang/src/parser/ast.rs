@@ -15,7 +15,9 @@
 //! differ), as rustc does. That keeps each enum variant small and lets code that doesn't
 //! care about the kind (the formatter, the editor) handle docs and spans once.
 
-use crate::lexer::{QuantityLit, Span};
+use spicy_model::span::Span;
+
+use crate::lexer::QuantityLit;
 
 /// A name as written: `r1`, `Resistor`, `vcc`, a field name, a pin name.
 ///
@@ -42,17 +44,21 @@ pub struct File<'src> {
     pub span: Span,
 }
 
-/// One top-level item, with the doc comments and attributes written above it. The span
-/// starts at the first doc comment or attribute.
+/// An item or a statement with the doc comments and attributes written above it (as
+/// rustc's `ast::Item<K>` covers every kind of item). The span starts at the first doc
+/// comment or attribute.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Item<'src> {
-    /// Spans of the `///` lines before the item, in order (the text is `&src[span]`,
-    /// including the `///`). Shown as the rationale on the item's page (language §5.6).
+pub struct Node<'src, K> {
+    /// Spans of the `///` lines before it, in order (the text is `&src[span]`, including
+    /// the `///`): an item's rationale (language §5.6), a part's or a spec's "why".
     pub docs: Vec<Span>,
     pub attrs: Vec<Attribute<'src>>,
-    pub kind: ItemKind<'src>,
+    pub kind: K,
     pub span: Span,
 }
+
+/// One top-level item: a `block` or a `contract`.
+pub type Item<'src> = Node<'src, ItemKind<'src>>;
 
 /// What an item is. `block` and `contract` share their shape (a name and a list of
 /// statements); which statements are allowed in which is checked by the parser
@@ -66,6 +72,17 @@ pub enum ItemKind<'src> {
     /// Text at the top level that couldn't be parsed as an item; the item's span covers
     /// all of it, up to the next `block` or `contract`.
     Error,
+}
+
+/// Which kind of body, without the body: the tag of `ItemKind::Block` and
+/// `ItemKind::Contract`, for code that needs to know which one it's in (the parser's
+/// `WrongBody` check) but not to hold it. Kept apart rather than folded into `ItemKind`
+/// (as rustc keeps `DefKind` apart from `ItemKind`), so matching an item stays
+/// `ItemKind::Block(body)`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BodyKind {
+    Block,
+    Contract,
 }
 
 /// `Name { statements }`: the part of a `block` or `contract` after its keyword.
@@ -86,17 +103,9 @@ pub struct Attribute<'src> {
     pub span: Span,
 }
 
-/// One statement in a body, with its doc comments and attributes. The span starts at the
-/// first of them and ends after the `;`.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Stmt<'src> {
-    /// Spans of the `///` lines before the statement: a part's rationale, a spec's
-    /// "why" (shown on value cards and spec rows).
-    pub docs: Vec<Span>,
-    pub attrs: Vec<Attribute<'src>>,
-    pub kind: StmtKind<'src>,
-    pub span: Span,
-}
+/// One statement in a body. Its span ends after the `;` (or after the last token, when
+/// the `;` is missing).
+pub type Stmt<'src> = Node<'src, StmtKind<'src>>;
 
 /// What a statement is (grammar.md §3).
 #[derive(Clone, Debug, PartialEq)]
@@ -214,11 +223,9 @@ pub enum ExprKind<'src> {
 /// Binary operators, loosest first (grammar.md §4.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
-    In,
-    Lt,
-    Le,
-    Gt,
-    Ge,
+    /// A comparison: `in`, `<`, `<=`, `>`, `>=`. Only valid at the top of an `assume` or
+    /// `spec`, which takes it out as a typed [`Relation`].
+    Rel(RelOp),
     /// `..=`
     Range,
     /// `±`, `+/-`
@@ -227,20 +234,6 @@ pub enum BinOp {
     Sub,
     Mul,
     Div,
-}
-
-impl BinOp {
-    /// The relation for this operator, if it is one (what an `assume`/`spec` needs).
-    pub fn relation(self) -> Option<RelOp> {
-        Some(match self {
-            BinOp::In => RelOp::In,
-            BinOp::Lt => RelOp::Lt,
-            BinOp::Le => RelOp::Le,
-            BinOp::Gt => RelOp::Gt,
-            BinOp::Ge => RelOp::Ge,
-            _ => return None,
-        })
-    }
 }
 
 /// One field of a struct literal: a pin binding (`a: vcc`), a parameter

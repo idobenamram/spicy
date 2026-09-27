@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 codespan-reporting = { version = "0.13.1", default-features = false, features = ["std"] }
+spicy_model = { path = "../spicy_model" }
 
 [dev-dependencies]
 insta = { version = "1.43.1", features = ["glob"] }

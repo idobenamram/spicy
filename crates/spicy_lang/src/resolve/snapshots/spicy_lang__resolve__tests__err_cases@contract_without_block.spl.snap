@@ -1,0 +1,16 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/contract_without_block.spl
+---
+--- errors ---
+E-contract ContractWithoutBlock 9..16 "Missing"
+
+--- rendered ---
+error[E-contract]: contract for an unknown block `Missing`
+  --> contract_without_block.spl:1:10
+  |
+1 | contract Missing {}
+  |          ^^^^^^^ no block with this name
+  |
+  = note: a contract describes the block of the same name

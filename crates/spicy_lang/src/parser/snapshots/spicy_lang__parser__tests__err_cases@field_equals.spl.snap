@@ -13,7 +13,7 @@ File 0..55
           Path base 45..49 "base"
 
 --- errors ---
-E-syntax FieldEquals fix 35..36 ":" 35..36 "="
+E-syntax FieldEquals 35..36 "=" fix 35..36 ":"
 
 --- rendered ---
 error[E-syntax]: fields use `:`, not `=`

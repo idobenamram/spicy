@@ -1,0 +1,59 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unicode_edges.spl
+---
+Quantity "1"
+IdentNonAscii "α"
+Whitespace "\n"
+IdentNonAscii "α1"
+Whitespace "\n"
+IdentNonAscii "letα"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1"
+Semi ";"
+Whitespace "\n"
+Ident "a"
+Unknown "\u{feff}"
+Ident "b"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-ascii-ident NonAsciiIdent 1..3 "α"
+E-ascii-ident NonAsciiIdent 4..7 "α1"
+E-ascii-ident NonAsciiIdent 8..13 "letα"
+E-unexpected-char UnexpectedChar 20..23 "\u{feff}"
+
+--- rendered ---
+error[E-ascii-ident]: identifiers must be ASCII
+  --> unicode_edges.spl:1:2
+  |
+1 | 1α
+  |  ^ `α` contains `α` (U+03B1)
+  |
+  = help: use ASCII letters, digits and `_`
+
+error[E-ascii-ident]: identifiers must be ASCII
+  --> unicode_edges.spl:2:1
+  |
+2 | α1
+  | ^^ `α1` contains `α` (U+03B1)
+  |
+  = help: use ASCII letters, digits and `_`
+
+error[E-ascii-ident]: identifiers must be ASCII
+  --> unicode_edges.spl:3:1
+  |
+3 | letα = 1;
+  | ^^^^ `letα` contains `α` (U+03B1)
+  |
+  = help: use ASCII letters, digits and `_`
+
+error[E-unexpected-char]: unexpected character `\u{feff}` (U+FEFF)
+  --> unicode_edges.spl:4:2
+  |
+4 | a�b
+  |  ^ not part of the language

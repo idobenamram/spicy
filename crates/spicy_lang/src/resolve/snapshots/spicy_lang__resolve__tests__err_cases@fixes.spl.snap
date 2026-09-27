@@ -1,0 +1,165 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/fixes.spl
+---
+block A 139..140
+  port vcc: Pin 152..155
+  port gnd: Ground 171..174
+  net bb 192..194
+  net n1 204..206
+  n2 = Resistor 216..218
+    a → vcc
+    b → gnd
+    value = 1000 Ω
+  r1 = Resistor 329..331
+    a → vcc
+    b → gnd
+    value = <invalid>
+  r2 = Resistor 383..385
+    a → vcc
+    b → gnd
+    value = <invalid>
+  r3 = Resistor 437..439
+    a → vcc
+    b → gnd
+    value = <invalid>
+  r4 = Resistor 584..586
+    a → <unbound>
+    b → gnd
+    value = 1000 Ω
+  r5 = Resistor 694..696
+    a → vcc
+    b → <unbound>
+    value = 1000 Ω
+  r6 = Resistor 808..810
+    a → vcc
+    b → gnd
+  r7 = Resistor 866..868
+    a → <unbound>
+    b → gnd
+    value = 1000 Ω
+  r8 = Resistor 920..922
+    a → <unbound>
+    b → gnd
+    value = 1000 Ω
+  r9 = Resistor 1043..1045
+    a → vcc
+    b → gnd
+    value = 1000 Ω
+  r10 = Resistor 1107..1110
+    a → vcc
+    b → gnd
+  r11 = <error> 1185..1188
+
+--- errors ---
+E-unit UnitMismatch 368..371 "47K" fix 368..371 "47k"
+E-unit UnitMismatch 422..425 "5mK"
+E-unit UnitMismatch 476..483 "1K + 1K"
+E-name UnknownName 603..605 "n3" fix 603..605 "n1"
+E-name UnknownName 718..719 "b" fix 718..719 "b: bb"
+E-binding UnknownField 840..850 "resistance" fix 840..850 "value"
+E-binding UnknownField 882..884 "aa" fix 882..884 "a"
+E-binding UnknownField 936..939 "vcc" fix 936..939 "a: vcc"
+E-binding UnknownField 1086..1091 "Value"
+E-binding Missing 1113..1121 "Resistor"
+E-binding UnknownField 1140..1142 "bb"
+E-name UnknownName 1191..1198 "Resistr" fix 1191..1198 "Resistor"
+
+--- rendered ---
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+   --> fixes.spl:10:48
+   |
+10 |     let r1 = Resistor { a: vcc, b: gnd, value: 47K };
+   |                                                ^^^ this is `K` (a temperature)
+   |
+   = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+   --> fixes.spl:11:48
+   |
+11 |     let r2 = Resistor { a: vcc, b: gnd, value: 5mK };
+   |                                                ^^^ this is `K` (a temperature)
+   |
+   = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+   --> fixes.spl:12:48
+   |
+12 |     let r3 = Resistor { a: vcc, b: gnd, value: 1K + 1K };
+   |                                                ^^^^^^^ this is `K` (a temperature)
+   |
+   = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-name]: unknown net, port or instance `n3`
+   --> fixes.spl:14:28
+   |
+14 |     let r4 = Resistor { a: n3, b: gnd, value: 1k };
+   |                            ^^ not defined
+   |
+   = help: did you mean `n1`?
+
+error[E-name]: unknown net, port or instance `b`
+   --> fixes.spl:16:33
+   |
+16 |     let r5 = Resistor { a: vcc, b, value: 1k };
+   |                                 ^ not defined
+   |
+   = help: did you mean `bb`?
+
+error[E-binding]: `Resistor` has no pin or field `resistance`
+   --> fixes.spl:18:41
+   |
+18 |     let r6 = Resistor { a: vcc, b: gnd, resistance: 1k };
+   |                                         ^^^^^^^^^^ unknown
+   |
+   = help: did you mean `value`?
+   = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` has no pin or field `aa`
+   --> fixes.spl:19:25
+   |
+19 |     let r7 = Resistor { aa: vcc, b: gnd, value: 1k };
+   |                         ^^ unknown
+   |
+   = help: did you mean `a`?
+   = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` has no pin or field `vcc`
+   --> fixes.spl:20:25
+   |
+20 |     let r8 = Resistor { vcc, b: gnd, value: 1k };
+   |                         ^^^ unknown
+   |
+   = help: did you mean `a`?
+   = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` has no pin or field `Value`
+   --> fixes.spl:22:52
+   |
+22 |     let r9 = Resistor { a: vcc, b: gnd, value: 1k, Value: 2k };
+   |                                                    ^^^^^ unknown
+   |
+   = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` is missing `value`
+   --> fixes.spl:23:15
+   |
+23 |     let r10 = Resistor { a: vcc, b: gnd, bb: gnd };
+   |               ^^^^^^^^ needs `value`
+
+error[E-binding]: `Resistor` has no pin or field `bb`
+   --> fixes.spl:23:42
+   |
+23 |     let r10 = Resistor { a: vcc, b: gnd, bb: gnd };
+   |                                          ^^ unknown
+   |
+   = note: `Resistor` has `a`, `b` and `value`
+
+error[E-name]: unknown part kind or block `Resistr`
+   --> fixes.spl:25:15
+   |
+25 |     let r11 = Resistr { a: vcc, b: gnd, value: 1k };
+   |               ^^^^^^^ not defined
+   |
+   = help: did you mean `Resistor`?

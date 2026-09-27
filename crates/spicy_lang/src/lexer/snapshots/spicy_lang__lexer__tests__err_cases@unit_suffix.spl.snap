@@ -97,15 +97,15 @@ Eof ""
 
 --- errors ---
 E-unit-suffix UnknownSuffix 10..11 "q"
-E-unit-suffix Meg 22..25 "Meg" fix "M"
-E-unit-suffix PrefixNotAllowed 36..37 "k" fix ""
-E-unit-suffix PrefixNotAllowed 51..52 "m" fix ""
+E-unit-suffix Meg 22..25 "Meg" fix 22..25 "M"
+E-unit-suffix PrefixNotAllowed 36..37 "k" fix 36..37 ""
+E-unit-suffix PrefixNotAllowed 51..52 "m" fix 51..52 ""
 E-unit-suffix DecimalAndInfix 63..68 "4.7k7"
-E-unit-suffix UnknownSuffix 79..82 "KHz" fix "kHz"
-E-unit-suffix UnknownSuffix 94..97 "ºC" fix "°C"
-E-unit-suffix SecondPrefix 110..111 "k" fix ""
+E-unit-suffix UnknownSuffix 79..82 "KHz" fix 79..82 "kHz"
+E-unit-suffix UnknownSuffix 94..97 "ºC" fix 94..97 "°C"
+E-unit-suffix SecondPrefix 110..111 "k" fix 110..111 ""
 E-unit-suffix DecimalAndInfix 121..126 "1e3k7"
-E-unit-suffix PrefixNotAllowed 137..138 "k" fix ""
+E-unit-suffix PrefixNotAllowed 137..138 "k" fix 137..138 ""
 
 --- rendered ---
 error[E-unit-suffix]: unknown unit `q`

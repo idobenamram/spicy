@@ -1,0 +1,6 @@
+block M {
+    port a: Pin;
+    port b: Pin;
+    net x = [a, b];
+    let r = Resistor { a: x, b, value: 1k };
+}

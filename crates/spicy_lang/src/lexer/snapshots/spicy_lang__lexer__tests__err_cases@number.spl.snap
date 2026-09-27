@@ -55,8 +55,8 @@ Eof ""
 --- errors ---
 E-number MissingExponentDigits 9..10 "e"
 E-number TooLarge 20..25 "1e400"
-E-number LeadingDecimalPoint 35..37 ".5" fix "0.5"
-E-number TrailingDecimalPoint 47..49 "1." fix "1.0"
+E-number LeadingDecimalPoint 35..37 ".5" fix 35..37 "0.5"
+E-number TrailingDecimalPoint 47..49 "1." fix 47..49 "1.0"
 E-number TooSmall 59..65 "1e-400"
 
 --- rendered ---

@@ -75,7 +75,7 @@ The tree always exists. The broken statement still has a node the editor and the
 | A8 | **Statement-level recovery:** on an error, scan again from the statement's start and stop after a `;` with no bracket open, before the closing `}`, or before a statement or item keyword at or after the error. Brackets opened before the error are assumed broken (an unclosed `Resistor {` doesn't swallow the block); brackets opened after it are skipped whole (`for … { … }`). **Item-level:** skip to `block`/`contract`. A missing `;` is a soft error when the next token starts something new. Several unclosed constructs at the end of the file give one error | Spade's and Zig's sync points, plus rust-analyzer's "keep the skipped span" |
 | A9 | **Shape rules live in the parser, meaning in elaboration.** Parser: chained comparisons, the `±` rule, a spec with no relation, a statement in the wrong body. Elaboration: names, units, pins | The split every reference makes (Spade vs its lowering, rustc vs `ast_validation`, Zig vs AstGen) |
 | A10 | **Doc comments are data on the node** (`docs: Vec<Span>`); attributes are nodes (`attrs`) | rustc and Spade attach them the same way |
-| A11 | **Two limits guard the stack:** nesting (parentheses, types, calls) up to 128, and tree depth up to 1024, counting chained operators too (`a + a + … + a` is flat text but a deep tree, and dropping or cloning a tree recurses once per level). Past either, `TooDeep` | The red team crashed the parser with 20 000 nested types and with a 100 000-term sum (on drop). A language server's worker threads have 2 MB stacks |
+| A11 | **Two limits guard the stack:** nesting (parentheses, types, calls) up to 128, and tree height up to 1024, counting chained operators too (`a + a + … + a` is flat text but a deep tree, and dropping or cloning a tree recurses once per level). Height is counted bottom-up, each node one more than its tallest child, because a chain grows *above* operands already parsed: a count of the levels above the parse point missed `a + (…) + a + …` (a later review built a 48 000-level tree that way). Past either limit, `TooDeep` | The red team crashed the parser with 20 000 nested types and with a 100 000-term sum (on drop). A language server's worker threads have 2 MB stacks |
 
 **Not needed yet:** node IDs (rustc assigns them later, not in the parser; our model gets its own), and the "no struct literal here" restriction (the MVP has no `for`/`if`, grammar.md §3).
 
@@ -100,7 +100,7 @@ pub struct Expr<'src>  { kind: ExprKind<'src>, span }
 pub enum   ExprKind    { Quantity(QuantityLit), Path(Path), StructLit { path, fields: Vec<Field> },
                          Paren(Box<Expr>), Array(Vec<Expr>), Field { base, name }, Call { callee, args },
                          Neg(Box<Expr>), Binary { op: BinOp, lhs, rhs }, Error }
-pub enum   BinOp       { In, Lt, Le, Gt, Ge, Range, Tol, Add, Sub, Mul, Div }
+pub enum   BinOp       { Rel(RelOp), Range, Tol, Add, Sub, Mul, Div }   // RelOp: In, Lt, Le, Gt, Ge
 ```
 
 ---

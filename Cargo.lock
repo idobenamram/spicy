@@ -2343,7 +2343,12 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "insta",
+ "spicy_model",
 ]
+
+[[package]]
+name = "spicy_model"
+version = "0.1.0"
 
 [[package]]
 name = "spicy_parser"

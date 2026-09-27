@@ -1,0 +1,47 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/fields.spl
+---
+block A 6..7
+  port p: Pin 19..20
+  port n: Pin 36..37
+  r1 = Resistor 52..54
+    a → p
+    b → n
+  r2 = Resistor 106..108
+    a → p
+    b → <unbound>
+  s = block B 138..139
+    x → p
+    y → <unbound>
+block B 163..164
+  port x: Pin 176..177
+  port y: Pin 193..194
+
+--- errors ---
+E-binding UnknownField 80..90 "resistance" fix 80..90 "value"
+E-binding Missing 111..119 "Resistor"
+E-binding Missing 142..143 "B"
+
+--- rendered ---
+error[E-binding]: `Resistor` has no pin or field `resistance`
+  --> fields.spl:4:37
+  |
+4 |     let r1 = Resistor { a: p, b: n, resistance: 1k };
+  |                                     ^^^^^^^^^^ unknown
+  |
+  = help: did you mean `value`?
+  = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` is missing `b` and `value`
+  --> fields.spl:5:14
+  |
+5 |     let r2 = Resistor { a: p };
+  |              ^^^^^^^^ needs `b` and `value`
+
+error[E-binding]: `B` is missing `y`
+  --> fields.spl:6:13
+  |
+6 |     let s = B { x: p };
+  |             ^ needs `y`

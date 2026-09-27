@@ -1,0 +1,85 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/cascades.spl
+---
+block A 33..34
+  port vcc: <error> 113..116
+  port gnd: Ground 151..154
+  r1 = Resistor 172..174
+    a → vcc
+    b → gnd
+    value = 1000 Ω
+  r2 = Resistor 297..299
+    a → vcc
+    b → gnd
+    value = <invalid>
+  r3 = Resistor 356..358
+    a → vcc
+    b → gnd
+    value = <invalid>
+  r4 = Resistor 421..423
+    a → vcc
+    b → gnd
+    value = <invalid>
+  q1 = Npn 485..487
+    c → vcc
+    b → gnd
+    e → gnd
+    beta = <invalid>
+
+--- errors ---
+E-type BadSignalType 118..121 "Bus"
+E-duplicate Duplicate 132..135 "vcc" related 113..116
+E-plus-minus PlusMinusTypo 339..341 "+-" fix 339..341 "±"
+E-chained Chained 404..406 "±"
+E-ambiguous-tolerance AmbiguousTolerance 460..466 "1k / 2"
+E-spread ToleranceInRange 526..535 "100 ± 1%"
+
+--- rendered ---
+error[E-type]: `Bus` isn't a port type
+  --> cascades.spl:4:15
+  |
+4 |     port vcc: Bus;
+  |               ^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-duplicate]: port `vcc` is defined twice
+  --> cascades.spl:5:10
+  |
+4 |     port vcc: Bus;
+  |          --- first defined here
+5 |     port vcc: Pin;
+  |          ^^^ second definition
+
+error[E-plus-minus]: `+-` means `+ (-…)` in Rust
+  --> cascades.spl:9:51
+  |
+9 |     let r2 = Resistor { a: vcc, b: gnd, value: 1k +- 1% };
+  |                                                   ^^ not a tolerance
+  |
+  = help: for a tolerance write `±` or `+/-`
+
+error[E-chained]: tolerances can't be chained
+   --> cascades.spl:10:56
+   |
+10 |     let r3 = Resistor { a: vcc, b: gnd, value: 1k ± 1% ± 1% };
+   |                                                        ^ second operator here
+
+error[E-ambiguous-tolerance]: ambiguous tolerance
+   --> cascades.spl:11:48
+   |
+11 |     let r4 = Resistor { a: vcc, b: gnd, value: 1k / 2 ± 10% };
+   |                                                ^^^^^^ does `±` apply to this whole expression?
+   |
+   = help: `(1k / 2) ± 10%` for a spread on the result
+   = help: `1k / (2 ± 10%)` for a spread on one term
+
+error[E-spread]: a range endpoint can't carry a tolerance
+   --> cascades.spl:12:50
+   |
+12 |     let q1 = Npn { c: vcc, b: gnd, e: gnd, beta: 100 ± 1% ..= 300 };
+   |                                                  ^^^^^^^^ this endpoint has a tolerance
+   |
+   = help: use either a range `a..=b` or a tolerance `x ± t`

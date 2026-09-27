@@ -6,7 +6,7 @@ input_file: crates/spicy_lang/test_data/parser/err/chained.spl
 File 0..98
   Contract A 0..97
     Spec a Lt 17..35
-      Binary Lt 25..30
+      Binary Rel(Lt) 25..30
         Path x 25..26 "x"
         Path y 29..30 "y"
       Path z 33..34 "z"

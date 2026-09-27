@@ -1,0 +1,29 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/let_not_instance.spl
+---
+block A 6..7
+  x = <error> 18..19
+  y = <error> 34..35
+
+--- errors ---
+E-let LetNotInstance 22..24 "5k"
+E-let LetNotInstance 38..42 "f(1)"
+
+--- rendered ---
+error[E-let]: in a block, `let` places a part or a block
+  --> let_not_instance.spl:2:13
+  |
+2 |     let x = 5k;
+  |             ^^ not a part or block
+  |
+  = help: write `let name = Kind { … };`; measures belong in the contract
+
+error[E-let]: in a block, `let` places a part or a block
+  --> let_not_instance.spl:3:13
+  |
+3 |     let y = f(1);
+  |             ^^^^ not a part or block
+  |
+  = help: write `let name = Kind { … };`; measures belong in the contract

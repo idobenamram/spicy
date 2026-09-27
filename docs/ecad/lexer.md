@@ -154,17 +154,15 @@ pub enum TokenKind {
 /// Output of decoding one Quantity token (pass 2; the parser calls the same function).
 pub struct QuantityLit {
     pub value: f64,              // prefix applied: `1kHz` → 1000.0
-    pub unit: Option<UnitSym>,   // None for `47k`, `3`
-    pub is_integer: bool,        // `3` (for `sigma(3)`, array sizes later), not `3.0`, `3k`, `3e0`
+    pub unit: Option<Unit>,      // None for `47k`, `3`
 }
-pub enum UnitSym { Volt, Amp, Ohm, Farad, Henry, Hertz, Second, Watt, Kelvin, Celsius, Percent, Decibel }
 
 pub fn scan(src: &str) -> Tokens<'_>;                              // pass 1
 pub fn check(tokens: &Tokens) -> Vec<LexError>;                    // pass 2
 pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError>;
 ```
 
-- **`UnitSym` is only the spelling's meaning,** not a physical dimension. The mapping to `Dimension` lives in `spicy_model` (roadmap §2.4). The formatter reprints the original text, so no spelling information is needed here.
+- **`Unit` is `spicy_model::units::Unit`** (`Volt`, `Ohm`, `Celsius`, `Percent`, …): the lexer maps each spelling (`ohm`, `Ω`, U+2126) to it, and the model's `Unit::quantity` maps it to a dimension, in one place (roadmap §2.4). The formatter reprints the original text, so no spelling information is needed here.
 - **`decode_quantity` is called by pass 2** (to find errors everywhere, even in regions the parser skips while recovering) **and by the parser** (to get the value). It's a pure function on a few bytes, so calling it twice costs nothing and saves keeping a side table.
 
 ---
@@ -204,8 +202,8 @@ Numbers `#…` refer to the error list in `grammar.md` §7.
 |---|---|---|---|
 | Quantity decoding | each `Quantity` | `47q`, `1Meg`, `k°C`, `4.7k7`, `4k7k`, `4k7%`, `1e`, `1e400`, `1e-400` | #9 unknown suffix (with close matches; a fix only when there's exactly one, since `1mhz` could be `mHz` or `MHz`), #10 `Meg` → `M`, #11 no prefix on this unit (`4k7%` → `4.7%`), #12 decimal point *or* infix prefix, not both; a second prefix after an infix one; missing exponent digits; value too large or too small |
 | Space before a unit | `Quantity`, whitespace, then a word that decodes as a suffix and doesn't start with a digit (`1 2` is two numbers) | `10 V`, `10 kΩ` | #13 remove the space |
-| Bare decimal point | `Dot` touching a following `Quantity` (not right after a name or `)`, where it's a field access: `x.5`); a `Quantity` touching a following `Dot` that isn't a field access | `.5`, `1.` | #14 write `0.5` / `1.0` |
-| `+-`, `--` | `Plus` touching `Minus`; a run of touching `Minus` (one error for the run) | `12V +- 5%`, `----x` | #2 did you mean `±` or `+/-`; #3 |
+| Bare decimal point | `Dot` touching a following `Quantity` (not right after a name or `)`, where it's a field access: `x.5`); a `Quantity` touching a following `Dot` that isn't a field access. Only when the fixed text decodes: `1.5.` and `.4k7` are left to the parser and the number check | `.5`, `1.` | #14 write `0.5` / `1.0` |
+| `+-`, `--` | `Plus` touching `Minus`; a run of touching `Minus` (one error for the run, checked from its first `-`) | `12V +- 5%`, `----x` | #2 did you mean `±` or `+/-`; #3 |
 | Lone `%` | `Unknown "%"` | `a % 3` | #15 `%` only means percent, glued to a number. After a number (`± 1 %`) the space check wins instead: "remove the space: `1%`" |
 | Unterminated comment | `UnterminatedBlockComment` | `/* …` | #22, with a label on the `/*` |
 | Look-alikes | `Unknown` in the table (§6.3) | `−`, `;`, `≤` | #23 "this is `−` (U+2212 MINUS SIGN), not `-`", with a replacement |
@@ -276,7 +274,7 @@ The alternative is a ~40-line runner of our own, like `spicy_simulate`'s `test_u
 
 `circuits/ce_amp.spl` has its own test (`include_str!`), so the case files never drift from it.
 
-**A coverage rule:** a test lists every `LexError` variant (in a hand-written `ALL` array) and fails if some variant never appears in an `err/` snapshot. Every error kind is tested at least once, and adding a variant without a test fails CI.
+**A coverage rule:** a test lists every `LexErrorKind` variant (in a hand-written `ALL_NAMES` array, test-only) and fails if some variant never appears in an `err/` snapshot. Every error kind is tested at least once, and adding a variant without a test fails CI.
 
 ### 7.2 Unit tests for quantity decoding
 

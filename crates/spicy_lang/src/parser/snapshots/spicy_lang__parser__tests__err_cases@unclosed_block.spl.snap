@@ -14,7 +14,7 @@ File 0..61
         Quantity 2e0 56..57 "2"
 
 --- errors ---
-E-syntax Unclosed 22..30 "contract"
+E-syntax Unclosed 22..30 "contract" related 8..9
 
 --- rendered ---
 error[E-syntax]: expected `}`

@@ -1,0 +1,12 @@
+block Spreads {
+    port a: Pin;
+    port b: Pin;
+    let r1 = Resistor { a, b, value: 2 * (1k ± 1%) };
+    let r2 = Resistor { a, b, value: (10k ± 500) / 2 };
+    let r3 = Resistor { a, b, value: 47k ± (1%) };
+    let r4 = Resistor { a, b, value: 47k ± (2 * 0.5%) };
+    let r5 = Resistor { a, b, value: -2 * (1k ± 100) };
+    let c1 = Capacitor { a, b, value: (1uF ± 10%), rating: (25V) };
+    let q1 = Npn { c: a, b, e: b, beta: 2 * (50..=150) };
+    let q2 = Npn { c: a, b, e: b, beta: -(-200) };
+}

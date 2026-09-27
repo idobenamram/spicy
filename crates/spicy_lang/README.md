@@ -1,6 +1,6 @@
 # spicy_lang
 
-The language front-end: `.spl` text → tokens → syntax tree, with rustc-style diagnostics.
+The language front-end: `.spl` text → tokens → syntax tree → `Design` (in `spicy_model`), with rustc-style diagnostics.
 
 **Owns:** turning text into `spicy_model`, with diagnostics. **Must not know about:** simulators or the engine (`docs/ecad/roadmap.md` §2.3).
 
@@ -15,8 +15,12 @@ The parser (roadmap M1c, design in `docs/ecad/ast.md`):
 - `parser::parse`: text → `Parsed` (tokens, syntax tree, lexer and parser errors). Never fails: broken code becomes `Error` nodes that keep their spans.
 - `parser::ast`: the tree. Owned enums, a byte span on every node, names borrowed from the source.
 
+Resolve, the first step of elaboration (roadmap M1d, design in `docs/ecad/model.md`):
+
+- `resolve::resolve`: `Parsed` → `Resolved` (the `Design`, its source map, and errors). Collects every block's ports first, then resolves bodies, so order never matters. Checks names, pins, fields and units.
+
 Tests:
 
-- `cargo test -p spicy_lang`: unit tests, the case files in `test_data/{lexer,parser}/{ok,err}` (snapshots under `src/{lexer,parser}/snapshots`, reviewed with `cargo insta review`), and the invariants on seeded random inputs.
+- `cargo test -p spicy_lang`: unit tests, the case files in `test_data/{lexer,parser,resolve}/{ok,err}` (snapshots under `src/{lexer,parser,resolve}/snapshots`, reviewed with `cargo insta review`), and the invariants on seeded random inputs.
 - Speed: `cargo test -p spicy_lang --release -- --ignored --nocapture speed`.
 - Fuzzing (needs a C++ compiler and cargo-fuzz): `cargo +nightly fuzz run fuzz_spicy_lang_lexer` or `fuzz_spicy_lang_parser` from `fuzz/`. The repo pins stable, hence `+nightly`.

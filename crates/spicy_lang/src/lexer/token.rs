@@ -1,33 +1,7 @@
-use std::ops::Range;
-
-/// A byte range in one source file.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Span {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl Span {
-    pub fn new(start: u32, end: u32) -> Self {
-        debug_assert!(start <= end);
-        Self { start, end }
-    }
-
-    pub fn range(self) -> Range<usize> {
-        self.start as usize..self.end as usize
-    }
-
-    pub fn len(self) -> u32 {
-        self.end - self.start
-    }
-
-    pub fn is_empty(self) -> bool {
-        self.start == self.end
-    }
-}
+use spicy_model::span::Span;
 
 /// Index of a token in [`Tokens`].
-pub type TokenIdx = usize;
+pub type TokenIdx = u32;
 
 /// What a token is. One byte, so the token list stays compact (lexer.md §3, L3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -124,29 +98,31 @@ impl<'src> Tokens<'src> {
         self.src
     }
 
-    /// Number of tokens, including the final `Eof`.
-    pub fn len(&self) -> usize {
-        self.kinds.len()
+    /// Number of tokens, including the final `Eof`. Fits in a `TokenIdx`: the source is
+    /// under 4 GiB and every token but `Eof` is at least a byte.
+    pub fn len(&self) -> TokenIdx {
+        self.kinds.len() as TokenIdx
     }
 
+    /// Always false: there is at least the `Eof`. (Clippy wants it next to `len`.)
     pub fn is_empty(&self) -> bool {
         self.kinds.is_empty()
     }
 
     pub fn kind(&self, i: TokenIdx) -> TokenKind {
-        self.kinds[i]
+        self.kinds[i as usize]
     }
 
     /// Like [`kind`](Self::kind), but `Eof` past the end, for lookahead without bounds checks.
     pub fn kind_or_eof(&self, i: TokenIdx) -> TokenKind {
-        self.kinds.get(i).copied().unwrap_or(TokenKind::Eof)
-    }
-
-    pub fn kinds(&self) -> &[TokenKind] {
-        &self.kinds
+        self.kinds
+            .get(i as usize)
+            .copied()
+            .unwrap_or(TokenKind::Eof)
     }
 
     pub fn span(&self, i: TokenIdx) -> Span {
+        let i = i as usize;
         Span::new(self.starts[i], self.starts[i + 1])
     }
 

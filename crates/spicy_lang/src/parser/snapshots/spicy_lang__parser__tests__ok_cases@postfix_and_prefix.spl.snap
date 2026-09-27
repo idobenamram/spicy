@@ -1,0 +1,49 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/postfix_and_prefix.spl
+---
+File 0..252
+  Block P 0..251
+    Let a 95..120
+      Call 103..119
+        Field .mag 103..117
+          Call 103..113
+            Field .at 103..107
+              Path h 103..104 "h"
+            Quantity 1e3 Hz 108..112 "1kHz"
+    Let b 125..144
+      Neg 133..143
+        Call 134..143
+          Call 134..140
+            Field .y 134..137
+              Path x 134..135 "x"
+            Quantity 1e0 138..139 "1"
+          Quantity 2e0 141..142 "2"
+    Let c 149..164
+      Neg 157..163
+        Neg 159..163
+          Quantity 3e0 dB 160..163 "3dB"
+    Let d 169..184
+      Binary Mul 177..183
+        Neg 177..179
+          Path a 178..179 "a"
+        Path b 182..183 "b"
+    Let e 189..216
+      Array 197..215
+        Paren 198..201
+          Path a 199..200 "a"
+        Array 203..210
+          Path b 204..205 "b"
+          Path c 207..208 "c"
+        Neg 212..214
+          Path d 213..214 "d"
+    Let f 221..249
+      StructLit R 229..248
+        Field v 233..246
+          Neg 236..246
+            Field .c 237..246
+              Paren 237..244
+                Binary Add 238..243
+                  Path a 238..239 "a"
+                  Path b 242..243 "b"

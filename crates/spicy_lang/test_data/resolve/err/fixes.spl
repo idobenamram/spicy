@@ -1,0 +1,26 @@
+// Every fix here is the single right answer: applied alone, it removes its error and
+// adds none (see `fixes_remove_their_error`).
+block A {
+    port vcc: Pin;
+    port gnd: Ground;
+    net bb;
+    net n1;
+    let n2 = Resistor { a: vcc, b: gnd, value: 1k };
+    // `K` is kelvin; only a lone literal gets the `k` fix.
+    let r1 = Resistor { a: vcc, b: gnd, value: 47K };
+    let r2 = Resistor { a: vcc, b: gnd, value: 5mK };
+    let r3 = Resistor { a: vcc, b: gnd, value: 1K + 1K };
+    // Net suggestions are nets only: `n3` is closest to `n1`, not to the instance `n2`.
+    let r4 = Resistor { a: n3, b: gnd, value: 1k };
+    // Shorthand `b` means `b: b`; the fix keeps the pin.
+    let r5 = Resistor { a: vcc, b, value: 1k };
+    // A misnamed field or pin: one error, the rename as the fix.
+    let r6 = Resistor { a: vcc, b: gnd, resistance: 1k };
+    let r7 = Resistor { aa: vcc, b: gnd, value: 1k };
+    let r8 = Resistor { vcc, b: gnd, value: 1k };
+    // No fix: `value` is already given, and `bb: gnd` can't be a field.
+    let r9 = Resistor { a: vcc, b: gnd, value: 1k, Value: 2k };
+    let r10 = Resistor { a: vcc, b: gnd, bb: gnd };
+    // A misspelled kind.
+    let r11 = Resistr { a: vcc, b: gnd, value: 1k };
+}

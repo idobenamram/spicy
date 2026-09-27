@@ -1,0 +1,73 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/signal_type_namespace.spl
+---
+block A 6..7
+  port v: <error> 19..20
+  port w: <error> 41..42
+  port x: <error> 56..57
+  port y: <error> 78..79
+  port z: <error> 101..102
+  p = <error> 121..122
+  q = <error> 143..144
+block B 168..169
+  port i: Pin 181..182
+
+--- errors ---
+E-name WrongNamespace 22..30 "Resistor"
+E-name WrongNamespace 44..45 "B"
+E-type BadSignalType 59..62 "Foo"
+E-type BadSignalType 81..90 "Power<Up>"
+E-type BadSignalType 104..111 "Pin<In>"
+E-name WrongNamespace 125..130 "Power"
+E-name WrongNamespace 147..148 "v"
+
+--- rendered ---
+error[E-name]: `Resistor` is a part kind, not a port type
+  --> signal_type_namespace.spl:2:13
+  |
+2 |     port v: Resistor;
+  |             ^^^^^^^^ expected a port type
+
+error[E-name]: `B` is a block, not a port type
+  --> signal_type_namespace.spl:3:13
+  |
+3 |     port w: B;
+  |             ^ expected a port type
+
+error[E-type]: `Foo` isn't a port type
+  --> signal_type_namespace.spl:4:13
+  |
+4 |     port x: Foo<Bar>;
+  |             ^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Power` takes a role: `In` or `Out`
+  --> signal_type_namespace.spl:5:13
+  |
+5 |     port y: Power<Up>;
+  |             ^^^^^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Pin` takes no role
+  --> signal_type_namespace.spl:6:13
+  |
+6 |     port z: Pin<In>;
+  |             ^^^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-name]: `Power` is a signal type, not a part kind or block
+  --> signal_type_namespace.spl:7:13
+  |
+7 |     let p = Power {};
+  |             ^^^^^ expected a part kind or block
+
+error[E-name]: `v` is a port, not a part kind or block
+  --> signal_type_namespace.spl:8:13
+  |
+8 |     let q = v { a: v };
+  |             ^ expected a part kind or block

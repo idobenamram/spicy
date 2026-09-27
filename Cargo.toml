@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "crates/spicy_circuit",
     "crates/spicy_lang",
+    "crates/spicy_model",
     "crates/spicy_parser",
     "crates/spicy_simulate",
     "crates/spicy_cli",

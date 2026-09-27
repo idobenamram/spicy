@@ -1,0 +1,59 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/bad_signal_type.spl
+---
+block A 6..7
+  port a: <error> 19..20
+  port b: <error> 36..37
+  port c: <error> 55..56
+  port d: <error> 79..80
+  port e: <error> 102..103
+
+--- errors ---
+E-type BadSignalType 22..25 "Bus"
+E-type BadSignalType 39..44 "Power"
+E-type BadSignalType 58..68 "Ground<In>"
+E-type BadSignalType 82..91 "Power<Up>"
+E-type BadSignalType 105..120 "Analog<In, Out>"
+
+--- rendered ---
+error[E-type]: `Bus` isn't a port type
+  --> bad_signal_type.spl:2:13
+  |
+2 |     port a: Bus;
+  |             ^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Power` needs a role: `In` or `Out`
+  --> bad_signal_type.spl:3:13
+  |
+3 |     port b: Power;
+  |             ^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Ground` takes no role
+  --> bad_signal_type.spl:4:13
+  |
+4 |     port c: Ground<In>;
+  |             ^^^^^^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Power` takes a role: `In` or `Out`
+  --> bad_signal_type.spl:5:13
+  |
+5 |     port d: Power<Up>;
+  |             ^^^^^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-type]: `Analog` takes one role: `In` or `Out`
+  --> bad_signal_type.spl:6:13
+  |
+6 |     port e: Analog<In, Out>;
+  |             ^^^^^^^^^^^^^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`

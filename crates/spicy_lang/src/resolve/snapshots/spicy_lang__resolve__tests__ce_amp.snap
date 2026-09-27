@@ -1,0 +1,37 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(\"ce_amp.spl\", src)"
+---
+block CeAmp 56..61
+  port vcc: Power<In> 73..76
+  port gnd: Ground 98..101
+  port input: Analog<In> 120..125
+  port output: Analog<Out> 148..154
+  net base 178..182
+  net emitter 192..199
+  r1 = Resistor 253..255
+    a → vcc
+    b → base
+    value = 47000 Ω ± 1%
+  r2 = Resistor 314..316
+    a → base
+    b → gnd
+    value = 10000 Ω ± 1%
+  rc = Resistor 375..377
+    a → vcc
+    b → output
+    value = 4700 Ω ± 1%
+  re = Resistor 439..441
+    a → emitter
+    b → gnd
+    value = 1000 Ω ± 1%
+  c_in = Electrolytic 502..506
+    p → base
+    n → input
+    value = 0.000001 F ± 20%
+  q1 = Npn 572..574
+    c → output
+    b → base
+    e → emitter
+    beta = 200 (100..=300)
+contract CeAmp

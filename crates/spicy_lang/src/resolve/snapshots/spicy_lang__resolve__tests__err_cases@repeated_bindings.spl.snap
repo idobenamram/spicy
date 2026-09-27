@@ -1,0 +1,74 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/repeated_bindings.spl
+---
+block A 6..7
+  port v: Pin 19..20
+  port g: Ground 36..37
+  r1 = Resistor 137..139
+    a → v
+    b → g
+    value = 1000 Ω
+  r2 = Resistor 197..199
+    a → v
+    b → g
+    value = 1000 Ω
+  r3 = Resistor 337..339
+    a → v
+    b → g
+
+--- errors ---
+E-duplicate Duplicate 176..185 "value: 5V" related 165..174
+E-unit UnitMismatch 183..185 "5V"
+E-duplicate Duplicate 225..235 "a: nowhere" related 213..217
+E-name UnknownName 228..235 "nowhere"
+E-binding UnknownField 365..369 "valu" fix 365..369 "value"
+E-binding UnknownField 375..379 "valu"
+
+--- rendered ---
+error[E-duplicate]: `value` is given twice
+  --> repeated_bindings.spl:5:48
+  |
+5 |     let r1 = Resistor { a: v, b: g, value: 1k, value: 5V };
+  |                                     ---------  ^^^^^^^^^ second time
+  |                                     |           
+  |                                     first given here
+
+error[E-unit]: expected `Ω` (a resistance), found `V` (a voltage)
+  --> repeated_bindings.spl:5:55
+  |
+5 |     let r1 = Resistor { a: v, b: g, value: 1k, value: 5V };
+  |                                                       ^^ this is `V` (a voltage)
+
+error[E-duplicate]: `a` is given twice
+  --> repeated_bindings.spl:6:37
+  |
+6 |     let r2 = Resistor { a: v, b: g, a: nowhere, value: 1k };
+  |                         ----        ^^^^^^^^^^ second time
+  |                         |            
+  |                         first given here
+
+error[E-name]: unknown net, port or instance `nowhere`
+  --> repeated_bindings.spl:6:40
+  |
+6 |     let r2 = Resistor { a: v, b: g, a: nowhere, value: 1k };
+  |                                        ^^^^^^^ not defined
+
+error[E-binding]: `Resistor` has no pin or field `valu`
+  --> repeated_bindings.spl:8:37
+  |
+8 |     let r3 = Resistor { a: v, b: g, valu: 1k, valu: 2k };
+  |                                     ^^^^ unknown
+  |
+  = help: did you mean `value`?
+  = note: `Resistor` has `a`, `b` and `value`
+
+error[E-binding]: `Resistor` has no pin or field `valu`
+  --> repeated_bindings.spl:8:47
+  |
+8 |     let r3 = Resistor { a: v, b: g, valu: 1k, valu: 2k };
+  |                                               ^^^^ unknown
+  |
+  = help: did you mean `value`?
+  = note: `Resistor` has `a`, `b` and `value`

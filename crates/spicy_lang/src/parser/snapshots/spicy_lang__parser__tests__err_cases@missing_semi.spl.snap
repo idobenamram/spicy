@@ -15,8 +15,8 @@ File 0..69
           Path b 63..64 "b"
 
 --- errors ---
-E-syntax MissingSemi fix 19..19 ";" 18..19 "a"
-E-syntax MissingSemi fix 66..66 ";" 65..66 "}"
+E-syntax MissingSemi 18..19 "a" fix 19..19 ";"
+E-syntax MissingSemi 65..66 "}" fix 66..66 ";"
 
 --- rendered ---
 error[E-syntax]: expected `;`

@@ -1,0 +1,6 @@
+//
+///
+/////
+/*/ not closed by its own slash */
+x /**/ y
+// ends in a bare CR

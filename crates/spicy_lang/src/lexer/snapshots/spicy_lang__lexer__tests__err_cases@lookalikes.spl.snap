@@ -275,30 +275,30 @@ Whitespace "\n"
 Eof ""
 
 --- errors ---
-E-lookalike Lookalike 10..13 "−" fix "-"
-E-lookalike Lookalike 27..30 "–" fix "-"
-E-lookalike Lookalike 44..47 "—" fix "-"
-E-lookalike Lookalike 61..64 "‐" fix "-"
-E-lookalike Lookalike 78..81 "‑" fix "-"
-E-lookalike Lookalike 94..96 ";" fix ";"
-E-lookalike Lookalike 107..110 "≤" fix "<="
-E-lookalike Lookalike 125..128 "≥" fix ">="
-E-lookalike Lookalike 143..145 "×" fix "*"
-E-lookalike Lookalike 159..161 "·" fix "*"
-E-lookalike Lookalike 175..178 "∕" fix "/"
-E-lookalike Lookalike 192..194 "÷" fix "/"
-E-unit-suffix UnknownSuffix 208..211 "˚C" fix "°C"
-E-lookalike Lookalike 222..224 "\u{a0}" fix " "
-E-lookalike Lookalike 238..241 "\u{200b}" fix ""
-E-lookalike Lookalike 249..252 "＝" fix "="
-E-lookalike Lookalike 267..270 "，" fix ","
-E-lookalike Lookalike 280..283 "：" fix ":"
-E-lookalike Lookalike 295..298 "；" fix ";"
-E-lookalike Lookalike 308..311 "（" fix "("
-E-lookalike Lookalike 312..315 "）" fix ")"
-E-lookalike Lookalike 327..330 "＋" fix "+"
-E-lookalike Lookalike 343..346 "\u{2009}" fix " "
-E-lookalike Lookalike 358..361 "\u{202f}" fix " "
+E-lookalike Lookalike 10..13 "−" fix 10..13 "-"
+E-lookalike Lookalike 27..30 "–" fix 27..30 "-"
+E-lookalike Lookalike 44..47 "—" fix 44..47 "-"
+E-lookalike Lookalike 61..64 "‐" fix 61..64 "-"
+E-lookalike Lookalike 78..81 "‑" fix 78..81 "-"
+E-lookalike Lookalike 94..96 ";" fix 94..96 ";"
+E-lookalike Lookalike 107..110 "≤" fix 107..110 "<="
+E-lookalike Lookalike 125..128 "≥" fix 125..128 ">="
+E-lookalike Lookalike 143..145 "×" fix 143..145 "*"
+E-lookalike Lookalike 159..161 "·" fix 159..161 "*"
+E-lookalike Lookalike 175..178 "∕" fix 175..178 "/"
+E-lookalike Lookalike 192..194 "÷" fix 192..194 "/"
+E-unit-suffix UnknownSuffix 208..211 "˚C" fix 208..211 "°C"
+E-lookalike Lookalike 222..224 "\u{a0}" fix 222..224 " "
+E-lookalike Lookalike 238..241 "\u{200b}" fix 238..241 ""
+E-lookalike Lookalike 249..252 "＝" fix 249..252 "="
+E-lookalike Lookalike 267..270 "，" fix 267..270 ","
+E-lookalike Lookalike 280..283 "：" fix 280..283 ":"
+E-lookalike Lookalike 295..298 "；" fix 295..298 ";"
+E-lookalike Lookalike 308..311 "（" fix 308..311 "("
+E-lookalike Lookalike 312..315 "）" fix 312..315 ")"
+E-lookalike Lookalike 327..330 "＋" fix 327..330 "+"
+E-lookalike Lookalike 343..346 "\u{2009}" fix 343..346 " "
+E-lookalike Lookalike 358..361 "\u{202f}" fix 358..361 " "
 
 --- rendered ---
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
@@ -417,8 +417,8 @@ error[E-lookalike]: ` ` (U+00A0 NO-BREAK SPACE) is not ASCII
 error[E-lookalike]: `​` (U+200B ZERO WIDTH SPACE) is not ASCII
    --> lookalikes.spl:15:10
    |
-15 | let a = b​;
-   |           invisible character
+15 | let a = b�;
+   |          ^ invisible character
    |
    = help: delete it
 

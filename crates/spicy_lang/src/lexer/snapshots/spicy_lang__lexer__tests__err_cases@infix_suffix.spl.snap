@@ -51,11 +51,11 @@ Whitespace "\n"
 Eof ""
 
 --- errors ---
-E-unit-suffix PrefixNotAllowed 9..10 "k" fix "."
-E-unit-suffix PrefixNotAllowed 23..24 "m" fix "."
+E-unit-suffix PrefixNotAllowed 9..10 "k" fix 9..10 "."
+E-unit-suffix PrefixNotAllowed 23..24 "m" fix 23..24 "."
 E-unit-suffix UnknownSuffix 41..43 "in"
 E-unit-suffix UnknownSuffix 54..57 "mhz"
-E-unit-suffix UnknownSuffix 70..71 "v" fix "V"
+E-unit-suffix UnknownSuffix 70..71 "v" fix 70..71 "V"
 
 --- rendered ---
 error[E-unit-suffix]: `%` takes no prefix

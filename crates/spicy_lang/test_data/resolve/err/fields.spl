@@ -1,0 +1,12 @@
+block A {
+    port p: Pin;
+    port n: Pin;
+    let r1 = Resistor { a: p, b: n, resistance: 1k };
+    let r2 = Resistor { a: p };
+    let s = B { x: p };
+}
+
+block B {
+    port x: Pin;
+    port y: Pin;
+}

@@ -8,7 +8,7 @@ File 0..43
     StmtError 14..42 "let r = Resistor { a: f(1, 2"
 
 --- errors ---
-E-syntax Unclosed 43..43 ""
+E-syntax Unclosed 43..43 "" related 37..38
 
 --- rendered ---
 error[E-syntax]: expected `)`

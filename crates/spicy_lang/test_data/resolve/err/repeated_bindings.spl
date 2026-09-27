@@ -1,0 +1,9 @@
+block A {
+    port v: Pin;
+    port g: Ground;
+    // A second binding is checked for its own mistakes, but the first one stays.
+    let r1 = Resistor { a: v, b: g, value: 1k, value: 5V };
+    let r2 = Resistor { a: v, b: g, a: nowhere, value: 1k };
+    // One misspelling written twice: both reported, one rename, no `Missing`.
+    let r3 = Resistor { a: v, b: g, valu: 1k, valu: 2k };
+}

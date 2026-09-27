@@ -1,0 +1,22 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/ok/comment_edges.spl
+---
+LineComment "//"
+Whitespace "\r\n"
+DocComment "///"
+Whitespace "\r\n"
+LineComment "/////"
+Whitespace "\r\n"
+BlockComment "/*/ not closed by its own slash */"
+Whitespace "\r\n"
+Ident "x"
+Whitespace " "
+BlockComment "/**/"
+Whitespace " "
+Ident "y"
+Whitespace "\r\n"
+LineComment "// ends in a bare CR"
+Whitespace "\r"
+Eof ""

@@ -1,0 +1,14 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/merges.spl
+---
+block M 6..7
+  port a: Pin 19..20
+  port b: Pin 36..37
+  net x 52..53
+  r = Resistor 72..73
+    a → x
+    b → b
+    value = 1000 Ω
+  merge x = [a, b]

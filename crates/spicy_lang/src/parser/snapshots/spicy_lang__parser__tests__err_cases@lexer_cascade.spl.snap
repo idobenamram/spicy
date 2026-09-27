@@ -16,10 +16,10 @@ File 0..97
     Net ok 87..94
 
 --- errors ---
-E-lookalike Lookalike 24..27 "−"
-E-lookalike Lookalike 44..46 ";"
-E-unit-space UnitSpace 59..65 "10 kΩ"
-E-number LeadingDecimalPoint 79..81 ".5"
+E-lookalike Lookalike 24..27 "−" fix 24..27 "-"
+E-lookalike Lookalike 44..46 ";" fix 44..46 ";"
+E-unit-space UnitSpace 59..65 "10 kΩ" fix 59..65 "10kΩ"
+E-number LeadingDecimalPoint 79..81 ".5" fix 79..81 "0.5"
 
 --- rendered ---
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII

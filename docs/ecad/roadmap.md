@@ -384,7 +384,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
     - a snapshot of `ce_amp.spl`'s AST;
     - a snapshot per remaining syntax error in §7;
     - a fuzz target that never panics and always returns a tree or diagnostics. 🔍
-- **M1d: Elaboration → `spicy_model`.** Creates `spicy_model`. Design: `model.md` (agreed 2026-09-27).
+- **M1d: Elaboration → `spicy_model`.** Creates `spicy_model`. Design: `model.md` (agreed 2026-09-27). **Resolve for blocks built 2026-09-27** (`spicy_model`, `spicy_lang::resolve`); contracts (M1d-5) and flatten (M1d-4) next.
   - Name resolution, pin binding (every pin exactly once) and unit checking.
   - Role checks (one source per `Power` net).
   - Flattening the hierarchy, and extracting the knobs and the contract.

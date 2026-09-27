@@ -1,0 +1,55 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/values.spl
+---
+block Values 6..12
+  port a: Pin 24..25
+  port b: Pin 41..42
+  r1 = Resistor 57..59
+    a → a
+    b → b
+    value = 47000 Ω ± 1%
+  r2 = Resistor 107..109
+    a → a
+    b → b
+    value = 4700 Ω
+  r3 = Resistor 153..155
+    a → a
+    b → b
+    value = 9400 Ω
+  r4 = Resistor 202..204
+    a → a
+    b → b
+    value = 3000 Ω
+  r5 = Resistor 250..252
+    a → a
+    b → b
+    value = 10000 Ω ± 50 Ω
+  r6 = Resistor 303..305
+    a → a
+    b → b
+    value = 47000 Ω
+  r7 = Resistor 349..351
+    a → a
+    b → b
+    value = 50 Ω
+  c1 = Electrolytic 397..399
+    p → a
+    n → b
+    value = 0.000001 F ± 20%
+    rating = 25 V
+  c2 = Capacitor 471..473
+    a → a
+    b → b
+    value = 0.000000022 F ± 5%
+  q1 = Npn 522..524
+    c → a
+    b → b
+    e → b
+    beta = 200 (100..=300)
+  q2 = Pnp 575..577
+    c → a
+    b → b
+    e → b
+    beta = 200

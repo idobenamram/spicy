@@ -1,0 +1,13 @@
+block A {
+    port v: Resistor;
+    port w: B;
+    port x: Foo<Bar>;
+    port y: Power<Up>;
+    port z: Pin<In>;
+    let p = Power {};
+    let q = v { a: v };
+}
+
+block B {
+    port i: Pin;
+}

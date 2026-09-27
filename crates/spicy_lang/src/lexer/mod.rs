@@ -10,11 +10,11 @@ pub(crate) mod lookalike;
 mod quantity;
 mod token;
 
-pub use check::{Fix, LexError, LexErrorKind, check};
+pub use check::{LexError, LexErrorKind, check};
 pub use quantity::{
-    QuantityError, QuantityErrorKind, QuantityLit, UnitSym, decode_quantity, suffix_suggestions,
+    QuantityError, QuantityErrorKind, QuantityLit, decode_quantity, suffix_suggestions,
 };
-pub use token::{Span, TokenIdx, TokenKind, Tokens};
+pub use token::{TokenIdx, TokenKind, Tokens};
 
 use quantity::{is_suffix_char, scan_mantissa};
 
@@ -32,12 +32,8 @@ pub fn scan(src: &str) -> Tokens<'_> {
         src.len() < u32::MAX as usize,
         "source files are limited to 4 GiB"
     );
-    let mut scanner = Scanner {
-        src,
-        bytes: src.as_bytes(),
-        pos: 0,
-    };
-    // A rough guess: one token per 4 bytes of source.
+    let mut scanner = Scanner { src, pos: 0 };
+    // A rough guess: one token per 4 bytes of source; `starts` has one extra entry.
     let mut kinds = Vec::with_capacity(src.len() / 4 + 1);
     let mut starts = Vec::with_capacity(src.len() / 4 + 2);
     if src.starts_with(BOM) {
@@ -55,28 +51,39 @@ pub fn scan(src: &str) -> Tokens<'_> {
         kinds.push(kind);
         starts.push(start);
     }
+    // The zero-length Eof: its start, then the end entry that closes it.
     kinds.push(TokenKind::Eof);
     starts.push(src.len() as u32);
     starts.push(src.len() as u32);
     Tokens { src, kinds, starts }
 }
 
+/// A cursor over the source. `pos` is always on a character boundary.
 struct Scanner<'src> {
     src: &'src str,
-    bytes: &'src [u8],
     pos: usize,
 }
 
 impl Scanner<'_> {
+    /// The byte `offset` bytes ahead of the current position.
     fn peek(&self, offset: usize) -> Option<u8> {
-        self.bytes.get(self.pos + offset).copied()
+        self.src.as_bytes().get(self.pos + offset).copied()
     }
 
     fn rest(&self) -> &str {
         &self.src[self.pos..]
     }
 
-    /// The character at the current position (only called on non-ASCII bytes).
+    fn rest_bytes(&self) -> &[u8] {
+        &self.src.as_bytes()[self.pos..]
+    }
+
+    /// Whether the text at the current position starts with `s`.
+    fn at(&self, s: &str) -> bool {
+        self.rest_bytes().starts_with(s.as_bytes())
+    }
+
+    /// The character at the current position. Precondition: not at the end.
     fn char_here(&self) -> char {
         self.rest()
             .chars()
@@ -84,15 +91,34 @@ impl Scanner<'_> {
             .expect("pos is inside the source")
     }
 
+    /// Consumes `len` bytes as one token of `kind`.
+    fn take(&mut self, len: usize, kind: TokenKind) -> TokenKind {
+        self.pos += len;
+        kind
+    }
+
+    /// Consumes every character that satisfies `keep`. ASCII is read byte by byte;
+    /// only non-ASCII is decoded.
+    fn take_while(&mut self, keep: impl Fn(char) -> bool) {
+        while let Some(b) = self.peek(0) {
+            let c = if b.is_ascii() {
+                b as char
+            } else {
+                self.char_here()
+            };
+            if !keep(c) {
+                break;
+            }
+            self.pos += c.len_utf8();
+        }
+    }
+
     /// Consumes one token and returns its kind. Precondition: not at the end.
     fn next_kind(&mut self) -> TokenKind {
         use TokenKind::*;
-        let b = self.bytes[self.pos];
-        let single = |s: &mut Self, kind| {
-            s.pos += 1;
-            kind
-        };
-        match b {
+        match self.src.as_bytes()[self.pos] {
+            // A byte loop, not `take_while`: whitespace is the most common token, and
+            // the closure over `char` makes the whole scan about a third slower.
             b' ' | b'\t' | b'\r' | b'\n' => {
                 while matches!(self.peek(0), Some(b' ' | b'\t' | b'\r' | b'\n')) {
                     self.pos += 1;
@@ -102,87 +128,57 @@ impl Scanner<'_> {
             b'/' => match self.peek(1) {
                 Some(b'/') => self.line_comment(),
                 Some(b'*') => self.block_comment(),
-                _ => single(self, Slash),
+                _ => self.take(1, Slash),
             },
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.ident(),
             b'0'..=b'9' => self.quantity(),
-            b'+' if self.rest().starts_with("+/-") => {
-                self.pos += 3;
-                PlusMinus
-            }
-            b'.' if self.rest().starts_with("..=") => {
-                self.pos += 3;
-                DotDotEq
-            }
-            b'.' if self.peek(1) == Some(b'.') => {
-                self.pos += 2;
-                DotDot
-            }
-            b':' if self.peek(1) == Some(b':') => {
-                self.pos += 2;
-                ColonColon
-            }
-            b'<' if self.peek(1) == Some(b'=') => {
-                self.pos += 2;
-                Le
-            }
-            b'>' if self.peek(1) == Some(b'=') => {
-                self.pos += 2;
-                Ge
-            }
-            b'{' => single(self, LBrace),
-            b'}' => single(self, RBrace),
-            b'(' => single(self, LParen),
-            b')' => single(self, RParen),
-            b'[' => single(self, LBracket),
-            b']' => single(self, RBracket),
-            b'<' => single(self, Lt),
-            b'>' => single(self, Gt),
-            b',' => single(self, Comma),
-            b';' => single(self, Semi),
-            b':' => single(self, Colon),
-            b'.' => single(self, Dot),
-            b'=' => single(self, Eq),
-            b'+' => single(self, Plus),
-            b'-' => single(self, Minus),
-            b'*' => single(self, Star),
-            b'#' => single(self, Pound),
-            b'?' => single(self, Question),
-            0x80.. => {
-                let c = self.char_here();
-                if c == '±' {
-                    self.pos += c.len_utf8();
-                    PlusMinus
-                } else if c.is_alphanumeric() {
-                    self.ident()
-                } else {
-                    self.pos += c.len_utf8();
-                    Unknown
-                }
-            }
+            // Operators of several characters, longest first.
+            b'+' if self.at("+/-") => self.take(3, PlusMinus),
+            b'.' if self.at("..=") => self.take(3, DotDotEq),
+            b'.' if self.at("..") => self.take(2, DotDot),
+            b':' if self.at("::") => self.take(2, ColonColon),
+            b'<' if self.at("<=") => self.take(2, Le),
+            b'>' if self.at(">=") => self.take(2, Ge),
+            b'{' => self.take(1, LBrace),
+            b'}' => self.take(1, RBrace),
+            b'(' => self.take(1, LParen),
+            b')' => self.take(1, RParen),
+            b'[' => self.take(1, LBracket),
+            b']' => self.take(1, RBracket),
+            b'<' => self.take(1, Lt),
+            b'>' => self.take(1, Gt),
+            b',' => self.take(1, Comma),
+            b';' => self.take(1, Semi),
+            b':' => self.take(1, Colon),
+            b'.' => self.take(1, Dot),
+            b'=' => self.take(1, Eq),
+            b'+' => self.take(1, Plus),
+            b'-' => self.take(1, Minus),
+            b'*' => self.take(1, Star),
+            b'#' => self.take(1, Pound),
+            b'?' => self.take(1, Question),
+            0x80.. => match self.char_here() {
+                '±' => self.take('±'.len_utf8(), PlusMinus),
+                c if c.is_alphanumeric() => self.ident(),
+                c => self.take(c.len_utf8(), Unknown),
+            },
             // Any other ASCII character: `%` on its own, `!`, `"`, control characters, …
-            _ => single(self, Unknown),
+            _ => self.take(1, Unknown),
         }
     }
 
-    /// `///` is a doc comment, `//` and `////…` are plain comments (as in Rust).
-    /// Both run to the end of the line, not including the newline.
+    /// `///` is a doc comment, `//` and `////…` are plain comments (as in Rust). Both
+    /// run to the end of the line; the line break (`\n` or `\r\n`) is not part of them.
     fn line_comment(&mut self) -> TokenKind {
-        let is_doc = self.rest().starts_with("///") && self.peek(3) != Some(b'/');
-        let mut len = self.bytes[self.pos..]
-            .iter()
-            .position(|&b| b == b'\n')
-            .unwrap_or(self.bytes.len() - self.pos);
-        // With CRLF line ends the `\r` belongs to the line break, not the comment.
-        if len > 2 && self.bytes[self.pos + len - 1] == b'\r' {
-            len -= 1;
-        }
-        self.pos += len;
-        if is_doc {
+        let kind = if self.at("///") && !self.at("////") {
             TokenKind::DocComment
         } else {
             TokenKind::LineComment
-        }
+        };
+        let rest = self.rest_bytes();
+        let line = &rest[..rest.iter().position(|&b| b == b'\n').unwrap_or(rest.len())];
+        self.pos += line.strip_suffix(b"\r").unwrap_or(line).len();
+        kind
     }
 
     /// `/* … */`, nested as in Rust. Walking byte by byte is safe: we only stop on ASCII
@@ -190,8 +186,8 @@ impl Scanner<'_> {
     fn block_comment(&mut self) -> TokenKind {
         self.pos += 2;
         let mut depth = 1u32;
-        while self.pos < self.bytes.len() {
-            match (self.bytes[self.pos], self.peek(1)) {
+        while let Some(b) = self.peek(0) {
+            match (b, self.peek(1)) {
                 (b'/', Some(b'*')) => {
                     depth += 1;
                     self.pos += 2;
@@ -209,36 +205,32 @@ impl Scanner<'_> {
         TokenKind::UnterminatedBlockComment
     }
 
-    /// ASCII letters, digits and `_`, plus any non-ASCII alphanumeric (which makes the
-    /// token `IdentNonAscii`, rejected by `check`). Then the keyword lookup.
+    /// Letters, digits and `_`, non-ASCII letters included (lexer.md L8). A word with
+    /// any non-ASCII in it is `IdentNonAscii`, rejected by `check`; the others go through
+    /// the keyword lookup.
     fn ident(&mut self) -> TokenKind {
         let start = self.pos;
-        let mut ascii = true;
-        while let Some(b) = self.peek(0) {
-            if b.is_ascii_alphanumeric() || b == b'_' {
-                self.pos += 1;
-            } else if b >= 0x80 && self.char_here().is_alphanumeric() {
-                ascii = false;
-                self.pos += self.char_here().len_utf8();
-            } else {
-                break;
-            }
+        // A byte loop over the ASCII run, not `take_while`: names are the most common
+        // token after whitespace, and the closure over `char` is measurably slower.
+        while matches!(self.peek(0), Some(b) if b.is_ascii_alphanumeric() || b == b'_') {
+            self.pos += 1;
         }
-        if !ascii {
-            return TokenKind::IdentNonAscii;
+        if self.peek(0).is_none_or(|b| b.is_ascii()) {
+            return keyword(&self.src[start..self.pos]).unwrap_or(TokenKind::Ident);
         }
-        keyword(&self.src[start..self.pos]).unwrap_or(TokenKind::Ident)
+        // A non-ASCII letter: the rest of the name, a char at a time.
+        self.take_while(|c| c == '_' || c.is_alphanumeric());
+        if self.src[start..self.pos].is_ascii() {
+            keyword(&self.src[start..self.pos]).unwrap_or(TokenKind::Ident)
+        } else {
+            TokenKind::IdentNonAscii
+        }
     }
 
     /// The number part (shared with the decoder), then every glued suffix character.
     fn quantity(&mut self) -> TokenKind {
-        self.pos += scan_mantissa(&self.bytes[self.pos..]).len;
-        while let Some(c) = self.rest().chars().next() {
-            if !is_suffix_char(c) {
-                break;
-            }
-            self.pos += c.len_utf8();
-        }
+        self.pos += scan_mantissa(self.rest_bytes()).len;
+        self.take_while(is_suffix_char);
         TokenKind::Quantity
     }
 }
@@ -266,6 +258,7 @@ fn keyword(word: &str) -> Option<TokenKind> {
 #[cfg(test)]
 mod tests {
     use super::{LexErrorKind, check, scan};
+    use crate::diagnostic::DiagKind;
     use crate::testing::{
         Rng, assert_every_kind_has_a_case, check_invariants, dump, file_name, read,
     };

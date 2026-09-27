@@ -1,0 +1,7 @@
+block A {
+    port a: Bus;
+    port b: Power;
+    port c: Ground<In>;
+    port d: Power<Up>;
+    port e: Analog<In, Out>;
+}

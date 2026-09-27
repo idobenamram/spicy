@@ -1,0 +1,116 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/units.spl
+---
+block A 6..7
+  port p: Pin 19..20
+  port n: Pin 36..37
+  r1 = Resistor 52..54
+    a → p
+    b → n
+    value = <invalid>
+  r2 = Resistor 103..105
+    a → p
+    b → n
+    value = <invalid>
+  r3 = Resistor 153..155
+    a → p
+    b → n
+    value = <invalid>
+  r7 = Resistor 207..209
+    a → p
+    b → n
+    value = <invalid>
+  r4 = Resistor 266..268
+    a → p
+    b → n
+    value = <invalid>
+  r5 = Resistor 322..324
+    a → p
+    b → n
+    value = <invalid>
+  c1 = Capacitor 370..372
+    a → p
+    b → n
+    value = 0.000001 F
+    rating = <invalid>
+  r6 = Resistor 439..441
+    a → p
+    b → n
+    value = <invalid>
+  q1 = Npn 501..503
+    c → p
+    b → n
+    e → n
+    beta = <invalid>
+
+--- errors ---
+E-unit UnitMismatch 87..91 "10nF"
+E-unit UnitMismatch 138..141 "47K" fix 138..141 "47k"
+E-unit MixedUnits 188..195 "1V + 1A"
+E-unit MixedUnits 242..254 "1V / 1mA + 5"
+E-unit NotArithmetic 301..310 "10°C * 2"
+E-value NotAValue 357..358 "p"
+E-value SpreadNotAllowed 418..427 "25V ± 1%"
+E-value SpreadInArithmetic 475..483 "1k ± 1%"
+E-value RangeReversed 536..545 "300..=100"
+
+--- rendered ---
+error[E-unit]: expected `Ω` (a resistance), found `F` (a capacitance)
+  --> units.spl:4:44
+  |
+4 |     let r1 = Resistor { a: p, b: n, value: 10nF };
+  |                                            ^^^^ this is `F` (a capacitance)
+
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+  --> units.spl:5:44
+  |
+5 |     let r2 = Resistor { a: p, b: n, value: 47K };
+  |                                            ^^^ this is `K` (a temperature)
+  |
+  = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-unit]: can't add `V` (a voltage) and `A` (a current)
+  --> units.spl:6:44
+  |
+6 |     let r3 = Resistor { a: p, b: n, value: 1V + 1A };
+  |                                            ^^^^^^^ different units
+
+error[E-unit]: can't add `Ω` (a resistance) and a plain number
+  --> units.spl:7:44
+  |
+7 |     let r7 = Resistor { a: p, b: n, value: 1V / 1mA + 5 };
+  |                                            ^^^^^^^^^^^^ different units
+
+error[E-unit]: temperatures can't be used in arithmetic here
+  --> units.spl:8:44
+  |
+8 |     let r4 = Resistor { a: p, b: n, value: 10°C * 2 };
+  |                                            ^^^^^^^^ not a plain quantity
+
+error[E-value]: expected a number
+  --> units.spl:9:44
+  |
+9 |     let r5 = Resistor { a: p, b: n, value: p };
+  |                                            ^ not a number
+
+error[E-value]: `rating` takes an exact value
+   --> units.spl:10:57
+   |
+10 |     let c1 = Capacitor { a: p, b: n, value: 1u, rating: 25V ± 1% };
+   |                                                         ^^^^^^^^ a tolerance or range
+
+error[E-value]: a tolerance or range can only be scaled
+   --> units.spl:11:45
+   |
+11 |     let r6 = Resistor { a: p, b: n, value: (1k ± 1%) + 1k };
+   |                                             ^^^^^^^ compute the nominal first, then add the spread
+   |
+   = note: `2 * (1k ± 1%)` works; adding to a spread doesn't
+
+error[E-value]: range bounds are the wrong way round
+   --> units.spl:12:44
+   |
+12 |     let q1 = Npn { c: p, b: n, e: n, beta: 300..=100 };
+   |                                            ^^^^^^^^^ the lower bound comes first

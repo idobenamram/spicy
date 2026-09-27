@@ -1,0 +1,10 @@
+// A second definition is checked for its own errors but never replaces the first.
+block A {
+    port v: Pin;
+    port g: Ground;
+    net x = [v];
+    net x = [g, nowhere];
+    let r1 = Resistor { a: v, b: g, value: 1k };
+    let r1 = Resistor { a: g, b: v, value: 2k, bad: v };
+    let v = Resistor { a: g, b: v, value: 3k };
+}

@@ -4,8 +4,10 @@
 //! `docs/ecad/ast.md` (syntax tree and parser).
 
 pub mod diagnostic;
+mod edit_distance;
 pub mod lexer;
 pub mod parser;
+pub mod resolve;
 
 /// Test support: only in this crate's tests and in fuzz builds (cargo-fuzz sets `cfg(fuzzing)`).
 #[cfg(any(test, fuzzing))]

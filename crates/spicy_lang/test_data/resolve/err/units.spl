@@ -1,0 +1,13 @@
+block A {
+    port p: Pin;
+    port n: Pin;
+    let r1 = Resistor { a: p, b: n, value: 10nF };
+    let r2 = Resistor { a: p, b: n, value: 47K };
+    let r3 = Resistor { a: p, b: n, value: 1V + 1A };
+    let r7 = Resistor { a: p, b: n, value: 1V / 1mA + 5 };
+    let r4 = Resistor { a: p, b: n, value: 10°C * 2 };
+    let r5 = Resistor { a: p, b: n, value: p };
+    let c1 = Capacitor { a: p, b: n, value: 1u, rating: 25V ± 1% };
+    let r6 = Resistor { a: p, b: n, value: (1k ± 1%) + 1k };
+    let q1 = Npn { c: p, b: n, e: n, beta: 300..=100 };
+}

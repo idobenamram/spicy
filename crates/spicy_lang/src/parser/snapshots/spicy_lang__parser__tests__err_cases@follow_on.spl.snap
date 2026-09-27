@@ -22,16 +22,16 @@ File 0..177
     StmtError 159..174 "let f = 10\u{200b}k;"
 
 --- errors ---
-E-syntax MissingSemi fix 29..29 ";" 25..29 "1Meg"
-E-unit-suffix Meg 26..29 "Meg"
+E-syntax MissingSemi 25..29 "1Meg" fix 29..29 ";"
+E-unit-suffix Meg 26..29 "Meg" fix 26..29 "M"
 E-relation NotARelation 57..64 "x − 1"
-E-lookalike Lookalike 59..62 "−"
+E-lookalike Lookalike 59..62 "−" fix 59..62 "-"
 E-ambiguous-tolerance AmbiguousTolerance 78..91 "capacity / 2h"
-E-unit-suffix UnknownSuffix 90..91 "h"
-E-number TrailingDecimalPoint 112..114 "1."
+E-unit-suffix UnknownSuffix 90..91 "h" fix 90..91 "H"
+E-number TrailingDecimalPoint 112..114 "1." fix 112..114 "1.0"
 E-percent LonePercent 130..131 "%"
 E-unexpected-char UnexpectedChar 149..150 "!"
-E-lookalike Lookalike 169..172 "\u{200b}"
+E-lookalike Lookalike 169..172 "\u{200b}" fix 169..172 ""
 
 --- rendered ---
 error[E-syntax]: expected `;`
@@ -109,7 +109,7 @@ error[E-unexpected-char]: unexpected character `!` (U+0021)
 error[E-lookalike]: `​` (U+200B ZERO WIDTH SPACE) is not ASCII
   --> follow_on.spl:9:15
   |
-9 |     let f = 10​k;
-  |                invisible character
+9 |     let f = 10�k;
+  |               ^ invisible character
   |
   = help: delete it

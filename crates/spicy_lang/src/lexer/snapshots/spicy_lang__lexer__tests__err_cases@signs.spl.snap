@@ -33,7 +33,7 @@ Whitespace "\n"
 Eof ""
 
 --- errors ---
-E-plus-minus PlusMinusTypo 20..22 "+-" fix "±"
+E-plus-minus PlusMinusTypo 20..22 "+-" fix 20..22 "±"
 E-double-minus DoubleMinus 35..37 "--"
 
 --- rendered ---

@@ -1,0 +1,20 @@
+// Amp is placed before it's defined, and `sig`, `out` and `base` are used before
+// their `net` lines (model.md E4). `gnd` is shorthand for `gnd: gnd`.
+block Top {
+    port v12: Power<In>;
+    port gnd: Ground;
+    let amp = Amp { vcc: v12, gnd, input: sig, output: out };
+    net sig;
+    net out;
+}
+
+block Amp {
+    port vcc: Power<In>;
+    port gnd: Ground;
+    port input: Analog<In>;
+    port output: Analog<Out>;
+    let r = Resistor { a: vcc, b: output, value: 4k7 };
+    let c = Capacitor { a: input, b: base, value: 100nF ± 10% };
+    net base;
+    let q = Npn { c: output, b: base, e: gnd };
+}

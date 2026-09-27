@@ -1,0 +1,28 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/ambiguous_tolerance_both_sides.spl
+---
+File 0..43
+  Contract A 0..42
+    Let k 17..40
+      Binary Tol 25..39
+        Binary Add 25..30
+          Path a 25..26 "a"
+          Path b 29..30 "b"
+        Binary Mul 34..39
+          Path c 34..35 "c"
+          Path d 38..39 "d"
+
+--- errors ---
+E-ambiguous-tolerance AmbiguousTolerance 25..39 "a + b ± c * d"
+
+--- rendered ---
+error[E-ambiguous-tolerance]: ambiguous tolerance
+  --> ambiguous_tolerance_both_sides.spl:2:13
+  |
+2 |     let k = a + b ± c * d;
+  |             ^^^^^^^^^^^^^ does `±` apply to this whole expression?
+  |
+  = help: `(a + b) ± (c * d)` for a spread on the result
+  = help: `a + (b ± c) * d` for a spread on one term

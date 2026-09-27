@@ -1,0 +1,139 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/value_arith.spl
+---
+block A 6..7
+  port p: Pin 19..20
+  port n: Pin 36..37
+  r1 = Resistor 112..114
+    a → p
+    b → n
+    value = <invalid>
+  r2 = Resistor 166..168
+    a → p
+    b → n
+    value = <invalid>
+  r3 = Resistor 281..283
+    a → p
+    b → n
+    value = <invalid>
+  r4 = Resistor 334..336
+    a → p
+    b → n
+    value = <invalid>
+  r5 = Resistor 435..437
+    a → p
+    b → n
+    value = <invalid>
+  r6 = Resistor 491..493
+    a → p
+    b → n
+    value = <invalid>
+  r7 = Resistor 608..610
+    a → p
+    b → n
+    value = <invalid>
+  r8 = Resistor 670..672
+    a → p
+    b → n
+    value = <invalid>
+  r9 = Resistor 731..733
+    a → p
+    b → n
+    value = <invalid>
+  r10 = Resistor 832..835
+    a → p
+    b → n
+    value = <invalid>
+  c1 = Capacitor 955..957
+    a → p
+    b → n
+    value = 0.000001 F
+    rating = <invalid>
+
+--- errors ---
+E-unit NotArithmetic 147..154 "2 * 3dB"
+E-unit UnitMismatch 201..209 "-(10°C)"
+E-value DivisionByZero 321..322 "0"
+E-value DivisionByZero 382..389 "(2 - 2)"
+E-value NegativeTolerance 476..479 "-1%"
+E-value NegativeTolerance 532..537 "-(50)"
+E-value SpreadInArithmetic 644..652 "1k ± 1%"
+E-value SpreadInArithmetic 705..719 "1k / (2 ± 1%)"
+E-value SpreadInArithmetic 766..781 "(1k ± 1%) * 1V"
+E-unit MixedUnits 868..876 "100 + 5%"
+E-value SpreadNotAllowed 1004..1013 "25V ± 1V"
+
+--- rendered ---
+error[E-unit]: dB levels can't be used in arithmetic here
+  --> value_arith.spl:5:44
+  |
+5 |     let r1 = Resistor { a: p, b: n, value: 2 * 3dB };
+  |                                            ^^^^^^^ not a plain quantity
+
+error[E-unit]: expected `Ω` (a resistance), found a temperature
+  --> value_arith.spl:6:44
+  |
+6 |     let r2 = Resistor { a: p, b: n, value: -(10°C) };
+  |                                            ^^^^^^^ this is a temperature
+
+error[E-value]: division by zero
+  --> value_arith.spl:8:49
+  |
+8 |     let r3 = Resistor { a: p, b: n, value: 1k / 0 };
+  |                                                 ^ the divisor is zero
+
+error[E-value]: division by zero
+  --> value_arith.spl:9:56
+  |
+9 |     let r4 = Resistor { a: p, b: n, value: (1k ± 1%) / (2 - 2) };
+  |                                                        ^^^^^^^ the divisor is zero
+
+error[E-value]: a tolerance can't be negative
+   --> value_arith.spl:11:49
+   |
+11 |     let r5 = Resistor { a: p, b: n, value: 1k ± -1% };
+   |                                                 ^^^ `±` already means both directions
+
+error[E-value]: a tolerance can't be negative
+   --> value_arith.spl:12:49
+   |
+12 |     let r6 = Resistor { a: p, b: n, value: 1k ± -(50) };
+   |                                                 ^^^^^ `±` already means both directions
+
+error[E-value]: a tolerance or range can only be scaled
+   --> value_arith.spl:14:45
+   |
+14 |     let r7 = Resistor { a: p, b: n, value: (1k ± 1%) + 1k };
+   |                                             ^^^^^^^ compute the nominal first, then add the spread
+   |
+   = note: `2 * (1k ± 1%)` works; adding to a spread doesn't
+
+error[E-value]: a tolerance or range can only be scaled
+   --> value_arith.spl:15:44
+   |
+15 |     let r8 = Resistor { a: p, b: n, value: 1k / (2 ± 1%) };
+   |                                            ^^^^^^^^^^^^^ compute the nominal first, then add the spread
+   |
+   = note: `2 * (1k ± 1%)` works; adding to a spread doesn't
+
+error[E-value]: a tolerance or range can only be scaled
+   --> value_arith.spl:16:44
+   |
+16 |     let r9 = Resistor { a: p, b: n, value: (1k ± 1%) * 1V };
+   |                                            ^^^^^^^^^^^^^^ compute the nominal first, then add the spread
+   |
+   = note: `2 * (1k ± 1%)` works; adding to a spread doesn't
+
+error[E-unit]: can't add a plain number and a ratio
+   --> value_arith.spl:18:45
+   |
+18 |     let r10 = Resistor { a: p, b: n, value: 100 + 5% };
+   |                                             ^^^^^^^^ different units
+
+error[E-value]: `rating` takes an exact value
+   --> value_arith.spl:20:58
+   |
+20 |     let c1 = Capacitor { a: p, b: n, value: 1u, rating: (25V ± 1V) };
+   |                                                          ^^^^^^^^ a tolerance or range

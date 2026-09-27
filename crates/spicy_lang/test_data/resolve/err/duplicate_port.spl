@@ -1,0 +1,8 @@
+// A second port of a name is checked for its own type, then dropped.
+block A {
+    port p: Pin;
+    port p: Bus;
+    port q: Power<In>;
+    port q: Resistor;
+    let r = Resistor { a: p, b: q, value: 1k };
+}

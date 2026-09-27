@@ -1,0 +1,32 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/pin_not_net.spl
+---
+block A 6..7
+  port p: Pin 19..20
+  r1 = Resistor 35..37
+    a → <unbound>
+    b → p
+    value = 1000 Ω
+  r2 = Resistor 86..88
+    a → <unbound>
+    b → p
+    value = 1000 Ω
+
+--- errors ---
+E-binding NotANet 54..57 "47k"
+E-binding NotANet 105..107 "r1"
+
+--- rendered ---
+error[E-binding]: pin `a` must be bound to a net or port
+  --> pin_not_net.spl:3:28
+  |
+3 |     let r1 = Resistor { a: 47k, b: p, value: 1k };
+  |                            ^^^ this is a value
+
+error[E-binding]: pin `a` must be bound to a net or port
+  --> pin_not_net.spl:4:28
+  |
+4 |     let r2 = Resistor { a: r1, b: p, value: 1k };
+  |                            ^^ this is an instance

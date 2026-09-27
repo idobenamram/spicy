@@ -1,0 +1,31 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/two_placements.spl
+---
+block Stereo 6..12
+  port v12: Power<In> 24..27
+  port gnd: Ground 49..52
+  port left_in: Analog<In> 71..78
+  port right_in: Analog<In> 101..109
+  port left_out: Analog<Out> 132..140
+  port right_out: Analog<Out> 164..173
+  left = block Stage 196..200
+    vcc → v12
+    gnd → gnd
+    input → left_in
+    output → left_out
+  right = block Stage 272..277
+    vcc → v12
+    gnd → gnd
+    input → right_in
+    output → right_out
+block Stage 350..355
+  port vcc: Power<In> 367..370
+  port gnd: Ground 392..395
+  port input: Analog<In> 414..419
+  port output: Analog<Out> 442..448
+  r = Resistor 471..472
+    a → input
+    b → output
+    value = 10000 Ω ± 1%

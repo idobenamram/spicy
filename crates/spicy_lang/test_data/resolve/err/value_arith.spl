@@ -1,0 +1,21 @@
+block A {
+    port p: Pin;
+    port n: Pin;
+    // dB levels and temperatures aren't linear quantities.
+    let r1 = Resistor { a: p, b: n, value: 2 * 3dB };
+    let r2 = Resistor { a: p, b: n, value: -(10°C) };
+    // Division by zero, in a value and in a scaled spread.
+    let r3 = Resistor { a: p, b: n, value: 1k / 0 };
+    let r4 = Resistor { a: p, b: n, value: (1k ± 1%) / (2 - 2) };
+    // A tolerance is a distance.
+    let r5 = Resistor { a: p, b: n, value: 1k ± -1% };
+    let r6 = Resistor { a: p, b: n, value: 1k ± -(50) };
+    // A spread can be scaled, not added to or divided by.
+    let r7 = Resistor { a: p, b: n, value: (1k ± 1%) + 1k };
+    let r8 = Resistor { a: p, b: n, value: 1k / (2 ± 1%) };
+    let r9 = Resistor { a: p, b: n, value: (1k ± 1%) * 1V };
+    // A ratio next to a plain number.
+    let r10 = Resistor { a: p, b: n, value: 100 + 5% };
+    // A parenthesized spread is still a spread on an exact field.
+    let c1 = Capacitor { a: p, b: n, value: 1u, rating: (25V ± 1V) };
+}

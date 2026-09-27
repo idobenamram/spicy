@@ -9,6 +9,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
 3. **[engine.md](engine.md)**: the engine design (current: v3).
 4. **[language.md](language.md)**: the circuit language (v0.1).
    - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
+   - **[model.md](model.md)**: elaboration, from syntax tree to flat design: `Design`, `FlatDesign`, knobs, nets, units, checks; compared with compilers, hardware elaborators, Modelica and circuit tools.
    - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests; compared with Spade, atopile, rustc, rust-analyzer and Zig.
    - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
@@ -34,6 +35,12 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [language_core.md](research/language_core.md)
     - [language_specs.md](research/language_specs.md)
     - [language_editor_mapping.md](research/language_editor_mapping.md)
+  - Elaboration (behind `model.md`):
+    - [model_compilers.md](research/model_compilers.md): rustc, rust-analyzer and Spade (name resolution, stable ids, lowering)
+    - [model_hdl.md](research/model_hdl.md): slang, Yosys and FIRRTL (elaboration, flattening, net merging)
+    - [model_modelica.md](research/model_modelica.md): the Modelica spec and OpenModelica (instantiation, connection sets, units)
+    - [model_circuit_tools.md](research/model_circuit_tools.md): atopile, ngspice, Xyce, KiCad and our SPICE parser (nets, naming, identity)
+    - [model_units.md](research/model_units.md): uom, F#, Unitful, pint (dimensions, temperature, %, dB)
     - These reports are kept as written. Where they disagree with the main docs, the main docs win. One known case: they propose a `logos` lexer and a lossless `rowan` tree; we chose a hand-written lexer and a typed AST with spans plus the full token list (roadmap.md §4.4).
 - **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md)).
 

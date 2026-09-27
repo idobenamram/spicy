@@ -1,0 +1,6 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/empty.spl
+---
+File 0..0

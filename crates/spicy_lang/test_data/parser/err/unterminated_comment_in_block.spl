@@ -1,0 +1,4 @@
+block A {
+    let x = f(1, /* never closed
+    let y = 2;
+}

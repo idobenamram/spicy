@@ -1,0 +1,9 @@
+block A {
+    assume vcc.v in 12V ± 5%;
+    spec s: x in 1..=2;
+}
+
+contract A {
+    port vcc: Power<In>;
+    net n;
+}

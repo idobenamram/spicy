@@ -1,0 +1,41 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/spec_names.spl
+---
+File 0..113
+  Contract A 0..112
+    StmtError 17..37 "spec in: x in 1..=2;"
+    StmtError 42..62 "spec fn: x in 1..=2;"
+    StmtError 67..85 "spec g x in 1..=2;"
+    Spec ok In 90..110
+      Path x 99..100 "x"
+      Binary Range 104..109
+        Quantity 1e0 104..105 "1"
+        Quantity 2e0 108..109 "2"
+
+--- errors ---
+E-keyword KeywordAsName 22..24 "in"
+E-reserved Reserved 47..49 "fn"
+E-syntax Expected 74..75 "x"
+
+--- rendered ---
+error[E-keyword]: `in` is a keyword
+  --> spec_names.spl:2:10
+  |
+2 |     spec in: x in 1..=2;
+  |          ^^ can't be used as a name
+  |
+  = help: choose another name
+
+error[E-reserved]: `fn` isn't supported yet
+  --> spec_names.spl:3:10
+  |
+3 |     spec fn: x in 1..=2;
+  |          ^^ reserved for a later version of the language
+
+error[E-syntax]: expected `:`, found `x`
+  --> spec_names.spl:4:12
+  |
+4 |     spec g x in 1..=2;
+  |            ^ expected `:`

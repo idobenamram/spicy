@@ -1,0 +1,51 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/expected.spl
+---
+File 0..136
+  Block A 0..135
+    StmtError 14..29 "port vcc Power;"
+    StmtError 34..70 "let r = Resistor { a: vcc b: base };"
+    StmtError 75..84 "let x = ;"
+    Net ok 89..96
+    StmtError 101..116 "let y = (1 + 2;"
+    StmtError 121..133 "let z = 1 2;"
+
+--- errors ---
+E-syntax Expected 23..28 "Power"
+E-syntax Expected 60..61 "b"
+E-syntax Expected 83..84 ";"
+E-syntax Expected 115..116 ";"
+E-syntax Expected 131..132 "2"
+
+--- rendered ---
+error[E-syntax]: expected `:`, found `Power`
+  --> expected.spl:2:14
+  |
+2 |     port vcc Power;
+  |              ^^^^^ expected `:`
+
+error[E-syntax]: expected `,` or `}`, found `b`
+  --> expected.spl:3:31
+  |
+3 |     let r = Resistor { a: vcc b: base };
+  |                               ^ expected `,` or `}`
+
+error[E-syntax]: expected an expression, found `;`
+  --> expected.spl:4:13
+  |
+4 |     let x = ;
+  |             ^ expected an expression
+
+error[E-syntax]: expected `)`, found `;`
+  --> expected.spl:6:19
+  |
+6 |     let y = (1 + 2;
+  |                   ^ expected `)`
+
+error[E-syntax]: expected `;`, found `2`
+  --> expected.spl:7:15
+  |
+7 |     let z = 1 2;
+  |               ^ expected `;`

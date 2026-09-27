@@ -1,0 +1,12 @@
+contract P {
+    // grammar.md §4.1: `in` loosest, then `..=`, then `±`, then arithmetic.
+    assume x in 12V ± 5%;
+    assume x in v - 0.5V..=v + 0.5V;
+    spec a: y in (capacity / t) ± 10%;
+    spec b: y in capacity / (t ± 10%);
+    spec c: -3V + 1V <= 1V;
+    spec d: vcc.v - dc(output.v) >= 2V;
+    spec e: a * b + c / d - e < 1;
+    spec f: y in r_nom ± 1%;
+    spec g: y in vcc.v ± 50mV;
+}

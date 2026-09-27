@@ -1,4 +1,4 @@
-//! Rendering diagnostics, shared by the lexer and (later) the parser.
+//! Rendering diagnostics, shared by the lexer and the parser.
 
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::files::SimpleFile;

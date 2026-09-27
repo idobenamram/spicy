@@ -1,0 +1,4 @@
+contract A {
+    assume vcc.v;
+    spec s: dc(output.v);
+}

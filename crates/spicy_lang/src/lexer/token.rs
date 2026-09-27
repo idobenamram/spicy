@@ -114,9 +114,9 @@ impl TokenKind {
 /// source length, so the last token (always [`TokenKind::Eof`]) has an end too.
 #[derive(Clone, Debug)]
 pub struct Tokens<'src> {
-    pub(crate) src: &'src str,
-    pub(crate) kinds: Vec<TokenKind>,
-    pub(crate) starts: Vec<u32>,
+    pub(super) src: &'src str,
+    pub(super) kinds: Vec<TokenKind>,
+    pub(super) starts: Vec<u32>,
 }
 
 impl<'src> Tokens<'src> {

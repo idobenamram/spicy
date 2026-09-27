@@ -1,0 +1,21 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/ok/crlf_comments.spl
+---
+DocComment "/// doc"
+Whitespace "\r\n"
+LineComment "// line"
+Whitespace "\r\n"
+KwLet "let"
+Whitespace " "
+Ident "x"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1"
+Semi ";"
+Whitespace " "
+LineComment "// trailing"
+Whitespace "\r\n"
+Eof ""

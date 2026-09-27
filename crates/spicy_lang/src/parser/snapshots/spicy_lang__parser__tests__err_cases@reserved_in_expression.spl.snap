@@ -1,0 +1,35 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/reserved_in_expression.spl
+---
+File 0..78
+  Block A 0..77
+    StmtError 14..27 "let x = true;"
+    StmtError 32..47 "let y = self.a;"
+    StmtError 52..63 "let fn = 1;"
+    Net ok 68..75
+
+--- errors ---
+E-reserved Reserved 22..26 "true"
+E-reserved Reserved 40..44 "self"
+E-reserved Reserved 56..58 "fn"
+
+--- rendered ---
+error[E-reserved]: `true` isn't supported yet
+  --> reserved_in_expression.spl:2:13
+  |
+2 |     let x = true;
+  |             ^^^^ reserved for a later version of the language
+
+error[E-reserved]: `self` isn't supported yet
+  --> reserved_in_expression.spl:3:13
+  |
+3 |     let y = self.a;
+  |             ^^^^ reserved for a later version of the language
+
+error[E-reserved]: `fn` isn't supported yet
+  --> reserved_in_expression.spl:4:9
+  |
+4 |     let fn = 1;
+  |         ^^ reserved for a later version of the language

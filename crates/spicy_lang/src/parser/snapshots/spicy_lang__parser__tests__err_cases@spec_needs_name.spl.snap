@@ -1,0 +1,25 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/spec_needs_name.spl
+---
+File 0..71
+  Contract A 0..70
+    StmtError 17..43 "spec dc(out.v) in 1V..=2V;"
+    Spec ok In 48..68
+      Path x 57..58 "x"
+      Binary Range 62..67
+        Quantity 1e0 62..63 "1"
+        Quantity 2e0 66..67 "2"
+
+--- errors ---
+E-syntax SpecNeedsName 22..24 "dc"
+
+--- rendered ---
+error[E-syntax]: a spec needs a name
+  --> spec_needs_name.spl:2:10
+  |
+2 |     spec dc(out.v) in 1V..=2V;
+  |          ^^ expected a name before the measure
+  |
+  = help: write `spec name: measure in bound;`

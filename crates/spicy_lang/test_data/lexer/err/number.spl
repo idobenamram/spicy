@@ -2,3 +2,4 @@ let a = 1e;
 let b = 1e400;
 let c = .5;
 let d = 1.;
+let e = 1e-400;

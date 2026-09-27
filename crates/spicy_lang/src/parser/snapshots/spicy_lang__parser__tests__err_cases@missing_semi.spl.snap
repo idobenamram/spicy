@@ -1,0 +1,36 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/missing_semi.spl
+---
+File 0..69
+  Block A 0..68
+    Net a 14..19
+    Net b 24..30
+    Let r 35..66
+      StructLit Resistor 43..66
+        Field a 54..58
+          Path a 57..58 "a"
+        Field b 60..64
+          Path b 63..64 "b"
+
+--- errors ---
+E-syntax MissingSemi fix 19..19 ";" 18..19 "a"
+E-syntax MissingSemi fix 66..66 ";" 65..66 "}"
+
+--- rendered ---
+error[E-syntax]: expected `;`
+  --> missing_semi.spl:2:9
+  |
+2 |     net a
+  |         ^ statements end with `;`
+  |
+  = help: add `;` at the end of this statement
+
+error[E-syntax]: expected `;`
+  --> missing_semi.spl:4:35
+  |
+4 |     let r = Resistor { a: a, b: b }
+  |                                   ^ statements end with `;`
+  |
+  = help: add `;` at the end of this statement

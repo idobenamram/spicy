@@ -1,0 +1,23 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/field_equals.spl
+---
+File 0..55
+  Block A 0..54
+    Let r 14..52
+      StructLit Resistor 22..51
+        Field a 33..40
+          Path vcc 37..40 "vcc"
+        Field b 42..49
+          Path base 45..49 "base"
+
+--- errors ---
+E-syntax FieldEquals fix 35..36 ":" 35..36 "="
+
+--- rendered ---
+error[E-syntax]: fields use `:`, not `=`
+  --> field_equals.spl:2:26
+  |
+2 |     let r = Resistor { a = vcc, b: base };
+  |                          ^ write `:` here

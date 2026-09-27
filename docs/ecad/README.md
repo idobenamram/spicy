@@ -9,6 +9,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
 3. **[engine.md](engine.md)**: the engine design (current: v3).
 4. **[language.md](language.md)**: the circuit language (v0.1).
    - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
+   - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests; compared with Spade, atopile, rustc, rust-analyzer and Zig.
    - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.

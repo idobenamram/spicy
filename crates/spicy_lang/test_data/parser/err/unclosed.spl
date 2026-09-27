@@ -1,0 +1,2 @@
+block A {
+    let r = Resistor { a: f(1, 2

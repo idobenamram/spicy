@@ -1,0 +1,52 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/chained.spl
+---
+File 0..98
+  Contract A 0..97
+    Spec a Lt 17..35
+      Binary Lt 25..30
+        Path x 25..26 "x"
+        Path y 29..30 "y"
+      Path z 33..34 "z"
+    Spec b In 40..67
+      Path x 48..49 "x"
+      Binary Tol 53..66
+        Binary Tol 53..60
+          Quantity 1e0 53..54 "1"
+          Quantity 2e0 % 58..60 "2%"
+        Quantity 1e0 % 64..66 "1%"
+    Spec c In 72..95
+      Path x 80..81 "x"
+      Binary Range 85..94
+        Binary Range 85..90
+          Quantity 1e0 85..86 "1"
+          Quantity 2e0 89..90 "2"
+        Quantity 3e0 93..94 "3"
+
+--- errors ---
+E-chained Chained 31..32 "<"
+E-chained Chained 61..63 "±"
+E-chained Chained 90..93 "..="
+
+--- rendered ---
+error[E-chained]: comparisons can't be chained
+  --> chained.spl:2:19
+  |
+2 |     spec a: x < y < z;
+  |                   ^ second operator here
+  |
+  = help: for a range, write `b in a..=c`
+
+error[E-chained]: tolerances can't be chained
+  --> chained.spl:3:25
+  |
+3 |     spec b: x in 1 ± 2% ± 1%;
+  |                         ^ second operator here
+
+error[E-chained]: ranges can't be chained
+  --> chained.spl:4:23
+  |
+4 |     spec c: x in 1..=2..=3;
+  |                       ^^^ second operator here

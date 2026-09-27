@@ -1,0 +1,20 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/unclosed.spl
+---
+File 0..43
+  Block A 0..42
+    StmtError 14..42 "let r = Resistor { a: f(1, 2"
+
+--- errors ---
+E-syntax Unclosed 43..43 ""
+
+--- rendered ---
+error[E-syntax]: expected `)`
+  --> unclosed.spl:3:1
+  |
+2 |     let r = Resistor { a: f(1, 2
+  |                            - …to close this
+3 | 
+  | ^ expected `)` here

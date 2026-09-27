@@ -1,0 +1,20 @@
+/// A block with every statement form.
+block All {
+    port vcc: Power<In>;
+    port bus: Bus<Analog<In>, Pin,>;
+    net base;
+    net merged = [a, b];
+    /// Rationale on a part.
+    let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };
+    let amp = CeAmp { vcc, gnd, input: guitar, output: to_adc, };
+    let empty = Nothing {};
+    let q = std::parts::Npn { c: out, b: base, e: emitter };
+}
+
+contract All {
+    let h = ac(output.v / input.v);
+    #[confidence(sigma(3))]
+    #[warn]
+    spec bias: dc(output.v) in 4.5V..=6.5V;
+    spec calls: f() in g(a, b,)..=h(1);
+}

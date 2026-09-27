@@ -1,0 +1,115 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/follow_on.spl
+---
+File 0..177
+  Contract A 0..176
+    Let a 17..29
+      ExprError 25..29 "1Meg"
+    Let b 34..44
+      Quantity 2e0 42..43 "2"
+    StmtError 49..65 "spec g: x − 1;"
+    Let i 70..99
+      Binary Tol 78..98
+        Binary Div 78..91
+          Path capacity 78..86 "capacity"
+          ExprError 89..91 "2h"
+        Quantity 1e1 % 95..98 "10%"
+    StmtError 104..115 "let c = 1.;"
+    StmtError 120..134 "let d = a % 3;"
+    StmtError 139..154 "let e = a != b;"
+    StmtError 159..174 "let f = 10\u{200b}k;"
+
+--- errors ---
+E-syntax MissingSemi fix 29..29 ";" 25..29 "1Meg"
+E-unit-suffix Meg 26..29 "Meg"
+E-relation NotARelation 57..64 "x − 1"
+E-lookalike Lookalike 59..62 "−"
+E-ambiguous-tolerance AmbiguousTolerance 78..91 "capacity / 2h"
+E-unit-suffix UnknownSuffix 90..91 "h"
+E-number TrailingDecimalPoint 112..114 "1."
+E-percent LonePercent 130..131 "%"
+E-unexpected-char UnexpectedChar 149..150 "!"
+E-lookalike Lookalike 169..172 "\u{200b}"
+
+--- rendered ---
+error[E-syntax]: expected `;`
+  --> follow_on.spl:2:13
+  |
+2 |     let a = 1Meg
+  |             ^^^^ statements end with `;`
+  |
+  = help: add `;` at the end of this statement
+
+error[E-unit-suffix]: `Meg` is SPICE's spelling of mega
+  --> follow_on.spl:2:14
+  |
+2 |     let a = 1Meg
+  |              ^^^ write `M` here
+  |
+  = help: `1Meg` is `1M`; lowercase `m` is milli
+
+error[E-relation]: expected a relation
+  --> follow_on.spl:4:13
+  |
+4 |     spec g: x − 1;
+  |             ^^^^^ not a relation
+  |
+  = help: write it like `x in a..=b` or `x <= b`
+
+error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
+  --> follow_on.spl:4:15
+  |
+4 |     spec g: x − 1;
+  |               ^ looks like `-`
+  |
+  = help: replace it with `-`
+
+error[E-ambiguous-tolerance]: ambiguous tolerance
+  --> follow_on.spl:5:13
+  |
+5 |     let i = capacity / 2h ± 10%;
+  |             ^^^^^^^^^^^^^ does `±` apply to this whole expression?
+  |
+  = help: `(capacity / 2h) ± 10%` for a spread on the result
+  = help: `capacity / (2h ± 10%)` for a spread on one term
+
+error[E-unit-suffix]: unknown unit `h`
+  --> follow_on.spl:5:25
+  |
+5 |     let i = capacity / 2h ± 10%;
+  |                         ^ not a unit or prefix
+  |
+  = help: did you mean `H`?
+  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+
+error[E-number]: a number can't end with `.`
+  --> follow_on.spl:6:13
+  |
+6 |     let c = 1.;
+  |             ^^ add a digit after the point
+  |
+  = help: write `1.0`
+
+error[E-percent]: `%` only means percent, glued to a number
+  --> follow_on.spl:7:15
+  |
+7 |     let d = a % 3;
+  |               ^ not attached to a number
+  |
+  = help: write `5%`; there is no modulo operator
+
+error[E-unexpected-char]: unexpected character `!` (U+0021)
+  --> follow_on.spl:8:15
+  |
+8 |     let e = a != b;
+  |               ^ not part of the language
+
+error[E-lookalike]: `​` (U+200B ZERO WIDTH SPACE) is not ASCII
+  --> follow_on.spl:9:15
+  |
+9 |     let f = 10​k;
+  |                invisible character
+  |
+  = help: delete it

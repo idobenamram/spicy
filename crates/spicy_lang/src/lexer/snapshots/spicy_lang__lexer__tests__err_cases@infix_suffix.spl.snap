@@ -1,0 +1,101 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/infix_suffix.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "4k7%"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "b"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "4m7°C"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "c"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "4k7in"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "d"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1mhz"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "e"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "4k7v"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-unit-suffix PrefixNotAllowed 9..10 "k" fix "."
+E-unit-suffix PrefixNotAllowed 23..24 "m" fix "."
+E-unit-suffix UnknownSuffix 41..43 "in"
+E-unit-suffix UnknownSuffix 54..57 "mhz"
+E-unit-suffix UnknownSuffix 70..71 "v" fix "V"
+
+--- rendered ---
+error[E-unit-suffix]: `%` takes no prefix
+  --> infix_suffix.spl:1:10
+  |
+1 | let a = 4k7%;
+  |          ^ `k` can't be a prefix here
+  |
+  = help: in this form `k` marks the decimal point, but `%` takes no prefix: write `.` instead
+
+error[E-unit-suffix]: `°C` takes no prefix
+  --> infix_suffix.spl:2:10
+  |
+2 | let b = 4m7°C;
+  |          ^ `m` can't be a prefix here
+  |
+  = help: in this form `m` marks the decimal point, but `°C` takes no prefix: write `.` instead
+
+error[E-unit-suffix]: unknown unit `in`
+  --> infix_suffix.spl:3:12
+  |
+3 | let c = 4k7in;
+  |            ^^ not a unit or prefix
+  |
+  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+
+error[E-unit-suffix]: unknown unit `mhz`
+  --> infix_suffix.spl:4:10
+  |
+4 | let d = 1mhz;
+  |          ^^^ not a unit or prefix
+  |
+  = help: did you mean `mHz` or `MHz`?
+  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+
+error[E-unit-suffix]: unknown unit `v`
+  --> infix_suffix.spl:5:12
+  |
+5 | let e = 4k7v;
+  |            ^ not a unit or prefix
+  |
+  = help: did you mean `V`?
+  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)

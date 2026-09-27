@@ -1,0 +1,5 @@
+block A {
+    net a;
+    /// nothing follows
+}
+/// at the end

@@ -1,0 +1,37 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/recovery_brackets.spl
+---
+File 0..109
+  Block A 0..108
+    StmtError 14..30 "let x = f(a; b);"
+    StmtError 35..50 "let y = [a; b];"
+    StmtError 55..70 "let z = (1 + 2;"
+    Net after_paren 75..91
+    Let w 96..106
+      Quantity 1e0 104..105 "1"
+
+--- errors ---
+E-syntax Expected 25..26 ";"
+E-syntax Expected 45..46 ";"
+E-syntax Expected 69..70 ";"
+
+--- rendered ---
+error[E-syntax]: expected `,` or `)`, found `;`
+  --> recovery_brackets.spl:2:16
+  |
+2 |     let x = f(a; b);
+  |                ^ expected `,` or `)`
+
+error[E-syntax]: expected `,` or `]`, found `;`
+  --> recovery_brackets.spl:3:15
+  |
+3 |     let y = [a; b];
+  |               ^ expected `,` or `]`
+
+error[E-syntax]: expected `)`, found `;`
+  --> recovery_brackets.spl:4:19
+  |
+4 |     let z = (1 + 2;
+  |                   ^ expected `)`

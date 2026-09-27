@@ -1,0 +1,4 @@
+block A {
+    let net = 1;
+    net in;
+}

@@ -1,0 +1,20 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/ok/field_then_number.spl
+---
+Ident "x"
+Dot "."
+Quantity "5"
+Whitespace "\n"
+Ident "f"
+LParen "("
+RParen ")"
+Dot "."
+Quantity "5"
+Whitespace "\n"
+Ident "x"
+Dot "."
+Quantity "0.1"
+Whitespace "\n"
+Eof ""

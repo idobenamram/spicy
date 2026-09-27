@@ -49,6 +49,6 @@ error[E-double-minus]: `--` means `-(-…)` in Rust
   --> signs.spl:2:9
   |
 2 | let x = --y;
-  |         ^^ two minus signs
+  |         ^^ repeated minus signs
   |
   = help: write `x`, or `-(-x)` if that's really meant

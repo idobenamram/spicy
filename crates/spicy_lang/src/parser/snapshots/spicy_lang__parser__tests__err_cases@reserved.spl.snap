@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/reserved.spl
+---
+File 0..61
+  ItemError 0..14 "fn helper() {}"
+  Block A 16..60
+    StmtError 30..46 "for i in 0..N {}"
+    Net ok 51..58
+
+--- errors ---
+E-reserved Reserved 0..2 "fn"
+E-reserved Reserved 30..33 "for"
+
+--- rendered ---
+error[E-reserved]: `fn` isn't supported yet
+  --> reserved.spl:1:1
+  |
+1 | fn helper() {}
+  | ^^ reserved for a later version of the language
+
+error[E-reserved]: `for` isn't supported yet
+  --> reserved.spl:4:5
+  |
+4 |     for i in 0..N {}
+  |     ^^^ reserved for a later version of the language

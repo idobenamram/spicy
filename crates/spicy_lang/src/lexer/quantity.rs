@@ -102,15 +102,18 @@ pub struct QuantityError {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum QuantityErrorKind {
-    /// `47q`, `KHz`. Suggestions are complete suffix spellings (`kHz`).
-    UnknownSuffix {
-        suffix: String,
-        suggestions: Vec<String>,
-    },
+    /// `47q`, `KHz`. `after_infix` when it follows an infix prefix (`4k7q`), where only
+    /// a bare unit may come. Suggestions are computed only when asked for
+    /// ([`suffix_suggestions`]), so decoding stays cheap.
+    UnknownSuffix { suffix: String, after_infix: bool },
     /// `1Meg`: SPICE's mega.
     Meg,
-    /// `k°C`, `m%`: `unit` is the unit's canonical symbol.
-    PrefixNotAllowed { prefix: char, unit: &'static str },
+    /// `k°C`, `m%`. `infix` for `4k7%`, where the letter stands for the decimal point.
+    PrefixNotAllowed {
+        prefix: char,
+        unit: UnitSym,
+        infix: bool,
+    },
     /// `4k7k`: the infix letter is already the prefix.
     SecondPrefix { prefix: char },
     /// `4.7k7`, `1e3k7`: an infix prefix needs a plain integer before it.
@@ -119,12 +122,14 @@ pub enum QuantityErrorKind {
     MissingExponentDigits,
     /// `1e400`: beyond `f64`.
     TooLarge,
+    /// `1e-400`: a non-zero number that rounds to zero.
+    TooSmall,
 }
 
 /// Where the parts of a quantity's number end. Byte offsets into the token text,
 /// which must start with an ASCII digit: `4.7e-3V` is int `4`, fraction `7`, exponent
 /// `-3`, then the suffix `V`.
-pub(crate) struct Mantissa {
+pub(super) struct Mantissa {
     /// End of the integer digits.
     pub int_end: usize,
     /// The fraction digits, after the `.` (empty without a decimal point).
@@ -150,7 +155,7 @@ fn eat_digits(b: &[u8], mut i: usize) -> usize {
 
 /// Digits and `_`; then `.` only if a digit follows (so `100..=300` and `0..N` work);
 /// then an exponent only if a digit follows the `e` or its sign.
-pub(crate) fn scan_mantissa(b: &[u8]) -> Mantissa {
+pub(super) fn scan_mantissa(b: &[u8]) -> Mantissa {
     debug_assert!(b.first().is_some_and(u8::is_ascii_digit));
     let int_end = eat_digits(b, 0);
     let mut i = int_end;
@@ -182,7 +187,7 @@ pub(crate) fn scan_mantissa(b: &[u8]) -> Mantissa {
 /// Characters a quantity's suffix may contain. Deliberately broad (lexer.md L5): `47q`
 /// and `4.7k7` stay one token each and get one precise error each. `º` and `˚` are
 /// look-alikes of `°`, kept so `10ºC` is one token with a "did you mean `°C`" fix.
-pub(crate) fn is_suffix_char(c: char) -> bool {
+pub(super) fn is_suffix_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(
             c,
@@ -229,7 +234,8 @@ fn split_suffix(s: &str) -> Result<(i32, Option<UnitSym>), QuantityErrorKind> {
         }
         return Err(QuantityErrorKind::PrefixNotAllowed {
             prefix: first,
-            unit: unit.symbol(),
+            unit,
+            infix: false,
         });
     }
     if s.starts_with("Meg") {
@@ -240,7 +246,7 @@ fn split_suffix(s: &str) -> Result<(i32, Option<UnitSym>), QuantityErrorKind> {
     }
     Err(QuantityErrorKind::UnknownSuffix {
         suffix: s.to_string(),
-        suggestions: suggestions(s),
+        after_infix: false,
     })
 }
 
@@ -249,11 +255,6 @@ fn split_suffix(s: &str) -> Result<(i32, Option<UnitSym>), QuantityErrorKind> {
 pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
     let m = scan_mantissa(text.as_bytes());
     let suffix = &text[m.len..];
-    let at = |kind, range: Range<usize>| QuantityError {
-        kind,
-        range: range.start as u32..range.end as u32,
-    };
-
     let parts = if let Some(parts) = infix(text, &m)? {
         parts
     } else if suffix.is_empty() {
@@ -272,7 +273,7 @@ pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
                 QuantityErrorKind::Meg => m.len..m.len + 3,
                 _ => m.len..text.len(),
             };
-            at(kind, range)
+            error_at(kind, range)
         })?;
         Parts {
             frac: m.frac.clone(),
@@ -282,19 +283,32 @@ pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
     };
 
     let written_exp = m.exponent.clone().map_or(0, |e| parse_exponent(&text[e]));
+    let frac = &text[parts.frac.clone()];
     let value = decimal_value(
         &text[..m.int_end],
-        &text[parts.frac],
+        frac,
         written_exp.saturating_add(i64::from(parts.prefix_exp)),
     );
     if value.is_infinite() {
-        return Err(at(QuantityErrorKind::TooLarge, 0..text.len()));
+        return Err(error_at(QuantityErrorKind::TooLarge, 0..text.len()));
+    }
+    let nonzero = |s: &str| s.bytes().any(|b| matches!(b, b'1'..=b'9'));
+    if value == 0.0 && (nonzero(&text[..m.int_end]) || nonzero(frac)) {
+        return Err(error_at(QuantityErrorKind::TooSmall, 0..text.len()));
     }
     Ok(QuantityLit {
         value,
         unit: parts.unit,
         is_integer: !m.point() && m.exponent.is_none() && suffix.is_empty(),
     })
+}
+
+/// A decoding error at `range` within the token's text.
+fn error_at(kind: QuantityErrorKind, range: Range<usize>) -> QuantityError {
+    QuantityError {
+        kind,
+        range: range.start as u32..range.end as u32,
+    }
 }
 
 /// What the suffix contributes to the value.
@@ -323,12 +337,8 @@ fn infix(text: &str, m: &Mantissa) -> Result<Option<Parts>, QuantityError> {
     {
         return Ok(None);
     }
-    let at = |kind, range: Range<usize>| QuantityError {
-        kind,
-        range: range.start as u32..range.end as u32,
-    };
     if m.point() || m.exponent.is_some() {
-        return Err(at(QuantityErrorKind::DecimalAndInfix, 0..text.len()));
+        return Err(error_at(QuantityErrorKind::DecimalAndInfix, 0..text.len()));
     }
     let digits_end = eat_digits(text.as_bytes(), after_prefix);
     let rest = &text[digits_end..];
@@ -336,10 +346,11 @@ fn infix(text: &str, m: &Mantissa) -> Result<Option<Parts>, QuantityError> {
         _ if rest.is_empty() => None,
         Some(unit) if unit.accepts_prefix() => Some(unit),
         Some(unit) => {
-            return Err(at(
+            return Err(error_at(
                 QuantityErrorKind::PrefixNotAllowed {
                     prefix,
-                    unit: unit.symbol(),
+                    unit,
+                    infix: true,
                 },
                 m.len..after_prefix,
             ));
@@ -347,16 +358,16 @@ fn infix(text: &str, m: &Mantissa) -> Result<Option<Parts>, QuantityError> {
         // `4k7k`, `4k7kΩ`: the infix letter already is the prefix.
         None if rest.chars().next().and_then(prefix_of).is_some() && split_suffix(rest).is_ok() => {
             let second = rest.chars().next().expect("rest is non-empty");
-            return Err(at(
+            return Err(error_at(
                 QuantityErrorKind::SecondPrefix { prefix: second },
                 digits_end..digits_end + second.len_utf8(),
             ));
         }
         None => {
-            return Err(at(
+            return Err(error_at(
                 QuantityErrorKind::UnknownSuffix {
                     suffix: rest.to_string(),
-                    suggestions: suggestions(rest),
+                    after_infix: true,
                 },
                 digits_end..text.len(),
             ));
@@ -437,64 +448,80 @@ fn decimal_value(int: &str, frac: &str, exp: i64) -> f64 {
 /// Up to three valid suffixes close to `s`, best first:
 /// 1. `s` with look-alike characters replaced (`ºC` → `°C`);
 /// 2. case-insensitive matches (`KHz` → `kHz`, `mhz` → `mHz`, `MHz`);
-/// 3. one edit away, for suffixes of two or more characters (`Hx` → `Hz`).
-fn suggestions(s: &str) -> Vec<String> {
+/// 3. one edit away, for suffixes of two to five characters (`Hx` → `Hz`).
+///
+/// After an infix prefix (`after_infix`, as in `4k7q`) only bare units are offered.
+/// Only called for a quantity that failed to decode, so it never slows a clean file.
+pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let push = |c: String, out: &mut Vec<String>| {
-        if c != s && !out.contains(&c) && out.len() < 3 {
-            out.push(c);
+    let push = |c: &str, out: &mut Vec<String>| {
+        if c != s && !out.iter().any(|o| o == c) && out.len() < 3 {
+            out.push(c.to_string());
         }
     };
+    let fits = |c: &Candidate| !after_infix || c.bare_unit;
 
     let normalized: String = s
         .chars()
         .map(|c| if matches!(c, 'º' | '˚') { '°' } else { c })
         .collect();
     if normalized != s && split_suffix(&normalized).is_ok() {
-        push(normalized, &mut out);
+        push(&normalized, &mut out);
     }
 
-    let candidates = candidates();
-    let lower = s.to_lowercase();
-    for c in &candidates {
-        if c.to_lowercase() == lower {
-            push(c.clone(), &mut out);
+    // Bounds keep a pathological suffix (a kilobyte of letters) cheap.
+    if s.len() <= 16 {
+        let lower = s.to_lowercase();
+        for c in candidates().iter().filter(|c| fits(c) && c.lower == lower) {
+            push(&c.spelling, &mut out);
         }
     }
-    if out.is_empty() && s.chars().count() >= 2 {
+    let len = s.chars().count();
+    if out.is_empty() && (2..=5).contains(&len) {
         // Same-length substitutions (`Hx` → `Hz`) before insertions and deletions.
-        let len = s.chars().count();
-        let mut close: Vec<&String> = candidates
+        let mut close: Vec<&Candidate> = candidates()
             .iter()
-            .filter(|c| edit_distance(c, s) == 1)
+            .filter(|c| fits(c) && edit_distance(&c.spelling, s) == 1)
             .collect();
-        close.sort_by_key(|c| c.chars().count().abs_diff(len));
+        close.sort_by_key(|c| c.spelling.chars().count().abs_diff(len));
         for c in close {
-            push(c.clone(), &mut out);
+            push(&c.spelling, &mut out);
         }
     }
     out
 }
 
-/// Every valid suffix, spelled canonically (`u` for micro, U+03A9 for ohm).
-fn candidates() -> Vec<String> {
-    let units = || {
-        UNITS
-            .iter()
-            .filter(|(spelling, _)| *spelling != "\u{2126}")
-            .map(|&(s, u)| (s, u))
-    };
-    let prefixes = || PREFIXES.iter().filter(|&&(p, _)| p == 'u' || p.is_ascii());
-    let mut out: Vec<String> = units().map(|(s, _)| s.to_string()).collect();
-    out.extend(prefixes().map(|&(p, _)| p.to_string()));
-    for &(p, _) in prefixes() {
-        for (s, u) in units() {
-            if u.accepts_prefix() {
-                out.push(format!("{p}{s}"));
+struct Candidate {
+    spelling: String,
+    lower: String,
+    /// A unit with no prefix (`V`, `Hz`), the only thing allowed after `4k7`.
+    bare_unit: bool,
+}
+
+/// Every valid suffix, spelled canonically (`u` for micro, U+03A9 for ohm). Built once.
+fn candidates() -> &'static [Candidate] {
+    static CANDIDATES: std::sync::OnceLock<Vec<Candidate>> = std::sync::OnceLock::new();
+    CANDIDATES.get_or_init(|| {
+        let units = || UNITS.iter().filter(|(spelling, _)| *spelling != "\u{2126}");
+        let prefixes = || PREFIXES.iter().filter(|&&(p, _)| p.is_ascii());
+        let candidate = |spelling: String, bare_unit| Candidate {
+            lower: spelling.to_lowercase(),
+            spelling,
+            bare_unit,
+        };
+        let mut out: Vec<Candidate> = units()
+            .map(|&(s, _)| candidate(s.to_string(), true))
+            .collect();
+        out.extend(prefixes().map(|&(p, _)| candidate(p.to_string(), false)));
+        for &(p, _) in prefixes() {
+            for &(s, u) in units() {
+                if u.accepts_prefix() {
+                    out.push(candidate(format!("{p}{s}"), false));
+                }
             }
         }
-    }
-    out
+        out
+    })
 }
 
 fn edit_distance(a: &str, b: &str) -> usize {
@@ -515,6 +542,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::Rng;
 
     fn ok(text: &str) -> (f64, Option<UnitSym>) {
         let q = decode_quantity(text).unwrap_or_else(|e| panic!("{text}: {e:?}"));
@@ -547,7 +575,8 @@ mod tests {
             fails("1k°C"),
             QuantityErrorKind::PrefixNotAllowed {
                 prefix: 'k',
-                unit: "°C"
+                unit: UnitSym::Celsius,
+                infix: false,
             }
         );
         assert!(matches!(
@@ -597,6 +626,18 @@ mod tests {
         assert_eq!(fails("1e3k7"), QuantityErrorKind::DecimalAndInfix);
         assert_eq!(fails("1e"), QuantityErrorKind::MissingExponentDigits);
         assert_eq!(fails("1e400"), QuantityErrorKind::TooLarge);
+        assert_eq!(fails("1e-400"), QuantityErrorKind::TooSmall);
+        assert_eq!(ok("0e-400").0, 0.0);
+        assert_eq!(ok("0.000"), (0.0, None));
+        // `4k7%`: the letter stands for the decimal point, so the fix is `4.7%`.
+        assert_eq!(
+            fails("4k7%"),
+            QuantityErrorKind::PrefixNotAllowed {
+                prefix: 'k',
+                unit: UnitSym::Percent,
+                infix: true,
+            }
+        );
         assert_eq!(
             fails("1e99999999999999999999999"),
             QuantityErrorKind::TooLarge
@@ -626,7 +667,10 @@ mod tests {
     #[test]
     fn suggestion_order() {
         let suggest = |text: &str| match fails(text) {
-            QuantityErrorKind::UnknownSuffix { suggestions, .. } => suggestions,
+            QuantityErrorKind::UnknownSuffix {
+                suffix,
+                after_infix,
+            } => suffix_suggestions(&suffix, after_infix),
             other => panic!("{text}: {other:?}"),
         };
         assert_eq!(suggest("1KHz"), vec!["kHz"]);
@@ -634,6 +678,14 @@ mod tests {
         assert_eq!(suggest("10ºC"), vec!["°C"]);
         assert_eq!(suggest("1Hx"), vec!["Hz", "H"]);
         assert_eq!(suggest("1q"), Vec::<String>::new());
+        // After an infix prefix only a bare unit fits (`4k7in` must not suggest `n`).
+        assert!(suggest("4k7in").iter().all(|s| s != "n"));
+        assert_eq!(suggest("4k7v"), vec!["V"]);
+        // A pathological suffix is cheap and gets nothing.
+        assert_eq!(
+            suggest(&format!("1{}", "q".repeat(1000))),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
@@ -676,20 +728,13 @@ mod tests {
             }
         }
         // Many random cases, from a fixed seed.
-        let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
-        let mut next = || {
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            x
-        };
+        let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
         for _ in 0..200_000 {
-            let int = (next() % 10u64.pow((next() % 17) as u32 + 1)).to_string();
-            let frac_len = (next() % 6) as usize;
-            let frac: String = (0..frac_len)
-                .map(|_| char::from(b'0' + (next() % 10) as u8))
+            let int = (rng.next() % 10u64.pow(rng.below(17) as u32 + 1)).to_string();
+            let frac: String = (0..rng.below(6))
+                .map(|_| char::from(b'0' + rng.below(10) as u8))
                 .collect();
-            let exp = (next() % 61) as i64 - 30;
+            let exp = rng.below(61) as i64 - 30;
             check(&int, &frac, exp);
         }
     }

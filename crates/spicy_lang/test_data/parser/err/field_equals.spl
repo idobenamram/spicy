@@ -1,0 +1,3 @@
+block A {
+    let r = Resistor { a = vcc, b: base };
+}

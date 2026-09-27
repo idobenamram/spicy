@@ -1,0 +1,4 @@
+contract A {
+    spec dc(out.v) in 1V..=2V;
+    spec ok: x in 1..=2;
+}

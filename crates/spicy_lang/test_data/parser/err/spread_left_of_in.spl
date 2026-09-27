@@ -1,0 +1,5 @@
+contract A {
+    spec a: 1..=2 in x;
+    spec b: x ± 1% in y;
+    spec c: x in 1..;
+}

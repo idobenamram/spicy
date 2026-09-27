@@ -378,7 +378,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
     - a snapshot per lexer error (`grammar.md` §7: #2–3, #9–15, #22–24).
   - Design: `lexer.md` (two passes, data layout, errors, tests).
   - **Done 2026-09-26:** `crates/spicy_lang` (lexer), 17 case files plus `circuits/ce_amp.spl`, the fuzz target `fuzz_spicy_lang_lexer`. 🔍
-- **M1c: Parser → AST.**
+- **M1c: Parser → AST.** Design: `ast.md`. **First version built 2026-09-26:** `crates/spicy_lang/src/parser`, 22 case files, the fuzz target `fuzz_spicy_lang_parser`.
   - The grammar of §3, the precedence and the `±` rule of §4, and recovery (§6).
   - **Done when:**
     - a snapshot of `ce_amp.spl`'s AST;

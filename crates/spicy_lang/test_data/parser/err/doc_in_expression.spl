@@ -1,0 +1,7 @@
+block A {
+    let x = /// doc
+        1;
+    let y = f(/// doc
+        2);
+    net ok;
+}

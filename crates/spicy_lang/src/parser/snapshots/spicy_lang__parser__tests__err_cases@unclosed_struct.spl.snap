@@ -1,0 +1,21 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/unclosed_struct.spl
+---
+File 0..68
+  Block A 0..67
+    StmtError 14..39 "let r = Resistor { a: vcc"
+    Let s 44..54
+      Quantity 1e0 52..53 "1"
+    Net n 59..65
+
+--- errors ---
+E-syntax Expected 44..47 "let"
+
+--- rendered ---
+error[E-syntax]: expected `,` or `}`, found `let`
+  --> unclosed_struct.spl:3:5
+  |
+3 |     let s = 1;
+  |     ^^^ expected `,` or `}`

@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/unclosed_block.spl
+---
+File 0..61
+  Block A 0..20
+    Net a 14..20
+  Contract A 22..60
+    Spec s In 39..58
+      Path x 47..48 "x"
+      Binary Range 52..57
+        Quantity 1e0 52..53 "1"
+        Quantity 2e0 56..57 "2"
+
+--- errors ---
+E-syntax Unclosed 22..30 "contract"
+
+--- rendered ---
+error[E-syntax]: expected `}`
+  --> unclosed_block.spl:4:1
+  |
+1 | block A {
+  |         - …to close this
+  .
+4 | contract A {
+  | ^^^^^^^^ expected `}` here

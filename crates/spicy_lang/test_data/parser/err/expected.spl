@@ -1,0 +1,8 @@
+block A {
+    port vcc Power;
+    let r = Resistor { a: vcc b: base };
+    let x = ;
+    net ok;
+    let y = (1 + 2;
+    let z = 1 2;
+}

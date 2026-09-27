@@ -1,0 +1,6 @@
+block A {
+    net a;
+
+contract A {
+    spec s: x in 1..=2;
+}

@@ -1,0 +1,6 @@
+block A {
+    let x = true;
+    let y = self.a;
+    let fn = 1;
+    net ok;
+}

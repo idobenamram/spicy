@@ -26,3 +26,10 @@ path = "fuzz_targets/spicy_lang_lexer.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_spicy_lang_parser"
+path = "fuzz_targets/spicy_lang_parser.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,20 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/unterminated_comment_in_block.spl
+---
+File 0..60
+  Block A 0..26
+    StmtError 14..26 "let x = f(1,"
+
+--- errors ---
+E-unterminated-comment UnterminatedBlockComment 27..29 "/*"
+
+--- rendered ---
+error[E-unterminated-comment]: unterminated block comment
+  --> unterminated_comment_in_block.spl:2:18
+  |
+2 |     let x = f(1, /* never closed
+  |                  ^^ this comment is never closed
+  |
+  = help: add `*/` (block comments nest, so each `/*` needs one)

@@ -1,0 +1,5 @@
+block A {
+    net a
+    net b;
+    let r = Resistor { a: a, b: b }
+}

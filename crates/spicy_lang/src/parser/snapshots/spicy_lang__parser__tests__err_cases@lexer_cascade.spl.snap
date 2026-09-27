@@ -1,0 +1,55 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/lexer_cascade.spl
+---
+File 0..97
+  Block A 0..96
+    Let a 14..30
+      Binary Sub 22..29
+        Path b 22..23 "b"
+        Path c 28..29 "c"
+    Let d 35..46
+      Path e 43..44 "e"
+    StmtError 51..66 "let f = 10 kΩ;"
+    StmtError 71..82 "let g = .5;"
+    Net ok 87..94
+
+--- errors ---
+E-lookalike Lookalike 24..27 "−"
+E-lookalike Lookalike 44..46 ";"
+E-unit-space UnitSpace 59..65 "10 kΩ"
+E-number LeadingDecimalPoint 79..81 ".5"
+
+--- rendered ---
+error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
+  --> lexer_cascade.spl:2:15
+  |
+2 |     let a = b − c;
+  |               ^ looks like `-`
+  |
+  = help: replace it with `-`
+
+error[E-lookalike]: `;` (U+037E GREEK QUESTION MARK) is not ASCII
+  --> lexer_cascade.spl:3:14
+  |
+3 |     let d = e;
+  |              ^ looks like `;`
+  |
+  = help: replace it with `;`
+
+error[E-unit-space]: a unit must touch its number
+  --> lexer_cascade.spl:4:13
+  |
+4 |     let f = 10 kΩ;
+  |             ^^^^^ `kΩ` reads as a separate word
+  |
+  = help: remove the space: `10kΩ`
+
+error[E-number]: a number can't start with `.`
+  --> lexer_cascade.spl:5:13
+  |
+5 |     let g = .5;
+  |             ^^ add a leading zero
+  |
+  = help: write `0.5`

@@ -1,0 +1,42 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/ambiguous_tolerance.spl
+---
+File 0..74
+  Contract A 0..73
+    Let i 17..45
+      Binary Tol 25..44
+        Binary Div 25..37
+          Path capacity 25..33 "capacity"
+          Path t 36..37 "t"
+        Quantity 1e1 % 41..44 "10%"
+    Let j 50..71
+      Binary Tol 58..70
+        Quantity 1e1 % 58..61 "10%"
+        Binary Add 65..70
+          Path a 65..66 "a"
+          Path b 69..70 "b"
+
+--- errors ---
+E-ambiguous-tolerance AmbiguousTolerance 25..37 "capacity / t"
+E-ambiguous-tolerance AmbiguousTolerance 65..70 "a + b"
+
+--- rendered ---
+error[E-ambiguous-tolerance]: ambiguous tolerance
+  --> ambiguous_tolerance.spl:2:13
+  |
+2 |     let i = capacity / t ± 10%;
+  |             ^^^^^^^^^^^^ does `±` apply to this whole expression?
+  |
+  = help: `(capacity / t) ± 10%` for a spread on the result
+  = help: `capacity / (t ± 10%)` for a spread on one term
+
+error[E-ambiguous-tolerance]: ambiguous tolerance
+  --> ambiguous_tolerance.spl:3:19
+  |
+3 |     let j = 10% ± a + b;
+  |                   ^^^^^ does `±` apply to this whole expression?
+  |
+  = help: `10% ± (a + b)` for a spread on the result
+  = help: `(10% ± a) + b` for a spread on one term

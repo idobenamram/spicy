@@ -1,0 +1,3 @@
+block A {
+    let q = Npn { beta: 100..300 };
+}

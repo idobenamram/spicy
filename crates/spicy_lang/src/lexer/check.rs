@@ -3,7 +3,9 @@
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 
 use super::lookalike;
-use super::quantity::{QuantityErrorKind, decode_quantity, is_suffix_char, scan_mantissa};
+use super::quantity::{
+    QuantityErrorKind, decode_quantity, is_suffix_char, scan_mantissa, suffix_suggestions,
+};
 use super::token::{Span, TokenIdx, TokenKind, Tokens};
 
 /// One lexer problem. Data, not text, so the editor and the AI get the fix as an edit
@@ -68,6 +70,7 @@ impl LexErrorKind {
                 QuantityErrorKind::DecimalAndInfix => "DecimalAndInfix",
                 QuantityErrorKind::MissingExponentDigits => "MissingExponentDigits",
                 QuantityErrorKind::TooLarge => "TooLarge",
+                QuantityErrorKind::TooSmall => "TooSmall",
             },
             LexErrorKind::UnitSpace { .. } => "UnitSpace",
             LexErrorKind::LeadingDecimalPoint => "LeadingDecimalPoint",
@@ -92,6 +95,7 @@ impl LexErrorKind {
         "DecimalAndInfix",
         "MissingExponentDigits",
         "TooLarge",
+        "TooSmall",
         "UnitSpace",
         "LeadingDecimalPoint",
         "TrailingDecimalPoint",
@@ -108,9 +112,9 @@ impl LexErrorKind {
     pub fn code(&self) -> &'static str {
         match self {
             LexErrorKind::Quantity(q) => match q {
-                QuantityErrorKind::MissingExponentDigits | QuantityErrorKind::TooLarge => {
-                    "E-number"
-                }
+                QuantityErrorKind::MissingExponentDigits
+                | QuantityErrorKind::TooLarge
+                | QuantityErrorKind::TooSmall => "E-number",
                 _ => "E-unit-suffix",
             },
             LexErrorKind::UnitSpace { .. } => "E-unit-space",
@@ -216,10 +220,11 @@ fn unit_space(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
         .take_while(|&c| is_suffix_char(c))
         .map(char::len_utf8)
         .sum();
-    if word_len == 0 {
+    let word = &src[word_start..word_start + word_len];
+    // A unit never starts with a digit: `1 2` is two numbers, not `12`.
+    if word.is_empty() || word.starts_with(|c: char| c.is_ascii_digit()) {
         return;
     }
-    let word = &src[word_start..word_start + word_len];
     let joined = format!("{}{}", tokens.text(i), word);
     if decode_quantity(&joined).is_err() {
         return;
@@ -243,15 +248,27 @@ fn quantity(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
     let span = Span::new(start + e.range.start, start + e.range.end);
     let fix = match &e.kind {
         QuantityErrorKind::Meg => Some("M".to_string()),
+        // `4k7%` → `4.7%`: the letter stood for the decimal point.
+        QuantityErrorKind::PrefixNotAllowed { infix: true, .. } => Some(".".to_string()),
         QuantityErrorKind::PrefixNotAllowed { .. } | QuantityErrorKind::SecondPrefix { .. } => {
             Some(String::new())
         }
-        QuantityErrorKind::UnknownSuffix { suggestions, .. } => suggestions.first().cloned(),
+        // A fix is applied without a second look (by the editor or the AI), so offer one
+        // only when there's no choice to make: `1mhz` could mean `mHz` or `MHz`.
+        QuantityErrorKind::UnknownSuffix {
+            suffix,
+            after_infix,
+        } => match suffix_suggestions(suffix, *after_infix).as_slice() {
+            [only] => Some(only.clone()),
+            _ => None,
+        },
         _ => None,
     };
-    let mut error = err(LexErrorKind::Quantity(e.kind), span);
-    error.fix = fix.map(|replacement| Fix { span, replacement });
-    out.push(error);
+    out.push(LexError {
+        kind: LexErrorKind::Quantity(e.kind),
+        span,
+        fix: fix.map(|replacement| Fix { span, replacement }),
+    });
 }
 
 /// `1.`: a plain number touching a `Dot` that isn't a field access.
@@ -271,9 +288,20 @@ fn trailing_point(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
     }
 }
 
-/// `.5`: a `Dot` touching a following number.
+/// `.5`: a `Dot` touching a following number. Not after something a field access could
+/// follow (`x.5`, `f().5`): there the `.` isn't a decimal point, and `0.5` would be no fix.
 fn leading_point(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
-    if tokens.kind_or_eof(i + 1) == TokenKind::Quantity {
+    let after_operand = i > 0
+        && matches!(
+            tokens.kind(i - 1),
+            TokenKind::Ident
+                | TokenKind::IdentNonAscii
+                | TokenKind::Quantity
+                | TokenKind::RParen
+                | TokenKind::RBracket
+                | TokenKind::RBrace
+        );
+    if !after_operand && tokens.kind_or_eof(i + 1) == TokenKind::Quantity {
         out.push(with_fix(
             LexErrorKind::LeadingDecimalPoint,
             span_of(tokens, i, i + 1),
@@ -294,9 +322,14 @@ fn plus_minus_typo(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
 }
 
 /// `--` (P1: in Rust it means `-(-…)`).
+/// The whole run gets one error: `----x` is one mistake, not two.
 fn double_minus(tokens: &Tokens, i: TokenIdx, out: &mut Errors) {
-    if tokens.kind_or_eof(i + 1) == TokenKind::Minus {
-        out.push(err(LexErrorKind::DoubleMinus, span_of(tokens, i, i + 1)));
+    let mut last = i;
+    while tokens.kind_or_eof(last + 1) == TokenKind::Minus {
+        last += 1;
+    }
+    if last > i {
+        out.push(err(LexErrorKind::DoubleMinus, span_of(tokens, i, last)));
     }
 }
 
@@ -350,15 +383,17 @@ fn code_point(c: char) -> String {
 }
 
 impl LexError {
-    /// The diagnostic the user sees (rendered by [`crate::diagnostic::render`]).
+    /// The diagnostic the user sees (rendered by [`crate::diagnostic::render_plain`]).
     pub fn diagnostic(&self) -> Diagnostic<()> {
         let primary = Label::primary((), self.span.range());
+        let fix = self.fix.as_ref().map_or("", |f| f.replacement.as_str());
         let (message, label, notes): (String, String, Vec<String>) = match &self.kind {
             LexErrorKind::Quantity(q) => match q {
                 QuantityErrorKind::UnknownSuffix {
                     suffix,
-                    suggestions,
+                    after_infix,
                 } => {
+                    let suggestions = suffix_suggestions(suffix, *after_infix);
                     let mut notes = Vec::new();
                     if !suggestions.is_empty() {
                         let list: Vec<String> =
@@ -381,10 +416,27 @@ impl LexError {
                     "write `M` here".to_string(),
                     vec!["help: `1Meg` is `1M`; lowercase `m` is milli".to_string()],
                 ),
-                QuantityErrorKind::PrefixNotAllowed { prefix, unit } => (
-                    format!("`{unit}` takes no prefix"),
+                QuantityErrorKind::PrefixNotAllowed {
+                    prefix,
+                    unit,
+                    infix: false,
+                } => (
+                    format!("`{}` takes no prefix", unit.symbol()),
                     format!("remove `{prefix}`"),
                     vec![],
+                ),
+                QuantityErrorKind::PrefixNotAllowed {
+                    prefix,
+                    unit,
+                    infix: true,
+                } => (
+                    format!("`{}` takes no prefix", unit.symbol()),
+                    format!("`{prefix}` can't be a prefix here"),
+                    vec![format!(
+                        "help: in this form `{prefix}` marks the decimal point, but `{}` takes \
+                         no prefix: write `.` instead",
+                        unit.symbol()
+                    )],
                 ),
                 QuantityErrorKind::SecondPrefix { prefix } => (
                     "a number takes one prefix".to_string(),
@@ -406,6 +458,11 @@ impl LexError {
                     "beyond the largest representable value".to_string(),
                     vec![],
                 ),
+                QuantityErrorKind::TooSmall => (
+                    "number is too small".to_string(),
+                    "rounds to zero".to_string(),
+                    vec![],
+                ),
             },
             LexErrorKind::UnitSpace { word, joined } => (
                 "a unit must touch its number".to_string(),
@@ -415,18 +472,12 @@ impl LexError {
             LexErrorKind::LeadingDecimalPoint => (
                 "a number can't start with `.`".to_string(),
                 "add a leading zero".to_string(),
-                vec![format!(
-                    "help: write `{}`",
-                    self.fix.as_ref().map_or("", |f| &f.replacement)
-                )],
+                vec![format!("help: write `{fix}`")],
             ),
             LexErrorKind::TrailingDecimalPoint => (
                 "a number can't end with `.`".to_string(),
                 "add a digit after the point".to_string(),
-                vec![format!(
-                    "help: write `{}`",
-                    self.fix.as_ref().map_or("", |f| &f.replacement)
-                )],
+                vec![format!("help: write `{fix}`")],
             ),
             LexErrorKind::PlusMinusTypo => (
                 "`+-` means `+ (-…)` in Rust".to_string(),
@@ -435,7 +486,7 @@ impl LexError {
             ),
             LexErrorKind::DoubleMinus => (
                 "`--` means `-(-…)` in Rust".to_string(),
-                "two minus signs".to_string(),
+                "repeated minus signs".to_string(),
                 vec!["help: write `x`, or `-(-x)` if that's really meant".to_string()],
             ),
             LexErrorKind::LonePercent => (
@@ -453,18 +504,20 @@ impl LexError {
                 name,
                 replacement,
             } => {
-                let help = if replacement.is_empty() {
-                    "help: delete it".to_string()
+                let (label, help) = if replacement.is_empty() {
+                    (
+                        "invisible character".to_string(),
+                        "help: delete it".to_string(),
+                    )
                 } else {
-                    format!("help: replace it with `{replacement}`")
+                    (
+                        format!("looks like `{replacement}`"),
+                        format!("help: replace it with `{replacement}`"),
+                    )
                 };
                 (
                     format!("`{found}` ({} {name}) is not ASCII", code_point(*found)),
-                    if replacement.is_empty() {
-                        "invisible character".to_string()
-                    } else {
-                        format!("looks like `{replacement}`")
-                    },
+                    label,
                     vec![help],
                 )
             }

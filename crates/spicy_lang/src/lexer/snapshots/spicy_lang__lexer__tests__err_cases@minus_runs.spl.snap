@@ -1,0 +1,51 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/minus_runs.spl
+---
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Minus "-"
+Minus "-"
+Minus "-"
+Minus "-"
+Ident "x"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "b"
+Whitespace " "
+Eq "="
+Whitespace " "
+Minus "-"
+Minus "-"
+Ident "y"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-double-minus DoubleMinus 8..12 "----"
+E-double-minus DoubleMinus 23..25 "--"
+
+--- rendered ---
+error[E-double-minus]: `--` means `-(-…)` in Rust
+  --> minus_runs.spl:1:9
+  |
+1 | let a = ----x;
+  |         ^^^^ repeated minus signs
+  |
+  = help: write `x`, or `-(-x)` if that's really meant
+
+error[E-double-minus]: `--` means `-(-…)` in Rust
+  --> minus_runs.spl:2:9
+  |
+2 | let b = --y;
+  |         ^^ repeated minus signs
+  |
+  = help: write `x`, or `-(-x)` if that's really meant

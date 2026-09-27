@@ -1,0 +1,5 @@
+block A {
+    let r = Resistor { a: vcc
+    let s = 1;
+    net n;
+}

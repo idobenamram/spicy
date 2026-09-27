@@ -1,0 +1,83 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/statements.spl
+---
+File 0..577
+  Block All 0..398
+    Doc 0..38 "/// A block with every statement form."
+    Port vcc 55..75
+      Type Power 65..74 "Power<In>"
+        Type In 71..73 "In"
+    Port bus 80..112
+      Type Bus 90..111 "Bus<Analog<In>, Pin,>"
+        Type Analog 94..104 "Analog<In>"
+          Type In 101..103 "In"
+        Type Pin 106..109 "Pin"
+    Net base 117..126
+    Net merged 131..151
+      Array 144..150
+        Path a 145..146 "a"
+        Path b 148..149 "b"
+    Let r1 156..241
+      Doc 156..180 "/// Rationale on a part."
+      StructLit Resistor 194..240
+        Field a 205..211
+          Path vcc 208..211 "vcc"
+        Field b 213..220
+          Path base 216..220 "base"
+        Field value 222..238
+          Binary Tol 229..238
+            Quantity 4.7e4 229..232 "47k"
+            Quantity 1e0 % 236..238 "1%"
+    Let amp 246..307
+      StructLit CeAmp 256..306
+        Field vcc (shorthand) 264..267
+        Field gnd (shorthand) 269..272
+        Field input 274..287
+          Path guitar 281..287 "guitar"
+        Field output 289..303
+          Path to_adc 297..303 "to_adc"
+    Let empty 312..335
+      StructLit Nothing 324..334
+    Let q 340..396
+      StructLit std::parts::Npn 348..395
+        Field c 366..372
+          Path out 369..372 "out"
+        Field b 374..381
+          Path base 377..381 "base"
+        Field e 383..393
+          Path emitter 386..393 "emitter"
+  Contract All 400..576
+    Let h 419..450
+      Call 427..449
+        Path ac 427..429 "ac"
+        Binary Div 430..448
+          Field .v 430..438
+            Path output 430..436 "output"
+          Field .v 441..448
+            Path input 441..446 "input"
+    Spec bias In 455..534
+      Attr confidence 455..478
+        Call 468..476
+          Path sigma 468..473 "sigma"
+          Quantity 3e0 474..475 "3"
+      Attr warn 483..490
+      Call 506..518
+        Path dc 506..508 "dc"
+        Field .v 509..517
+          Path output 509..515 "output"
+      Binary Range 522..533
+        Quantity 4.5e0 V 522..526 "4.5V"
+        Quantity 6.5e0 V 529..533 "6.5V"
+    Spec calls In 539..574
+      Call 551..554
+        Path f 551..552 "f"
+      Binary Range 558..573
+        Call 558..566
+          Path g 558..559 "g"
+          Path a 560..561 "a"
+          Path b 563..564 "b"
+        Call 569..573
+          Path h 569..570 "h"
+          Quantity 1e0 571..572 "1"

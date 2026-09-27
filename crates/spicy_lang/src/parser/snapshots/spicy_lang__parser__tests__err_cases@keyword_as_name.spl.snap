@@ -1,0 +1,30 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/keyword_as_name.spl
+---
+File 0..41
+  Block A 0..40
+    StmtError 14..26 "let net = 1;"
+    StmtError 31..38 "net in;"
+
+--- errors ---
+E-keyword KeywordAsName 18..21 "net"
+E-keyword KeywordAsName 35..37 "in"
+
+--- rendered ---
+error[E-keyword]: `net` is a keyword
+  --> keyword_as_name.spl:2:9
+  |
+2 |     let net = 1;
+  |         ^^^ can't be used as a name
+  |
+  = help: choose another name
+
+error[E-keyword]: `in` is a keyword
+  --> keyword_as_name.spl:3:9
+  |
+3 |     net in;
+  |         ^^ can't be used as a name
+  |
+  = help: choose another name

@@ -6,12 +6,14 @@
 //! 2. [`check`] reads the tokens and reports every problem, with fixes.
 
 mod check;
-mod lookalike;
+pub(crate) mod lookalike;
 mod quantity;
 mod token;
 
 pub use check::{Fix, LexError, LexErrorKind, check};
-pub use quantity::{QuantityError, QuantityErrorKind, QuantityLit, UnitSym, decode_quantity};
+pub use quantity::{
+    QuantityError, QuantityErrorKind, QuantityLit, UnitSym, decode_quantity, suffix_suggestions,
+};
 pub use token::{Span, TokenIdx, TokenKind, Tokens};
 
 use quantity::{is_suffix_char, scan_mantissa};
@@ -167,10 +169,14 @@ impl Scanner<'_> {
     /// Both run to the end of the line, not including the newline.
     fn line_comment(&mut self) -> TokenKind {
         let is_doc = self.rest().starts_with("///") && self.peek(3) != Some(b'/');
-        let len = self.bytes[self.pos..]
+        let mut len = self.bytes[self.pos..]
             .iter()
             .position(|&b| b == b'\n')
             .unwrap_or(self.bytes.len() - self.pos);
+        // With CRLF line ends the `\r` belongs to the line break, not the comment.
+        if len > 2 && self.bytes[self.pos + len - 1] == b'\r' {
+            len -= 1;
+        }
         self.pos += len;
         if is_doc {
             TokenKind::DocComment
@@ -259,19 +265,10 @@ fn keyword(word: &str) -> Option<TokenKind> {
 /// The case-file suite and property tests (lexer.md §7).
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-    use std::path::Path;
-
     use super::{LexErrorKind, check, scan};
-    use crate::testing::{check_invariants, dump};
-
-    fn read(path: &Path) -> String {
-        std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
-    }
-
-    fn file_name(path: &Path) -> String {
-        path.file_name().unwrap().to_string_lossy().into_owned()
-    }
+    use crate::testing::{
+        Rng, assert_every_kind_has_a_case, check_invariants, dump, file_name, read,
+    };
 
     /// `ok/` cases: no errors, and a snapshot of the tokens.
     #[test]
@@ -313,40 +310,9 @@ mod tests {
     /// Every error kind appears in at least one `err/` case.
     #[test]
     fn every_error_kind_has_a_case() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/lexer/err");
-        let mut seen = BTreeSet::new();
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.extension().is_some_and(|e| e == "spl") {
-                for e in check(&scan(&read(&path))) {
-                    seen.insert(e.kind.name());
-                }
-            }
-        }
-        let missing: Vec<_> = LexErrorKind::ALL_NAMES
-            .iter()
-            .filter(|name| !seen.contains(*name))
-            .collect();
-        assert!(
-            missing.is_empty(),
-            "error kinds without an err/ case: {missing:?}"
-        );
-    }
-
-    /// A small deterministic generator (xorshift64*), so the property test needs no crate.
-    struct Rng(u64);
-
-    impl Rng {
-        fn next(&mut self) -> u64 {
-            self.0 ^= self.0 >> 12;
-            self.0 ^= self.0 << 25;
-            self.0 ^= self.0 >> 27;
-            self.0.wrapping_mul(0x2545_F491_4F6C_DD1D)
-        }
-
-        fn below(&mut self, n: usize) -> usize {
-            (self.next() % n as u64) as usize
-        }
+        assert_every_kind_has_a_case("lexer/err", LexErrorKind::ALL_NAMES, |src| {
+            check(&scan(src)).iter().map(|e| e.kind.name()).collect()
+        });
     }
 
     /// Pieces the random inputs are built from, weighted toward what the lexer cares about

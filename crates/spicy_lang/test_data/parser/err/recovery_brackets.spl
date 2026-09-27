@@ -1,0 +1,7 @@
+block A {
+    let x = f(a; b);
+    let y = [a; b];
+    let z = (1 + 2;
+    net after_paren;
+    let w = 1;
+}

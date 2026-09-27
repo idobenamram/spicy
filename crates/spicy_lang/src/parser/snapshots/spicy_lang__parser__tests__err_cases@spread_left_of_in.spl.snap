@@ -1,0 +1,46 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/spread_left_of_in.spl
+---
+File 0..87
+  Contract A 0..86
+    Spec a In 17..36
+      Binary Range 25..30
+        Quantity 1e0 25..26 "1"
+        Quantity 2e0 29..30 "2"
+      Path x 34..35 "x"
+    Spec b In 41..62
+      Binary Tol 49..56
+        Path x 49..50 "x"
+        Quantity 1e0 % 54..56 "1%"
+      Path y 60..61 "y"
+    StmtError 67..84 "spec c: x in 1..;"
+
+--- errors ---
+E-spread RangeInComparison 25..30 "1..=2"
+E-spread RangeInComparison 49..56 "x ± 1%"
+E-syntax Expected 83..84 ";"
+
+--- rendered ---
+error[E-spread]: compare with a single value
+  --> spread_left_of_in.spl:2:13
+  |
+2 |     spec a: 1..=2 in x;
+  |             ^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `in`
+
+error[E-spread]: compare with a single value
+  --> spread_left_of_in.spl:3:13
+  |
+3 |     spec b: x ± 1% in y;
+  |             ^^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `in`
+
+error[E-syntax]: expected an expression, found `;`
+  --> spread_left_of_in.spl:4:21
+  |
+4 |     spec c: x in 1..;
+  |                     ^ expected an expression

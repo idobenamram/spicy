@@ -41,6 +41,15 @@ Quantity "1"
 Dot "."
 Semi ";"
 Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "e"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "1e-400"
+Semi ";"
+Whitespace "\n"
 Eof ""
 
 --- errors ---
@@ -48,6 +57,7 @@ E-number MissingExponentDigits 9..10 "e"
 E-number TooLarge 20..25 "1e400"
 E-number LeadingDecimalPoint 35..37 ".5" fix "0.5"
 E-number TrailingDecimalPoint 47..49 "1." fix "1.0"
+E-number TooSmall 59..65 "1e-400"
 
 --- rendered ---
 error[E-number]: missing digits after the exponent
@@ -79,3 +89,9 @@ error[E-number]: a number can't end with `.`
   |         ^^ add a digit after the point
   |
   = help: write `1.0`
+
+error[E-number]: number is too small
+  --> number.spl:5:9
+  |
+5 | let e = 1e-400;
+  |         ^^^^^^ rounds to zero

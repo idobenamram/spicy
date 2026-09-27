@@ -1,0 +1,6 @@
+fn helper() {}
+
+block A {
+    for i in 0..N {}
+    net ok;
+}

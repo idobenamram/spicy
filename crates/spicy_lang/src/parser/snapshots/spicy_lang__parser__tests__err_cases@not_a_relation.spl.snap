@@ -1,0 +1,30 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/not_a_relation.spl
+---
+File 0..59
+  Contract A 0..58
+    StmtError 17..30 "assume vcc.v;"
+    StmtError 35..56 "spec s: dc(output.v);"
+
+--- errors ---
+E-relation NotARelation 24..29 "vcc.v"
+E-relation NotARelation 43..55 "dc(output.v)"
+
+--- rendered ---
+error[E-relation]: expected a relation
+  --> not_a_relation.spl:2:12
+  |
+2 |     assume vcc.v;
+  |            ^^^^^ not a relation
+  |
+  = help: write it like `x in a..=b` or `x <= b`
+
+error[E-relation]: expected a relation
+  --> not_a_relation.spl:3:13
+  |
+3 |     spec s: dc(output.v);
+  |             ^^^^^^^^^^^^ not a relation
+  |
+  = help: write it like `x in a..=b` or `x <= b`

@@ -1,0 +1,74 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/precedence.spl
+---
+File 0..403
+  Contract P 0..402
+    Assume In 96..118
+      Path x 103..104 "x"
+      Binary Tol 108..117
+        Quantity 1.2e1 V 108..111 "12V"
+        Quantity 5e0 % 115..117 "5%"
+    Assume In 123..155
+      Path x 130..131 "x"
+      Binary Range 135..154
+        Binary Sub 135..143
+          Path v 135..136 "v"
+          Quantity 5e-1 V 139..143 "0.5V"
+        Binary Add 146..154
+          Path v 146..147 "v"
+          Quantity 5e-1 V 150..154 "0.5V"
+    Spec a In 160..195
+      Path y 168..169 "y"
+      Binary Tol 173..194
+        Paren 173..187
+          Binary Div 174..186
+            Path capacity 174..182 "capacity"
+            Path t 185..186 "t"
+        Quantity 1e1 % 191..194 "10%"
+    Spec b In 200..235
+      Path y 208..209 "y"
+      Binary Div 213..234
+        Path capacity 213..221 "capacity"
+        Paren 224..234
+          Binary Tol 225..233
+            Path t 225..226 "t"
+            Quantity 1e1 % 230..233 "10%"
+    Spec c Le 240..263
+      Binary Add 248..256
+        Neg 248..251
+          Quantity 3e0 V 249..251 "3V"
+        Quantity 1e0 V 254..256 "1V"
+      Quantity 1e0 V 260..262 "1V"
+    Spec d Ge 268..303
+      Binary Sub 276..296
+        Field .v 276..281
+          Path vcc 276..279 "vcc"
+        Call 284..296
+          Path dc 284..286 "dc"
+          Field .v 287..295
+            Path output 287..293 "output"
+      Quantity 2e0 V 300..302 "2V"
+    Spec e Lt 308..338
+      Binary Sub 316..333
+        Binary Add 316..329
+          Binary Mul 316..321
+            Path a 316..317 "a"
+            Path b 320..321 "b"
+          Binary Div 324..329
+            Path c 324..325 "c"
+            Path d 328..329 "d"
+        Path e 332..333 "e"
+      Quantity 1e0 336..337 "1"
+    Spec f In 343..368
+      Path y 351..352 "y"
+      Binary Tol 356..367
+        Path r_nom 356..361 "r_nom"
+        Quantity 1e0 % 365..367 "1%"
+    Spec g In 373..400
+      Path y 381..382 "y"
+      Binary Tol 386..399
+        Field .v 386..391
+          Path vcc 386..389 "vcc"
+        Quantity 5e-2 V 395..399 "50mV"

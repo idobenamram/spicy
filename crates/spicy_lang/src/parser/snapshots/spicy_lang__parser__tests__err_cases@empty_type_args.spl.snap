@@ -1,0 +1,19 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/empty_type_args.spl
+---
+File 0..41
+  Block A 0..40
+    StmtError 14..26 "port p: A<>;"
+    Net ok 31..38
+
+--- errors ---
+E-syntax Expected 24..25 ">"
+
+--- rendered ---
+error[E-syntax]: expected a type, found `>`
+  --> empty_type_args.spl:2:15
+  |
+2 |     port p: A<>;
+  |               ^ expected a type

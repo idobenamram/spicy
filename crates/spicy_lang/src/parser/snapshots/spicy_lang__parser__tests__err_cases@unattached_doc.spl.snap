@@ -1,0 +1,29 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/unattached_doc.spl
+---
+File 0..62
+  Block A 0..46
+    Net a 14..20
+
+--- errors ---
+W-doc UnattachedDoc 25..44 "/// nothing follows"
+W-doc UnattachedDoc 47..61 "/// at the end"
+
+--- rendered ---
+warning[W-doc]: doc comment isn't attached to anything
+  --> unattached_doc.spl:3:5
+  |
+3 |     /// nothing follows
+  |     ^^^^^^^^^^^^^^^^^^^ nothing follows this doc comment
+  |
+  = help: move it before an item or a statement, or use `//`
+
+warning[W-doc]: doc comment isn't attached to anything
+  --> unattached_doc.spl:5:1
+  |
+5 | /// at the end
+  | ^^^^^^^^^^^^^^ nothing follows this doc comment
+  |
+  = help: move it before an item or a statement, or use `//`

@@ -1,0 +1,25 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/half_open_range.spl
+---
+File 0..48
+  Block A 0..47
+    Let q 14..45
+      StructLit Npn 22..44
+        Field beta 28..42
+          Binary Range 34..42
+            Quantity 1e2 34..37 "100"
+            Quantity 3e2 39..42 "300"
+
+--- errors ---
+E-range HalfOpenRange fix 37..39 "..=" 37..39 ".."
+
+--- rendered ---
+error[E-range]: a value range is closed
+  --> half_open_range.spl:2:28
+  |
+2 |     let q = Npn { beta: 100..300 };
+  |                            ^^ write `..=`
+  |
+  = note: `..` is reserved for integer ranges in loops

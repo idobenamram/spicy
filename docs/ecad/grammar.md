@@ -25,9 +25,9 @@ Quantity "4.6"  PlusMinus "±"  Quantity "5%"  Semi
 
 ```
 Spec { name: "gain",
-       expr: Relation { op: In,
-                        lhs: Call { callee: Field(Call(Field(h, at), [1kHz]), mag), args: [] },
-                        rhs: Tol { nominal: 4.6, tol: 5% } } }
+       relation: Relation { lhs: Call(Field(Call(Field(h, at), [1kHz]), mag), []),
+                            op:  In,
+                            rhs: Binary(Tol, 4.6, 5%) } }
 ```
 
 Two rules decide that shape:
@@ -102,7 +102,7 @@ quantity  = mantissa [ suffix ] ;
 mantissa  = digits [ "." digits ] [ exponent ]
           | digits prefix_letter digits ;          (* 4k7 = 4.7k *)
 digits    = digit { digit | "_" } ;
-exponent  = ( "e" | "E" ) [ "+" | "-" ] digit { digit } ;
+exponent  = ( "e" | "E" ) [ "+" | "-" ] digit { digit | "_" } ;   (* `_` allowed, as in Rust: `1e1_0` *)
 suffix    = unit_char { unit_char } ;              (* letters, µ, μ, Ω, Ω, °, % *)
 ```
 
@@ -157,7 +157,7 @@ path          = IDENT { "::" IDENT } ;
 **Choices in this grammar, and why:**
 
 - **One `let` for everything.** `let r1 = Resistor {…}` (a part), `let amp = CeAmp {…}` (a block placement) and `let h = ac(…)` (a measure) all parse the same way. Name resolution decides later what the path refers to. *Why:* the parser needs no symbol table, and the placement syntax is just an expression, as in Spade.
-- **`assume` and `spec` take an ordinary expression.** The parser then checks its shape: the top node must be a relation, otherwise the error is "expected a relation like `x in a..=b` or `x <= b`". *Why:* the Pratt loop handles all expressions, and the AST still gets a structured `Spec { measure, op, bound }`.
+- **`assume` and `spec` take an ordinary expression.** The parser then checks its shape: the top node must be a relation, otherwise the error is "expected a relation like `x in a..=b` or `x <= b`". *Why:* the Pratt loop handles all expressions, and the AST still gets a structured `Spec { name, relation: Relation { lhs, op, rhs } }`.
 - **Parentheses are kept in the AST** as a `Paren` node. They're needed for the `±` rule (§4.2), and the formatter needs them.
 - **Struct literals are allowed in every expression.** No MVP statement has `expr {` followed by a body. Once `for` and `if` arrive, their headers will forbid struct literals, as in Rust and Spade (roadmap §4.5).
 - **Generics appear only in types** (after `port x:`), so `<` in an expression is always less-than. No turbofish is needed.
@@ -225,7 +225,7 @@ error: ambiguous tolerance
 
 These parse, but the parser rejects their shape:
 - **A tolerance inside a range endpoint:** `1V ± 1% ..= 2V` gives "a range endpoint can't carry a tolerance".
-- **A range or tolerance on the right of `<`, `<=`, `>`, `>=`:** `x <= 1V..=2V` gives "compare with a single value, or use `in` for a range".
+- **A range or tolerance on either side of `<`, `<=`, `>`, `>=`, or on the left of `in`:** `x <= 1V..=2V` and `1..=2 in x` give "compare with a single value, or use `in` for a range".
 
 **The Rust check (P1):** Rust puts `..=` *below* comparisons, so `a < b..=c` means `(a < b)..=c` there. Ours would put the range inside the comparison, but that shape is always an error (the second rule above). So we accept less than Rust here; we never give Rust-looking code a different meaning.
 
@@ -265,7 +265,7 @@ Worked through:
 | `1K` | 1 | 1 kelvin. Used as a resistance, elaboration says "expected Ohm, found Kelvin; kilo is lowercase `k`" |
 | `1Meg` | none | error: "SPICE's `Meg` is `M` here" |
 | `k°C`, `m%`, `kdB` | none | error: these units take no prefix |
-| `5%` | 1 | 0.05, dimensionless |
+| `5%` | 1 | 5, unit `%` (the tolerance reads it as a fraction later) |
 
 *Why split after lexing, not in the lexer:* the lexer stays a simple scanner, and each suffix mistake gets its own diagnostic pointing at just the suffix.
 
@@ -273,12 +273,11 @@ Worked through:
 
 ## 6. Error recovery
 
-- **At statement level:** after an error, skip tokens until one of:
-  - a `;`, which is consumed;
-  - a token that can start a statement (`port` `net` `let` `assume` `spec` `#` `///`);
-  - the `}` that closes the current block.
-
-  The skip counts `{ }`, `( )` and `[ ]`, so a `}` inside a struct literal doesn't end the block.
+- **At statement level:** after an error, skip tokens (scanning again from the statement's start, so brackets opened before the error are known) until one of:
+  - a `;` with no bracket open, which is consumed;
+  - the `}` that closes the current body;
+  - a statement or item keyword at or after the error, even inside brackets opened *before* the error (an unclosed `Resistor {` doesn't swallow the rest of the block). Brackets opened *after* the error are skipped whole (`for i in 0..N { … }`).
+  - `///` or `#` at the top level, strictly after the error.
 - **At item level:** skip to `block`, `contract` or end of file.
 - **Missing `;`:** reported with an insert-`;` suggestion, and parsing continues as if it were there.
 - **The result:** each broken statement gives one error, the rest of the file still parses, and later stages run on the statements that parsed (roadmap §4.5).

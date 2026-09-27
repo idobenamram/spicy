@@ -115,7 +115,7 @@ atopile's unit decoding (`decode_symbol` in `Units.py`) is the same idea as ours
 | L8 | **Identifiers continue over non-ASCII letters** (`char::is_alphanumeric`) but get the kind `IdentNonAscii`, which pass 2 rejects | One clear error per identifier (`r1_α`: "identifiers are ASCII"), not a fragment and a stray character. It also lets `10 kΩ` be recognized as a spaced-out unit |
 | L9 | **Keywords by lookup after scanning an identifier.** MVP keywords get their own kinds; all reserved words share `KwReserved` | Zig's approach. The parser reports "`fn` is reserved" from the text |
 | L10 | **The lexer's errors are data** (an enum with spans and optional fixes), rendered through codespan-reporting in one shared module | The editor, the language server and the AI get structured fixes (P8). Snapshot tests see the rendered text |
-| L11 | **No dependencies.** A ~40-line byte cursor, not `unscanny`; no Unicode tables | Roadmap §4.4. ASCII fast path; non-ASCII is decoded only where it appears |
+| L11 | **No parsing dependencies.** A ~40-line byte cursor, not `unscanny`; no Unicode tables. (codespan-reporting renders the diagnostics, nothing else) | Roadmap §4.4. ASCII fast path; non-ASCII is decoded only where it appears |
 
 ---
 
@@ -202,10 +202,10 @@ Numbers `#…` refer to the error list in `grammar.md` §7.
 
 | Check | Looks at | Example | Diagnostic |
 |---|---|---|---|
-| Quantity decoding | each `Quantity` | `47q`, `1Meg`, `k°C`, `4.7k7`, `4k7k`, `1e`, `1e400` | #9 unknown suffix (with close matches), #10 `Meg` → `M`, #11 no prefix on this unit, #12 decimal point *or* infix prefix, not both; a second prefix after an infix one; missing exponent digits; value too large |
-| Space before a unit | `Quantity`, whitespace, then a word that decodes as a suffix | `10 V`, `10 kΩ` | #13 remove the space |
-| Bare decimal point | `Dot` touching a following `Quantity`; a `Quantity` touching a following `Dot` that isn't a field access | `.5`, `1.` | #14 write `0.5` / `1.0` |
-| `+-`, `--` | `Plus` touching `Minus`; `Minus` touching `Minus` | `12V +- 5%` | #2 did you mean `±` or `+/-`; #3 |
+| Quantity decoding | each `Quantity` | `47q`, `1Meg`, `k°C`, `4.7k7`, `4k7k`, `4k7%`, `1e`, `1e400`, `1e-400` | #9 unknown suffix (with close matches; a fix only when there's exactly one, since `1mhz` could be `mHz` or `MHz`), #10 `Meg` → `M`, #11 no prefix on this unit (`4k7%` → `4.7%`), #12 decimal point *or* infix prefix, not both; a second prefix after an infix one; missing exponent digits; value too large or too small |
+| Space before a unit | `Quantity`, whitespace, then a word that decodes as a suffix and doesn't start with a digit (`1 2` is two numbers) | `10 V`, `10 kΩ` | #13 remove the space |
+| Bare decimal point | `Dot` touching a following `Quantity` (not right after a name or `)`, where it's a field access: `x.5`); a `Quantity` touching a following `Dot` that isn't a field access | `.5`, `1.` | #14 write `0.5` / `1.0` |
+| `+-`, `--` | `Plus` touching `Minus`; a run of touching `Minus` (one error for the run) | `12V +- 5%`, `----x` | #2 did you mean `±` or `+/-`; #3 |
 | Lone `%` | `Unknown "%"` | `a % 3` | #15 `%` only means percent, glued to a number. After a number (`± 1 %`) the space check wins instead: "remove the space: `1%`" |
 | Unterminated comment | `UnterminatedBlockComment` | `/* …` | #22, with a label on the `/*` |
 | Look-alikes | `Unknown` in the table (§6.3) | `−`, `;`, `≤` | #23 "this is `−` (U+2212 MINUS SIGN), not `-`", with a replacement |
@@ -235,7 +235,7 @@ rustc has 264 entries. We start with the ones that come from datasheets, PDFs an
 | `≤` `≥` | | `<=` `>=` |
 | `×` `·` | multiplication sign, middle dot | `*` |
 | `∕` `÷` | division slash, division sign | `/` |
-| `º` `˚` | masculine ordinal, ring above | `°` |
+| `º` `˚` | masculine ordinal, ring above | `°`. `º` is a letter, so it only gets this fix inside a number's suffix (`10ºC` → `10°C`); elsewhere it reads as an identifier character |
 | U+00A0, U+2009, U+202F | no-break space, thin space, narrow no-break space | a normal space, or no space before a unit (§6.1) |
 | `＝` `：` `，` `（` `）` | fullwidth forms | the ASCII character |
 
@@ -255,7 +255,6 @@ The rust-analyzer layout:
 crates/spicy_lang/test_data/lexer/
   ok/
     quantities.spl        every row of grammar.md §5.2, one per line
-    ce_amp.spl            a copy of circuits/ce_amp.spl
     comments.spl          //, ///, ////, nested /* /* */ */
     punctuation.spl       every operator, including ..= next to numbers (0..N, 100..=300, 0.5..=1)
     …
@@ -274,6 +273,8 @@ For each case file, the test writes two snapshots:
 - The `glob!` macro runs the test once per file. It's a dev-only feature, so nothing is added to the shipped build.
 
 The alternative is a ~40-line runner of our own, like `spicy_simulate`'s `test_util.rs` with its `SPICY_UPDATE_SNAPSHOTS=1`. It would avoid the `glob` feature, but you'd lose `cargo insta review`.
+
+`circuits/ce_amp.spl` has its own test (`include_str!`), so the case files never drift from it.
 
 **A coverage rule:** a test lists every `LexError` variant (in a hand-written `ALL` array) and fails if some variant never appears in an `err/` snapshot. Every error kind is tested at least once, and adding a variant without a test fails CI.
 
@@ -297,7 +298,7 @@ These must hold for **any** `&str`:
 
 They're checked in three places:
 - **On every case file.** Free, runs with the suite.
-- **A seeded random test in `cargo test`:** a hand-written xorshift generator, 10 000 inputs of up to 256 characters. The alphabet is weighted, as in Zig: mostly the characters that matter (`0-9 k m M . = ± + / - * ( ) { } ; : _ µ Ω ° % " "` and newline), some random Unicode. Deterministic, dependency-free, and runs in CI on stable.
+- **A seeded random test in `cargo test`:** a hand-written xorshift generator, 10 000 inputs of up to 48 pieces each. The alphabet is weighted, as in Zig: mostly the characters that matter (`0-9 k m M . = ± + / - * ( ) { } ; : _ µ Ω ° % " "` and newline), some random Unicode. Deterministic, dependency-free, and runs in CI on stable.
 - **A cargo-fuzz target** next to the existing `fuzz_spicy_parser`, for long runs on nightly.
 
 ### 7.4 Speed
@@ -323,7 +324,7 @@ crates/spicy_lang/
 fuzz/fuzz_targets/spicy_lang_lexer.rs
 ```
 
-**Out of scope for the lexer:** reading files, checking UTF-8, and the 4 GiB limit. A small source-loading function in `spicy_lang` does those, and reports invalid UTF-8 with its byte offset.
+**Out of scope for the lexer:** reading files, checking UTF-8, and the 4 GiB limit. That belongs to whoever loads source files (the CLI's `check`/`export` commands, M1d–M1f); it isn't built yet.
 
 ---
 

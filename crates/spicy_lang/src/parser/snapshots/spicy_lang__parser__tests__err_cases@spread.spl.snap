@@ -1,0 +1,54 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/spread.spl
+---
+File 0..98
+  Contract A 0..97
+    Spec a In 17..44
+      Path x 25..26 "x"
+      Binary Range 30..43
+        Binary Tol 30..38
+          Quantity 1e0 V 30..32 "1V"
+          Quantity 1e0 % 36..38 "1%"
+        Quantity 2e0 V 41..43 "2V"
+    Spec b Le 49..70
+      Path x 57..58 "x"
+      Binary Range 62..69
+        Quantity 1e0 V 62..64 "1V"
+        Quantity 2e0 V 67..69 "2V"
+    Spec c Gt 75..95
+      Path x 83..84 "x"
+      Binary Tol 87..94
+        Quantity 1e0 87..88 "1"
+        Quantity 1e0 % 92..94 "1%"
+
+--- errors ---
+E-spread ToleranceInRange 30..38 "1V ± 1%"
+E-spread RangeInComparison 62..69 "1V..=2V"
+E-spread RangeInComparison 87..94 "1 ± 1%"
+
+--- rendered ---
+error[E-spread]: a range endpoint can't carry a tolerance
+  --> spread.spl:2:18
+  |
+2 |     spec a: x in 1V ± 1%..=2V;
+  |                  ^^^^^^^ this endpoint has a tolerance
+  |
+  = help: use either a range `a..=b` or a tolerance `x ± t`
+
+error[E-spread]: compare with a single value
+  --> spread.spl:3:18
+  |
+3 |     spec b: x <= 1V..=2V;
+  |                  ^^^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `in`
+
+error[E-spread]: compare with a single value
+  --> spread.spl:4:17
+  |
+4 |     spec c: x > 1 ± 1%;
+  |                 ^^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `in`

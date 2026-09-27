@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/doc_in_expression.spl
+---
+File 0..89
+  Block A 0..88
+    StmtError 14..40 "let x = /// doc\n        1;"
+    StmtError 45..74 "let y = f(/// doc\n        2);"
+    Net ok 79..86
+
+--- errors ---
+E-syntax Expected 22..29 "/// doc"
+E-syntax Expected 55..62 "/// doc"
+
+--- rendered ---
+error[E-syntax]: expected an expression, found `/// doc`
+  --> doc_in_expression.spl:2:13
+  |
+2 |     let x = /// doc
+  |             ^^^^^^^ expected an expression
+
+error[E-syntax]: expected an expression, found `/// doc`
+  --> doc_in_expression.spl:4:15
+  |
+4 |     let y = f(/// doc
+  |               ^^^^^^^ expected an expression

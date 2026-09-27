@@ -81,7 +81,7 @@ Read it top to bottom:
 | `Circuit` | `spicy_circuit` | lowering (either front-end), once per design | shared (`Arc`) by every run | The simulator's vocabulary: nodes, per-kind device wiring, each instance's model id. **Wiring only, no numbers.** Names and origins go in a `CircuitNames` side table the simulator never reads (`circuit.md` §4.9) |
 | `CircuitNames` | `spicy_circuit` | lowering, beside the `Circuit` | as long as results are shown | Node names, device paths (`X1.R1`, `amp.r1`) and origins (spans). Only the edges read it: CLI, raw writer, engine, error messages |
 | `Params` | `spicy_circuit` | lowering (nominal); backends (per run) | one run, reusable buffer | Resolved device numbers. Per kind, a model table shared by instances and an instance table (`circuit.md` §4.2): plain `Copy` structs, SI units, no strings, `Option` only for defaults that depend on another value. The unit a knob changes, and the level ngspice export works at |
-| `Conditions` | `spicy_circuit` | backends / CLI, per run | one run | Temperature, later other global conditions |
+| `Conditions` | `spicy_circuit` | lowering (nominal); backends / CLI, per run | one run | `temp` and `tnom` (K), later other global conditions. Doesn't exist in code yet: the engine plan makes it concrete, carried and "Not simulated yet" until temperature support (`engine_plan.md` §5.2) |
 | `Analysis` | `spicy_circuit` | SPICE lowering or the engine, per request | per request | "Run op / DC sweep / AC / tran". Lives here so an exporter doesn't import the simulator |
 | `Binding` | `spicy_backends` | lowering, once per design | the engine job | Knob `amp.r1.value` → `Params.resistors[2].r`. Keeps knobs out of the circuit and the simulator |
 | `Plan` | `spicy_simulate` | from the `Circuit`, once per design × solver | shared (`Arc`) by threads | Where each device writes (stamp arrays parallel to the device arrays), the sparsity patterns, and KLU's symbolic analysis. It allocates internal nodes and branch rows, and records the structure key it was built for (`circuit.md` §4.3). Replaces the `stamp` fields `setup_pattern` writes into devices today |
@@ -161,20 +161,31 @@ f.spicy ─parse─► Deck ─lower─► Circuit + Params + [Analysis]
 
 **(b) The engine loop with `.spl`: many runs, same wiring, different numbers**
 
+On our simulator (after the MVP, roadmap M4):
+
 ```
 ce_amp.spl ─► Design ─► FlatDesign
   once:    lower ─► Arc<Circuit>, nominal Params, Binding ─► Arc<Plan>
   per run (thread t): Binding.apply(knob point) ─► Params_t ─► Workspace_t
-           (warm start from the nominal solution)
-           ─► Solution_t ─► measures by node id ─► affine form ─► verdict
+           ─► Solution_t ─► every measure, derived ones included, evaluated from this run ─► verdict
 ```
 
-**(c) ngspice export**
+In the MVP (on ngspice) the same shape runs through the engine deck, as in (c). Measures are evaluated per run; there's no affine form in between (decision D-F, `engine_plan.md` §10).
+
+**(c) ngspice export, and the engine on ngspice**
+
+Two export modes (`engine_plan.md` §5):
 
 ```
-Circuit + Params(point) + Conditions + [Analysis] ─export─► SPICE text + name map
-     ngspice -b ─► raw file ─read─► same ids ─► same measures
+numeric:  Circuit + Params(point) + Conditions + [Analysis] ─export─► SPICE text + name map
+               ngspice -b ─► raw file ─read─► same ids ─► same measures
+
+engine:   FlatDesign + KnobTable ─export once─► EngineDeck { deck with a .param per knob, knob map, probe map }
+               libngspice worker: load once ─► per run: alterparam knobs · reset · analyses
+                                            ─► read back every knob ─► vectors ─► measures per run ─► verdict
 ```
+
+The engine never writes a netlist per knob point: it loads one deck and changes its parameters.
 
 Exporting from `Circuit` means a part kind is expanded into devices in exactly one place (the language lowering). Exporting a SPICE file through `Deck → Circuit → export` also tests our own SPICE lowering against ngspice.
 
@@ -253,6 +264,8 @@ These replace roadmap M2a–M2c's ordering. The roadmap links here.
 
 ## 11. Problems the review found in today's code
 
+The engine MVP runs on ngspice (roadmap decision D-B, `engine_plan.md`), so the open simulator rows below wait until our simulator joins as the second backend (roadmap M4).
+
 | Problem | Where | Status |
 |---|---|---|
 | **Subcircuit instances shared internal nodes.** Two `DIV` instances solved to a single `mid` node at 3.5 V, instead of 5 V and 2 V | `expr.rs` (`Scope::get_node_name`), `instance_parser.rs` | ✅ Fixed in step 1: internal nodes are prefixed with the instance name (`X1.mid`, as in ngspice); ground stays global. Tests: `Scope` naming unit tests (`expr.rs`), `subcircuit_instances_get_their_own_internal_nodes` (parser), `subcircuit_instances_have_separate_internal_nodes` (simulator) |
@@ -277,3 +290,9 @@ These replace roadmap M2a–M2c's ordering. The roadmap links here.
 | Topology is rebuilt for every analysis | `dc.rs`, `ac.rs`, `trans.rs` | Steps 2 and 4 (deferred) |
 | AC is dense, allocates per frequency, and ignores transistors | `ac.rs` | Roadmap M2d |
 | Transient history is keyed by device name | `trans.rs` | ✅ Fixed in step 3b: indexed by capacitor, since names left the simulator |
+| **New (engine research, 2026-09-27):** the Ebers–Moll equations break reciprocity: both injection currents use `IS`, where αF·I_ES = αR·I_CS = IS is required. VCE,sat comes out 47.8 mV where ngspice's equations give 65.6 mV, and forward IC is low by αF (0.5% at β = 200) | `devices/bjt.rs:133-135` | Open. Fixing it changes results (snapshots move). Deferred: the engine starts on ngspice (roadmap, simulator follow-ups) |
+| **New:** a DC operating point that doesn't converge is returned as a solution: a circuit with no DC solution gives V = −7.3·10²⁶ V and exit code 0 | `trans.rs` (`newton_solve`), `dc.rs` | Open, deferred as above |
+| **New:** `simulate_dc` and `simulate_ac` panic (`expect`) instead of returning errors, so one failed run would abort a whole engine check | `dc.rs`, `ac.rs` | Open, deferred as above |
+| **New:** the AC sweep accumulates `f *= r`, so a point meant to be 1 kHz is 1000.000000000002 Hz | `ac.rs` | Open, deferred as above |
+| **New:** no per-device operating-point records (region, VCE − VCE,sat, Newton status), which the engine's guards read | `devices/`, `dc.rs` | Open, deferred as above |
+| **New:** the default Newton tolerances make finite-difference slopes 25–26% wrong (VC 19 µV off; the iteration count changes between nominal and nudged runs). The engine needs reltol ≈ 1e-6, vntol 1e-9 V, abstol 1e-12 A | `NewtonConfig` defaults | Open: roadmap M2e, deferred as above |

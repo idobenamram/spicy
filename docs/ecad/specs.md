@@ -164,7 +164,7 @@ Both are written with ranges, but they mean opposite things, and the language an
 
 There is a project default (open decision: `sigma 3` vs `worst_case`), overridable per block and per spec.
 
-The engine always **shows both** worst-case and realistic results when they disagree, as with S1 in walkthrough §6. The confidence level only decides which one sets the verdict.
+The engine always **shows both** worst-case and realistic results when they disagree, as with S1 in walkthrough §5.6. The confidence level only decides which one sets the verdict.
 
 ---
 
@@ -192,19 +192,21 @@ Every evaluated spec produces:
 
   | Verdict | Meaning |
   |---|---|
-  | PASS (guaranteed) | A proven outer bound is inside the spec |
-  | PASS (estimated) | The estimate is inside the spec and was checked at the worst point |
-  | FAIL | A reachable point violates the spec (always definite) |
-  | UNDECIDED | The spec edge falls between inner and outer |
+  | PASS (guaranteed) | A proven outer bound is inside the spec (exact methods only: the corner theorem, datasheet arithmetic) |
+  | PASS (all corners) | Every corner was simulated and passes, and the inside-the-box checks found nothing worse |
+  | PASS (estimated) | The worst point found passes with margin beyond the search's observed error (the `sigma(3)` search, later the loop) |
+  | PASS (implied by worst case) | A `sigma(3)` side whose `worst_case` already passes: the 3σ region lies inside the tolerance box |
+  | FAIL | A simulated, reachable point violates the spec (always definite, with its counterexample) |
+  | UNDECIDED | The engine can't say, and it names the reason and what would settle it (`next`) |
 
-  See walkthrough §4.
+  These are decision D-E (`engine_plan.md` §3, accepted 2026-09-27). There's no "verified". See walkthrough §4.
 - **Bracket:** inner bound (values that really happen) and outer bound (guaranteed or estimated).
-- **Method:** exact (corners) / guaranteed (affine arithmetic) / worst-point loop with N simulations / Monte Carlo k of N.
+- **Method:** every corner enumerated (the MVP, ≤ about 12 knobs per spec side) / the 3σ-point search / guaranteed (affine arithmetic, later) / the worst-point loop (after the MVP) / Monte Carlo k of N; always with its run count.
 - **Top contributors:** which knobs use up the margin, split into range and statistical.
 - **Counterexample** (for FAIL): the exact knob settings, one click away from a simulation at that point.
 - **Worst-case and realistic values** side by side when they differ (§7).
 
-Internally, each result is stored as an **affine form** in named knobs (v2 Part B). That's what lets results be combined with other specs and formulas without double-counting shared knobs (walkthrough §8), and reused at system level without re-simulating (§2).
+In the MVP, derived measures are evaluated per run, which keeps shared knobs from being counted twice (walkthrough §8). **Affine forms** in named knobs (v2 Part B) come back when results must be combined or reused at system level without re-simulating (§2): decision D-F, `engine_plan.md` §10.
 
 ---
 
@@ -224,9 +226,9 @@ Internally, each result is stored as an **affine form** in named knobs (v2 Part 
      ```
      ┌ Amp · Specs ──────────────────────────────────────────────────────────────┐
      │ name  measure              analysis  require      confidence  status      │
-     │ bias  V(out)               DC        4.5…6.5 V    3σ          ✓ 6.34      │
-     │ gain  V(out)/V(in) @1kHz   AC        4.6 ± 5%     3σ          ✓ 4.52…4.67 │
-     │ bass  f_low(−3 dB)         AC sweep  ≤ 30 Hz      99.9%       ✗ 0.9% fail │
+     │ bias  V(out)               DC        4.5…6.5 V    3σ          ✓ 6.28      │
+     │ gain  V(out)/V(in) @1kHz   AC        4.6 ± 5%     3σ          ✓ 4.52…4.66 │
+     │ bass  f_low(−3 dB)         AC sweep  ≤ 30 Hz      99.9%       ✗ 1.1% fail │
      │ auto: C_in voltage         DC        ≤ 80% rated  worst       ✓ 18%       │
      └───────────────────────────────────────────────────────────────────────────┘
      ```
@@ -243,12 +245,13 @@ Summary of v2 Part B, as applied to specs:
 |---|---|---|
 | Hand-written formulas only | Affine arithmetic with splitting | PASS (guaranteed) / FAIL |
 | A linear part of the circuit only | Corner theorem, with directions proven | PASS (guaranteed, exact) / FAIL |
-| Anything through a nonlinear device | Worst-point loop: nominal → slopes → predicted worst point → simulate → re-linearize | PASS (estimated) / FAIL |
+| Anything through a nonlinear device, ≤ about 12 knobs per spec side (the MVP) | `worst_case`: every corner, plus an interior check at the worst one. `sigma(3)`: the 3σ-point search from two starts (`engine_plan.md` §2) | PASS (all corners) / PASS (estimated) / PASS (implied by worst case) / FAIL / UNDECIDED |
+| The same, with more knobs (after the MVP) | Worst-point loop: nominal → slopes → predicted worst point → simulate → re-linearize, gated on agreeing with enumeration | PASS (estimated) / FAIL / UNDECIDED |
 | (sign-off) | Monte Carlo at the worst range corner | "k of N fail", with a confidence statement |
 
-**When it runs:**
-- **On every edit:** cheap re-evaluation from saved slopes.
-- **In the background:** the loop, for DC and AC specs.
+**When it runs** (`engine_plan.md` §1.1):
+- **In the MVP:** only on `spicy check`, a full cold check (about 0.4 s for the CE amp on ngspice).
+- **In the editor:** a re-check on save or idle. There is no per-edit estimate from saved slopes: re-checking is fast enough, and stored lines were badly wrong for real edits (`research/engine_synthesis.md` C11).
 - **On demand:** transient specs.
 - **At sign-off:** Monte Carlo.
 

@@ -6,12 +6,14 @@ Design documents for the AI-native schematic and simulation editor built on spic
 
 1. **[vision.md](vision.md)**: what we're building and why.
 2. **[walkthrough.md](walkthrough.md)**: one amplifier followed through the whole engine, with real numbers. The best introduction to how the engine thinks.
-3. **[engine.md](engine.md)**: the engine design (current: v3).
+3. **[engine.md](engine.md)**: the engine design (current: v4, on ngspice: every corner, inside-the-box guards, the 3σ-point search).
+   - **[engine_plan.md](engine_plan.md)**: the engine MVP plan on ngspice, from three research rounds (accepted 2026-09-27: decisions D-A to D-F).
 4. **[language.md](language.md)**: the circuit language (v0.1).
    - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
    - **[model.md](model.md)**: elaboration, from syntax tree to flat design: `Design`, `FlatDesign`, knobs, nets, units, checks; compared with compilers, hardware elaborators, Modelica and circuit tools.
    - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests; compared with Spade, atopile, rustc, rust-analyzer and Zig.
    - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.
+   - **[stage_review.md](stage_review.md)**: the cleanup process every stage goes through (a reusable prompt): the readability standard, the subagents (reference researcher, flow reviewers, type auditor), and the checks.
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
    - **[circuit.md](circuit.md)**: the circuit data model (`spicy_circuit`): today's flow traced through the code, and each design choice checked against ngspice, Xyce, Gnucap, OSDI/VACASK and compilers.
@@ -27,6 +29,20 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [engine_precision_analog.md](research/engine_precision_analog.md)
     - [engine_mixed_signal.md](research/engine_mixed_signal.md)
     - [engine_method_redteam.md](research/engine_method_redteam.md)
+  - Engine in depth (round 2, toward the M3 plan):
+    - [engine_synthesis.md](research/engine_synthesis.md): the merged findings, decisions D1–D10 and the revised M3 plan. Start here.
+    - [engine_flows.md](research/engine_flows.md): every flow from an edit to a verdict, with the data, caching and cost of each
+    - [agent_flows.md](research/agent_flows.md): how the AI agent handles each user request through the engine, and the tool interface it needs
+    - [engine_math_worst_case.md](research/engine_math_worst_case.md): the `worst_case` loop as pseudocode, against the 256-corner answer key
+    - [engine_math_statistical.md](research/engine_math_statistical.md): `sigma(k)`, distributions, yield and Monte Carlo checks
+    - [engine_math_affine_measures.md](research/engine_math_affine_measures.md): affine forms, contributors, measures and slopes by nudging
+    - [engine_math_guards.md](research/engine_math_guards.md): adversarial circuits, the safety net, guards and the verdict table
+  - Engine positions (round 3, on ngspice; each with a prototype engine and agent flow diagrams):
+    - [engine_position_minimal.md](research/engine_position_minimal.md): the smallest trustworthy engine; enumerate corners up to 12 knobs
+    - [engine_position_soundness.md](research/engine_position_soundness.md): a verdict must never lie; the adversarial suite on ngspice
+    - [engine_position_agent.md](research/engine_position_agent.md): the engine as the AI agent's instrument; every agent flow end to end
+    - [engine_position_scale.md](research/engine_position_scale.md): 8 to 302 knobs; cones, worker pools, transient cost
+    - [engine_position_alternatives.md](research/engine_position_alternatives.md): the loop against screening, response surfaces and sampling
   - Data pipeline:
     - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
     - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured
@@ -42,7 +58,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [model_circuit_tools.md](research/model_circuit_tools.md): atopile, ngspice, Xyce, KiCad and our SPICE parser (nets, naming, identity)
     - [model_units.md](research/model_units.md): uom, F#, Unitful, pint (dimensions, temperature, %, dB)
     - These reports are kept as written. Where they disagree with the main docs, the main docs win. One known case: they propose a `logos` lexer and a lossless `rowan` tree; we chose a hand-written lexer and a typed AST with spans plus the full token list (roadmap.md §4.4).
-- **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md)).
+- **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md), [engine_v3.md](archive/engine_v3.md)).
 
 ## Conventions
 

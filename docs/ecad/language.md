@@ -628,12 +628,14 @@ spec bias: dc(output.v) in 4.5V..=6.5V;
 
 ### 8.4 Measures and probes
 
-**A measure is a value.** `let vc = dc(output.v);` has type `Volt` and is carried by the engine as an affine form in named knobs. So measures mix with hand formulas without double-counting shared knobs:
+**A measure is a value.** `let vc = dc(output.v);` has type `Volt`. So measures mix with hand formulas without double-counting shared knobs:
 
 ```rust
 let headroom = vcc.v - dc(output.v);      // shares the vcc.v knob correctly
 spec top_room: headroom >= 2V;
 ```
+
+**How the engine keeps that promise** (decision D-F, `engine_plan.md` §10): in the MVP a derived measure is **evaluated per run**. `headroom` takes `vcc.v` and `dc(output.v)` from the same simulated board, so one knob can't be counted twice, and over the corners the answer is exact (5.1951 V on the CE amp). Affine forms in named knobs (engine v3 §3.1) return when results must be combined without re-simulating: hierarchy, calibration, error budgets and datasheet arithmetic.
 
 **Probes are field accessors:**
 
@@ -650,7 +652,7 @@ spec top_room: headroom >= 2V;
 - **AC:** `.at(f)`, `.mag()`, `.phase()`, `.f_low(-3dB)`, `.bandwidth()`, `.phase_margin()`
 - **Transient:** `.peak()`, `.pp()`, `.rms()`, `.overshoot()`, `.crossing(…)`, `.thd(f)`
 
-**Smooth measures are preferred.** Non-smooth ones (settling time) are flagged, and rewritten to a smooth equivalent where one exists (a windowed maximum). A missing crossing is never treated as a pass.
+**Smooth measures are preferred.** Non-smooth ones (settling time) are flagged, and rewritten to a smooth equivalent where one exists (a windowed maximum). A missing crossing is never treated as a pass. A crossing shown to lie **beyond** the searched band (e.g. an f_low below its lowest frequency) is a one-sided bound, not a missing crossing: it can decide the passing side of a spec, never the failing side (`research/engine_synthesis.md` C9).
 
 ### 8.5 Benches (test setups)
 
@@ -768,7 +770,7 @@ error[E-part]: part is looser than the design budget
   - in the spec table,
   - as inlay hints in the code:
     ```
-    spec bass: h.f_low(-3dB) <= 30Hz;     ✗ 31.7 Hz (3σ) · 0.9% of boards · C_in
+    spec bass: h.f_low(-3dB) <= 30Hz;     ✗ 31.2 Hz (3σ) · 1.1% of boards · C_in
     ```
   - A counterexample is printed as a pasteable `corner` for re-simulation.
 - **AI "select to ask"** sends:
@@ -776,7 +778,7 @@ error[E-part]: part is looser than the design budget
   - a rendered image with the same labels;
   - the relevant results.
 
-  The AI answers with named edits, which are shown as a schematic diff together with how the verdicts would change, before you accept.
+  The AI answers with named edits, which are shown as a schematic diff together with how the verdicts would change, before you accept. Every verdict in that diff comes from a re-check of the edited design, with its verdict word (PASS (all corners), PASS (estimated), PASS (implied by worst case), FAIL, UNDECIDED) and its status (`simulated`, or `stale` once the design changes). Nothing is shown as "verified" or as an unchecked prediction (`engine_plan.md` §3, §7).
 
 Full detail, including auto-placement and KiCad import/export: `research/language_editor_mapping.md`.
 

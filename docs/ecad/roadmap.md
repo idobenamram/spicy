@@ -1,7 +1,7 @@
 # Roadmap: from the design docs to a working MVP
 
 > 2026-09-25 · Living document. Based on `engine.md`, `language.md`, and a check of the current code (§1).
-> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed, as are three fixes to the SPICE parser: nested subcircuits, parameter scoping, and case-insensitivity. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next:** the language front-end (M1, now six small steps ending in a SPICE export; the grammar note `grammar.md` awaits review); the simulator work the MVP still needs (temperature, AC at the operating point, accuracy) can follow it.
+> **Status:** M0 (housekeeping) and simulator steps 1 and 3 (`pipeline.md` §9: bug fixes, ngspice defaults, CLI concerns out of the simulator; `spicy_circuit` as the simulator's input) are committed, as are three fixes to the SPICE parser: nested subcircuits, parameter scoping, and case-insensitivity. Steps 2 and 4 (reusing the simulator's setup across runs) are deferred until the engine runs many simulations. **Next:** the language front-end (M1, now six small steps ending in a SPICE export; the grammar note `grammar.md` awaits review); in parallel, the engine (M3) on **ngspice**, as planned in `engine_plan.md` (accepted 2026-09-27). Our simulator's follow-ups (temperature, AC at the operating point, accuracy, the bugs the engine research found) wait until after the MVP, when it joins as a second backend (M4).
 
 **The MVP in one sentence:** `spicy check circuits/ce_amp.spl` parses the walkthrough amplifier written in our language, runs the worst-point loop on our own simulator, and prints a verdict for each of its three specs. Each verdict must match a brute-force answer key (every corner simulated).
 
@@ -48,8 +48,10 @@ Agreed: our simulator shouldn't need a netlist. The language produces a design m
                            ▼
 SPICE ──spicy_parser──►  spicy_circuit::Circuit  ──►  spicy_simulate  (op · dc · ac · tran)
                            │
-                           └──►  SPICE netlist export  ──►  ngspice (M4) / a file to share or debug
+                           └──►  SPICE netlist export  ──►  ngspice (the engine's first backend, M3) / a file to share or debug
 ```
+
+**For the MVP (decided 2026-09-27)** the engine runs on ngspice through the export's engine deck: loaded once, with knob values set per run by `alterparam` (`engine_plan.md` §4–§5). The native path stays the architecture for our simulator, which joins as the second backend (M4).
 
 **`spicy_circuit::Circuit`** is flat, numeric and ready to simulate:
 - named nodes;
@@ -79,8 +81,8 @@ crates/
 
   spicy_model/      (new)     the design model (§2.4); shared by language, engine and (later) the editor
   spicy_lang/       (new)     language front-end: text → spicy_model, with diagnostics
-  spicy_engine/     (new)     knobs, measurements, the worst-point loop, verdicts; defines the `Backend` trait
-  spicy_backends/   (new)     adapters: our simulator (model → circuit → simulate); ngspice (M4, behind a cargo feature)
+  spicy_engine/     (new)     knob space, measures, corner enumeration + the 3σ-point search, verdicts; defines the `Backend` trait
+  spicy_backends/   (new)     adapters: ngspice first (M3: libngspice in a worker process, engine_plan.md §4); our simulator later (M4)
 ```
 
 Dependencies (arrows mean "depends on"; no cycles):
@@ -92,7 +94,7 @@ Dependencies (arrows mean "depends on"; no cycles):
                   │        │      │            │                                   ▲
                   └──► spicy_model ◄┘                            spicy_parser ─────┘
                            ▲                                (SPICE front-end, used by the CLI)
-                           └────────────── spicy_backends
+                           └────────────── spicy_backends ───► spicy_engine   (implements its Backend trait)
 ```
 
 ### 2.3 Who owns what
@@ -139,7 +141,7 @@ The design as the engineer wrote it, after name resolution and unit checking, wi
 | Shortcut | Why | When it goes away |
 |---|---|---|
 | The prelude (`Resistor`, `Npn`, `Power`, …) is defined in Rust inside `spicy_lang` | The MVP language can't define parts or signals yet | Once `signal` / `part` items exist |
-| Each run lowers the model to a fresh `Circuit` | Simple; lowering a 10-part design takes microseconds | The parameter layer (engine v3 §6.5, step 1) |
+| ~~Each run lowers the model to a fresh `Circuit`~~ Superseded: lower **once**, then set knob values per run (on ngspice, the engine deck + `alterparam`; on our simulator, `Params` + the `Binding`, `circuit.md` §5) | It costs no more, and keeps the loaded circuit shared across runs (`research/engine_flows.md` §7) | — |
 | Slopes by nudging each knob (L0) | Works with any backend | Sensitivities in our simulator (M8) |
 
 ### 2.6 Outside `crates/`
@@ -152,7 +154,9 @@ externals/    reference repos (gitignored)
 
 ---
 
-## 3. How the ngspice integration will work (M4)
+## 3. How the ngspice integration works (M3, decided 2026-09-27)
+
+The engine MVP runs on ngspice (ngspice-42 with KLU, installed). The details are in `engine_plan.md` §4 (the backend) and §5 (what the export must emit); this section is the summary.
 
 **Input.** ngspice only reads SPICE netlists, so this is where the netlist export lives. The exporter turns a flat design plus a knob point into ngspice's SPICE dialect:
 - element names derived from model paths (`amp.r1` → `R_amp_r1`), with a table mapping them back;
@@ -168,11 +172,12 @@ externals/    reference repos (gitignored)
 | For | Simple; a crash can't take down our process; parallel runs = parallel processes | No process start per run; the circuit stays loaded |
 | Against | Process start and file I/O on every run | C FFI; global state (one circuit per loaded library); a system library dependency |
 
-**Plan:** start with the subprocess. Move to the shared library only if run overhead matters.
+**Decided (D-B):** the shared library, in a **worker process**. The library is loaded once, and every run is `alterparam` + `reset` + the analyses, with each knob's value read back from ngspice. The separate process keeps the isolation: a netlist error kills libngspice, and it can't take our process down. On the CE amp the whole check takes 0.4 s this way, against 1.0–1.2 s with `ngspice -b` batches (`engine_plan.md` §4.1). The subprocess path stays as the tests' cross-check.
 
 **Other pieces:**
 - **Results:** a raw-file reader (we only have a writer today) maps vectors back to model paths. Measurements are done by our own library, as for every backend (engine v3 §6.1).
-- **Capability:** L0 (values only) at first. ngspice's `.sens` may raise it to L1 later, to be verified.
+- **Capability:** L0 (values only), for good. Verified: `.sens` returns about 0 for AC and ignores later temperature changes; for DC it gives one output per call, so nudging is cheaper for many measures (`research/engine_position_scale.md`).
+- **Traps, each pinned by a test** (`engine_plan.md` §4.3): `reset` undoes `option temp` and `option reltol` (use `.temp {param}` and `.options` in the deck); runs slow down without `destroy all`; a circuit with no DC solution returns 999,999,999.99 V with no error; TNOM defaults to 27 °C; `dec` sweeps miss 1 kHz exactly.
 - **Building without ngspice:** the adapter sits behind a cargo feature. CI installs the Ubuntu `ngspice` package and runs the cross-check tests; locally they're skipped when ngspice isn't installed.
 - **Cross-checking:** every golden circuit runs on both simulators, and a difference beyond tolerance fails the test (engine v3 §6.4).
 
@@ -395,15 +400,19 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
   - The default bench (language §8.5): a DC source on each `Power<In>` port at its assumed nominal, and an AC source on `Analog<In>`.
   - Two decisions, in the step's design note:
     - what "nominal" means for a range knob (the midpoint gives β = 200, as in the walkthrough);
-    - the default model for a bare `Npn`.
+    - the default model for a bare `Npn`: **decided (D-A, 2026-09-27)**, `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: 25 °C }`, always written out in exports and reports (`engine_plan.md` §5.4). It needs the new `BjtModel` fields and `Conditions` of `engine_plan.md` §5.2.
   - **Done when:**
     - a snapshot of the lowered circuit;
-    - simulated natively, the operating point gives VC ≈ 5.52 V. 🔍
+    - simulated natively, the operating point gives VC ≈ 5.52 V;
+    - on ngspice, with the D-A model at TNOM 25 °C, VC = 5.503227 V (`engine_plan.md` §2.1). 🔍
 - **M1f: SPICE export** (formerly the first half of M4).
   - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R_amp_r1`).
   - `spicy export`.
+  - **Two export modes** (`engine_plan.md` §5, the engine's contract): the **numeric** export at one knob point, and the **engine deck** (`EngineDeck`: a `.param` per knob, `.temp {…}`, `.options` as an input, one `.model QM_<path>` per BJT named apart from its instance `Q_<path>`, no analyses, plus the knob and probe maps).
+  - **Needs first** (data only, no temperature physics): `BjtModel` gains `xtb`, `xti`, `eg`, `tnom`, and `Conditions { temp, tnom }` becomes real (`engine_plan.md` §5.2); `spicy_parser` accepts those model parameters, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
   - **Done when:**
-    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params`;
+    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params` + `Conditions`;
+    - the engine deck at nominal lowers to the same result as the numeric export, and ngspice reads back every knob's requested value at nominal and at one corner;
     - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`);
     - the exported amplifier simulates to the same VC. 🔍
 
@@ -447,31 +456,52 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 | **Subcircuit scoping gaps** | `.model` cards inside a subcircuit are global; nested `.SUBCKT` definitions and `.global` aren't supported | `subcircuit_phase.rs`; `pipeline.md` §11 |
 | **Parse allocations** | Parsing a 10,000-line netlist allocates 44.5 MB (about 4.4 KB per line): e.g. parameter lists rebuilt per device, a token vector per statement, subcircuit bodies cloned per instance. Profile before optimizing | parser |
 
-### M3: The loop MVP (`spicy_engine`)
+### Simulator follow-ups (tracked, not scheduled)
 
-- **M3a: Design note.** The `Backend` trait and capability levels; knob representation; results as affine forms (an `affine` module inside `spicy_engine`); the MVP measurement functions (`dc`, `ac…at…mag`, `f_low`). Create `spicy_engine` and `spicy_backends`. 🔍
-- **M3b: Answer key first.** A brute-force checker that simulates all 256 corners of the 8 knobs and reports each spec's true worst case. It's the test oracle for the rest. 🔍
-- **M3c: `worst_case` confidence.**
-  1. Safety net: every range corner.
-  2. Nominal run, then slopes by nudging.
-  3. Affine form, then the predicted worst corner.
-  4. Simulate it, compare, re-linearize, and repeat until nothing changes.
-  5. Verdict, bracket, contributors, counterexample.
+**Decided 2026-09-27:** the engine MVP runs on **ngspice** (installed: ngspice-42, with KLU and the shared library). The engine assumes a working simulator at ngspice's speed; our simulator's issues wait, and it joins later as a second backend. The M1f SPICE export is what ngspice reads.
 
-  Tests: verdicts and worst values match the answer key. 🔍
-- **M3d: `sigma(3)` confidence.** Range knobs at worst, statistical knobs at the 3σ worst point (σ = tol/3). Verified with a seeded Monte Carlo in tests. 🔍
-- **M3e: `spicy check` output.** A verdict table in the terminal: spec, verdict, worst value, top contributors, counterexample. 🔍
+Found by the engine research (`research/engine_synthesis.md` §5), each with a row in `pipeline.md` §11:
 
-**Done when:** `spicy check circuits/ce_amp.spl` prints verdicts that agree with the answer key, and tests pin them.
+| Item | Why it matters |
+|---|---|
+| BJT Ebers–Moll reciprocity (`bjt.rs:133-135`) | Wrong VCE,sat (47.8 vs 65.6 mV) and forward IC low by αF. Fixing it moves snapshots |
+| Non-convergence returned as a solution | −7.3·10²⁶ V with exit code 0; an engine must see "run failed" |
+| Panics in `simulate_dc` / `simulate_ac` | One failed run aborts a whole check |
+| AC frequencies accumulated (`f *= r`) | `at(1kHz)` must mean exactly 1 kHz |
+| No per-device operating-point records | The engine's guards read region and margins |
+| Engine-grade tolerances (M2e) | Finite-difference slopes are 25–26% wrong at today's defaults |
+| Temperature (M2c), BJT/diode AC at the operating point (M2d, sparse) | Needed before our simulator can run the MVP specs |
+
+### M3: The engine MVP (`spicy_engine`), on ngspice
+
+Planned in detail in `engine_plan.md` (accepted 2026-09-27; §9 is this list, §8 the tests). It replaces the earlier M3, which built the worst-point loop and affine forms first: with ≤ 12 knobs per spec, enumerating every corner is exact and cheap, so the loop comes after the MVP (decisions D-D, D-F).
+
+M3a–M3e run on hand-written ngspice decks and hand-built contracts, so they don't wait for the language; M3f joins the two tracks.
+
+- **M3a: Design note.** The plan's types (§6.2), the `Backend` trait, the two verdict tables, the report schema, and the `EngineDeck` type that M1f and M3b meet at (§5.1). Creates `spicy_engine` and `spicy_backends`. No `affine` module (D-F). 🔍
+- **M3b: ngspice backend.** The libngspice worker process (D-B), request encoding, read-back of every knob, plausibility checks, restart after a crash; the `ngspice -b` cross-check path.
+  - **Done when:** the backend-rule tests pass (plan §8.4), and the nominal CE amp gives VC 5.503227 V, |H(1 kHz)| 4.590771, f_low 20.126944 Hz (TNOM 25 °C). 🔍
+- **M3c: `worst_case`.** The knob space, cones (the capacitor rule), the measures, the run table, enumeration per spec side, the inside-the-box guards (tangent check, 8 audit points, pooling, ascent), the numerical band, and the worst-case verdict table; the answer-key harness.
+  - **Done when:** `worst_case` equals the answer key on every M3 case of plan §8.2; run counts pinned. 🔍
+- **M3d: `sigma(3)`.** The exact distribution map (D3), the 3σ-point search from two starts, the other range corners, range nudges, the uniform-spread check, and the sigma verdict table; the σ answer-key harness.
+  - **Done when:** σ values within 1e-4 of the σ key on the CE amp (both XTB settings), the plan's §8.3 UNDECIDEDs exactly, no false PASS on the adversarial suite; run counts pinned. 🔍
+- **M3e: Output and store.** Records with `claim`, `next`, tags and `not_modeled`; the terminal table; `--format json` (unstable); `--explain`, `--at`, `--deep`; the per-revision store (`.spicy/checks/<rev>.json`) and `stale`.
+  - **Done when:** snapshots of the CE amp and every suite case, as table and JSON. 🔍
+- **M3f: End to end.** `KnobTable` → knob space, `FlatContract` → plan, M1f's engine deck.
+  - **Done when:** `spicy check circuits/ce_amp.spl` prints the plan's §2.8 table, equal to the answer key: bias FAIL at `worst_case` (6.5595 V) beside PASS at `sigma(3)` (6.2813 V); every other side PASS. Snapshot-tested. 🔍
+
+**Acceptance for all of M3:** no false PASS on the adversarial suite (9 cases, kept in the repo as ngspice decks; plan §8.2).
 
 ### M4 and after (planned in detail once the MVP works)
 
-- **M4:** ngspice backend + cross-checking (§3). The SPICE export itself moved to M1f.
-- **M5:** Part records and `part:` pinning; the datasheet-arithmetic engine (engine v3 §4.1).
+- **M4: Our simulator as a second backend.** The simulator follow-ups above: the reciprocity fix, errors instead of panics and silent non-convergence, the exact AC grid, per-device records, then temperature (M2c), AC at the operating point (M2d) and engine tolerances (M2e). **Gate:** the adversarial suite passes on it, and it agrees with ngspice within the numerical band (engine v3 §6.4).
+- **The loop, for more knobs:** the flip walk over cones, margin checks spliced into every side whose cone holds the device, the PASS allowance by measure kind (plan §9.3). **Gate:** it agrees with enumeration on every regression circuit of ≤ 12 knobs per side.
+- **Transient tier:** THD and other `tran` measures, on demand, with large-signal margins.
+- **M5:** Part records and `part:` pinning (knob identity kept); the datasheet-arithmetic engine, with affine forms (engine v3 §4.1).
 - **M6:** Aging links and `life`; lots; the rest of the knob model (engine v3 §2).
 - **M7:** Statistics: board yield, importance sampling (engine v3 §4.4).
 - **M8:** Parameter layer and sensitivities in our simulator (transposed KLU solve, DC/AC adjoint).
-- **Later:** language growth (generics, loops, interfaces, modules), automatic checks, the editor.
+- **Later:** language growth (generics, loops, interfaces, modules), automatic checks, the editor and the agent (plan §7, §9.3).
 
 ---
 
@@ -480,7 +510,7 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 | # | Decision | Status |
 |---|---|---|
 | 1 | Crate layout (§2.2), now with `spicy_circuit` for native simulator input | **Agreed:** the `spicy_circuit` data model is in `circuit.md` |
-| 2 | Our simulator for the MVP; ngspice right after | Agreed |
+| 2 | ~~Our simulator for the MVP; ngspice right after~~ → **ngspice for the MVP; our simulator as the second backend (M4)** | **Agreed** 2026-09-27 |
 | 3 | MVP language subset (§4.1) | To confirm |
 | 4 | Syntax tree: typed AST with spans + the full token list; no lossless tree, no `rowan` (§4.4) | **Agreed** 2026-09-26 |
 | 4b | Lexer and parser hand-written, no `logos`; Spade as a design reference only, never copied (§4.4, §4.5) | **Agreed** 2026-09-26 |
@@ -490,6 +520,12 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 | 8 | Commits | Only after your review of each milestone |
 | 9 | One-time `cargo fmt --all` + fmt check in CI | Done |
 | 10 | Clippy warnings in existing code | Left for now |
+| D-A | Default model for a bare `Npn`: `IS=1e-14 BF={beta} XTB=1.5 XTI=3 EG=1.11`, TNOM 25 °C, written out (`engine_plan.md` §10) | **Agreed** 2026-09-27 |
+| D-B | ngspice transport: libngspice in a worker process; `ngspice -b` as the tests' cross-check | **Agreed** 2026-09-27 |
+| D-C | Round 2's D1–D10, as answered in `engine_plan.md` §10 | **Agreed** 2026-09-27 |
+| D-D | No worst-point loop in M3: enumerate corners (≤ about 12 knobs per spec side); the loop comes after, gated on agreeing with enumeration | **Agreed** 2026-09-27 |
+| D-E | Verdict words: PASS (all corners) / PASS (estimated) / PASS (implied by worst case); UNDECIDED with reasons and `next`; `simulated` / `stale`; no "verified" | **Agreed** 2026-09-27 |
+| D-F | No affine forms in M3: measures evaluated per run; affine forms return with hierarchy, calibration, error budgets and datasheet arithmetic | **Agreed** 2026-09-27 |
 
 ---
 

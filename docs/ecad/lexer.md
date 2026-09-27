@@ -109,7 +109,7 @@ atopile's unit decoding (`decode_symbol` in `Units.py`) is the same idea as ours
 | L2 | **Every byte is in exactly one token**, trivia included, and a zero-length `Eof` token closes the list | Byte-for-byte round trip (roadmap §4.4). The parser never needs to check for end of input separately |
 | L3 | **Struct-of-arrays:** `kinds: Vec<TokenKind>` (1 byte each) and `starts: Vec<u32>`. Token `i` covers `starts[i]..starts[i+1]` | Zig and rust-analyzer. 5 bytes per token, no spans stored twice, cache-friendly. `u32` caps a file at 4 GiB, which is checked on load |
 | L4 | **Multi-character operators are formed in pass 1** (`<=`, `..=`, `::`, `+/-`) | No macros, so there's no reason for rustc's single-character layer |
-| L5 | **Quantities scan permissively:** a digit starts a `Quantity`, which then takes every letter, digit, `_`, `µ`, `μ`, `Ω`, `Ω`, `°`, `%` glued to it. Pass 2 decodes it | Zig's approach. `4.7k7` and `47q` are one token each and get one precise error each, instead of confusing follow-on errors |
+| L5 | **Quantities scan permissively:** a digit starts a `Quantity`, which then takes every letter, digit, `_`, `µ`, `μ`, `Ω`, `Ω`, `°`, `%` (and the `°` look-alikes `º` `˚`) glued to it. Pass 2 decodes it | Zig's approach. `4.7k7` and `47q` are one token each and get one precise error each, instead of confusing follow-on errors |
 | L6 | **The value is correctly rounded, with no allocation:** the digits are read as an integer and a power of ten (`100nF` → 100 × 10^-9), then **Clinger's fast path**: when the digits fit in 53 bits and the power is at most 22, one exact multiply or divide (100 / 1e9). Otherwise std's `str::parse::<f64>` runs the full algorithm. This is what Rust's `dec2flt` (`can_use_fast_path`) and Zig's `parse_float` (`isFastPath`) do internally | Multiplying by an inexact power loses the last bit: `100.0 * 1e-9` is `1.0000000000000001e-07`, but 100 / 1e9 is `1e-07`. Across 14 common values (1 … 680) × 8 prefixes, **26 of 112** such multiplications are off in the last bit. Exact values keep export round trips exact (`100n` prints back as `100n`). A test checks the fast path against std on 200 000 random inputs and on both sides of every limit |
 | L7 | **Unknown characters are one token per character** (`Unknown`), and the rest of the line keeps lexing | Rust's behavior (Zig skips to the end of the line). A look-alike fix applies to one character, and the parser still sees the tokens after it |
 | L8 | **Identifiers continue over non-ASCII letters** (`char::is_alphanumeric`) but get the kind `IdentNonAscii`, which pass 2 rejects | One clear error per identifier (`r1_α`: "identifiers are ASCII"), not a fragment and a stray character. It also lets `10 kΩ` be recognized as a spaced-out unit |
@@ -180,7 +180,7 @@ At each position, the first matching rule wins:
 | `/*` | `BlockComment` | Nested depth count. Reaching EOF gives `UnterminatedBlockComment` |
 | ASCII letter or `_` | `Ident` / `Kw*` | Take `[A-Za-z0-9_]` and any non-ASCII alphanumeric. Any non-ASCII inside makes it `IdentNonAscii`. Then the keyword lookup |
 | non-ASCII alphanumeric (`µ`, `Ω`, `α`) | `IdentNonAscii` | As above |
-| digit | `Quantity` | Mantissa `[0-9][0-9_]*`; then `.` only if a digit follows; then an exponent `[eE][+-]?digit…` only if a digit follows `e` (or the sign); then the suffix, every glued `[A-Za-z0-9_]` / `µ μ Ω Ω ° %` |
+| digit | `Quantity` | Mantissa `[0-9][0-9_]*`; then `.` only if a digit follows; then an exponent `[eE][+-]?digit…` only if a digit follows `e` (or the sign); then the suffix, every glued `[A-Za-z0-9_]` / `µ μ Ω Ω ° %`, and the `°` look-alikes `º ˚` (`quantity_len`) |
 | `+/-` | `PlusMinus` | Only when the three characters touch |
 | `±` | `PlusMinus` | |
 | `..=`, `..`, `::`, `<=`, `>=` | as named | Longest match first |
@@ -216,7 +216,7 @@ The remaining `grammar.md` §7 errors belong to the parser (M1c). That moves #2 
 
 `check` is **one loop over the tokens** with a `match` on each token's kind, so each token is looked at once. This is how rustc does it (it validates each raw token as it's produced, in `next_token_from_cursor`), and rust-analyzer too (`LexedStr::new`). Zig goes further and checks a number literal only when `AstGen` uses it. We don't, because we want errors inside regions the parser skips while recovering.
 
-**Each error claims its span.** An error that starts inside a claimed span is dropped. For a `Quantity`, the checks run most specific first: a spaced-out unit, then the number itself, then a trailing `.`. That's how `10 kΩ` gives only "remove the space", not also "identifiers are ASCII" for `kΩ`.
+Each check looks at one token kind and returns at most one error; the loop decides what's kept. **Each error claims its span.** An error that starts inside a claimed span is dropped. For a `Quantity`, the checks run most specific first: a spaced-out unit, then the number itself, then a trailing `.`. That's how `10 kΩ` gives only "remove the space", not also "identifiers are ASCII" for `kΩ`.
 
 Every check reports at or after its own token, so claims only move forward. One `claimed_until` offset tracks them, and the errors come out already in source order.
 
@@ -312,10 +312,13 @@ crates/spicy_lang/
   Cargo.toml             deps: codespan-reporting · dev-deps: insta (glob)
   README.md              responsibility (roadmap §2.3)
   src/lib.rs
-  src/lexer/mod.rs       scan (pass 1), the cursor
+  src/lexer/mod.rs       scan (pass 1): next_kind, one rule per token, the cursor last
   src/lexer/token.rs     TokenKind, Tokens, Span
-  src/lexer/check.rs     check (pass 2), the claim rule
-  src/lexer/quantity.rs  decode_quantity, units and prefixes
+  src/lexer/check.rs     check (pass 2): one check per token kind, the claim rule
+  src/lexer/error.rs     LexErrorKind and its text (as parser/error.rs, resolve/error.rs)
+  src/lexer/quantity.rs  everything about numbers and units, each rule once: where a
+                         Quantity ends (quantity_len, used by scan and check),
+                         decode_quantity, the unit and prefix tables, suggestions
   src/lexer/lookalike.rs the §6.3 table
   src/diagnostic.rs      error data → codespan-reporting rendering (shared with the parser)
   test_data/lexer/{ok,err}/

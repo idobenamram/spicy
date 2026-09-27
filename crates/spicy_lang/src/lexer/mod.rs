@@ -1,22 +1,32 @@
-//! The lexer: text → tokens, in two passes (lexer.md).
+//! The lexer: text → tokens and errors (lexer.md). Two passes, read top to bottom:
 //!
-//! 1. [`scan`] cuts the text into tokens. It never fails: every byte lands in exactly
-//!    one token, trivia included, and problems become token kinds (`Unknown`,
-//!    `IdentNonAscii`, `UnterminatedBlockComment`) instead of errors.
-//! 2. [`check`] reads the tokens and reports every problem, with fixes.
+//! 1. [`scan`] (this file) cuts the text into tokens. It never fails: every byte lands
+//!    in exactly one token, trivia included, and problems become token kinds
+//!    (`Unknown`, `IdentNonAscii`, `UnterminatedBlockComment`) instead of errors, as
+//!    in rustc_lexer.
+//! 2. [`check`] (`check.rs`) reads the tokens and reports every problem, with fixes, as
+//!    rustc_parse "cooks" each raw token. The errors are data (`error.rs`).
+//!
+//! Numbers and units have a module of their own (`quantity.rs`): the scanner asks it
+//! where a `Quantity` ends ([`quantity::quantity_len`]), `check` asks it the same for
+//! a spaced-out unit and to decode each number, and the parser calls
+//! [`decode_quantity`] for the value. Look-alike characters (`−` for `-`) are a table
+//! in `lookalike.rs`, read by `check` and the parser.
 
 mod check;
+mod error;
 pub(crate) mod lookalike;
 mod quantity;
 mod token;
 
-pub use check::{LexError, LexErrorKind, check};
+pub use check::check;
+pub use error::{LexError, LexErrorKind};
 pub use quantity::{
     QuantityError, QuantityErrorKind, QuantityLit, decode_quantity, suffix_suggestions,
 };
 pub use token::{TokenIdx, TokenKind, Tokens};
 
-use quantity::{is_suffix_char, scan_mantissa};
+use quantity::quantity_len;
 
 const BOM: &str = "\u{FEFF}";
 
@@ -65,54 +75,6 @@ struct Scanner<'src> {
 }
 
 impl Scanner<'_> {
-    /// The byte `offset` bytes ahead of the current position.
-    fn peek(&self, offset: usize) -> Option<u8> {
-        self.src.as_bytes().get(self.pos + offset).copied()
-    }
-
-    fn rest(&self) -> &str {
-        &self.src[self.pos..]
-    }
-
-    fn rest_bytes(&self) -> &[u8] {
-        &self.src.as_bytes()[self.pos..]
-    }
-
-    /// Whether the text at the current position starts with `s`.
-    fn at(&self, s: &str) -> bool {
-        self.rest_bytes().starts_with(s.as_bytes())
-    }
-
-    /// The character at the current position. Precondition: not at the end.
-    fn char_here(&self) -> char {
-        self.rest()
-            .chars()
-            .next()
-            .expect("pos is inside the source")
-    }
-
-    /// Consumes `len` bytes as one token of `kind`.
-    fn take(&mut self, len: usize, kind: TokenKind) -> TokenKind {
-        self.pos += len;
-        kind
-    }
-
-    /// Consumes every character that satisfies `keep`. ASCII is read byte by byte;
-    /// only non-ASCII is decoded.
-    fn take_while(&mut self, keep: impl Fn(char) -> bool) {
-        while let Some(b) = self.peek(0) {
-            let c = if b.is_ascii() {
-                b as char
-            } else {
-                self.char_here()
-            };
-            if !keep(c) {
-                break;
-            }
-            self.pos += c.len_utf8();
-        }
-    }
-
     /// Consumes one token and returns its kind. Precondition: not at the end.
     fn next_kind(&mut self) -> TokenKind {
         use TokenKind::*;
@@ -131,7 +93,7 @@ impl Scanner<'_> {
                 _ => self.take(1, Slash),
             },
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.ident(),
-            b'0'..=b'9' => self.quantity(),
+            b'0'..=b'9' => self.take(quantity_len(self.rest()), Quantity),
             // Operators of several characters, longest first.
             b'+' if self.at("+/-") => self.take(3, PlusMinus),
             b'.' if self.at("..=") => self.take(3, DotDotEq),
@@ -226,13 +188,6 @@ impl Scanner<'_> {
             TokenKind::IdentNonAscii
         }
     }
-
-    /// The number part (shared with the decoder), then every glued suffix character.
-    fn quantity(&mut self) -> TokenKind {
-        self.pos += scan_mantissa(self.rest_bytes()).len;
-        self.take_while(is_suffix_char);
-        TokenKind::Quantity
-    }
 }
 
 /// MVP keywords get their own kinds; every reserved word is `KwReserved` (grammar.md §2.3).
@@ -252,6 +207,58 @@ fn keyword(word: &str) -> Option<TokenKind> {
         | "interface" | "family" | "env" | "param" | "bench" => KwReserved,
         _ => return None,
     })
+}
+
+/// The cursor: looking at and consuming the text (as rustc_lexer's `Cursor`, with
+/// `first`, `bump` and `eat_while`), on bytes, decoding a `char` only for non-ASCII.
+impl Scanner<'_> {
+    /// The byte `offset` bytes ahead of the current position.
+    fn peek(&self, offset: usize) -> Option<u8> {
+        self.src.as_bytes().get(self.pos + offset).copied()
+    }
+
+    fn rest(&self) -> &str {
+        &self.src[self.pos..]
+    }
+
+    fn rest_bytes(&self) -> &[u8] {
+        &self.src.as_bytes()[self.pos..]
+    }
+
+    /// Whether the text at the current position starts with `s`.
+    fn at(&self, s: &str) -> bool {
+        self.rest_bytes().starts_with(s.as_bytes())
+    }
+
+    /// The character at the current position. Precondition: not at the end.
+    fn char_here(&self) -> char {
+        self.rest()
+            .chars()
+            .next()
+            .expect("pos is inside the source")
+    }
+
+    /// Consumes `len` bytes as one token of `kind`.
+    fn take(&mut self, len: usize, kind: TokenKind) -> TokenKind {
+        self.pos += len;
+        kind
+    }
+
+    /// Consumes every character that satisfies `keep`. ASCII is read byte by byte;
+    /// only non-ASCII is decoded.
+    fn take_while(&mut self, keep: impl Fn(char) -> bool) {
+        while let Some(b) = self.peek(0) {
+            let c = if b.is_ascii() {
+                b as char
+            } else {
+                self.char_here()
+            };
+            if !keep(c) {
+                break;
+            }
+            self.pos += c.len_utf8();
+        }
+    }
 }
 
 /// The case-file suite and property tests (lexer.md §7).

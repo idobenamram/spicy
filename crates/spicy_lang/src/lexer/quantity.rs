@@ -1,7 +1,18 @@
 //! Reading a `Quantity` token: `47k`, `4k7`, `1uF`, `10°C`, `5%` (grammar.md §2.5, §5).
 //!
-//! The scanner and the decoder share [`scan_mantissa`], and the scanner and `check`
-//! share [`is_suffix_char`], so they can never disagree about where a number ends.
+//! Everything the lexer knows about numbers and units is in this file, each rule once:
+//! - **Where the token ends:** [`quantity_len`], the number ([`scan_mantissa`]) and then
+//!   every suffix character glued to it ([`suffix_len`]). The scanner cuts a `Quantity`
+//!   with it and `check` finds a spaced-out unit (`10 kΩ`) with it, so the two can't
+//!   disagree about where a number ends.
+//! - **What it means:** [`decode_quantity`], the same number split, then the suffix split
+//!   into a prefix and a unit by the tables below. `check` calls it to report errors, the
+//!   parser to get the value. Every error range is an offset into the token's text, as
+//!   in Zig's `parseNumberLiteral`.
+//! - **Help when it doesn't decode:** [`suffix_suggestions`] and [`SUFFIX_NOTE`].
+//!
+//! A token's shape next to its meaning, as Spade declares a literal's regex and the
+//! callback that decodes it together (`spade-ast/src/token.rs`).
 
 use std::ops::Range;
 
@@ -44,6 +55,11 @@ const PREFIXES: &[(char, i32)] = &[
     ('G', 9),
     ('T', 12),
 ];
+
+/// Characters that look like the `°` of `°C`: `º` (U+00BA, masculine ordinal) and `˚`
+/// (U+02DA, ring above). A suffix may contain them, so `10ºC` is one token, and
+/// [`suffix_suggestions`] offers `°C` for it. (Alone, `˚` is in the look-alike table.)
+const DEGREE_LOOKALIKES: [char; 2] = ['\u{BA}', '\u{2DA}'];
 
 /// A decoded quantity literal.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -88,18 +104,59 @@ pub enum QuantityErrorKind {
     TooSmall,
 }
 
+/// Where a `Quantity` token that starts `s` ends: the number, then every suffix
+/// character glued to it (lexer.md L5). `s` starts with an ASCII digit.
+#[inline]
+pub(super) fn quantity_len(s: &str) -> usize {
+    let number = scan_mantissa(s.as_bytes()).len;
+    number + suffix_len(&s[number..])
+}
+
+/// How much of `s` is suffix characters: what glues onto a number. ASCII is read byte
+/// by byte; only non-ASCII is decoded (quantities are common, and `chars()` on every
+/// suffix made quantity-heavy files ~15% slower to parse).
+#[inline]
+pub(super) fn suffix_len(s: &str) -> usize {
+    let mut len = 0;
+    while let Some(&b) = s.as_bytes().get(len) {
+        let c = if b.is_ascii() {
+            b as char
+        } else {
+            s[len..].chars().next().expect("len is on a char boundary")
+        };
+        if !is_suffix_char(c) {
+            break;
+        }
+        len += c.len_utf8();
+    }
+    len
+}
+
+/// Characters a quantity's suffix may contain. Deliberately broad (lexer.md L5): `47q`
+/// and `4.7k7` stay one token each and get one precise error each. Besides ASCII, every
+/// character of a spelling in [`UNITS`] and [`PREFIXES`], and the [`DEGREE_LOOKALIKES`]
+/// (a test checks the tables).
+fn is_suffix_char(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(
+            c,
+            '_' | '%' | '\u{B5}' | '\u{3BC}' | '\u{3A9}' | '\u{2126}' | '°'
+        )
+        || DEGREE_LOOKALIKES.contains(&c)
+}
+
 /// Where the parts of a quantity's number end. Byte offsets into the token text,
 /// which must start with an ASCII digit: `4.7e-3V` is int `4`, fraction `7`, exponent
 /// `-3`, then the suffix `V`.
-pub(super) struct Mantissa {
+struct Mantissa {
     /// End of the integer digits.
-    pub int_end: usize,
+    int_end: usize,
     /// The fraction digits, after the `.` (empty without a decimal point).
-    pub frac: Range<usize>,
+    frac: Range<usize>,
     /// The exponent's sign and digits, after the `e`/`E`, if there is one.
-    pub exponent: Option<Range<usize>>,
+    exponent: Option<Range<usize>>,
     /// End of the whole number; the suffix starts here.
-    pub len: usize,
+    len: usize,
 }
 
 impl Mantissa {
@@ -110,7 +167,7 @@ impl Mantissa {
 
 /// Digits and `_`; then `.` only if a digit follows (so `100..=300` and `0..N` work);
 /// then an exponent only if a digit follows the `e` or its sign.
-pub(super) fn scan_mantissa(b: &[u8]) -> Mantissa {
+fn scan_mantissa(b: &[u8]) -> Mantissa {
     debug_assert!(b.first().is_some_and(u8::is_ascii_digit));
     let int_end = eat_digits(b, 0);
     let mut i = int_end;
@@ -146,17 +203,6 @@ fn eat_digits(b: &[u8], mut i: usize) -> usize {
     i
 }
 
-/// Characters a quantity's suffix may contain. Deliberately broad (lexer.md L5): `47q`
-/// and `4.7k7` stay one token each and get one precise error each. `º` and `˚` are
-/// look-alikes of `°`, kept so `10ºC` is one token with a "did you mean `°C`" fix.
-pub(super) fn is_suffix_char(c: char) -> bool {
-    c.is_ascii_alphanumeric()
-        || matches!(
-            c,
-            '_' | '%' | '\u{B5}' | '\u{3BC}' | '\u{3A9}' | '\u{2126}' | '°' | 'º' | '˚'
-        )
-}
-
 /// Decodes a `Quantity` token's text. Used by `check` (to report errors everywhere) and
 /// by the parser (to get the value). Allocates only on errors and for very long numbers.
 pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
@@ -164,7 +210,7 @@ pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
     let (frac, suffix) = match infix_prefix(&text[m.len..]) {
         Some(prefix) => decode_infix(text, &m, prefix)?,
         None => {
-            let suffix = split_suffix(&text[m.len..]).map_err(|e| e.shifted(m.len))?;
+            let suffix = split_suffix(text, m.len)?;
             (m.frac.clone(), suffix)
         }
     };
@@ -219,8 +265,7 @@ fn decode_infix(
     }
     let frac_start = m.len + letter.len_utf8();
     let frac_end = eat_digits(text.as_bytes(), frac_start);
-    let rest = &text[frac_end..];
-    let unit = match split_suffix(rest) {
+    let unit = match split_suffix(text, frac_end) {
         Ok(Suffix { prefix: None, unit }) => unit,
         // `4k7k`, `4k7kΩ`: the infix letter already is the prefix.
         Ok(Suffix {
@@ -235,7 +280,7 @@ fn decode_infix(
         Err(_) => {
             return Err(error_at(
                 QuantityErrorKind::UnknownSuffix {
-                    suffix: rest.to_string(),
+                    suffix: text[frac_end..].to_string(),
                     after_infix: true,
                 },
                 frac_end..text.len(),
@@ -259,10 +304,11 @@ fn decode_infix(
     Ok((frac_start..frac_end, Suffix { prefix, unit }))
 }
 
-/// Splits a suffix by the rules of grammar.md §5.2, in order: the whole suffix as a
-/// unit, then as a prefix, then prefix + unit. An empty suffix has neither. Error
-/// ranges are within `s`.
-fn split_suffix(s: &str) -> Result<Suffix, QuantityError> {
+/// Splits the suffix `text[start..]` by the rules of grammar.md §5.2, in order: the
+/// whole suffix as a unit, then as a prefix, then prefix + unit. An empty suffix has
+/// neither.
+fn split_suffix(text: &str, start: usize) -> Result<Suffix, QuantityError> {
+    let s = &text[start..];
     if s.is_empty() {
         return Ok(Suffix {
             prefix: None,
@@ -298,12 +344,12 @@ fn split_suffix(s: &str) -> Result<Suffix, QuantityError> {
                     unit,
                     infix: false,
                 },
-                0..letter.len_utf8(),
+                start..start + letter.len_utf8(),
             ));
         }
     }
     if s.starts_with("Meg") {
-        return Err(error_at(QuantityErrorKind::Meg, 0.."Meg".len()));
+        return Err(error_at(QuantityErrorKind::Meg, start..start + "Meg".len()));
     }
     let kind = if s == "e" || s == "E" {
         QuantityErrorKind::MissingExponentDigits
@@ -313,7 +359,7 @@ fn split_suffix(s: &str) -> Result<Suffix, QuantityError> {
             after_infix: false,
         }
     };
-    Err(error_at(kind, 0..s.len()))
+    Err(error_at(kind, start..text.len()))
 }
 
 fn unit_exact(s: &str) -> Option<Unit> {
@@ -327,20 +373,11 @@ fn prefix_of(c: char) -> Option<i32> {
     PREFIXES.iter().find(|&&(p, _)| p == c).map(|&(_, e)| e)
 }
 
-/// A decoding error at `range` within the token's text.
+/// A decoding error at `range`, byte offsets into the token's text.
 fn error_at(kind: QuantityErrorKind, range: Range<usize>) -> QuantityError {
     QuantityError {
         kind,
         span: Span::new(range.start as u32, range.end as u32),
-    }
-}
-
-impl QuantityError {
-    /// The same error, for text that starts `offset` bytes into the token.
-    fn shifted(self, offset: usize) -> QuantityError {
-        let offset = offset as u32;
-        let span = Span::new(self.span.start + offset, self.span.end + offset);
-        QuantityError { span, ..self }
     }
 }
 
@@ -416,7 +453,7 @@ pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
         }
     };
     // Whether `c`, written after the number, is a valid suffix.
-    let fits = |c: &str| match split_suffix(c) {
+    let fits = |c: &str| match split_suffix(c, 0) {
         Ok(Suffix {
             prefix: None,
             unit: Some(unit),
@@ -427,7 +464,13 @@ pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
 
     let normalized: String = s
         .chars()
-        .map(|c| if matches!(c, 'º' | '˚') { '°' } else { c })
+        .map(|c| {
+            if DEGREE_LOOKALIKES.contains(&c) {
+                '°'
+            } else {
+                c
+            }
+        })
         .collect();
     if normalized != s && fits(&normalized) {
         push(&normalized, &mut out);
@@ -457,6 +500,11 @@ pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
     }
     out
 }
+
+/// The note under an unknown suffix: every unit and prefix, one spelling each. A test
+/// checks it against [`UNITS`] and [`PREFIXES`].
+pub(super) const SUFFIX_NOTE: &str = "note: units are V A Ω F H Hz s W K °C % dB, optionally after a \
+                                      prefix f p n u µ m k M G T (case matters)";
 
 /// Every valid suffix, spelled canonically (`u` for micro, U+03A9 for ohm). Built once.
 fn candidates() -> &'static [String] {
@@ -705,6 +753,57 @@ mod tests {
             }
         }
         assert!(multiplying_would_be_off > 0);
+    }
+
+    /// The scanner glues every spelling in the tables onto a number, so each one reaches
+    /// the decoder whole: every character of every unit and prefix is a suffix character.
+    #[test]
+    fn every_spelling_is_made_of_suffix_chars() {
+        let spellings = UNITS.iter().map(|&(s, _)| s.to_string());
+        let prefixes = PREFIXES.iter().map(|&(p, _)| p.to_string());
+        for s in spellings.chain(prefixes) {
+            assert_eq!(suffix_len(&s), s.len(), "{s}");
+            assert_eq!(quantity_len(&format!("1{s} ")), 1 + s.len(), "{s}");
+        }
+        for c in DEGREE_LOOKALIKES {
+            assert!(is_suffix_char(c), "{c}");
+        }
+    }
+
+    /// Where a quantity token ends: the number, then the glued suffix, and nothing that
+    /// can't be in one (`..`, an operator, a space, a non-ASCII letter off the list).
+    #[test]
+    fn quantity_ends() {
+        let len = |s: &str| quantity_len(s);
+        assert_eq!(len("4.7e-3kΩ+x"), "4.7e-3kΩ".len());
+        assert_eq!(len("10ºC;"), "10ºC".len());
+        assert_eq!(len("10˚C"), "10˚C".len());
+        assert_eq!(len("1..=3"), 1);
+        assert_eq!(len("1.x"), 1);
+        assert_eq!(len("4k7_x%y"), "4k7_x%y".len());
+        assert_eq!(len("1kα"), 2);
+        assert_eq!(len("1 k"), 1);
+    }
+
+    /// The note names every unit (by its symbol) and every ASCII prefix, plus `µ`.
+    #[test]
+    fn suffix_note_lists_the_tables() {
+        let (units, prefixes) = SUFFIX_NOTE
+            .strip_prefix("note: units are ")
+            .and_then(|s| s.strip_suffix(" (case matters)"))
+            .and_then(|s| s.split_once(", optionally after a prefix "))
+            .expect("the note's shape");
+        let units: Vec<&str> = units.split(' ').collect();
+        let prefixes: Vec<&str> = prefixes.split(' ').collect();
+        for &(_, unit) in UNITS {
+            assert!(units.contains(&unit.symbol().as_str()), "{unit:?}");
+        }
+        for &(p, _) in PREFIXES.iter().filter(|(p, _)| p.is_ascii()) {
+            assert!(prefixes.contains(&p.to_string().as_str()), "{p}");
+        }
+        assert!(prefixes.contains(&"\u{B5}"));
+        assert_eq!(units.len(), 12);
+        assert_eq!(prefixes.len(), PREFIXES.len() - 1);
     }
 
     #[test]

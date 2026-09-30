@@ -747,10 +747,10 @@ impl<'s> InstanceParser<'s> {
 
         let input = self.source_map.get_content(cursor.span.source_index);
         let model_name = parse_ident(cursor, input)?;
-        let model = self
+        let (card_name, model) = self
             .expanded_deck
             .model_table
-            .get(model_name.text)
+            .get_card(model_name.text)
             .ok_or_else(|| ParserError::MissingModel {
                 model: model_name.text.to_string(),
                 span: model_name.span,
@@ -769,6 +769,7 @@ impl<'s> InstanceParser<'s> {
             cursor.span,
             positive_node,
             negative_node,
+            card_name.to_string(),
             model.clone(),
         );
 
@@ -835,10 +836,10 @@ impl<'s> InstanceParser<'s> {
 
         let input = self.source_map.get_content(cursor.span.source_index);
         let model_name = parse_ident(cursor, input)?;
-        let model = self
+        let (card_name, model) = self
             .expanded_deck
             .model_table
-            .get(model_name.text)
+            .get_card(model_name.text)
             .ok_or_else(|| ParserError::MissingModel {
                 model: model_name.text.to_string(),
                 span: model_name.span,
@@ -858,6 +859,7 @@ impl<'s> InstanceParser<'s> {
             collector_node,
             base_node,
             emitter_node,
+            card_name.to_string(),
             model.clone(),
         );
 

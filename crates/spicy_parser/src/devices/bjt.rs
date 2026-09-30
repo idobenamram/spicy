@@ -8,6 +8,8 @@ pub struct BjtSpec {
     pub collector: NodeIndex,
     pub base: NodeIndex,
     pub emitter: NodeIndex,
+    /// The `.model` card's name, as the card spells it.
+    pub model_name: String,
     pub model: BjtModel,
     pub area: Option<Value>,
     pub m: Option<Value>,
@@ -23,6 +25,7 @@ impl BjtSpec {
         collector: NodeIndex,
         base: NodeIndex,
         emitter: NodeIndex,
+        model_name: String,
         model: BjtModel,
     ) -> Self {
         Self {
@@ -31,6 +34,7 @@ impl BjtSpec {
             collector,
             base,
             emitter,
+            model_name,
             model,
             area: None,
             m: None,

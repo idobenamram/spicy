@@ -111,6 +111,11 @@ impl Name {
         Self(name.to_string())
     }
 
+    /// The name as it was written.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
     fn no_case(&self) -> &NoCase {
         NoCase::new(&self.0)
     }

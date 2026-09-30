@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
-assertion_line: 1267
+assertion_line: 1269
 expression: deck
 ---
 Deck {
@@ -39,6 +39,7 @@ Deck {
                 negative: NodeIndex(
                     2,
                 ),
+                model_name: "Dmod",
                 model: DiodeModel {
                     is: Some(
                         Value {

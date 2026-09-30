@@ -98,7 +98,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     let mut diode_models = ModelTable::default();
     for d in &devices.diodes {
         let model = diode_model(d);
-        let model = DiodeModelId::new(diode_models.insert(diode_model_key(&model), model));
+        let model = DiodeModelId::new(diode_models.insert(d.model_name.clone(), model));
         circuit.diodes.push(Diode {
             positive: node(d.positive),
             negative: node(d.negative),
@@ -108,11 +108,12 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
         names.diodes.push(d.name.clone());
     }
     params.diode_models = diode_models.models;
+    names.diode_models = diode_models.keys;
 
     let mut bjt_models = ModelTable::default();
     for q in &devices.bjts {
         let model = bjt_model(q);
-        let model = BjtModelId::new(bjt_models.insert(bjt_model_key(&model), model));
+        let model = BjtModelId::new(bjt_models.insert(q.model_name.clone(), model));
         circuit.bjts.push(Bjt {
             collector: node(q.collector),
             base: node(q.base),
@@ -123,6 +124,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
         names.bjts.push(q.name.clone());
     }
     params.bjt_models = bjt_models.models;
+    names.bjt_models = bjt_models.keys;
 
     for v in &devices.voltage_sources {
         circuit.vsources.push(two_terminal(v.positive, v.negative));
@@ -171,10 +173,15 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     })
 }
 
-/// Stores each distinct model once. The parser copies a `.model` card into
-/// every instance that names it, so identical cards are merged here, by value.
+/// Stores each model once, under a key. Diode and BJT models are keyed by
+/// their `.model` card's name: one entry per card, as ngspice keeps one model
+/// per card, so two cards stay two even when their numbers match. Resistor,
+/// capacitor and inductor models are built per instance (inline `tc1=` plus an
+/// optional card), so they are keyed, and merged, by value.
 struct ModelTable<K, M> {
     ids: HashMap<K, usize>,
+    /// Each model's key, in model order.
+    keys: Vec<K>,
     models: Vec<M>,
 }
 
@@ -182,18 +189,23 @@ impl<K, M> Default for ModelTable<K, M> {
     fn default() -> Self {
         Self {
             ids: HashMap::new(),
+            keys: Vec::new(),
             models: Vec::new(),
         }
     }
 }
 
-impl<K: Hash + Eq, M> ModelTable<K, M> {
+impl<K: Hash + Eq + Clone, M> ModelTable<K, M> {
     /// Returns the index of the model with this key, adding it if it's new.
     fn insert(&mut self, key: K, model: M) -> usize {
-        *self.ids.entry(key).or_insert_with(|| {
-            self.models.push(model);
-            self.models.len() - 1
-        })
+        if let Some(&id) = self.ids.get(&key) {
+            return id;
+        }
+        let id = self.models.len();
+        self.ids.insert(key.clone(), id);
+        self.keys.push(key);
+        self.models.push(model);
+        id
     }
 }
 
@@ -209,15 +221,6 @@ fn resistor_model_key(model: &ResistorModel) -> [u64; 4] {
 
 fn tc_model_key(tc1: f64, tc2: f64) -> [u64; 2] {
     [tc1.to_bits(), tc2.to_bits()]
-}
-
-fn diode_model_key(model: &DiodeModel) -> [u64; 3] {
-    [model.is, model.n, model.rs].map(f64::to_bits)
-}
-
-fn bjt_model_key(model: &BjtModel) -> (Polarity, [u64; 5]) {
-    let numbers = [model.is, model.bf, model.br, model.nf, model.nr];
-    (model.polarity, numbers.map(f64::to_bits))
 }
 
 fn node_names(deck: &Deck) -> Vec<String> {
@@ -571,11 +574,14 @@ mod tests {
         assert_eq!(params.bjt_models[0].is, 1e-16);
     }
 
+    /// One model per `.model` card, as ngspice keeps: instances naming the same card
+    /// share it (whatever case they write it in), and two cards stay two even when
+    /// their numbers match, so a knob on one card never moves the other.
     #[test]
-    fn identical_model_cards_are_stored_once() {
+    fn each_model_card_is_one_model() {
         let lowered = lower_body(
             ".model QA NPN bf=200\n.model QB NPN bf=200\n.model QC NPN bf=50\n\
-             Q1 c b 0 QA\nQ2 c b 0 QA\nQ3 c b 0 QB\nQ4 c b 0 QC",
+             Q1 c b 0 QA\nQ2 c b 0 qa\nQ3 c b 0 QB\nQ4 c b 0 QC",
         );
         let models: Vec<usize> = lowered
             .circuit
@@ -583,9 +589,22 @@ mod tests {
             .iter()
             .map(|q| q.model.index())
             .collect();
-        assert_eq!(models, [0, 0, 0, 1]);
+        assert_eq!(models, [0, 0, 1, 2]);
         let bf: Vec<f64> = lowered.params.bjt_models.iter().map(|m| m.bf).collect();
-        assert_eq!(bf, [200.0, 50.0]);
+        assert_eq!(bf, [200.0, 200.0, 50.0]);
+        assert_eq!(
+            lowered.names.bjt_models,
+            ["QA", "QB", "QC"],
+            "each card's own spelling"
+        );
+    }
+
+    #[test]
+    fn equal_diode_cards_stay_two_models() {
+        let lowered =
+            lower_body(".model DA D is=1e-14\n.model DB D is=1e-14\nD1 a 0 DA\nD2 a 0 DB");
+        assert_eq!(lowered.params.diode_models.len(), 2);
+        assert_eq!(lowered.names.diode_models, ["DA", "DB"]);
     }
 
     #[test]

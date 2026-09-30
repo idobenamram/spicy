@@ -113,7 +113,7 @@ It matters more as the simulator grows:
 
 **Recommendation.**
 - Per device kind, a **model table** and an **instance table**. Each instance holds a `ModelId`. An instance without a model points to the kind's default model.
-- **Identical model cards are merged** at lowering.
+- **One model entry per `.model` card** (revised 2026-09-30; `research/circuit_conditions_engine.md` §6.2): instances naming one card share it, and two cards stay two even when their numbers match, as ngspice keeps one model per card. Merging identical cards by value had been a workaround for the parser losing card names; it made a knob on one transistor's card move another's. Resistor, capacitor and inductor models, built per instance from inline `tc1=` plus an optional card, are still merged by value. Card names go in `CircuitNames`.
 - An instance that overrides a model parameter gets **its own model entry**, made at lowering (Gnucap's copy-on-write). The language's `q1: Npn { beta: 100..=300 }` works this way: each part gets its own model.
 - **Per-run mismatch** (Monte Carlo, local variation) goes in instance fields, never into new models. BSIM4 does the same with its instance-level `delvto`.
 
@@ -321,7 +321,7 @@ pub enum Analysis {
 
 **Step 3:**
 - The `spicy_circuit` crate: ids, `Circuit`, `Params`, `CircuitNames`, `Analysis`. Every kind has a model table and an instance table: R, C and L models hold their temperature coefficients (and the resistor's default geometry).
-- `spicy_parser::lower(&Deck)`: SPICE precedence and defaults, merged model cards, `scale` folded, names resolved (the DC sweep source) with span errors. The parser stops allocating branch rows.
+- `spicy_parser::lower(&Deck)`: SPICE precedence and defaults, one model per card (merged by value for R/C/L), `scale` folded, names resolved (the DC sweep source) with span errors. The parser stops allocating branch rows.
 - The simulator builds its devices from `Circuit` + `Params` (its derive step applies `m`, `area`, `1/r`) and drops its parser dependency. It assigns branch rows itself. Matrix positions stay inside its devices for now (step 2 is deferred).
 - Snapshots stay identical, except the reviewed reordering of branch currents (§4.4).
 
@@ -334,7 +334,7 @@ pub enum Analysis {
 | # | Decision | Recommendation | Change |
 |---|---|---|---|
 | 1 | Separate storage for structure (`Circuit`), values (`Params`) and names (`CircuitNames`) | Yes | — |
-| 2 | Models | Shared per-kind model tables; a `ModelId` per instance; identical cards merged; overrides get their own model; per-run mismatch on instances | **Reverses** "copy `.model` values into each instance" |
+| 2 | Models | Shared per-kind model tables; a `ModelId` per instance; one model per card (revised 2026-09-30); overrides get their own model; per-run mismatch on instances | **Reverses** "copy `.model` values into each instance" |
 | 3 | Internal nodes and branch rows | The simulator allocates them, with a structure key | Moves branch rows out of the parser |
 | 4 | Order of unknowns | The simulator's choice; results printed in circuit order; one reviewed snapshot reorder | **Revises** `pipeline.md` decision 6; drops the `order` list |
 | 5 | `m`, `area`, `scale` | `m` and `area` stay parameters, applied by the simulator; SPICE lowering folds `scale` | **Revises** `pipeline.md` decision 7 |

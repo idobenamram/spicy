@@ -153,4 +153,10 @@ pub struct CircuitNames {
     pub bjts: Vec<String>,
     pub vsources: Vec<String>,
     pub isources: Vec<String>,
+    /// The `.model` card of each diode model, indexed like
+    /// [`Params::diode_models`](crate::Params::diode_models).
+    pub diode_models: Vec<String>,
+    /// The `.model` card of each BJT model, indexed like
+    /// [`Params::bjt_models`](crate::Params::bjt_models).
+    pub bjt_models: Vec<String>,
 }

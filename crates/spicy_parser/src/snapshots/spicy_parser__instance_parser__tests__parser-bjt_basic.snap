@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
-assertion_line: 1267
+assertion_line: 1269
 expression: deck
 ---
 Deck {
@@ -48,6 +48,7 @@ Deck {
                 emitter: NodeIndex(
                     3,
                 ),
+                model_name: "Qmod",
                 model: BjtModel {
                     polarity: Npn,
                     is: Some(

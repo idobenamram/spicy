@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/lower.rs
-assertion_line: 722
+assertion_line: 746
 expression: lowered
 ---
 Lowered {
@@ -472,6 +472,8 @@ Lowered {
         bjts: [],
         vsources: [],
         isources: [],
+        diode_models: [],
+        bjt_models: [],
     },
     analyses: [],
 }

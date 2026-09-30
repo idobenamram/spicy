@@ -23,6 +23,14 @@ impl ModelTable {
     pub(crate) fn get(&self, model: &str) -> Option<&DeviceModel> {
         self.map.get(NoCase::new(model))
     }
+
+    /// The card an instance names, with the card's own spelling of its name:
+    /// `Q1 c b e qmod` finds `.model QMod …` and returns `"QMod"`.
+    pub(crate) fn get_card(&self, model: &str) -> Option<(&str, &DeviceModel)> {
+        self.map
+            .get_key_value(NoCase::new(model))
+            .map(|(name, model)| (name.as_str(), model))
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize)]

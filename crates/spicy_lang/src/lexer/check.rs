@@ -1,6 +1,6 @@
 //! Pass 2: reads the tokens and reports every problem (lexer.md §6).
 
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 use super::error::{LexError, LexErrorKind};
 use super::lookalike;
@@ -243,7 +243,7 @@ fn non_ascii_ident(tokens: &Tokens, i: TokenIdx) -> LexError {
 mod tests {
     use super::super::scan;
     use super::check;
-    use crate::diagnostic::DiagKind;
+    use spicy_errors::DiagKind;
 
     /// Each error as `(name, text, fix)`.
     fn errors(src: &str) -> Vec<(&'static str, &str, Option<String>)> {

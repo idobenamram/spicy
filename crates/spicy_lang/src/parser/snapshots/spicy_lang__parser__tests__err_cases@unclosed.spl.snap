@@ -5,7 +5,8 @@ input_file: crates/spicy_lang/test_data/parser/err/unclosed.spl
 ---
 File 0..43
   Block A 0..42
-    StmtError 14..42 "let r = Resistor { a: f(1, 2"
+    Let r 14..42
+      ExprError 22..42 "Resistor { a: f(1, 2"
 
 --- errors ---
 E-syntax Unclosed 43..43 "" related 37..38

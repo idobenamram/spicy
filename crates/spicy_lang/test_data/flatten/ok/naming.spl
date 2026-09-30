@@ -1,0 +1,36 @@
+// How a merged net is named (model.md §9, pass 5): the smallest key wins, comparing
+// depth, then rank (port, merge target, net), then the path.
+block Child {
+    port aaa: Pin;
+    port g: Ground;
+    let r = Resistor { a: aaa, b: g, value: 1k };
+}
+
+block Top {
+    port g: Ground;
+    port p: Pin;
+
+    // Depth first: `zzz` (depth 0) beats the child's port `c.aaa` (depth 1), although
+    // `aaa` sorts first.
+    net zzz;
+    let c = Child { aaa: zzz, g };
+
+    // Port over merge target: the net of `p` and `q` is named `p`.
+    net q = [p];
+
+    // Merge target over net: `sum`, not `a` or `b`.
+    net a;
+    net b;
+    net sum = [a, b];
+
+    // Two merge targets tie on depth and rank: the path decides, `x` before `y`.
+    net m;
+    net y = [m];
+    net x = [m];
+
+    let r1 = Resistor { a: zzz, b: p, value: 1k };
+    let r2 = Resistor { a: sum, b: m, value: 1k };
+    let r3 = Resistor { a: b, b: g, value: 1k };
+    let r4 = Resistor { a, b: g, value: 1k };
+    let r5 = Resistor { a: x, b: g, value: 1k };
+}

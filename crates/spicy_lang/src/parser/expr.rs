@@ -9,7 +9,7 @@
 
 use super::ast::{BinOp, Expr, ExprKind, Field, RelOp};
 use super::{MAX_TREE_DEPTH, PResult, ParseError, ParseErrorKind, Parser};
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 use crate::lexer::{TokenKind, decode_quantity};
 
@@ -196,7 +196,10 @@ impl<'src> Parser<'_, 'src> {
                 // The lexer already reported a quantity that doesn't decode.
                 match decode_quantity(text) {
                     Ok(q) => (ExprKind::Quantity(q), 0),
-                    Err(_) => (ExprKind::Error, 0),
+                    Err(_) => {
+                        let reported = self.lexed.expect("the lexer reports a number it rejects");
+                        (ExprKind::Error(reported), 0)
+                    }
                 }
             }
             TokenKind::Ident => {

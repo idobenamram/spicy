@@ -17,6 +17,7 @@ block A 6..7
   r3 = Resistor 337..339
     a → v
     b → g
+    value = <invalid>
 
 --- errors ---
 E-duplicate Duplicate 176..185 "value: 5V" related 165..174

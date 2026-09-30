@@ -1,0 +1,62 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/power.spl
+---
+root PassedOn
+  net gnd (ground)  aliases pass.gnd, pass.inner.gnd
+  net rail  aliases pass.vcc, pass.inner.vcc
+  Resistor r a→rail b→gnd value=1000 Ω
+  Resistor pass.inner.r a→rail b→gnd value=1000 Ω
+root TwoSources
+  net gnd (ground)  aliases reg.gnd
+  net vcc  aliases reg.input, reg.out
+  Resistor reg.load a→vcc b→gnd value=1000 Ω
+  Resistor reg.r a→vcc b→vcc value=10 Ω
+root Unpowered
+  net gnd (ground)  aliases load.gnd
+  net rail  aliases load.vcc
+  Resistor r a→rail b→gnd value=1000 Ω
+  Resistor load.r a→rail b→gnd value=1000 Ω
+
+--- errors ---
+W-short ShortedPart 243..292 "let r = Resistor { a: input, b: out, value: 10 };"
+E-power SeveralSources 644..652 "out: vcc" related 568..571
+E-power NoSource 819..828 "vcc: rail"
+E-power NoSource 1250..1259 "vcc: rail"
+
+--- rendered ---
+warning[W-short]: both pins of `r` are on one net (in `Regulator`)
+  --> power.spl:7:5
+  |
+7 |     let r = Resistor { a: input, b: out, value: 10 };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted
+
+error[E-power]: net `vcc` has more than one power source
+   --> power.spl:21:39
+   |
+19 |     port vcc: Power<In>;
+   |          --- the first source
+20 |     port gnd: Ground;
+21 |     let reg = Regulator { input: vcc, out: vcc, gnd };
+   |                                       ^^^^^^^^ a second source
+   |
+   = note: the sources are `vcc` and `reg.out`
+
+error[E-power]: nothing powers net `rail`
+   --> power.spl:28:23
+   |
+28 |     let load = Load { vcc: rail, gnd };
+   |                       ^^^^^^^^^ needs a power source
+   |
+   = note: `load.vcc` takes power from it
+   = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
+
+error[E-power]: nothing powers net `rail`
+   --> power.spl:44:23
+   |
+44 |     let pass = Pass { vcc: rail, gnd };
+   |                       ^^^^^^^^^ needs a power source
+   |
+   = note: `pass.inner.vcc` takes power from it
+   = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`

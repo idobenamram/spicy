@@ -1,0 +1,23 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/cycle_stops_checks.spl
+---
+root Board
+  net g (ground)  aliases p.g
+  net x  aliases p.x
+
+--- errors ---
+E-recursion RecursivePlacement 397..401 "Ping" related 255..259
+
+--- rendered ---
+error[E-recursion]: `Ping` places itself: Ping → Pong → Ping
+   --> cycle_stops_checks.spl:18:16
+   |
+ 9 | block Ping {
+   |       ---- defined here
+   .
+18 |     let ping = Ping { g, x };
+   |                ^^^^ places `Ping` again
+   |
+   = note: a block can't contain itself, directly or through others

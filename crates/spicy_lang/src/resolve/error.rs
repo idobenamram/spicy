@@ -4,7 +4,7 @@
 use spicy_model::prelude::FieldType;
 use spicy_model::units::{Dimension, QKind, Quantity};
 
-use crate::diagnostic::{Diag, DiagKind, Fix, Text};
+use spicy_errors::{Diag, DiagKind, Fix, Text, list};
 
 /// One problem resolve found. `related` is the first definition of a duplicate.
 pub type ResolveError = Diag<ResolveErrorKind>;
@@ -152,7 +152,6 @@ impl ResolveErrorKind {
 }
 
 impl DiagKind for ResolveErrorKind {
-    #[cfg(any(test, fuzzing))]
     fn name(&self) -> &'static str {
         use ResolveErrorKind::*;
         match self {
@@ -401,15 +400,5 @@ pub(super) fn describe(kind: QKind, dim: Dimension) -> String {
             Some(name) => format!("`{}` ({name})", dim.symbol()),
             None => format!("`{}`", dim.symbol()),
         },
-    }
-}
-
-/// `a`, `a and b`, `a, b and c`, with backticks.
-fn list<S: AsRef<str>>(items: &[S]) -> String {
-    let quoted: Vec<String> = items.iter().map(|s| format!("`{}`", s.as_ref())).collect();
-    match quoted.as_slice() {
-        [] => String::new(),
-        [one] => one.clone(),
-        [init @ .., last] => format!("{} and {last}", init.join(", ")),
     }
 }

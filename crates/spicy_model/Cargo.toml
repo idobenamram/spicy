@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+spicy_errors = { path = "../spicy_errors" }
+spicy_span = { path = "../spicy_span" }
+spicy_index = { path = "../spicy_index" }

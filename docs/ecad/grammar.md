@@ -278,8 +278,10 @@ Worked through:
   - the `}` that closes the current body;
   - a statement or item keyword at or after the error, even inside brackets opened *before* the error (an unclosed `Resistor {` doesn't swallow the rest of the block). Brackets opened *after* the error are skipped whole (`for i in 0..N { … }`).
   - `///` or `#` at the top level, strictly after the error.
+- **At value level** (decided 2026-09-29): when a statement's right-hand side doesn't parse (the value of a `let` or of a `net x =`, a port's type), or something other than `;` follows it, only the value becomes an error node, over the text up to the statement's `;` (the same stopping rules, but a value may be empty). The statement keeps its name, so `net base = [g g];` still declares `base` and its uses aren't reported again (rustc: "we still want a field even if its expr didn't parse").
 - **At item level:** skip to `block`, `contract` or end of file.
 - **Missing `;`:** reported with an insert-`;` suggestion, and parsing continues as if it were there.
+- **Missing `{`** after `block Name` or `contract Name`, when a statement or `}` follows: reported with an insert-`{` suggestion, and the body is read as if it were there, so the block keeps its name (decided 2026-09-29).
 - **The result:** each broken statement gives one error, the rest of the file still parses, and later stages run on the statements that parsed (roadmap §4.5).
 
 ---

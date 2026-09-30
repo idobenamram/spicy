@@ -1,0 +1,37 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/ground.spl
+---
+root NoGround
+  net a
+  net b
+  Resistor r a→a b→b value=1000 Ω
+root TwoGrounds
+  net g1 (ground)
+  net g2 (ground)
+  Resistor r a→g1 b→g2 value=1000 Ω
+
+--- errors ---
+E-ground NoGround 74..82 "NoGround"
+E-ground SeveralGrounds 213..215 "g2" related 192..194
+
+--- rendered ---
+error[E-ground]: `NoGround` has no ground net
+  --> ground.spl:2:7
+  |
+2 | block NoGround {
+  |       ^^^^^^^^ no net here carries a `Ground` port
+  |
+  = help: add `port gnd: Ground;` and bind the parts' return pins to it
+
+error[E-ground]: `TwoGrounds` has more than one ground net
+   --> ground.spl:10:10
+   |
+ 9 |     port g1: Ground;
+   |          -- the first ground
+10 |     port g2: Ground;
+   |          ^^ a second ground
+   |
+   = note: the ground nets are `g1` and `g2`
+   = help: bind every `Ground` port to the same net

@@ -1,0 +1,56 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/power_levels.spl
+---
+root Board
+  net gnd (ground)  aliases double.gnd, dual.gnd, one.gnd, two.gnd, double.reg.gnd, double.reg2.gnd, dual.reg1.gnd, dual.reg2.gnd, one.reg.gnd, two.reg.gnd
+  net v12  aliases double.input, dual.input, one.input, two.input, double.reg.input, double.reg2.input, dual.reg1.input, dual.reg2.input, one.reg.input, two.reg.input
+  net five  aliases double.v5, double.reg.out, double.reg2.out
+  net seven  aliases dual.o1, dual.o2, dual.reg1.out, dual.reg2.out
+  net six  aliases one.v5, two.v5, one.reg.out, two.reg.out
+  Resistor r a→five b→gnd value=1000 Ω
+  Resistor r2 a→six b→gnd value=1000 Ω
+  Resistor r3 a→seven b→gnd value=1000 Ω
+  Resistor double.reg.r a→v12 b→five value=10 Ω
+  Resistor double.reg2.r a→v12 b→five value=10 Ω
+  Resistor dual.reg1.r a→v12 b→seven value=10 Ω
+  Resistor dual.reg2.r a→v12 b→seven value=10 Ω
+  Resistor one.reg.r a→v12 b→six value=10 Ω
+  Resistor two.reg.r a→v12 b→six value=10 Ω
+
+--- errors ---
+E-power SeveralSources 623..630 "out: v5" related 579..586
+E-power SeveralSources 1277..1284 "v5: six" related 1226..1233
+E-power SeveralSources 1391..1400 "o2: seven" related 1380..1389
+
+--- rendered ---
+error[E-power]: net `v5` has more than one power source (in `Double`)
+   --> power_levels.spl:17:29
+   |
+16 |     let reg = Reg { input, out: v5, gnd };
+   |                            ------- the first source
+17 |     let reg2 = Reg { input, out: v5, gnd };
+   |                             ^^^^^^^ a second source
+   |
+   = note: the sources are `reg.out` and `reg2.out`
+
+error[E-power]: net `six` has more than one power source
+   --> power_levels.spl:45:36
+   |
+44 |     let one = Single { input: v12, v5: six, gnd };
+   |                                    ------- the first source
+45 |     let two = Single { input: v12, v5: six, gnd };
+   |                                    ^^^^^^^ a second source
+   |
+   = note: the sources are `one.reg.out` and `two.reg.out`
+
+error[E-power]: net `seven` has more than one power source
+   --> power_levels.spl:47:46
+   |
+47 |     let dual = Dual { input: v12, o1: seven, o2: seven, gnd };
+   |                                   ---------  ^^^^^^^^^ a second source
+   |                                   |           
+   |                                   the first source
+   |
+   = note: the sources are `dual.reg1.out` and `dual.reg2.out`

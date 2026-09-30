@@ -4,13 +4,13 @@ use std::collections::BTreeSet;
 use std::fmt::Write;
 
 use codespan_reporting::diagnostic::Diagnostic;
-use spicy_model::span::Span;
+use spicy_span::Span;
 
-use crate::diagnostic::{Diag, DiagKind, render_plain};
+use spicy_errors::{Diag, DiagKind, Render, render_plain};
 
 use crate::lexer::{LexError, TokenKind, check, scan};
 use crate::parser::ast::{
-    Attribute, Expr, ExprKind, File, Item, ItemKind, Path, Relation, Stmt, StmtKind, Type,
+    Attribute, Expr, ExprKind, File, Item, ItemKind, Path, Relation, Stmt, StmtKind, Type, TypeKind,
 };
 use crate::parser::parse;
 
@@ -207,7 +207,7 @@ pub fn check_invariants(src: &str) {
 }
 
 pub fn diagnostics(errors: &[LexError]) -> Vec<Diagnostic<()>> {
-    errors.iter().map(LexError::diagnostic).collect()
+    errors.iter().map(Render::diagnostic).collect()
 }
 
 /// The token dump used by the case-file snapshots: one `Kind "text"` line per token
@@ -232,6 +232,7 @@ pub fn check_parse_invariants(src: &str) {
     check_invariants(src);
     let parsed = parse(src);
     check_resolve_invariants(src, &parsed);
+    check_flatten_invariants(src, &parsed);
     let len = src.len() as u32;
     assert_eq!(
         parsed.file.span,
@@ -367,7 +368,7 @@ impl<'a> Printer<'a> {
         let (label, body) = match &item.kind {
             ItemKind::Block(b) => ("Block", b),
             ItemKind::Contract(b) => ("Contract", b),
-            ItemKind::Error => {
+            ItemKind::Error(_) => {
                 self.leaf("ItemError", item.span);
                 return;
             }
@@ -392,7 +393,7 @@ impl<'a> Printer<'a> {
             StmtKind::Spec { name, relation } => {
                 (format!("Spec {} {:?}", name.text, relation.op), Some(name))
             }
-            StmtKind::Error => {
+            StmtKind::Error(_) => {
                 self.leaf("StmtError", stmt.span);
                 return;
             }
@@ -414,7 +415,7 @@ impl<'a> Printer<'a> {
                 StmtKind::Assume { relation } | StmtKind::Spec { relation, .. } => {
                     p.relation(relation);
                 }
-                StmtKind::Error => {}
+                StmtKind::Error(_) => {}
             }
         });
     }
@@ -425,10 +426,14 @@ impl<'a> Printer<'a> {
     }
 
     fn ty(&mut self, ty: &Type) {
-        self.leaf(&format!("Type {}", path_text(&ty.path)), ty.span);
-        self.check_path(&ty.path, ty.span);
+        let TypeKind::Path { path, args } = &ty.kind else {
+            self.leaf("TypeError", ty.span);
+            return;
+        };
+        self.leaf(&format!("Type {}", path_text(path)), ty.span);
+        self.check_path(path, ty.span);
         self.nested(|p| {
-            for arg in &ty.args {
+            for arg in args {
                 p.ty(arg);
             }
         });
@@ -447,7 +452,7 @@ impl<'a> Printer<'a> {
                 self.leaf(&format!("Path {}", path_text(path)), e.span);
                 self.check_path(path, e.span);
             }
-            ExprKind::Error => self.leaf("ExprError", e.span),
+            ExprKind::Error(_) => self.leaf("ExprError", e.span),
             ExprKind::StructLit { path, fields } => {
                 self.line(&format!("StructLit {}", path_text(path)), e.span);
                 self.check_path(path, e.span);
@@ -525,6 +530,13 @@ fn path_text(path: &Path) -> String {
 
 use spicy_model::design::{Design, DesignSourceMap, FieldValue, InstanceOf};
 
+use spicy_model::flat::{
+    Flat, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
+};
+use spicy_model::flatten::{FlattenError, FlattenProblem, check_simulation};
+use spicy_model::prelude::SignalType;
+
+use crate::elaborate::{Elaborated, elaborate};
 use crate::resolve::{ResolveError, resolve};
 
 /// The `Design` dump used by the resolve case-file snapshots: every block, port, net
@@ -540,6 +552,104 @@ pub fn dump_resolve(file_name: &str, src: &str) -> String {
         .chain(resolved.errors.iter().map(|e| problem(src, e)))
         .collect();
     out.push_str(&problems_section(file_name, src, problems));
+    out
+}
+
+/// The flat dump used by the flatten case-file snapshots: each root's nets (name, then
+/// aliases, and whether it's a ground net), devices (pins on nets, fields exact or
+/// knobs) and knobs; then every problem from every stage, with every root simulated, as
+/// data and as the user sees them.
+pub fn dump_elaborate(file_name: &str, src: &str) -> String {
+    let parsed = parse(src);
+    let elaborated = elaborate(&parsed);
+    let mut out = String::new();
+    for flat in elaborated.roots() {
+        out.push_str(&dump_flat(flat));
+    }
+    let problems = (parsed.lex_errors.iter().map(|e| problem(src, e)))
+        .chain(parsed.errors.iter().map(|e| problem(src, e)))
+        .chain(elaborated.resolved.errors.iter().map(|e| problem(src, e)))
+        .chain(
+            flatten_problems(&elaborated)
+                .iter()
+                .map(|e| problem(src, e)),
+        )
+        .collect();
+    out.push_str(&problems_section(file_name, src, problems));
+    out
+}
+
+/// Every flatten error of `src`, with every root simulated, for the coverage rule.
+pub fn flatten_errors(src: &str) -> Vec<FlattenError> {
+    flatten_problems(&elaborate(&parse(src)))
+}
+
+/// Flatten's problems, then each root's simulation checks' (`check_simulation`), as if
+/// every root were simulated.
+fn flatten_problems(elaborated: &Elaborated) -> Vec<FlattenError> {
+    let mut errors = elaborated.flattened.errors.clone();
+    for flat in elaborated.roots() {
+        let _ = check_simulation(flat, &elaborated.resolved.source_map, &mut errors);
+    }
+    errors
+}
+
+/// One root's part of [`dump_elaborate`]: its nets, devices and knobs, by path.
+pub fn dump_flat(flat: Flat) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "root {}", flat.design.block(flat.data.root()).name);
+    let net = |n: FlatNetId| flat.net_path(n).to_string();
+    for (id, n) in flat.data.nets.iter().enumerate() {
+        let aliases: Vec<String> = n.names[1..]
+            .iter()
+            .map(|&a| flat.local_path(a).to_string())
+            .collect();
+        let ground = if flat.data.grounds.contains(&FlatNetId::new(id)) {
+            " (ground)"
+        } else {
+            ""
+        };
+        let _ = write!(out, "  net {}{ground}", net(FlatNetId::new(id)));
+        if !aliases.is_empty() {
+            let _ = write!(out, "  aliases {}", aliases.join(", "));
+        }
+        out.push('\n');
+    }
+    for (id, device) in flat.data.devices.iter().enumerate() {
+        let pins: Vec<String> = device
+            .kind
+            .pins()
+            .iter()
+            .zip(&device.pins)
+            .map(|(pin, n)| format!("{pin}→{}", n.map_or("<unbound>".to_string(), net)))
+            .collect();
+        let _ = write!(
+            out,
+            "  {} {} {}",
+            device.kind.name(),
+            flat.device_path(FlatDeviceId::new(id)),
+            pins.join(" ")
+        );
+        for (field, value) in device.kind.fields().iter().zip(&device.fields) {
+            match value {
+                FlatField::Unset => {}
+                FlatField::Exact(q) => {
+                    let _ = write!(out, " {}={q}", field.name);
+                }
+                FlatField::Knob(k) => {
+                    let _ = write!(out, " {}=knob {}", field.name, flat.knob_path(*k));
+                }
+                FlatField::Invalid(_) => {
+                    let _ = write!(out, " {}=<invalid>", field.name);
+                }
+            }
+        }
+        out.push('\n');
+    }
+    for (id, knob) in flat.data.knobs.iter().enumerate() {
+        let path = flat.knob_path(KnobId::new(id));
+        let _ = writeln!(out, "  knob {path} {:?} {}", knob.kind, knob.value);
+    }
     out
 }
 
@@ -570,7 +680,7 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
                     let ports = b.port_names().collect();
                     (format!("block {}", b.name), ports)
                 }
-                InstanceOf::Error => ("<error>".to_string(), Vec::new()),
+                InstanceOf::Error(_) => ("<error>".to_string(), Vec::new()),
             };
             let _ = writeln!(out, "  {} = {kind} {}", inst.name, at(ispans.name));
             for (pin, net) in pins.iter().zip(&inst.pins) {
@@ -584,7 +694,7 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
                         FieldValue::Given(v) => {
                             let _ = writeln!(out, "    {} = {v}", field.name);
                         }
-                        FieldValue::Invalid => {
+                        FieldValue::Invalid(_) => {
                             let _ = writeln!(out, "    {} = <invalid>", field.name);
                         }
                     }
@@ -681,7 +791,7 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
             let (n_pins, n_fields) = match inst.of {
                 InstanceOf::Part(k) => (k.pins().len(), k.fields().len()),
                 InstanceOf::Block(b) => (design.block(b).ports.len(), 0),
-                InstanceOf::Error => (0, 0),
+                InstanceOf::Error(_) => (0, 0),
             };
             assert_eq!(inst.pins.len(), n_pins, "a slot per pin");
             assert_eq!(inst.fields.len(), n_fields, "a slot per field");
@@ -691,14 +801,14 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
                 ispans.fields.len(),
                 "a span slot per field"
             );
-            if inst.of != InstanceOf::Error {
+            if !matches!(inst.of, InstanceOf::Error(_)) {
                 inside(ispans.kind, ispans.stmt, "instance kind");
             }
             for s in ispans.pins.iter().chain(&ispans.fields).flatten() {
                 inside(*s, ispans.stmt, "binding");
             }
             for (net, s) in inst.pins.iter().zip(&ispans.pins) {
-                if let Some(net) = net {
+                if let Ok(net) = net {
                     assert!(
                         net.index() < block.nets.len(),
                         "pins point at the block's nets"
@@ -707,15 +817,168 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
                 }
             }
             for (value, s) in inst.fields.iter().zip(&ispans.fields) {
-                assert_eq!(
-                    *value == FieldValue::Unset,
-                    s.is_none(),
-                    "a field has a span exactly when it was written"
-                );
+                match value {
+                    FieldValue::Unset => assert!(s.is_none(), "an unset field wasn't written"),
+                    FieldValue::Given(_) => assert!(s.is_some(), "a given field was written"),
+                    // Written but wrong, or required and not written.
+                    FieldValue::Invalid(_) => {}
+                }
             }
+        }
+        // Every placeholder was reported inside its block, so the block is tainted:
+        // flatten relies on it to skip checking a broken circuit.
+        let placeholder = block.ports.iter().any(|p| p.signal.is_err())
+            || block.instances.iter().any(|i| {
+                matches!(i.of, InstanceOf::Error(_))
+                    || i.pins.iter().any(Result::is_err)
+                    || i.fields.iter().any(|f| matches!(f, FieldValue::Invalid(_)))
+            });
+        if placeholder {
+            assert!(
+                block.tainted.is_some(),
+                "a block with a placeholder is tainted"
+            );
         }
     }
     for e in &resolved.errors {
+        check_problem(src, e);
+    }
+}
+
+/// Each problem is reported once (model.md E23): no two alike, in the same place with
+/// the same related place.
+fn assert_reported_once(errors: &[FlattenError]) {
+    let problems: std::collections::HashSet<_> = errors
+        .iter()
+        .map(|e| (e.span, e.related, &e.kind))
+        .collect();
+    assert_eq!(
+        problems.len(),
+        errors.len(),
+        "each problem is reported once"
+    );
+}
+
+/// Flattening any parsed input never panics, gives the same result every time, and
+/// each root's flat design holds together: placements and devices point at what placed
+/// them, paths unique, every local net of every placement in exactly one flat net,
+/// every pin on an existing net, every knob referenced once, and the ground net found
+/// exactly when the root was checked (model.md §6). Every problem is reported once.
+fn check_flatten_invariants(src: &str, parsed: &crate::parser::Parsed) {
+    let elaborated = elaborate(parsed);
+    let design = &elaborated.resolved.design;
+    // Nothing may depend on a `HashMap`'s order, which is seeded afresh each time.
+    assert_eq!(
+        format!("{:?}", elaborate(parsed).flattened),
+        format!("{:?}", elaborated.flattened),
+        "flattening is deterministic"
+    );
+    let errors = &elaborated.flattened.errors;
+    assert_reported_once(errors);
+    let map = &elaborated.resolved.source_map;
+    let upstream = parsed.has_errors() || !elaborated.resolved.errors.is_empty();
+    let recursion = errors
+        .iter()
+        .any(|e| matches!(e.kind.problem, FlattenProblem::RecursivePlacement { .. }));
+    for view in elaborated.roots() {
+        let flat = view.data;
+        assert_eq!(flat.instances[0].origin, None, "the root comes first");
+        for (at, instance) in flat.instances.iter().enumerate().skip(1) {
+            let origin = instance.origin.expect("a placement has a parent");
+            assert!(origin.at.index() < at, "parents come first");
+            let placed = view.instance(origin);
+            assert_eq!(placed.of, InstanceOf::Block(instance.block));
+        }
+        for device in &flat.devices {
+            let part = view.instance(device.origin);
+            assert_eq!(part.of, InstanceOf::Part(device.kind));
+        }
+        for (k, knob) in flat.knobs.iter().enumerate() {
+            let KnobSource::Field { device, field } = knob.source;
+            assert_eq!(
+                flat.devices[device.index()].fields[field],
+                FlatField::Knob(KnobId::new(k)),
+                "a knob's source is the field that refers to it"
+            );
+        }
+        if flat.tainted.is_some() {
+            assert!(
+                upstream || recursion,
+                "a broken root has an error behind it"
+            );
+        }
+        for ground in &flat.grounds {
+            let grounded = flat.nets[ground.index()].names.iter().any(|name| {
+                let block = view.block(name.at);
+                block
+                    .net_port(name.net)
+                    .and_then(|p| block.ports[p.index()].signal.ok())
+                    == Some(SignalType::Ground)
+            });
+            assert!(grounded, "a ground net has a `Ground` port");
+        }
+        // Simulating it gives its one ground net, or an error: its own, or the one
+        // that broke it, and then nothing more is reported.
+        let mut simulated = Vec::new();
+        match check_simulation(view, map, &mut simulated) {
+            Ok(ground) => assert_eq!(flat.grounds, [ground], "node 0 is the ground net"),
+            Err(_) if flat.tainted.is_some() => {
+                assert_eq!(simulated, vec![], "a broken root isn't checked")
+            }
+            Err(_) => assert!(
+                simulated.iter().any(|e| matches!(
+                    e.kind.problem,
+                    FlattenProblem::NoGround { .. } | FlattenProblem::SeveralGrounds { .. }
+                )),
+                "no single ground net is reported"
+            ),
+        }
+        assert_reported_once(&simulated);
+        for e in &simulated {
+            check_problem(src, e);
+        }
+        let unique = |paths: Vec<String>, what: &str| {
+            let set: BTreeSet<&String> = paths.iter().collect();
+            assert_eq!(set.len(), paths.len(), "{what} paths are unique");
+        };
+        let paths = |n: usize, path: &dyn Fn(usize) -> String| (0..n).map(path).collect();
+        let instance = |i| view.path(FlatInstanceId::new(i)).to_string();
+        unique(paths(flat.instances.len(), &instance), "instance");
+        let device = |d| view.device_path(FlatDeviceId::new(d)).to_string();
+        unique(paths(flat.devices.len(), &device), "device");
+        let knob = |k| view.knob_path(KnobId::new(k)).to_string();
+        unique(paths(flat.knobs.len(), &knob), "knob");
+        let mut entries = BTreeSet::new();
+        for net in &flat.nets {
+            assert!(!net.names.is_empty(), "every net has a name");
+            for name in &net.names {
+                assert!(
+                    entries.insert((name.at, name.net)),
+                    "a local net is in one flat net"
+                );
+            }
+        }
+        let locals: usize = flat
+            .instances
+            .iter()
+            .map(|i| design.block(i.block).nets.len())
+            .sum();
+        assert_eq!(entries.len(), locals, "every local net is in a flat net");
+        let mut knobs = BTreeSet::new();
+        for device in &flat.devices {
+            for net in device.pins.iter().flatten() {
+                assert!(net.index() < flat.nets.len(), "pins point at existing nets");
+            }
+            for field in &device.fields {
+                if let FlatField::Knob(k) = field {
+                    assert!(k.index() < flat.knobs.len(), "knobs exist");
+                    assert!(knobs.insert(*k), "each knob belongs to one field");
+                }
+            }
+        }
+        assert_eq!(knobs.len(), flat.knobs.len(), "every knob is referenced");
+    }
+    for e in &elaborated.flattened.errors {
         check_problem(src, e);
     }
 }

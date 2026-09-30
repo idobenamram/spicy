@@ -1,10 +1,8 @@
 //! Parser errors (ast.md §3, grammar.md §7). Data first, rendered on demand, like the
 //! lexer's.
 
-use codespan_reporting::diagnostic::Severity;
-
 use super::ast::{BinOp, BodyKind};
-use crate::diagnostic::{Diag, DiagKind, Fix, Text};
+use spicy_errors::{Diag, DiagKind, Fix, Severity, Text};
 
 /// One problem the parser found.
 pub type ParseError = Diag<ParseErrorKind>;
@@ -19,6 +17,8 @@ pub enum ParseErrorKind {
     },
     /// #1: a statement that isn't closed by `;`.
     MissingSemi,
+    /// `block Child port a: Pin; }`: a body's statements without the `{` before them.
+    MissingBrace,
     /// #21: `(`, `[` or `{` never closed; the opener is the error's `related` span.
     Unclosed { closer: &'static str },
     /// Top-level text that isn't `block` or `contract`.
@@ -62,6 +62,7 @@ impl ParseErrorKind {
     pub const ALL_NAMES: &'static [&'static str] = &[
         "Expected",
         "MissingSemi",
+        "MissingBrace",
         "Unclosed",
         "ExpectedItem",
         "Reserved",
@@ -81,11 +82,11 @@ impl ParseErrorKind {
 }
 
 impl DiagKind for ParseErrorKind {
-    #[cfg(any(test, fuzzing))]
     fn name(&self) -> &'static str {
         match self {
             ParseErrorKind::Expected { .. } => "Expected",
             ParseErrorKind::MissingSemi => "MissingSemi",
+            ParseErrorKind::MissingBrace => "MissingBrace",
             ParseErrorKind::Unclosed { .. } => "Unclosed",
             ParseErrorKind::ExpectedItem { .. } => "ExpectedItem",
             ParseErrorKind::Reserved { .. } => "Reserved",
@@ -116,6 +117,7 @@ impl DiagKind for ParseErrorKind {
         match self {
             ParseErrorKind::Expected { .. }
             | ParseErrorKind::MissingSemi
+            | ParseErrorKind::MissingBrace
             | ParseErrorKind::Unclosed { .. }
             | ParseErrorKind::ExpectedItem { .. }
             | ParseErrorKind::SpecNeedsName
@@ -151,6 +153,11 @@ impl DiagKind for ParseErrorKind {
                 "expected `;`".to_string(),
                 "statements end with `;`".to_string(),
                 vec!["help: add `;` at the end of this statement".to_string()],
+            ),
+            ParseErrorKind::MissingBrace => (
+                "expected `{`".to_string(),
+                "a body starts with `{` after the name".to_string(),
+                vec!["help: add `{` after the name".to_string()],
             ),
             ParseErrorKind::Unclosed { closer, .. } => (
                 format!("expected `{closer}`"),

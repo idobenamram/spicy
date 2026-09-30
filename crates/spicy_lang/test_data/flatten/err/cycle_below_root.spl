@@ -1,0 +1,35 @@
+// A cycle below the roots (model.md E14): the roots aren't on it, so they're still
+// roots. The search enters the cycle at `A`, reports `A → B → C → A` once, at `C`'s
+// `let a`, and cuts only the cycle's three placements: each root keeps its own
+// placement, and stops at the cut one below it.
+block EnterA {
+    port g: Ground;
+    let a = A { g };
+}
+
+block EnterB {
+    port g: Ground;
+    let b = B { g };
+}
+
+block EnterC {
+    port g: Ground;
+    let c = C { g };
+}
+
+block A {
+    port g: Ground;
+    let b = B { g };
+}
+
+block B {
+    port g: Ground;
+    let c = C { g };
+}
+
+// The part before the placement: the placement that closes the cycle is `a`, not `r`.
+block C {
+    port g: Ground;
+    let r = Resistor { a: g, b: g, value: 1k };
+    let a = A { g };
+}

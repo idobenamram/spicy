@@ -265,10 +265,10 @@ impl Scanner<'_> {
 #[cfg(test)]
 mod tests {
     use super::{LexErrorKind, check, scan};
-    use crate::diagnostic::DiagKind;
     use crate::testing::{
         Rng, assert_every_kind_has_a_case, check_invariants, dump, file_name, read,
     };
+    use spicy_errors::DiagKind;
 
     /// `ok/` cases: no errors, and a snapshot of the tokens.
     #[test]

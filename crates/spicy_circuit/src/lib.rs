@@ -23,24 +23,7 @@ pub use params::{
     ResistorParams, SourceParams, Waveform,
 };
 
-/// Defines a `u32` index newtype.
-macro_rules! id {
-    ($(#[$doc:meta])* $name:ident) => {
-        $(#[$doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-        pub struct $name(u32);
-
-        impl $name {
-            pub fn new(index: usize) -> Self {
-                Self(u32::try_from(index).expect(concat!(stringify!($name), " out of range")))
-            }
-
-            pub fn index(self) -> usize {
-                self.0 as usize
-            }
-        }
-    };
-}
+use spicy_index::id;
 
 id!(
     /// A node. Node 0 is ground.

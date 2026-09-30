@@ -15,7 +15,8 @@
 //! differ), as rustc does. That keeps each enum variant small and lets code that doesn't
 //! care about the kind (the formatter, the editor) handle docs and spans once.
 
-use spicy_model::span::Span;
+use spicy_errors::Reported;
+use spicy_span::Span;
 
 use crate::lexer::QuantityLit;
 
@@ -71,7 +72,7 @@ pub enum ItemKind<'src> {
     Contract(Body<'src>),
     /// Text at the top level that couldn't be parsed as an item; the item's span covers
     /// all of it, up to the next `block` or `contract`.
-    Error,
+    Error(Reported),
 }
 
 /// Which kind of body, without the body: the tag of `ItemKind::Block` and
@@ -91,6 +92,11 @@ pub struct Body<'src> {
     /// The block's name. A contract uses the name of the block it describes.
     pub name: Ident<'src>,
     pub stmts: Vec<Stmt<'src>>,
+    /// The proof, if parsing it reported an error: then something written may be
+    /// missing from it. An error found at the next item (a missing `}`) is the open
+    /// body's, as rustc taints the body whose checking reported one, not the place the
+    /// error points at.
+    pub broken: Option<Reported>,
 }
 
 /// An attribute on an item or statement: `#[warn]`, `#[confidence(sigma(3))]`.
@@ -133,7 +139,7 @@ pub enum StmtKind<'src> {
         relation: Relation<'src>,
     },
     /// A statement that couldn't be parsed; the statement's span covers the skipped text.
-    Error,
+    Error(Reported),
 }
 
 /// The top level of an `assume` or `spec`, split out so elaboration gets the measured
@@ -158,13 +164,24 @@ pub enum RelOp {
     Ge,
 }
 
-/// A port's type: `Power<In>`, `Ground`, `Analog<Out>`. `args` are the generic
-/// arguments (`In`); they're types too, so `Bus<Analog<In>>` nests.
+/// A port's type, with its span: `Power<In>`, `Ground`, `Analog<Out>`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Type<'src> {
-    pub path: Path<'src>,
-    pub args: Vec<Type<'src>>,
+    pub kind: TypeKind<'src>,
     pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypeKind<'src> {
+    /// A named type. `args` are the generic arguments (`In`); they're types too, so
+    /// `Bus<Analog<In>>` nests.
+    Path {
+        path: Path<'src>,
+        args: Vec<Type<'src>>,
+    },
+    /// A type that couldn't be parsed (`port a: ;`). The port keeps its name, so its
+    /// uses aren't reported again.
+    Error(Reported),
 }
 
 /// An expression with its span. Every value in the language is one: a number, a
@@ -214,10 +231,10 @@ pub enum ExprKind<'src> {
         lhs: Box<Expr<'src>>,
         rhs: Box<Expr<'src>>,
     },
-    /// A number the lexer rejected (`47q`). The lexer already reported it; the node
-    /// keeps the tree whole. (An expression that fails to parse makes its whole
-    /// statement a `StmtKind::Error` instead.)
-    Error,
+    /// A value that couldn't be parsed, over the text skipped to the end of its
+    /// statement: the statement keeps its name (`net base = [g g];` still declares
+    /// `base`). Or a number the lexer rejected (`47q`), which the lexer reported.
+    Error(Reported),
 }
 
 /// Binary operators, loosest first (grammar.md §4.1).

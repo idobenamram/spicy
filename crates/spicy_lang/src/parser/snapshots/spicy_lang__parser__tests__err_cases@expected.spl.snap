@@ -6,11 +6,15 @@ input_file: crates/spicy_lang/test_data/parser/err/expected.spl
 File 0..136
   Block A 0..135
     StmtError 14..29 "port vcc Power;"
-    StmtError 34..70 "let r = Resistor { a: vcc b: base };"
-    StmtError 75..84 "let x = ;"
+    Let r 34..70
+      ExprError 42..69 "Resistor { a: vcc b: base }"
+    Let x 75..84
+      ExprError 82..82 ""
     Net ok 89..96
-    StmtError 101..116 "let y = (1 + 2;"
-    StmtError 121..133 "let z = 1 2;"
+    Let y 101..116
+      ExprError 109..116 "(1 + 2;"
+    Let z 121..133
+      ExprError 129..132 "1 2"
 
 --- errors ---
 E-syntax Expected 23..28 "Power"

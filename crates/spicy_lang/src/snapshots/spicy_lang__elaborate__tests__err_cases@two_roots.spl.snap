@@ -1,0 +1,21 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/two_roots.spl
+---
+root One
+  net g (ground)  aliases f.a, f.b
+  Resistor f.r a→g b→g value=1000 Ω
+root Two
+  net g (ground)  aliases f.a, f.b
+  Resistor f.r a→g b→g value=1000 Ω
+
+--- errors ---
+W-short ShortedPart 229..266 "let r = Resistor { a, b, value: 1k };"
+
+--- rendered ---
+warning[W-short]: both pins of `r` are on one net (in `Filter`)
+  --> two_roots.spl:6:5
+  |
+6 |     let r = Resistor { a, b, value: 1k };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted

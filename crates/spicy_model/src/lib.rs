@@ -5,9 +5,12 @@
 //! - [`units`]: dimensions, SI values, spreads.
 //! - [`prelude`]: the standard part kinds and signal types.
 //! - [`design`]: the `Design`, each block once, as written.
-//! - [`span`]: byte ranges in the source, shared with the language front end.
+//! - [`flat`]: the `FlatDesign`, one root with every placement expanded, and the `Flat`
+//!   handle that reads it with its `Design`.
+//! - [`flatten`]: `Design` → one `FlatDesign` per root.
 
 pub mod design;
+pub mod flat;
+pub mod flatten;
 pub mod prelude;
-pub mod span;
 pub mod units;

@@ -1,0 +1,23 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(\"ce_amp.spl\", src)"
+---
+root CeAmp
+  net gnd (ground)
+  net input
+  net output
+  net vcc
+  net base
+  net emitter
+  Electrolytic c_in p→base n→input value=knob c_in.value
+  Npn q1 c→output b→base e→emitter beta=knob q1.beta
+  Resistor r1 a→vcc b→base value=knob r1.value
+  Resistor r2 a→base b→gnd value=knob r2.value
+  Resistor rc a→vcc b→output value=knob rc.value
+  Resistor re a→emitter b→gnd value=knob re.value
+  knob c_in.value Statistical 0.000001 F ± 20%
+  knob q1.beta Statistical 200 (100..=300)
+  knob r1.value Statistical 47000 Ω ± 1%
+  knob r2.value Statistical 10000 Ω ± 1%
+  knob rc.value Statistical 4700 Ω ± 1%
+  knob re.value Statistical 1000 Ω ± 1%

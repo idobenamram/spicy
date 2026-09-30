@@ -1,0 +1,20 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/ok/supply.spl
+---
+root Board
+  net gnd (ground)  aliases linked.gnd, load.gnd, load2.gnd, load3.gnd, load4.gnd, merged.gnd, sensed.gnd, sup.gnd, linked.reg.gnd, merged.reg.gnd, sensed.reg.gnd, sup.reg.gnd
+  net v12  aliases linked.input, merged.input, sensed.input, sup.input, linked.reg.input, merged.reg.input, sensed.reg.input, sup.reg.input
+  net five  aliases load.vcc, sup.v5, sup.reg.out
+  net four  aliases load4.vcc, merged.v5, merged.rail, merged.reg.out
+  net three  aliases linked.v5, load3.vcc, linked.mid, linked.link.a, linked.link.b, linked.reg.out, linked.link.both
+  net two  aliases load2.vcc, sensed.sense, sensed.v5, sensed.out, sensed.reg.out
+  Resistor linked.reg.r a→v12 b→three value=10 Ω
+  Resistor load.r a→five b→gnd value=1000 Ω
+  Resistor load2.r a→two b→gnd value=1000 Ω
+  Resistor load3.r a→three b→gnd value=1000 Ω
+  Resistor load4.r a→four b→gnd value=1000 Ω
+  Resistor merged.reg.r a→v12 b→four value=10 Ω
+  Resistor sensed.reg.r a→v12 b→two value=10 Ω
+  Resistor sup.reg.r a→v12 b→five value=10 Ω

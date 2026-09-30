@@ -1,0 +1,8 @@
+[package]
+name = "spicy_errors"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+codespan-reporting = { version = "0.13.1", default-features = false, features = ["std"] }
+spicy_span = { path = "../spicy_span" }

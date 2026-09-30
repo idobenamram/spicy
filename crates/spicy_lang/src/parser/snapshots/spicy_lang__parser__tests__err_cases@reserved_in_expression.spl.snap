@@ -5,8 +5,10 @@ input_file: crates/spicy_lang/test_data/parser/err/reserved_in_expression.spl
 ---
 File 0..78
   Block A 0..77
-    StmtError 14..27 "let x = true;"
-    StmtError 32..47 "let y = self.a;"
+    Let x 14..27
+      ExprError 22..26 "true"
+    Let y 32..47
+      ExprError 40..46 "self.a"
     StmtError 52..63 "let fn = 1;"
     Net ok 68..75
 

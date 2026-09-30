@@ -24,13 +24,15 @@ pub use error::{ParseError, ParseErrorKind};
 
 use codespan_reporting::diagnostic::Diagnostic;
 
-use spicy_model::span::Span;
+use spicy_errors::Reported;
+use spicy_span::Span;
 
 use crate::lexer::{LexError, TokenIdx, TokenKind, Tokens, check, lookalike, scan};
 use ast::{
-    Attribute, BinOp, Body, BodyKind, File, Ident, Item, ItemKind, Node, Path, Relation, Stmt,
-    StmtKind, Type,
+    Attribute, BinOp, Body, BodyKind, Expr, ExprKind, File, Ident, Item, ItemKind, Node, Path,
+    Relation, Stmt, StmtKind, Type, TypeKind,
 };
+use spicy_errors::Render;
 
 /// Everything one parse produces (decision A5): the tokens (so the source can be rebuilt
 /// exactly), the tree, and every problem the lexer and the parser found.
@@ -49,7 +51,7 @@ impl Parsed<'_> {
     }
 
     /// Every lexer and parser diagnostic, in source order, ready to render (with
-    /// [`crate::diagnostic::render_plain`] or codespan-reporting's terminal output).
+    /// [`spicy_errors::render_plain`] or codespan-reporting's terminal output).
     pub fn diagnostics(&self) -> Vec<Diagnostic<()>> {
         let mut all: Vec<(Span, _)> = self
             .lex_errors
@@ -69,7 +71,7 @@ pub fn parse(src: &str) -> Parsed<'_> {
     let lex_errors = check(&tokens);
 
     // 2. Parse the significant tokens into a tree; broken parts become `Error` nodes.
-    let mut parser = Parser::new(&tokens);
+    let mut parser = Parser::new(&tokens, Reported::among(&lex_errors));
     let file = parser.file();
 
     // 3. One error per mistake: drop the parse errors that only repeat another one.
@@ -85,9 +87,7 @@ pub fn parse(src: &str) -> Parsed<'_> {
 
 /// A parse function failed; its error is already recorded. Unwinds to the nearest
 /// statement or item, which recovers (decision A8).
-struct Fatal;
-
-type PResult<T> = Result<T, Fatal>;
+type PResult<T> = Result<T, Reported>;
 
 /// How deep expressions and types may nest (`((((…`, `A<A<…>>`, `- - -x`) before the
 /// parser gives up on them, so pathological input can't overflow the stack while parsing.
@@ -108,10 +108,12 @@ struct Parser<'t, 'src> {
     /// Current recursion depth of the parse functions (see `MAX_NESTING`).
     nesting: u32,
     errors: Vec<ParseError>,
+    /// The proof, if the lexer reported an error: a number it rejected is an `Error` node.
+    lexed: Option<Reported>,
 }
 
 impl<'t, 'src> Parser<'t, 'src> {
-    fn new(tokens: &'t Tokens<'src>) -> Self {
+    fn new(tokens: &'t Tokens<'src>, lexed: Option<Reported>) -> Self {
         // Roughly half the tokens are trivia; reserving up front avoids regrowing.
         let mut sig = Vec::with_capacity(tokens.len() as usize / 2 + 1);
         for i in 0..tokens.len() {
@@ -125,11 +127,14 @@ impl<'t, 'src> Parser<'t, 'src> {
             pos: 0,
             nesting: 0,
             errors: Vec::new(),
+            lexed,
         }
     }
 
     /// The parse errors, one per mistake: those a lexer error already explains are
     /// dropped (decision A7), and so are repeats of "expected `)`" at the end of the file.
+    /// A proof made from a dropped one still holds: the lexer error that explains it, or
+    /// the first "expected `)`", is still reported.
     fn finish(self, lex_errors: &[LexError]) -> Vec<ParseError> {
         let shadows = self.follow_on_ranges(lex_errors);
         let mut errors = self.errors;
@@ -178,9 +183,9 @@ impl<'t, 'src> Parser<'t, 'src> {
             match self.item() {
                 Ok(Some(item)) => items.push(item),
                 Ok(None) => break,
-                Err(Fatal) => {
+                Err(reported) => {
                     let span = self.recover(start, Level::Item);
-                    items.push(error_node(ItemKind::Error, span));
+                    items.push(error_node(ItemKind::Error(reported), span));
                 }
             }
         }
@@ -223,15 +228,32 @@ impl<'t, 'src> Parser<'t, 'src> {
     }
 
     /// `Name { statements }`, after `block` or `contract`. A missing `}` at the end of
-    /// the file, or before the next item, is reported and the body ends there.
+    /// the file, or before the next item, is reported and the body ends there. A missing
+    /// `{` before the statements is reported with the insertion, and the body is read
+    /// on, so the block keeps its name (a soft error, like a missing `;`).
     fn body(&mut self, which: BodyKind) -> PResult<Body<'src>> {
+        let reported = self.errors.len();
         let name = self.name()?;
-        let open = self.expect(TokenKind::LBrace, "`{`")?;
+        let open = match self.eat(TokenKind::LBrace) {
+            Some(open) => open,
+            None if starts_stmt(self.peek()) || self.peek() == TokenKind::RBrace => {
+                let at = Span::new(name.span.end, name.span.end);
+                let error = ParseError::new(ParseErrorKind::MissingBrace, name.span);
+                self.errors.push(error.with_fix(at, " {"));
+                at
+            }
+            None => return Err(self.expected("`{`")),
+        };
         let stmts = self.stmts(which);
         if self.eat(TokenKind::RBrace).is_none() {
             self.unclosed(open, "}");
         }
-        Ok(Body { name, stmts })
+        let broken = Reported::among(&self.errors[reported..]);
+        Ok(Body {
+            name,
+            stmts,
+            broken,
+        })
     }
 
     // --- Statements --------------------------------------------------------------
@@ -245,9 +267,9 @@ impl<'t, 'src> Parser<'t, 'src> {
             match self.stmt(body) {
                 Ok(Some(stmt)) => stmts.push(stmt),
                 Ok(None) => break,
-                Err(Fatal) => {
+                Err(reported) => {
                     let span = self.recover(start, Level::Stmt);
-                    stmts.push(error_node(StmtKind::Error, span));
+                    stmts.push(error_node(StmtKind::Error(reported), span));
                 }
             }
         }
@@ -271,6 +293,7 @@ impl<'t, 'src> Parser<'t, 'src> {
         {
             self.error_here(ParseErrorKind::WrongBody { stmt, body });
         }
+        // Each reads through its `;`.
         let kind = match keyword {
             KwPort => self.port_stmt()?,
             KwNet => self.net_stmt()?,
@@ -282,7 +305,6 @@ impl<'t, 'src> Parser<'t, 'src> {
                 return Err(self.expected("a statement (`port`, `net`, `let`, `assume` or `spec`)"));
             }
         };
-        self.semi()?;
         Ok(Some(Stmt {
             docs,
             attrs,
@@ -291,42 +313,70 @@ impl<'t, 'src> Parser<'t, 'src> {
         }))
     }
 
-    /// `port name: Type`
+    /// `port name: Type;`
     fn port_stmt(&mut self) -> PResult<StmtKind<'src>> {
         self.bump(); // `port`
         let name = self.name()?;
         self.expect(TokenKind::Colon, "`:`")?;
-        let ty = self.ty()?;
+        let ty = self.rhs(Self::ty, |reported, span| Type {
+            kind: TypeKind::Error(reported),
+            span,
+        });
         Ok(StmtKind::Port { name, ty })
     }
 
-    /// `net name` or `net name = merge`
+    /// `net name;` or `net name = merge;`
     fn net_stmt(&mut self) -> PResult<StmtKind<'src>> {
         self.bump(); // `net`
         let name = self.name()?;
         let merge = match self.eat(TokenKind::Eq) {
-            Some(_) => Some(self.expr()?),
-            None => None,
+            Some(_) => Some(self.rhs(Self::expr, error_expr)),
+            None => {
+                self.semi()?;
+                None
+            }
         };
         Ok(StmtKind::Net { name, merge })
     }
 
-    /// `let name = value`
+    /// `let name = value;`
     fn let_stmt(&mut self) -> PResult<StmtKind<'src>> {
         self.bump(); // `let`
         let name = self.name()?;
         self.expect(TokenKind::Eq, "`=`")?;
-        let value = self.expr()?;
+        let value = self.rhs(Self::expr, error_expr);
         Ok(StmtKind::Let { name, value })
     }
 
-    /// `assume relation`
+    /// A statement's right-hand side, then its `;`. When the value doesn't parse, or
+    /// something other than `;` follows it (`let z = 1 2;`), it becomes an `Error` node
+    /// over the text up to the statement's end, and the statement keeps its name: `net
+    /// base = [g g];` still declares `base`, so its uses aren't reported again (rustc:
+    /// "we still want a field even if its expr didn't parse").
+    fn rhs<T>(
+        &mut self,
+        parse: impl FnOnce(&mut Self) -> PResult<T>,
+        error: impl FnOnce(Reported, Span) -> T,
+    ) -> T {
+        let start = self.pos;
+        let value = parse(self).and_then(|value| self.semi().map(|()| value));
+        value.unwrap_or_else(|reported| {
+            let span = self.recover(start, Level::Value);
+            // The statement's `;`, if it has one: recovery stops before it.
+            self.eat(TokenKind::Semi);
+            error(reported, span)
+        })
+    }
+
+    /// `assume relation;`
     fn assume_stmt(&mut self) -> PResult<StmtKind<'src>> {
         self.bump(); // `assume`
-        Ok(match self.relation()? {
-            Some(relation) => StmtKind::Assume { relation },
-            None => StmtKind::Error,
-        })
+        let kind = match self.relation()? {
+            Ok(relation) => StmtKind::Assume { relation },
+            Err(reported) => StmtKind::Error(reported),
+        };
+        self.semi()?;
+        Ok(kind)
     }
 
     /// `spec name: relation`
@@ -342,16 +392,18 @@ impl<'t, 'src> Parser<'t, 'src> {
         }
         let name = self.name()?;
         self.expect(Colon, "`:`")?;
-        Ok(match self.relation()? {
-            Some(relation) => StmtKind::Spec { name, relation },
-            None => StmtKind::Error,
-        })
+        let kind = match self.relation()? {
+            Ok(relation) => StmtKind::Spec { name, relation },
+            Err(reported) => StmtKind::Error(reported),
+        };
+        self.semi()?;
+        Ok(kind)
     }
 
     /// The expression of an `assume` or `spec`, split at its top-level relation. `None`
     /// when the top isn't one: reported, but a soft error, so the statement becomes
     /// `StmtKind::Error` and its `;` is still read.
-    fn relation(&mut self) -> PResult<Option<Relation<'src>>> {
+    fn relation(&mut self) -> PResult<Result<Relation<'src>, Reported>> {
         let expr = self.expr()?;
         if let ast::ExprKind::Binary {
             op: BinOp::Rel(op),
@@ -359,14 +411,16 @@ impl<'t, 'src> Parser<'t, 'src> {
             rhs,
         } = expr.kind
         {
-            return Ok(Some(Relation {
+            return Ok(Ok(Relation {
                 lhs: *lhs,
                 op,
                 rhs: *rhs,
             }));
         }
-        self.error(ParseErrorKind::NotARelation, expr.span);
-        Ok(None)
+        let kind = ParseErrorKind::NotARelation;
+        Ok(Err(
+            ParseError::new(kind, expr.span).report(&mut self.errors)
+        ))
     }
 
     /// The `;` that ends a statement. If the next token starts something new, a missing
@@ -415,19 +469,24 @@ impl<'t, 'src> Parser<'t, 'src> {
         while self.peek() != Eof {
             let kind = self.peek();
             let before_error = self.pos < failed_at;
-            // Never at `start`, so the first token is always consumed.
-            let at_or_after_error = !before_error && self.pos > start;
+            // Never at `start` for a statement or item, so its first token is always
+            // consumed; a value may be empty (`let r =` before the next statement).
+            let at_or_after_error = !before_error && (self.pos > start || level == Level::Value);
             // The next statement or item starts here.
             if at_or_after_error && braces_after == 0 && level.resumes_at(kind) {
                 break;
             }
             // This statement ends here.
-            if level == Level::Stmt && braces_before == 0 && braces_after == 0 {
+            if level != Level::Item && braces_before == 0 && braces_after == 0 {
                 match kind {
                     // The `}` that closes the body.
                     RBrace => break,
+                    // The statement's `;`: a statement's recovery takes it, a value's
+                    // leaves it to its statement.
                     Semi if parens == 0 => {
-                        self.bump();
+                        if level == Level::Stmt {
+                            self.bump();
+                        }
                         break;
                     }
                     // Strictly after the error: `let x = /// doc` isn't restarted at the
@@ -447,8 +506,15 @@ impl<'t, 'src> Parser<'t, 'src> {
             }
             self.bump();
         }
-        let from = self.span_at(start).start;
-        Span::new(from, self.prev_end().max(from))
+        // What was skipped. An empty value (`let j =` before the next statement) is at
+        // the end of the text before it, inside its statement.
+        let end = self.prev_end();
+        let from = if self.pos == start {
+            end
+        } else {
+            self.span_at(start).start
+        };
+        Span::new(from, end)
     }
 
     // --- Names, paths, types, attributes, lists ----------------------------------
@@ -465,8 +531,8 @@ impl<'t, 'src> Parser<'t, 'src> {
                 let keyword = self.text().to_string();
                 // Consumed, so recovery doesn't read it as the start of a statement.
                 let span = self.bump();
-                self.error(ParseErrorKind::KeywordAsName { keyword }, span);
-                Err(Fatal)
+                let kind = ParseErrorKind::KeywordAsName { keyword };
+                Err(ParseError::new(kind, span).report(&mut self.errors))
             }
             _ => Err(self.expected("a name")),
         }
@@ -492,7 +558,8 @@ impl<'t, 'src> Parser<'t, 'src> {
                 None => Vec::new(),
             };
             let span = Span::new(path.span.start, p.prev_end());
-            Ok(Type { path, args, span })
+            let kind = TypeKind::Path { path, args };
+            Ok(Type { kind, span })
         })
     }
 
@@ -602,13 +669,13 @@ impl<'t, 'src> Parser<'t, 'src> {
     }
 
     /// Records an error at the current token, for a rule that can't go on.
-    fn fail(&mut self, kind: ParseErrorKind) -> Fatal {
-        self.error_here(kind);
-        Fatal
+    fn fail(&mut self, kind: ParseErrorKind) -> Reported {
+        let span = self.span();
+        ParseError::new(kind, span).report(&mut self.errors)
     }
 
     /// "expected `what`, found …" at the current token.
-    fn expected(&mut self, what: &'static str) -> Fatal {
+    fn expected(&mut self, what: &'static str) -> Reported {
         let found = self.found();
         self.fail(ParseErrorKind::Expected {
             expected: what,
@@ -625,16 +692,16 @@ impl<'t, 'src> Parser<'t, 'src> {
 
     /// "`fn` isn't supported yet" at the current token. It isn't consumed: recovery
     /// doesn't stop at a reserved word anyway.
-    fn reserved(&mut self) -> Fatal {
+    fn reserved(&mut self) -> Reported {
         let word = self.text().to_string();
         self.fail(ParseErrorKind::Reserved { word })
     }
 
     /// "expected `}`" at the current token, pointing back at the `open`er it would close.
-    fn unclosed(&mut self, open: Span, closer: &'static str) {
+    fn unclosed(&mut self, open: Span, closer: &'static str) -> Reported {
         let span = self.span();
         let error = ParseError::new(ParseErrorKind::Unclosed { closer }, span);
-        self.errors.push(error.with_related(open));
+        error.with_related(open).report(&mut self.errors)
     }
 
     /// At the end of the file: `unclosed`. Otherwise "expected `expected`, found …"
@@ -644,10 +711,9 @@ impl<'t, 'src> Parser<'t, 'src> {
         open: Span,
         closer: &'static str,
         expected: &'static str,
-    ) -> Fatal {
+    ) -> Reported {
         if self.peek() == TokenKind::Eof {
-            self.unclosed(open, closer);
-            Fatal
+            self.unclosed(open, closer)
         } else {
             self.expected(expected)
         }
@@ -731,11 +797,21 @@ fn error_node<'src, K>(kind: K, span: Span) -> Node<'src, K> {
     }
 }
 
+/// A value that didn't parse, over the text skipped (see `rhs`).
+fn error_expr<'src>(reported: Reported, span: Span) -> Expr<'src> {
+    Expr {
+        kind: ExprKind::Error(reported),
+        span,
+    }
+}
+
 /// Where `recover` resynchronizes: at the next statement or at the next item.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Level {
     Item,
     Stmt,
+    /// A statement's right-hand side: the rest of the statement, up to its `;`.
+    Value,
 }
 
 impl Level {
@@ -743,7 +819,7 @@ impl Level {
     fn resumes_at(self, kind: TokenKind) -> bool {
         match self {
             Level::Item => starts_item(kind),
-            Level::Stmt => starts_item(kind) || is_stmt_keyword(kind),
+            Level::Stmt | Level::Value => starts_item(kind) || is_stmt_keyword(kind),
         }
     }
 }
@@ -825,10 +901,10 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::diagnostic::DiagKind;
     use crate::testing::{
         Rng, assert_every_kind_has_a_case, check_parse_invariants, dump_parse, file_name, read,
     };
+    use spicy_errors::DiagKind;
 
     /// `ok/` cases: no errors, and a snapshot of the tree.
     #[test]
@@ -1056,7 +1132,7 @@ mod tests {
             let (kind, body) = match &item.kind {
                 ItemKind::Block(b) => ("block", Some(b)),
                 ItemKind::Contract(b) => ("contract", Some(b)),
-                ItemKind::Error => ("item-error", None),
+                ItemKind::Error(_) => ("item-error", None),
             };
             match body {
                 Some(b) => nodes.push(format!("{kind} {}", b.name.text)),
@@ -1069,7 +1145,7 @@ mod tests {
                     StmtKind::Let { .. } => "let",
                     StmtKind::Assume { .. } => "assume",
                     StmtKind::Spec { .. } => "spec",
-                    StmtKind::Error => "error",
+                    StmtKind::Error(_) => "error",
                 };
                 let docs = if stmt.docs.is_empty() { "" } else { " (doc)" };
                 nodes.push(format!("  {kind} {:?}{docs}", text(stmt.span)));
@@ -1232,7 +1308,7 @@ mod tests {
     /// rule per case.
     #[test]
     fn statement_recovery() {
-        let cases: [(&str, &[&str], &[&str]); 6] = [
+        let cases: [(&str, &[&str], &[&str]); 8] = [
             // A lone `;` is consumed, so the loop progresses.
             (
                 "block A { ; net ok; }",
@@ -1245,7 +1321,7 @@ mod tests {
                 "block A { let r = R { a: 1 2 net ok; }",
                 &[
                     "block A",
-                    "  error \"let r = R { a: 1 2\"",
+                    "  let \"let r = R { a: 1 2\"",
                     "  net \"net ok;\"",
                 ],
                 &["Expected `,` or `}` \"2\""],
@@ -1263,11 +1339,7 @@ mod tests {
             // An attribute the statement failed on doesn't restart it.
             (
                 "block A { let x = #[a] 1; net ok; }",
-                &[
-                    "block A",
-                    "  error \"let x = #[a] 1;\"",
-                    "  net \"net ok;\"",
-                ],
+                &["block A", "  let \"let x = #[a] 1;\"", "  net \"net ok;\""],
                 &["Expected an expression \"#\""],
             ),
             // A keyword used as a name is skipped, not read as the next statement.
@@ -1281,13 +1353,32 @@ mod tests {
                 "block A { let x = fn\n/// doc\nnet ok; }",
                 &[
                     "block A",
-                    "  error \"let x = fn\"",
+                    "  let \"let x = fn\"",
                     "  net \"/// doc\\nnet ok;\" (doc)",
                 ],
                 &["Reserved \"fn\""],
             ),
+            // A value that breaks leaves its statement, and the name it declares:
+            // `base` is still a net, so its uses aren't reported again.
+            (
+                "block A { net base = [g g]; net ok; }",
+                &[
+                    "block A",
+                    "  net \"net base = [g g];\"",
+                    "  net \"net ok;\"",
+                ],
+                &["Expected `,` or `]` \"g\""],
+            ),
+            // An empty value before the next statement is empty, inside its statement
+            // (found by fuzzing: it was placed at the next statement).
+            (
+                "block A { let j =\n    let k = 1; }",
+                &["block A", "  let \"let j =\"", "  let \"let k = 1;\""],
+                &["Expected an expression \"let\""],
+            ),
         ];
         for (src, nodes, errs) in cases {
+            crate::testing::check_parse_invariants(src);
             let (got_nodes, got_errors) = outline(src);
             assert_eq!(got_nodes, nodes, "{src}");
             assert_eq!(got_errors, errs, "{src}");
@@ -1347,7 +1438,7 @@ mod tests {
             .map(|item| match &item.kind {
                 ItemKind::Block(b) => ("block", b.stmts.len()),
                 ItemKind::Contract(b) => ("contract", b.stmts.len()),
-                ItemKind::Error => ("error", 0),
+                ItemKind::Error(_) => ("error", 0),
             })
             .collect();
         assert_eq!(counts, [("block", 12), ("contract", 6)]);

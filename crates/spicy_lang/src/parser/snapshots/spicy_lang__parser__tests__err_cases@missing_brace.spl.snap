@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/missing_brace.spl
+---
+File 0..303
+  Block Child 215..245
+    Port a 231..243
+      Type Pin 239..242 "Pin"
+  Block Top 247..302
+    Port a 263..275
+      Type Pin 271..274 "Pin"
+    Let c 280..300
+      StructLit Child 288..299
+        Field a (shorthand) 296..297
+
+--- errors ---
+E-syntax MissingBrace 221..226 "Child" fix 226..226 " {"
+
+--- rendered ---
+error[E-syntax]: expected `{`
+  --> missing_brace.spl:4:7
+  |
+4 | block Child
+  |       ^^^^^ a body starts with `{` after the name
+  |
+  = help: add `{` after the name

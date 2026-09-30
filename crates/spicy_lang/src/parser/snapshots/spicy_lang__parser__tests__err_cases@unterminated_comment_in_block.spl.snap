@@ -5,7 +5,8 @@ input_file: crates/spicy_lang/test_data/parser/err/unterminated_comment_in_block
 ---
 File 0..60
   Block A 0..26
-    StmtError 14..26 "let x = f(1,"
+    Let x 14..26
+      ExprError 22..26 "f(1,"
 
 --- errors ---
 E-unterminated-comment UnterminatedBlockComment 27..29 "/*"

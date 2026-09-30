@@ -1,0 +1,17 @@
+// Each root is flattened and checked on its own, so a problem inside a block two roots
+// place is found in both: it's one problem, reported once, counted in both placements.
+block Filter {
+    port a: Pin;
+    port b: Pin;
+    let r = Resistor { a, b, value: 1k };
+}
+
+block One {
+    port g: Ground;
+    let f = Filter { a: g, b: g };
+}
+
+block Two {
+    port g: Ground;
+    let f = Filter { a: g, b: g };
+}

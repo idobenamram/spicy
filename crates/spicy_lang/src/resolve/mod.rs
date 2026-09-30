@@ -9,9 +9,12 @@
 //! 2. **The bodies:** each block's body, by a [`BodyResolver`](body::BodyResolver) of
 //!    its own, which has two passes of its own: every name the body declares, then
 //!    every statement, so statement order never matters.
+//! 3. **What's broken:** every block with an error inside it is tainted
+//!    ([`Block::tainted`]), so flatten doesn't check a circuit with a part missing.
 //!
-//! Errors never stop the stage (E7): a name that doesn't resolve becomes an
-//! `InstanceOf::Error` or a missing binding, reported once. A second definition of a
+//! Errors never stop the stage (E7): a name that doesn't resolve becomes a placeholder
+//! holding the proof it was reported (an `InstanceOf::Error`, an `Err` binding), reported
+//! once. A second definition of a
 //! name (a block, a port, a `net` or `let`) is checked for its own mistakes, then
 //! dropped: it never enters the design.
 //!
@@ -26,12 +29,13 @@ pub use error::{NameKind, Namespace, ResolveError, ResolveErrorKind};
 
 use std::collections::HashMap;
 
+use spicy_errors::{Diag, DiagKind, Reported};
 use spicy_model::design::{
     Block, BlockId, BlockSpans, Contract, Design, DesignSourceMap, Instance, InstanceSpans, Merge,
     MergeSpans, Net, NetId, Port, PortId,
 };
 use spicy_model::prelude::{PartKind, Role, SignalType, SignalTypeError};
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 use crate::edit_distance::edit_distance;
 use crate::parser::Parsed;
@@ -54,13 +58,15 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         parsed,
         errors: Vec::new(),
         blocks: Scope::default(),
-        syntax_errors: syntax_error_spans(parsed),
+        syntax: ErrorStarts::default()
+            .with(&parsed.lex_errors)
+            .with(&parsed.errors),
         suggestions_left: SUGGESTION_BUDGET,
     };
 
     // Pass 1, the file's names: every block's name, then every block's ports, then the
     // contracts. A block can be placed, and a port typed, before its definition.
-    let (bodies, second_bodies) = r.declare_blocks();
+    let (bodies, block_spans, second_bodies) = r.declare_blocks();
     let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) =
         bodies.iter().map(|body| r.signature(body)).unzip();
     let contracts = r.match_contracts(signatures.len());
@@ -79,9 +85,29 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     }
     // A second block of a name gets the same checks, for its own mistakes, then is
     // dropped: it isn't part of the design.
-    for body in second_bodies {
+    for &(body, _) in &second_bodies {
         let (signature, start) = r.signature(body);
         BodyResolver::new(&mut r, &signatures, &signature, start, body).resolve(body);
+    }
+
+    // Pass 3, what's broken: every block with an error in it (see `Block::tainted`).
+    // One its body's parse reported, since an error found at the next item (a missing
+    // `}`) is the open body's, not the next one's; or a lexer or resolve error inside it.
+    let inside = ErrorStarts::default()
+        .with(&parsed.lex_errors)
+        .with(&r.errors);
+    let blocks = design.blocks.iter_mut().zip(&bodies).zip(block_spans);
+    for ((block, body), span) in blocks {
+        block.tainted = body.broken.or_else(|| inside.inside(span));
+    }
+    // A block defined twice: which definition was meant isn't known, so the first,
+    // the one the design keeps, is broken too.
+    for (body, reported) in second_bodies {
+        let first = r
+            .blocks
+            .get(body.name.text)
+            .expect("a second block has a first");
+        design.blocks[first.index()].tainted.get_or_insert(reported);
     }
 
     Resolved {
@@ -91,13 +117,31 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     }
 }
 
-/// Where every lexer and parser error starts, sorted.
-fn syntax_error_spans(parsed: &Parsed) -> Vec<Span> {
-    let lex = parsed.lex_errors.iter().map(|e| e.span);
-    let parse = parsed.errors.iter().filter(|e| e.is_error());
-    let mut spans: Vec<Span> = lex.chain(parse.map(|e| e.span)).collect();
-    spans.sort_unstable();
-    spans
+/// Where reported errors are, sorted, with the proof they were reported: what the
+/// parser built around a syntax error is a guess, and a block with an error inside it
+/// is tainted.
+#[derive(Clone, Default)]
+struct ErrorStarts {
+    spans: Vec<Span>,
+    reported: Option<Reported>,
+}
+
+impl ErrorStarts {
+    /// These errors, and the errors among `diags`, one stage's problems.
+    fn with<K: DiagKind>(mut self, diags: &[Diag<K>]) -> Self {
+        let errors = diags.iter().filter(|e| e.is_error());
+        self.spans.extend(errors.map(|e| e.span));
+        self.spans.sort_unstable();
+        self.reported = self.reported.or(Reported::among(diags));
+        self
+    }
+
+    /// The proof, if one of the errors starts inside `s`.
+    fn inside(&self, s: Span) -> Option<Reported> {
+        let i = self.spans.partition_point(|e| e.start < s.start);
+        let found = self.spans.get(i).is_some_and(|e| e.start < s.end);
+        found.then(|| self.reported.expect("an error start is a reported error"))
+    }
 }
 
 /// The file-wide state: the blocks' names, and what every part of the stage adds to
@@ -108,9 +152,9 @@ struct Resolver<'p, 'src> {
     errors: Vec<ResolveError>,
     /// The kind namespace's blocks (model.md E5).
     blocks: Scope<'src, BlockId>,
-    /// Every lexer and parser error, sorted: an expression with one inside isn't typed
-    /// (see `value`).
-    syntax_errors: Vec<Span>,
+    /// Every lexer and parser error: an expression with one inside isn't typed (see
+    /// `value`).
+    syntax: ErrorStarts,
     suggestions_left: usize,
 }
 
@@ -142,7 +186,12 @@ impl BlockBuilder {
     }
 
     /// A port and its net, which is named after it.
-    fn push_port(&mut self, name: &Ident, signal: Option<SignalType>, ty: Span) -> PortId {
+    fn push_port(
+        &mut self,
+        name: &Ident,
+        signal: Result<SignalType, Reported>,
+        ty: Span,
+    ) -> PortId {
         let port = PortId::new(self.block.ports.len());
         self.block.ports.push(Port { signal });
         self.spans.port_types.push(ty);
@@ -189,24 +238,25 @@ impl<T> Default for Scope<'_, T> {
 
 impl<'src, T: Copy> Scope<'src, T> {
     /// Declares `name` as `value`. If it's already declared, reports a duplicate of the
-    /// first declaration (`what` is what kind of name it is) and returns false.
+    /// first declaration (`what` is what kind of name it is).
     fn declare(
         &mut self,
         name: &Ident<'src>,
         value: T,
         what: NameKind,
         errors: &mut Vec<ResolveError>,
-    ) -> bool {
+    ) -> Result<(), Reported> {
         if let Some(&(_, first)) = self.declared.get(name.text) {
             let kind = ResolveErrorKind::Duplicate {
                 name: name.text.to_string(),
                 what,
             };
-            errors.push(ResolveError::new(kind, name.span).with_related(first));
-            return false;
+            return Err(ResolveError::new(kind, name.span)
+                .with_related(first)
+                .report(errors));
         }
         self.declared.insert(name.text, (value, name.span));
-        true
+        Ok(())
     }
 
     fn get(&self, name: &str) -> Option<T> {
@@ -276,38 +326,40 @@ impl<'p, 'src> Resolver<'p, 'src> {
         &self.src()[path.span.range()]
     }
 
-    fn error(&mut self, kind: ResolveErrorKind, at: Span) {
-        self.errors.push(ResolveError::new(kind, at));
-    }
-
-    /// Whether a lexer or parser error starts inside `s`.
-    fn has_syntax_error(&self, s: Span) -> bool {
-        let i = self.syntax_errors.partition_point(|e| e.start < s.start);
-        self.syntax_errors.get(i).is_some_and(|e| e.start < s.end)
+    fn report(&mut self, kind: ResolveErrorKind, at: Span) -> Reported {
+        ResolveError::new(kind, at).report(&mut self.errors)
     }
 
     // --- Pass 1: the file's names ---------------------------------------------------
 
     /// Every block's name, in `blocks`. Returns the blocks of the design, in source
-    /// order (a block's id is its place here), and the second definitions of a block
-    /// name, already reported.
-    fn declare_blocks(&mut self) -> (Vec<&'p Body<'src>>, Vec<&'p Body<'src>>) {
-        let (mut first, mut second) = (Vec::new(), Vec::new());
+    /// order (a block's id is its place here), with the span of each one's whole item,
+    /// and the second definitions of a block name, each with the proof it was reported.
+    fn declare_blocks(
+        &mut self,
+    ) -> (
+        Vec<&'p Body<'src>>,
+        Vec<Span>,
+        Vec<(&'p Body<'src>, Reported)>,
+    ) {
+        let (mut first, mut spans, mut second) = (Vec::new(), Vec::new(), Vec::new());
         for item in &self.parsed.file.items {
             let ItemKind::Block(body) = &item.kind else {
                 continue;
             };
             let id = BlockId::new(first.len());
-            if self
+            let declared = self
                 .blocks
-                .declare(&body.name, id, NameKind::Block, &mut self.errors)
-            {
-                first.push(body);
-            } else {
-                second.push(body);
+                .declare(&body.name, id, NameKind::Block, &mut self.errors);
+            match declared {
+                Ok(()) => {
+                    first.push(body);
+                    spans.push(item.span);
+                }
+                Err(reported) => second.push((body, reported)),
             }
         }
-        (first, second)
+        (first, spans, second)
     }
 
     /// A block's signature, and the start of the block itself: its name, and its ports
@@ -323,7 +375,10 @@ impl<'p, 'src> Resolver<'p, 'src> {
             // port with a wrong type is still a port: its uses resolve (model.md E7).
             let signal = self.signal_type(ty);
             let port = PortId::new(block.block.ports.len());
-            if ports.declare(name, port, NameKind::Port, &mut self.errors) {
+            if ports
+                .declare(name, port, NameKind::Port, &mut self.errors)
+                .is_ok()
+            {
                 block.push_port(name, signal, ty.span);
             }
         }
@@ -338,7 +393,10 @@ impl<'p, 'src> Resolver<'p, 'src> {
             let ItemKind::Contract(body) = &item.kind else {
                 continue;
             };
-            if !seen.declare(&body.name, (), NameKind::Contract, &mut self.errors) {
+            if seen
+                .declare(&body.name, (), NameKind::Contract, &mut self.errors)
+                .is_err()
+            {
                 continue;
             }
             match self.blocks.get(body.name.text) {
@@ -347,25 +405,36 @@ impl<'p, 'src> Resolver<'p, 'src> {
                     let kind = ResolveErrorKind::ContractWithoutBlock {
                         name: body.name.text.to_string(),
                     };
-                    self.error(kind, body.name.span);
+                    self.report(kind, body.name.span);
                 }
             }
         }
         contracts
     }
 
-    /// A port's type: `Pin`, `Power<In>`. `None` if it's wrong, reported.
-    fn signal_type(&mut self, ty: &ast::Type) -> Option<SignalType> {
-        let result = self.try_signal_type(ty);
-        result.map_err(|e| self.errors.push(e)).ok()
+    /// A port's type: `Pin`, `Power<In>`. `Err` if it's wrong, reported, or didn't
+    /// parse.
+    fn signal_type(&mut self, ty: &ast::Type) -> Result<SignalType, Reported> {
+        match &ty.kind {
+            ast::TypeKind::Path { path, args } => {
+                let result = self.try_signal_type(path, args, ty.span);
+                result.map_err(|e| e.report(&mut self.errors))
+            }
+            ast::TypeKind::Error(reported) => Err(*reported),
+        }
     }
 
     #[expect(
         clippy::result_large_err,
         reason = "cold: the error is reported right away"
     )]
-    fn try_signal_type(&self, ty: &ast::Type) -> Result<SignalType, ResolveError> {
-        let name = self.path_text(&ty.path);
+    fn try_signal_type(
+        &self,
+        path: &ast::Path,
+        args: &[ast::Type],
+        span: Span,
+    ) -> Result<SignalType, ResolveError> {
+        let name = self.path_text(path);
         if !SignalType::is_name(name) {
             // `port v: Resistor;`: say what it is instead of "isn't a port type".
             let is = if self.blocks.get(name).is_some() {
@@ -384,11 +453,16 @@ impl<'p, 'src> Resolver<'p, 'src> {
                     problem: "isn't a port type",
                 },
             };
-            return Err(ResolveError::new(kind, ty.path.span));
+            return Err(ResolveError::new(kind, path.span));
         }
-        let role = match ty.args.as_slice() {
+        let role = match args {
             [] => Ok(None),
-            [arg] if arg.args.is_empty() => Role::from_name(self.path_text(&arg.path))
+            [
+                ast::Type {
+                    kind: ast::TypeKind::Path { path, args },
+                    ..
+                },
+            ] if args.is_empty() => Role::from_name(self.path_text(path))
                 .map(Some)
                 .ok_or("takes a role: `In` or `Out`"),
             _ => Err("takes one role: `In` or `Out`"),
@@ -403,7 +477,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
             name: name.to_string(),
             problem,
         };
-        Err(ResolveError::new(kind, ty.span))
+        Err(ResolveError::new(kind, span))
     }
 }
 
@@ -439,11 +513,11 @@ mod tests {
     use spicy_model::design::{FieldValue, InstanceOf};
 
     use super::*;
-    use crate::diagnostic::DiagKind;
     use crate::parser::parse;
     use crate::testing::{
         assert_every_kind_has_a_case, dump_resolve, file_name, read, resolve_errors,
     };
+    use spicy_errors::DiagKind;
 
     /// `ok/` cases: no problems at any stage, and a snapshot of the design.
     #[test]
@@ -500,7 +574,7 @@ mod tests {
         assert!(
             amp.instances
                 .iter()
-                .all(|i| i.pins.iter().all(Option::is_some))
+                .all(|i| i.pins.iter().all(Result::is_ok))
         );
         assert_eq!(design.contracts, [Some(Contract {})]);
         insta::assert_snapshot!(dump_resolve("ce_amp.spl", src));
@@ -648,6 +722,28 @@ mod tests {
     /// A second block of a name is resolved for its own errors, after the design's
     /// blocks, then dropped: the design, its source map and its contracts hold the
     /// first only, and placements bind the first's ports.
+    /// A statement whose value or type doesn't parse keeps its name, and a block whose
+    /// `{` is missing keeps its body, so nothing that uses them is reported again: only
+    /// the syntax error remains (rustc keeps a field whose expression didn't parse).
+    #[test]
+    fn a_broken_value_adds_no_resolve_errors() {
+        let sources = [
+            // `base` is still a net of `A`.
+            "block A {\n    port g: Ground;\n    net base = [g g];\n    \
+             let r = Resistor { a: base, b: g, value: 1k };\n}\n",
+            // `a` is still a port of `Child`.
+            "block Child {\n    port a: ;\n    port g: Ground;\n}\n\n\
+             block Top {\n    port g: Ground;\n    let c = Child { a: g, g };\n}\n",
+            // `Child` is still a block.
+            "block Child\n    port a: Pin;\n}\n\n\
+             block Top {\n    port a: Pin;\n    let c = Child { a };\n}\n",
+        ];
+        for src in sources {
+            assert!(parse(src).has_errors(), "{src}");
+            assert_eq!(resolve_errors(src), vec![], "{src}");
+        }
+    }
+
     #[test]
     fn a_second_block_is_checked_then_dropped() {
         let src = "block A {\n    port p: Pin;\n}\nblock A {\n    port q: Bus;\n    let r = Resistor { a: q, b: nowhere, value: 1k };\n}\nblock B {\n    port x: Pin;\n    let a = A { p: x };\n}\ncontract A {}\n";
@@ -659,7 +755,7 @@ mod tests {
         assert_eq!(design.contracts, [Some(Contract {}), None]);
         let a = &design.blocks[1].instances[0];
         assert_eq!(a.of, InstanceOf::Block(BlockId::new(0)));
-        assert_eq!(a.pins, [Some(NetId::new(0))]);
+        assert_eq!(a.pins, [Ok(NetId::new(0))]);
         let errors: Vec<_> = resolved.errors.iter().map(|e| e.kind.name()).collect();
         assert_eq!(errors, ["Duplicate", "BadSignalType", "UnknownName"]);
     }

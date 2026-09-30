@@ -1,0 +1,13 @@
+// Nets that no part connects to ground (a warning, model.md §7 question 4). The root's
+// inputs count as connected: the bench drives them.
+block Island {
+    port g: Ground;
+    port input: Analog<In>;
+    net x;
+    net y;
+    net z;
+    let driven = Resistor { a: input, b: g, value: 1k };
+    let alone = Resistor { a: x, b: y, value: 1k };
+    let c = Capacitor { a: y, b: x, value: 1u };
+    let r = Resistor { a: z, b: z, value: 1k };
+}

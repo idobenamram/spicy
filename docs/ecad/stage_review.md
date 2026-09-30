@@ -49,7 +49,12 @@ Clean-up means **simplifying without losing anything**: behavior, error messages
 
 3. **Synthesize.** Merge the reports, and resolve any overlap between patches (a three-way merge, with the bug fix winning).
    - Apply the clear items.
-   - **Bring real design choices to the user** as questions, each with the options, the trade-offs and a recommendation. Don't guess on those.
+   - **Bring real design choices to the user** as questions, and don't guess on those. Give each one enough to decide on:
+     - what the references do in the same situation, with citations;
+     - the options, with the pros and cons of each;
+     - how the structs and call sites look under each option, in code;
+     - what each costs (sites, docs, speed, crate layering);
+     - a recommendation.
    - A rejected idea is listed, with the reason.
 
 4. **Apply and verify, one change at a time.** After each change:

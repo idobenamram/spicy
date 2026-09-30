@@ -1,0 +1,49 @@
+// Sources are counted per level (model.md §9, pass 8). Two regulators behind one
+// supply's `v5` meet inside `Double`, and are reported there; two supplies on one net
+// meet on the board. At one level each port counts: `Dual`'s two outputs on `seven`
+// are two sources (as KiCad, Modelica and atopile count them).
+block Reg {
+    port input: Power<In>;
+    port out: Power<Out>;
+    port gnd: Ground;
+    let r = Resistor { a: input, b: out, value: 10 };
+}
+
+block Double {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port gnd: Ground;
+    let reg = Reg { input, out: v5, gnd };
+    let reg2 = Reg { input, out: v5, gnd };
+}
+
+block Single {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port gnd: Ground;
+    let reg = Reg { input, out: v5, gnd };
+}
+
+block Dual {
+    port input: Power<In>;
+    port o1: Power<Out>;
+    port o2: Power<Out>;
+    port gnd: Ground;
+    let reg1 = Reg { input, out: o1, gnd };
+    let reg2 = Reg { input, out: o2, gnd };
+}
+
+block Board {
+    port v12: Power<In>;
+    port gnd: Ground;
+    net five;
+    net six;
+    net seven;
+    let double = Double { input: v12, v5: five, gnd };
+    let r = Resistor { a: five, b: gnd, value: 1k };
+    let one = Single { input: v12, v5: six, gnd };
+    let two = Single { input: v12, v5: six, gnd };
+    let r2 = Resistor { a: six, b: gnd, value: 1k };
+    let dual = Dual { input: v12, o1: seven, o2: seven, gnd };
+    let r3 = Resistor { a: seven, b: gnd, value: 1k };
+}

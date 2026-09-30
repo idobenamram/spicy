@@ -9,12 +9,13 @@
 //! tracking whether it is still unitless; [`typed`](Resolver::typed) gives a unitless
 //! one the expected unit and checks it.
 
+use spicy_errors::Reported;
 use spicy_model::prelude::FieldType;
 use spicy_model::units::{QKind, Quantity, Spread, Unit, Value};
 
 use super::Resolver;
 use super::error::{ResolveError, ResolveErrorKind, describe};
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 use crate::lexer::QuantityLit;
 use crate::parser::ast::{BinOp, Expr, ExprKind};
@@ -31,19 +32,29 @@ struct Term {
 impl Resolver<'_, '_> {
     /// A value for a field of type `expected`: a number, a tolerance (`47k ± 1%`), a
     /// range (`100..=300`), or one of those scaled (`2 * (1k ± 1%)`). `field` names the
-    /// position, for messages. `None` when it's wrong, and the error has been reported.
-    pub(super) fn value(&mut self, e: &Expr, expected: FieldType, field: &str) -> Option<Value> {
+    /// position, for messages. `Err` when it's wrong, and the error has been reported.
+    pub(super) fn value(
+        &mut self,
+        e: &Expr,
+        expected: FieldType,
+        field: &str,
+    ) -> Result<Value, Reported> {
         // The parser already reported a mistake in here, and what it built is a guess
         // (`1k +- 1%`, `a ± b ± c`): typing the guess would report the mistake twice.
-        if self.has_syntax_error(e.span) {
-            return None;
+        if let Some(reported) = self.syntax.inside(e.span) {
+            return Err(reported);
         }
         self.spread_value(e, expected, field)
     }
 
     /// [`value`](Self::value) once the syntax is known to be sound. Recursive: a scaled
     /// spread is a spread inside a `*` or `/`.
-    fn spread_value(&mut self, e: &Expr, expected: FieldType, field: &str) -> Option<Value> {
+    fn spread_value(
+        &mut self,
+        e: &Expr,
+        expected: FieldType,
+        field: &str,
+    ) -> Result<Value, Reported> {
         let e = unparen(e);
         let ExprKind::Binary { op, lhs, rhs } = &e.kind else {
             return self.scalar(e, expected).map(Value::exact);
@@ -53,29 +64,27 @@ impl Resolver<'_, '_> {
                 let kind = ResolveErrorKind::SpreadNotAllowed {
                     field: field.to_string(),
                 };
-                self.error(kind, e.span);
-                None
+                Err(self.report(kind, e.span))
             }
             (BinOp::Tol, ..) => {
                 let nominal = self.scalar(lhs, expected)?;
                 let spread = self.tolerance(rhs, expected)?;
-                Some(Value { nominal, spread })
+                Ok(Value { nominal, spread })
             }
             (BinOp::Range, ..) => self.range(lhs, rhs, expected, e.span),
             // Scaling a spread by a plain factor: `2 * (1k ± 1%)`, `(10k ± 5%) / 2`. The
             // parser's help for `2 * 1k ± 1%` suggests exactly this, so it must work.
             (BinOp::Mul | BinOp::Div, true, false) => {
                 let k = self.scale_factor(rhs, *op == BinOp::Div, e.span)?;
-                Some(self.spread_value(lhs, expected, field)?.scaled(k))
+                Ok(self.spread_value(lhs, expected, field)?.scaled(k))
             }
             (BinOp::Mul, false, true) => {
                 let k = self.scale_factor(lhs, false, e.span)?;
-                Some(self.spread_value(rhs, expected, field)?.scaled(k))
+                Ok(self.spread_value(rhs, expected, field)?.scaled(k))
             }
             // Dividing by a spread, or multiplying two, isn't scaling.
             (BinOp::Mul | BinOp::Div, true, true) | (BinOp::Div, false, true) => {
-                self.error(ResolveErrorKind::SpreadInArithmetic, e.span);
-                None
+                Err(self.report(ResolveErrorKind::SpreadInArithmetic, e.span))
             }
             _ => self.scalar(e, expected).map(Value::exact),
         }
@@ -83,12 +92,17 @@ impl Resolver<'_, '_> {
 
     /// `lo..=hi`. Its nominal is the midpoint (model.md E16; agreed 2026-09-27):
     /// `beta: 100..=300` is 200, as in the walkthrough.
-    fn range(&mut self, lo: &Expr, hi: &Expr, expected: FieldType, at: Span) -> Option<Value> {
+    fn range(
+        &mut self,
+        lo: &Expr,
+        hi: &Expr,
+        expected: FieldType,
+        at: Span,
+    ) -> Result<Value, Reported> {
         let lo = self.scalar(lo, expected)?;
         let hi = self.scalar(hi, expected)?;
         if lo.si > hi.si {
-            self.error(ResolveErrorKind::RangeReversed, at);
-            return None;
+            return Err(self.report(ResolveErrorKind::RangeReversed, at));
         }
         let nominal = Quantity {
             si: (lo.si + hi.si) / 2.0,
@@ -98,25 +112,23 @@ impl Resolver<'_, '_> {
             lo: lo.si,
             hi: hi.si,
         };
-        Some(Value { nominal, spread })
+        Ok(Value { nominal, spread })
     }
 
     /// What a spread is multiplied by when scaled by `e`: `e`, or `1 / e` if `divide`.
     /// `at` is the whole product, reported when `e` isn't a plain factor.
-    fn scale_factor(&mut self, e: &Expr, divide: bool, at: Span) -> Option<f64> {
+    fn scale_factor(&mut self, e: &Expr, divide: bool, at: Span) -> Result<f64, Reported> {
         let k = self.term(e)?.q;
         if !k.is_ratio() {
-            self.error(ResolveErrorKind::SpreadInArithmetic, at);
-            return None;
+            return Err(self.report(ResolveErrorKind::SpreadInArithmetic, at));
         }
         if !divide {
-            return Some(k.si);
+            return Ok(k.si);
         }
         if k.si == 0.0 {
-            self.error(ResolveErrorKind::DivisionByZero, e.span);
-            return None;
+            return Err(self.report(ResolveErrorKind::DivisionByZero, e.span));
         }
-        Some(1.0 / k.si)
+        Ok(1.0 / k.si)
     }
 
     /// The spread after `±`. A ratio written with `%` (`1%`, `2 * 0.5%`) is relative
@@ -125,7 +137,7 @@ impl Resolver<'_, '_> {
     /// as relative only where it's written so.
     /// (Temperature spreads, which are differences in K, arrive with contract
     /// assumptions in M1d-5.)
-    fn tolerance(&mut self, e: &Expr, expected: FieldType) -> Option<Spread> {
+    fn tolerance(&mut self, e: &Expr, expected: FieldType) -> Result<Spread, Reported> {
         let t = self.term(e)?;
         let relative = t.q.is_ratio() && has_percent(e);
         let size = if relative {
@@ -134,10 +146,9 @@ impl Resolver<'_, '_> {
             self.typed(t, expected, e)?.si
         };
         if size < 0.0 {
-            self.error(ResolveErrorKind::NegativeTolerance, e.span);
-            return None;
+            return Err(self.report(ResolveErrorKind::NegativeTolerance, e.span));
         }
-        Some(if relative {
+        Ok(if relative {
             Spread::Rel(size)
         } else {
             Spread::Abs(size)
@@ -145,7 +156,7 @@ impl Resolver<'_, '_> {
     }
 
     /// One number, possibly computed (`2 * 4.7k`), checked against `expected`.
-    fn scalar(&mut self, e: &Expr, expected: FieldType) -> Option<Quantity> {
+    fn scalar(&mut self, e: &Expr, expected: FieldType) -> Result<Quantity, Reported> {
         let t = self.term(e)?;
         self.typed(t, expected, e)
     }
@@ -153,22 +164,21 @@ impl Resolver<'_, '_> {
     /// `t`, the term `e` computes to, as a quantity of type `expected`: given its unit
     /// if it's unitless (model.md E12: `47k`, `2 * 4.7k` and `1k + 2k` are all ohms in a
     /// `value:`), then checked.
-    fn typed(&mut self, t: Term, expected: FieldType, e: &Expr) -> Option<Quantity> {
+    fn typed(&mut self, t: Term, expected: FieldType, e: &Expr) -> Result<Quantity, Reported> {
         let q = if t.unitless {
             Quantity::new(t.q.si, expected.dim)
         } else {
             t.q
         };
         if q.dim == expected.dim && q.kind == expected.kind {
-            return Some(q);
+            return Ok(q);
         }
-        self.unit_mismatch(q, expected, e);
-        None
+        Err(self.unit_mismatch(q, expected, e))
     }
 
     /// Reports that `e` is `q`, not `expected`. A value in kelvin gets a note that `K`
     /// isn't kilo, and a lone `47K` the fix `47k`.
-    fn unit_mismatch(&mut self, q: Quantity, expected: FieldType, e: &Expr) {
+    fn unit_mismatch(&mut self, q: Quantity, expected: FieldType, e: &Expr) -> Reported {
         let kind = ResolveErrorKind::UnitMismatch { expected, found: q };
         let kelvin_for_kilo = kind.kelvin_for_kilo();
         let mut error = ResolveError::new(kind, e.span);
@@ -185,20 +195,20 @@ impl Resolver<'_, '_> {
         {
             error = error.with_fix(e.span, format!("{digits}k"));
         }
-        self.errors.push(error);
+        error.report(&mut self.errors)
     }
 
     /// The number `e` computes to, and whether it's still unitless (see [`Term`]).
-    fn term(&mut self, e: &Expr) -> Option<Term> {
+    fn term(&mut self, e: &Expr) -> Result<Term, Reported> {
         if let Some((lit, negative)) = literal(e) {
-            return Some(Term::literal(lit, negative));
+            return Ok(Term::literal(lit, negative));
         }
         match &e.kind {
             ExprKind::Paren(inner) => self.term(inner),
             ExprKind::Neg(inner) => {
                 let t = self.term(inner)?;
                 self.linear(&t, e.span)?;
-                Some(Term {
+                Ok(Term {
                     q: Quantity { si: -t.q.si, ..t.q },
                     ..t
                 })
@@ -206,26 +216,26 @@ impl Resolver<'_, '_> {
             ExprKind::Binary {
                 op: BinOp::Tol | BinOp::Range,
                 ..
-            } => {
-                self.error(ResolveErrorKind::SpreadInArithmetic, e.span);
-                None
-            }
+            } => Err(self.report(ResolveErrorKind::SpreadInArithmetic, e.span)),
             ExprKind::Binary {
                 op: op @ (BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div),
                 lhs,
                 rhs,
             } => self.arithmetic(*op, lhs, rhs, e.span),
             // A number the lexer rejected: already reported.
-            ExprKind::Error => None,
-            _ => {
-                self.error(ResolveErrorKind::NotAValue, e.span);
-                None
-            }
+            ExprKind::Error(reported) => Err(*reported),
+            _ => Err(self.report(ResolveErrorKind::NotAValue, e.span)),
         }
     }
 
     /// `lhs op rhs` for one of `+ - * /`; `at` is the whole expression.
-    fn arithmetic(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, at: Span) -> Option<Term> {
+    fn arithmetic(
+        &mut self,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        at: Span,
+    ) -> Result<Term, Reported> {
         let a = self.term(lhs)?;
         let b = self.term(rhs)?;
         self.linear(&a, at)?;
@@ -239,8 +249,7 @@ impl Resolver<'_, '_> {
                         left: a.describe(),
                         right: b.describe(),
                     };
-                    self.error(kind, at);
-                    return None;
+                    return Err(self.report(kind, at));
                 }
                 let si = if op == BinOp::Add {
                     a.q.si + b.q.si
@@ -252,29 +261,27 @@ impl Resolver<'_, '_> {
             BinOp::Mul => (a.q.si * b.q.si, a.q.dim * b.q.dim),
             _ => {
                 if b.q.si == 0.0 {
-                    self.error(ResolveErrorKind::DivisionByZero, rhs.span);
-                    return None;
+                    return Err(self.report(ResolveErrorKind::DivisionByZero, rhs.span));
                 }
                 (a.q.si / b.q.si, a.q.dim / b.q.dim)
             }
         };
-        Some(Term {
+        Ok(Term {
             q: Quantity::new(si, dim),
             unitless: a.unitless && b.unitless,
         })
     }
 
-    /// `Some` if `t` may be used in arithmetic. Temperatures and dB levels aren't linear
+    /// `Ok` if `t` may be used in arithmetic. Temperatures and dB levels aren't linear
     /// quantities: `2 * 10°C` and `3dB + 3dB` have no single meaning, so they're only
     /// written as they are. `at` is the arithmetic, for the error.
-    fn linear(&mut self, t: &Term, at: Span) -> Option<()> {
+    fn linear(&mut self, t: &Term, at: Span) -> Result<(), Reported> {
         let what = match t.q.kind {
-            QKind::Plain => return Some(()),
+            QKind::Plain => return Ok(()),
             QKind::TempPoint => "temperatures",
             QKind::Db => "dB levels",
         };
-        self.error(ResolveErrorKind::NotArithmetic { what }, at);
-        None
+        Err(self.report(ResolveErrorKind::NotArithmetic { what }, at))
     }
 }
 
@@ -352,9 +359,9 @@ fn unparen<'e, 'src>(mut e: &'e Expr<'src>) -> &'e Expr<'src> {
 mod tests {
     use spicy_model::design::FieldValue;
 
-    use crate::diagnostic::DiagKind;
     use crate::parser::parse;
     use crate::resolve::resolve;
+    use spicy_errors::DiagKind;
 
     /// Resolves the part `part` (`Resistor { a: p, b: n, value: 47k }`, with ports `p`
     /// and `n` in scope) and returns its last field's value, or its errors as

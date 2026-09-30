@@ -1,0 +1,32 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/shorted.spl
+---
+root Bench
+  net g (ground)  aliases first.a, third.b
+  net x  aliases first.b, second.a, second.b, third.a
+  Capacitor first.r a→g b→x value=0.000001 F
+  Capacitor second.r a→x b→x value=0.000001 F
+  Capacitor third.r a→x b→g value=0.000001 F
+root Board
+  net g (ground)  aliases one.a, one.b, two.a, two.b
+  Resistor one.r a→g b→g value=1000 Ω
+  Resistor two.r a→g b→g value=1000 Ω
+
+--- errors ---
+W-short ShortedPart 387..424 "let r = Resistor { a, b, value: 1k };"
+W-short ShortedPart 591..629 "let r = Capacitor { a, b, value: 1u };"
+
+--- rendered ---
+warning[W-short]: both pins of `r` are on one net (in `Filter`)
+  --> shorted.spl:8:5
+  |
+8 |     let r = Resistor { a, b, value: 1k };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted
+
+warning[W-short]: both pins of `r` are on one net (in 1 of 3 placements of `Stage`, e.g. `second`)
+   --> shorted.spl:20:5
+   |
+20 |     let r = Capacitor { a, b, value: 1u };
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted

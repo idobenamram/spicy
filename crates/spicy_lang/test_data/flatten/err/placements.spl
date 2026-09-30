@@ -1,0 +1,28 @@
+// A problem inside a block is reported once, where it's written, however many
+// placements have it (model.md E23), under one root or several.
+block Load {
+    port vcc: Power<In>;
+    port gnd: Ground;
+    let r = Resistor { a: vcc, b: gnd, value: 1k };
+}
+
+block Mid {
+    port gnd: Ground;
+    net rail;
+    net x;
+    net y;
+    let load = Load { vcc: rail, gnd };
+    let island = Resistor { a: x, b: y, value: 1k };
+    let short = Resistor { a: gnd, b: gnd, value: 1k };
+}
+
+block One {
+    port gnd: Ground;
+    let a = Mid { gnd };
+    let b = Mid { gnd };
+}
+
+block Two {
+    port gnd: Ground;
+    let c = Mid { gnd };
+}

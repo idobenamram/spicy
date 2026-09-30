@@ -1,0 +1,72 @@
+// A `Power<Out>` passed up a level is one source (model.md §9, pass 8): `sup.v5` and
+// the `sup.reg.out` behind it feed `five` once. It still is when it's passed through a
+// merged net (`merged`), a block of plain pins (`linked`), or alongside a plain pin
+// tied to the same rail (`sensed`): only the innermost source, the regulator, counts.
+block Reg {
+    port input: Power<In>;
+    port out: Power<Out>;
+    port gnd: Ground;
+    let r = Resistor { a: input, b: out, value: 10 };
+}
+
+block Supply {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port gnd: Ground;
+    let reg = Reg { input, out: v5, gnd };
+}
+
+block Merged {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port gnd: Ground;
+    net rail = [v5];
+    let reg = Reg { input, out: rail, gnd };
+}
+
+block Link {
+    port a: Pin;
+    port b: Pin;
+    net both = [a, b];
+}
+
+block Linked {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port gnd: Ground;
+    net mid;
+    let reg = Reg { input, out: mid, gnd };
+    let link = Link { a: mid, b: v5 };
+}
+
+block Sensed {
+    port input: Power<In>;
+    port v5: Power<Out>;
+    port sense: Pin;
+    port gnd: Ground;
+    net out = [v5, sense];
+    let reg = Reg { input, out, gnd };
+}
+
+block Load {
+    port vcc: Power<In>;
+    port gnd: Ground;
+    let r = Resistor { a: vcc, b: gnd, value: 1k };
+}
+
+block Board {
+    port v12: Power<In>;
+    port gnd: Ground;
+    net five;
+    net four;
+    net three;
+    let sup = Supply { input: v12, v5: five, gnd };
+    let load = Load { vcc: five, gnd };
+    let merged = Merged { input: v12, v5: four, gnd };
+    let load4 = Load { vcc: four, gnd };
+    let linked = Linked { input: v12, v5: three, gnd };
+    let load3 = Load { vcc: three, gnd };
+    net two;
+    let sensed = Sensed { input: v12, v5: two, sense: two, gnd };
+    let load2 = Load { vcc: two, gnd };
+}

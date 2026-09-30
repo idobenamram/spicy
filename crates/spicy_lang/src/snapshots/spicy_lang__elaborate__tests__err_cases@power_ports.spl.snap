@@ -1,0 +1,68 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/power_ports.spl
+---
+root Board
+  net gnd (ground)  aliases dual.gnd, load.gnd, pass.gnd, plain.gnd, r1.gnd, r2.gnd, r3.gnd, tied.gnd, dual.reg.gnd, pass.inner.gnd, plain.load.gnd
+  net v12  aliases dual.input, r1.input, r2.input, r3.input, dual.reg.input
+  net bus  aliases r1.out, r2.out, r3.out
+  net eight  aliases load.vcc, tied.o1, tied.o2, tied.both
+  net line  aliases plain.p, plain.load.vcc
+  net rail  aliases pass.a, pass.b, pass.inner.vcc
+  net seven  aliases dual.o1, dual.o2, dual.reg.out
+  Resistor dual.r a→seven b→gnd value=1000 Ω
+  Resistor dual.reg.r a→v12 b→seven value=10 Ω
+  Resistor load.r a→eight b→gnd value=1000 Ω
+  Resistor pass.r a→rail b→gnd value=1000 Ω
+  Resistor pass.inner.r a→rail b→gnd value=1000 Ω
+  Resistor plain.load.r a→line b→gnd value=1000 Ω
+  Resistor r1.r a→v12 b→bus value=10 Ω
+  Resistor r2.r a→v12 b→bus value=10 Ω
+  Resistor r3.r a→v12 b→bus value=10 Ω
+  Resistor tied.r a→eight b→gnd value=1000 Ω
+
+--- errors ---
+E-power SeveralSources 2019..2028 "o2: seven" related 2008..2017
+E-power NoSource 2151..2158 "a: rail"
+E-power NoSource 2200..2207 "p: line"
+E-power SeveralSources 2295..2303 "out: bus" related 2247..2255
+
+--- rendered ---
+error[E-power]: net `seven` has more than one power source
+   --> power_ports.spl:66:46
+   |
+66 |     let dual = Dual { input: v12, o1: seven, o2: seven, gnd };
+   |                                   ---------  ^^^^^^^^^ a second source
+   |                                   |           
+   |                                   the first source
+   |
+   = note: the sources are `dual.o1` and `dual.reg.out`
+
+error[E-power]: nothing powers net `rail`
+   --> power_ports.spl:69:23
+   |
+69 |     let pass = Pass { a: rail, b: rail, gnd };
+   |                       ^^^^^^^ needs a power source
+   |
+   = note: `pass.inner.vcc` and `pass.b` take power from it
+   = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
+
+error[E-power]: nothing powers net `line`
+   --> power_ports.spl:70:25
+   |
+70 |     let plain = Plain { p: line, gnd };
+   |                         ^^^^^^^ needs a power source
+   |
+   = note: `plain.load.vcc` takes power from it
+   = help: connect `line` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
+
+error[E-power]: net `bus` has more than one power source
+   --> power_ports.spl:72:32
+   |
+71 |     let r1 = Reg { input: v12, out: bus, gnd };
+   |                                -------- the first source
+72 |     let r2 = Reg { input: v12, out: bus, gnd };
+   |                                ^^^^^^^^ a second source
+   |
+   = note: the sources are `r1.out`, `r2.out` and `r3.out`

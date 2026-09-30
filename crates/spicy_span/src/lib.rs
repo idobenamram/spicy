@@ -1,6 +1,6 @@
 //! Where something was written: one byte range type for every stage, from the lexer
-//! to the design's source map (as rustc has one `Span` in `rustc_span`). It lives here,
-//! the lowest crate that needs it: `spicy_lang` depends on this crate and re-exports it.
+//! to the design's source map and every problem reported, as rustc has one `Span` in
+//! `rustc_span`, a crate of its own below the rest.
 
 use std::ops::Range;
 

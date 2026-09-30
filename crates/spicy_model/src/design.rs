@@ -6,29 +6,12 @@
 //! differ only in whitespace or comments compare equal (model.md E22, as
 //! rust-analyzer keeps a body's data apart from its source map).
 
+use spicy_index::id;
+
 use crate::prelude::{PartKind, SignalType};
-use crate::span::Span;
 use crate::units::Value;
-
-/// Defines a `u32` index newtype.
-macro_rules! id {
-    ($(#[$doc:meta])* $name:ident) => {
-        $(#[$doc])*
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-        pub struct $name(u32);
-
-        impl $name {
-            /// Panics past `u32::MAX`, which no design reaches (as `spicy_circuit`'s ids).
-            pub fn new(index: usize) -> Self {
-                Self(u32::try_from(index).expect(concat!(stringify!($name), " out of range")))
-            }
-
-            pub fn index(self) -> usize {
-                self.0 as usize
-            }
-        }
-    };
-}
+use spicy_errors::Reported;
+use spicy_span::Span;
 
 id!(
     /// A block, by its position in [`Design::blocks`] (source order).
@@ -79,6 +62,13 @@ pub struct Block {
     /// `net x = [a, b];`: `x` and the listed nets are one net. Applied by flatten's
     /// union-find, with every name kept as an alias (model.md E15).
     pub merges: Vec<Merge>,
+    /// Whether an error was reported inside the block (by the lexer, the parser or
+    /// resolve), with the proof (rustc's `tainted_by_errors`). Every placeholder below
+    /// has one, and so does what leaves none: a statement the parser couldn't read, a
+    /// second `let` or binding of a name, a merged net that doesn't resolve. So flatten
+    /// doesn't check a root that places a tainted block as a whole: the checks would
+    /// report the damage (model.md E7).
+    pub tainted: Option<Reported>,
 }
 
 impl Block {
@@ -113,9 +103,9 @@ impl Block {
 /// net's ([`Block::port_name`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Port {
-    /// `None` when the written type was wrong; that error has been reported. The port
-    /// still exists, so its name resolves and placements can bind it (model.md E7).
-    pub signal: Option<SignalType>,
+    /// `Err` when the written type was wrong. The port still exists, so its name
+    /// resolves and placements can bind it (model.md E7).
+    pub signal: Result<SignalType, Reported>,
 }
 
 /// A node inside the block. A port's net is named after the port.
@@ -137,9 +127,9 @@ pub struct Instance {
     pub name: String,
     pub of: InstanceOf,
     /// Pin (for a part) or port (for a block) → the net it's bound to, in the order of
-    /// the part kind's pins or the block's ports. `None` only when the binding was
-    /// wrong or missing; that error has been reported.
-    pub pins: Vec<Option<NetId>>,
+    /// the part kind's pins or the block's ports. Every pin must be bound: `Err` when
+    /// the binding was wrong or missing.
+    pub pins: Vec<Result<NetId, Reported>>,
     /// Field values of a part, in the order of the part kind's fields. Empty for a
     /// placed block (blocks have no params yet).
     pub fields: Vec<FieldValue>,
@@ -148,12 +138,12 @@ pub struct Instance {
 /// One field of an instance.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FieldValue {
-    /// Not written. For an optional field, lowering applies the device's default
-    /// (M1e); a field that isn't written gets no knob.
+    /// An optional field not written: lowering applies the device's default (M1e). It
+    /// gets no knob.
     Unset,
     Given(Value),
-    /// Written but wrong; the error has been reported, so later steps skip it.
-    Invalid,
+    /// Written but wrong, or a required field not written. Later steps skip it.
+    Invalid(Reported),
 }
 
 /// What an instance is an instance of (model.md E6: decided by what the name in
@@ -162,9 +152,9 @@ pub enum FieldValue {
 pub enum InstanceOf {
     Part(PartKind),
     Block(BlockId),
-    /// The name didn't resolve; the error has been reported, so later steps skip the
-    /// instance without reporting again (model.md E7).
-    Error,
+    /// The name didn't resolve, so later steps skip the instance without reporting
+    /// again (model.md E7).
+    Error(Reported),
 }
 
 /// Where every part of the `Design` was written, indexed like the design itself.
@@ -206,7 +196,7 @@ pub struct InstanceSpans {
     /// `Kind { … }`.
     pub kind: Span,
     /// Each pin binding (`a: vcc`), in the order of [`Instance::pins`]. Like `pins` and
-    /// `fields` there, empty when the instance is [`InstanceOf::Error`].
+    /// `fields` there, empty when the instance is an [`InstanceOf::Error`].
     pub pins: Vec<Option<Span>>,
     /// Each field (`value: 47k ± 1%`), in the order of [`Instance::fields`].
     pub fields: Vec<Option<Span>>,

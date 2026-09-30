@@ -1,0 +1,28 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/unchecked_root.spl
+---
+root One
+  net gnd (ground)  aliases a.gnd
+  Resistor a.short a→gnd b→gnd value=1000 Ω
+root Two
+  net gnd (ground)  aliases c.gnd
+  Resistor c.short a→gnd b→gnd value=1000 Ω
+
+--- errors ---
+W-short ShortedPart 271..322 "let short = Resistor { a: gnd, b: gnd, value: 1k };"
+E-name UnknownName 464..471 "Nothing"
+
+--- rendered ---
+warning[W-short]: both pins of `short` are on one net (in `Mid`)
+  --> unchecked_root.spl:6:5
+  |
+6 |     let short = Resistor { a: gnd, b: gnd, value: 1k };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted
+
+error[E-name]: unknown part kind or block `Nothing`
+   --> unchecked_root.spl:17:18
+   |
+17 |     let broken = Nothing { gnd };
+   |                  ^^^^^^^ not defined

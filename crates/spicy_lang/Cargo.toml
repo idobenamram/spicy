@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+spicy_errors = { path = "../spicy_errors" }
+spicy_span = { path = "../spicy_span" }
 codespan-reporting = { version = "0.13.1", default-features = false, features = ["std"] }
 spicy_model = { path = "../spicy_model" }
 

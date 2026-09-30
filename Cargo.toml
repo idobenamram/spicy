@@ -3,10 +3,13 @@
 resolver = "2"
 members = [
     "crates/spicy_circuit",
+    "crates/spicy_errors",
+    "crates/spicy_index",
     "crates/spicy_lang",
     "crates/spicy_model",
     "crates/spicy_parser",
     "crates/spicy_simulate",
+    "crates/spicy_span",
     "crates/spicy_cli",
     "fuzz",
 ]

@@ -16,8 +16,8 @@
 
 use std::ops::Range;
 
-use spicy_model::span::Span;
 use spicy_model::units::Unit;
+use spicy_span::Span;
 
 use crate::edit_distance::edit_distance;
 

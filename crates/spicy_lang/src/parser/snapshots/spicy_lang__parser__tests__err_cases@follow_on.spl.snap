@@ -16,10 +16,14 @@ File 0..177
           Path capacity 78..86 "capacity"
           ExprError 89..91 "2h"
         Quantity 1e1 % 95..98 "10%"
-    StmtError 104..115 "let c = 1.;"
-    StmtError 120..134 "let d = a % 3;"
-    StmtError 139..154 "let e = a != b;"
-    StmtError 159..174 "let f = 10\u{200b}k;"
+    Let c 104..115
+      ExprError 112..114 "1."
+    Let d 120..134
+      ExprError 128..133 "a % 3"
+    Let e 139..154
+      ExprError 147..153 "a != b"
+    Let f 159..174
+      ExprError 167..173 "10\u{200b}k"
 
 --- errors ---
 E-syntax MissingSemi 25..29 "1Meg" fix 29..29 ";"

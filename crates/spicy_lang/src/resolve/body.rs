@@ -9,12 +9,13 @@
 
 use std::collections::{HashMap, HashSet};
 
+use spicy_errors::Reported;
 use spicy_model::design::{
     Block, BlockId, BlockSpans, FieldValue, Instance, InstanceOf, InstanceSpans, Merge, MergeSpans,
     NetId,
 };
 use spicy_model::prelude::{FieldSchema, PartKind, SignalType};
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 use super::{
     BlockBuilder, NameKind, Namespace, ResolveError, ResolveErrorKind, Resolver, Scope, Signature,
@@ -96,10 +97,46 @@ impl Slots {
 struct Bindings<'f> {
     /// Where each slot was given; `None` if it wasn't.
     given: Vec<Option<Span>>,
-    pins: Vec<Option<NetId>>,
-    fields: Vec<FieldValue>,
+    /// Each pin's net, once given.
+    pins: Vec<Option<Result<NetId, Reported>>>,
+    /// Each field's value, once given.
+    fields: Vec<Option<FieldValue>>,
     /// The fields that name no slot.
     unknown: Vec<&'f Field<'f>>,
+}
+
+impl Bindings<'_> {
+    /// The instance's pins and fields. A pin or a required field that wasn't given
+    /// holds `unbound`, the proof it was reported; an optional one is `Unset`. (Each is
+    /// collected in place: an element is the same size either way.)
+    fn values(
+        self,
+        slots: Slots,
+        unbound: Option<Reported>,
+    ) -> (Vec<Result<NetId, Reported>>, Vec<FieldValue>) {
+        let missing = || unbound.expect("a slot that must be given and wasn't is reported");
+        let pins = self
+            .pins
+            .into_iter()
+            .map(|pin| pin.unwrap_or_else(|| Err(missing())));
+        let fields = self
+            .fields
+            .into_iter()
+            .zip(slots.fields)
+            .map(|(value, schema)| match value {
+                Some(value) => value,
+                None if schema.required => FieldValue::Invalid(missing()),
+                None => FieldValue::Unset,
+            });
+        (pins.collect(), fields.collect())
+    }
+
+    /// Where each pin, then each field, was given: taken out, before the values.
+    fn spans(&mut self, slots: Slots) -> (Vec<Option<Span>>, Vec<Option<Span>>) {
+        let mut pins = std::mem::take(&mut self.given);
+        let fields = pins.split_off(slots.pins);
+        (pins, fields)
+    }
 }
 
 impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
@@ -133,17 +170,20 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                 StmtKind::Net { name, .. } => {
                     let net = NetId::new(this.block.block.nets.len());
                     let value = ValueName::Net(net);
+                    let errors = &mut this.r.errors;
                     if this
                         .names
-                        .declare(name, value, NameKind::Net, &mut this.r.errors)
+                        .declare(name, value, NameKind::Net, errors)
+                        .is_ok()
                     {
                         this.block.push_net(name);
                     }
                 }
                 StmtKind::Let { name, .. } => {
                     let errors = &mut this.r.errors;
-                    this.names
-                        .declare(name, ValueName::Instance, NameKind::Instance, errors);
+                    let _ =
+                        this.names
+                            .declare(name, ValueName::Instance, NameKind::Instance, errors);
                 }
                 _ => {}
             }
@@ -190,7 +230,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                 let pin = pins.iter().position(|p| *p == name);
                 pin.or_else(|| kind.field(name).map(|(f, _)| pins.len() + f))
             }
-            InstanceOf::Error => None,
+            InstanceOf::Error(_) => None,
         }
     }
 
@@ -214,7 +254,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                     .map(str::to_string)
                     .collect()
             }
-            InstanceOf::Error => Vec::new(),
+            InstanceOf::Error(_) => Vec::new(),
         }
     }
 
@@ -238,15 +278,15 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     /// list, reported.
     fn merge(&mut self, name: &Ident, stmt: &Stmt, list: &Expr) -> Option<(Merge, MergeSpans)> {
         let ExprKind::Array(items) = &list.kind else {
-            if !matches!(list.kind, ExprKind::Error) {
-                self.r.error(ResolveErrorKind::BadMerge, list.span);
+            if !matches!(list.kind, ExprKind::Error(_)) {
+                self.r.report(ResolveErrorKind::BadMerge, list.span);
             }
             return None;
         };
         let mut with = Vec::new();
         let mut item_spans = Vec::new();
         for item in items {
-            if let Some(other) = self.net_ref(item, NetUse::Merge) {
+            if let Ok(other) = self.net_ref(item, NetUse::Merge) {
                 with.push(other);
                 item_spans.push(item.span);
             }
@@ -263,28 +303,22 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     }
 
     /// An expression that must name a net or port of the block.
-    fn net_ref(&mut self, e: &Expr, used: NetUse) -> Option<NetId> {
+    fn net_ref(&mut self, e: &Expr, used: NetUse) -> Result<NetId, Reported> {
         match &e.kind {
             ExprKind::Path(path) => {
                 let name = self.r.path_text(path);
                 self.net_named(name, e.span, used)
             }
-            ExprKind::Error => None,
-            _ => {
-                self.not_a_net(used, NameKind::Value, e.span);
-                None
-            }
+            ExprKind::Error(reported) => Err(*reported),
+            _ => Err(self.not_a_net(used, NameKind::Value, e.span)),
         }
     }
 
     /// The net `name`, written at `at`.
-    fn net_named(&mut self, name: &str, at: Span, used: NetUse) -> Option<NetId> {
+    fn net_named(&mut self, name: &str, at: Span, used: NetUse) -> Result<NetId, Reported> {
         match self.names.get(name) {
-            Some(ValueName::Net(net)) => Some(net),
-            Some(ValueName::Instance) => {
-                self.not_a_net(used, NameKind::Instance, at);
-                None
-            }
+            Some(ValueName::Net(net)) => Ok(net),
+            Some(ValueName::Instance) => Err(self.not_a_net(used, NameKind::Instance, at)),
             None => {
                 // Only nets: suggesting an instance would trade this error for another.
                 let nets = self
@@ -298,18 +332,17 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                     NetUse::Merge | NetUse::Pin(_) => s.clone(),
                 });
                 let error = unknown_name(name, Namespace::Value, suggestion, fix, at);
-                self.r.errors.push(error);
-                None
+                Err(error.report(&mut self.r.errors))
             }
         }
     }
 
-    fn not_a_net(&mut self, used: NetUse, found: NameKind, at: Span) {
+    fn not_a_net(&mut self, used: NetUse, found: NameKind, at: Span) -> Reported {
         let kind = ResolveErrorKind::NotANet {
             pin: used.pin(),
             found,
         };
-        self.r.error(kind, at);
+        self.r.report(kind, at)
     }
 
     // --- Instances ------------------------------------------------------------------
@@ -318,22 +351,24 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     /// each part of it was written. A value that isn't `Kind { … }`, or a kind that
     /// doesn't resolve, gives an `InstanceOf::Error` instance, reported.
     fn instance(&mut self, name: &Ident, stmt: &Stmt, value: &Expr) -> (Instance, InstanceSpans) {
-        let mut instance = Instance {
-            name: name.text.to_string(),
-            of: InstanceOf::Error,
-            pins: Vec::new(),
-            fields: Vec::new(),
-        };
         let mut spans = InstanceSpans {
             name: name.span,
             stmt: stmt.span,
             ..InstanceSpans::default()
         };
+        let instance = |of, pins, fields| Instance {
+            name: name.text.to_string(),
+            of,
+            pins,
+            fields,
+        };
         let ExprKind::StructLit { path, fields } = &value.kind else {
-            if !matches!(value.kind, ExprKind::Error) {
-                self.r.error(ResolveErrorKind::LetNotInstance, value.span);
-            }
-            return (instance, spans);
+            let reported = match value.kind {
+                ExprKind::Error(reported) => reported,
+                _ => self.r.report(ResolveErrorKind::LetNotInstance, value.span),
+            };
+            let unresolved = instance(InstanceOf::Error(reported), Vec::new(), Vec::new());
+            return (unresolved, spans);
         };
         spans.kind = path.span;
         let slots = match self.kind_named(path) {
@@ -348,18 +383,14 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                 fields: &[],
             },
             // Reported; its fields aren't checked.
-            InstanceOf::Error => return (instance, spans),
+            of @ InstanceOf::Error(_) => return (instance(of, Vec::new(), Vec::new()), spans),
         };
-        let bound = self.bind(slots, fields);
-        self.report_unbound(slots, path, &bound);
+        let mut bound = self.bind(slots, fields);
+        let unbound = self.report_unbound(slots, path, &bound);
 
-        instance.of = slots.of;
-        instance.pins = bound.pins;
-        instance.fields = bound.fields;
-        let mut given = bound.given;
-        spans.fields = given.split_off(slots.pins);
-        spans.pins = given;
-        (instance, spans)
+        (spans.pins, spans.fields) = bound.spans(slots);
+        let (pins, fields) = bound.values(slots, unbound);
+        (instance(slots.of, pins, fields), spans)
     }
 
     /// The part kind or block `path` names, in the kind namespace: the file's blocks,
@@ -374,8 +405,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             return InstanceOf::Part(kind);
         }
         let error = self.not_a_kind(name, path.span);
-        self.r.errors.push(error);
-        InstanceOf::Error
+        InstanceOf::Error(error.report(&mut self.r.errors))
     }
 
     /// Why `name` isn't a part kind or block: it's something else, or nothing.
@@ -405,7 +435,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         let mut b = Bindings {
             given: vec![None; slots.len()],
             pins: vec![None; slots.pins],
-            fields: vec![FieldValue::Unset; slots.fields.len()],
+            fields: vec![None; slots.fields.len()],
             unknown: Vec::new(),
         };
         for field in fields {
@@ -423,19 +453,19 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                     None => self.net_named(name, field.name.span, NetUse::Shorthand(name)),
                 };
                 if first.is_none() {
-                    b.pins[i] = net;
+                    b.pins[i] = Some(net);
                 }
             } else {
                 let f = i - slots.pins;
                 let value = match &field.value {
                     Some(e) => self.r.value(e, slots.fields[f].ty, name),
-                    None => {
-                        self.r.error(ResolveErrorKind::NotAValue, field.span);
-                        None
-                    }
+                    None => Err(self.r.report(ResolveErrorKind::NotAValue, field.span)),
                 };
                 if first.is_none() {
-                    b.fields[f] = value.map_or(FieldValue::Invalid, FieldValue::Given);
+                    b.fields[f] = Some(match value {
+                        Ok(value) => FieldValue::Given(value),
+                        Err(reported) => FieldValue::Invalid(reported),
+                    });
                 }
             }
             // Slots, not names: a slot is given once, and its span is the whole binding.
@@ -446,7 +476,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                         what: NameKind::Binding,
                     };
                     let error = ResolveError::new(kind, field.span).with_related(first);
-                    self.r.errors.push(error);
+                    error.report(&mut self.r.errors);
                 }
                 None => b.given[i] = Some(field.span),
             }
@@ -455,14 +485,16 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     }
 
     /// Reports the fields that name no slot, and every slot that must be given and
-    /// wasn't: unbound pins or ports, and unset required fields.
-    fn report_unbound(&mut self, slots: Slots, path: &ast::Path, b: &Bindings) {
+    /// wasn't: unbound pins or ports, and unset required fields. Returns the proof, if
+    /// it reported any.
+    fn report_unbound(&mut self, slots: Slots, path: &ast::Path, b: &Bindings) -> Option<Reported> {
         let missing: Vec<usize> = (0..slots.len())
             .filter(|&i| b.given[i].is_none() && slots.required(i))
             .collect();
         if b.unknown.is_empty() && missing.is_empty() {
-            return;
+            return None;
         }
+        let mut reported = None;
         let of = self.r.path_text(path);
         let slot_names = self.slot_names(slots.of);
         // Each unknown name once: `valu: 1k, valu: 2k` is one misspelling written twice.
@@ -506,14 +538,15 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             if let Some(fix) = fix {
                 error = error.with_fix(field.name.span, fix);
             }
-            self.r.errors.push(error);
+            reported = Some(error.report(&mut self.r.errors));
         }
         if renamed.is_none() && !missing.is_empty() {
             let kind = ResolveErrorKind::Missing {
                 of: of.to_string(),
                 names: missing.iter().map(|&i| slot_names[i].clone()).collect(),
             };
-            self.r.error(kind, path.span);
+            reported = Some(self.r.report(kind, path.span));
         }
+        reported
     }
 }

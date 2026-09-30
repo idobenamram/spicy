@@ -1,0 +1,11 @@
+// A body's statements without the `{` before them: a soft error, like a missing `;`.
+// It's reported with the insertion, and the body is read on, so `Child` keeps its name
+// and `Top`'s placement of it resolves.
+block Child
+    port a: Pin;
+}
+
+block Top {
+    port a: Pin;
+    let c = Child { a };
+}

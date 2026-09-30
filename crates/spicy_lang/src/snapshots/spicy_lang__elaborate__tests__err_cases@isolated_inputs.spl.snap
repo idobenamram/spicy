@@ -1,0 +1,28 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/isolated_inputs.spl
+---
+root Bench
+  net gnd (ground)
+  net out
+  net vcc
+  net k  aliases s.o
+  net load
+  net m  aliases s.i
+  net n
+  Resistor lone a→out b→n value=1000 Ω
+  Resistor pull a→vcc b→load value=1000 Ω
+  Resistor s.r a→m b→k value=1000 Ω
+
+--- errors ---
+W-isolated IsolatedNets 473..474 "k"
+
+--- rendered ---
+warning[W-isolated]: `k` and `m` are connected to nothing that reaches ground
+   --> isolated_inputs.spl:17:9
+   |
+17 |     net k;
+   |         ^ isolated
+   |
+   = note: a simulation can't solve an isolated net

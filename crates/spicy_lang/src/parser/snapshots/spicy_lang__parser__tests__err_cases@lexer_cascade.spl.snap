@@ -11,8 +11,10 @@ File 0..97
         Path c 28..29 "c"
     Let d 35..46
       Path e 43..44 "e"
-    StmtError 51..66 "let f = 10 kΩ;"
-    StmtError 71..82 "let g = .5;"
+    Let f 51..66
+      ExprError 59..65 "10 kΩ"
+    Let g 71..82
+      ExprError 79..81 ".5"
     Net ok 87..94
 
 --- errors ---

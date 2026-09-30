@@ -3,7 +3,7 @@
 
 use super::lookalike;
 use super::quantity::{QuantityErrorKind, SUFFIX_NOTE, suffix_suggestions};
-use crate::diagnostic::{Diag, DiagKind, Fix, Text};
+use spicy_errors::{Diag, DiagKind, Fix, Text};
 
 /// One lexer problem (lexer.md L10).
 pub type LexError = Diag<LexErrorKind>;
@@ -73,7 +73,6 @@ fn code_point(c: char) -> String {
 }
 
 impl DiagKind for LexErrorKind {
-    #[cfg(any(test, fuzzing))]
     fn name(&self) -> &'static str {
         match self {
             LexErrorKind::Quantity(q) => match q {

@@ -1,0 +1,16 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/too_many.spl
+---
+--- errors ---
+E-size TooManyPlacements 422..423 "b"
+
+--- rendered ---
+error[E-size]: `L10` flattens to more than 1000000 placements
+   --> too_many.spl:14:9
+   |
+14 |     let b = L0 { p, g };
+   |         ^ past the limit here
+   |
+   = note: each placement places everything inside its block again: a block placed twice inside a block placed twice is four placements

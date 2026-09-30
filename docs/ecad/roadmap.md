@@ -79,6 +79,9 @@ crates/
   spicy_simulate/   (exists)  our simulator; reads spicy_circuit only
   spicy_cli/        (exists)  CLI + TUI; gains a `check` command
 
+  spicy_span/       (new)     `Span`: where something was written, for every stage (rustc's `rustc_span`)
+  spicy_index/      (new)     the `id!` macro: typed `u32` indices (rustc's `rustc_index`); used by spicy_model and spicy_circuit
+  spicy_errors/     (new)     the problem type every stage reports (`Diag`, `Reported`) and its rendering (rustc's `rustc_errors`)
   spicy_model/      (new)     the design model (§2.4); shared by language, engine and (later) the editor
   spicy_lang/       (new)     language front-end: text → spicy_model, with diagnostics
   spicy_engine/     (new)     knob space, measures, corner enumeration + the 3σ-point search, verdicts; defines the `Backend` trait
@@ -96,6 +99,8 @@ Dependencies (arrows mean "depends on"; no cycles):
                            ▲                                (SPICE front-end, used by the CLI)
                            └────────────── spicy_backends ───► spicy_engine   (implements its Backend trait)
 ```
+
+Below them, three small crates with no dependencies of their own apart from codespan (added 2026-09-29, the rustc way): `spicy_span` and `spicy_index`, which depend on nothing, and `spicy_errors`, which depends on `spicy_span` and `codespan-reporting`. `spicy_model` depends on all three, `spicy_lang` on `spicy_span` and `spicy_errors`, and `spicy_circuit` on `spicy_index`.
 
 ### 2.3 Who owns what
 
@@ -389,7 +394,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
     - a snapshot of `ce_amp.spl`'s AST;
     - a snapshot per remaining syntax error in §7;
     - a fuzz target that never panics and always returns a tree or diagnostics. 🔍
-- **M1d: Elaboration → `spicy_model`.** Creates `spicy_model`. Design: `model.md` (agreed 2026-09-27). **Resolve for blocks built 2026-09-27** (`spicy_model`, `spicy_lang::resolve`); contracts (M1d-5) and flatten (M1d-4) next.
+- **M1d: Elaboration → `spicy_model`.** Creates `spicy_model`. Design: `model.md` (agreed 2026-09-27). **Resolve for blocks built 2026-09-27** (`spicy_model`, `spicy_lang::resolve`). **Flatten, first version, built 2026-09-28** (`spicy_model::flatten`, `spicy_lang::elaborate`; plan in `model.md` §9): every root, nets merged and named, per-placement knobs, recursion and the whole-net checks. **Reviewed 2026-09-29** (`research/flatten_decisions.md`): ids only, read through a `Flat` handle; a `Reported` proof token for everything broken; the checks in two tiers, the block's own and the ones for simulating it (`check_simulation`); sources counted innermost, as KiCad does; slang's "in 2 of 3 placements" wording; a size limit. Contracts (M1d-5) next, which add the `assume` knobs and the flat contract.
   - Name resolution, pin binding (every pin exactly once) and unit checking.
   - Role checks (one source per `Power` net).
   - Flattening the hierarchy, and extracting the knobs and the contract.
@@ -487,7 +492,7 @@ M3a–M3e run on hand-written ngspice decks and hand-built contracts, so they do
   - **Done when:** σ values within 1e-4 of the σ key on the CE amp (both XTB settings), the plan's §8.3 UNDECIDEDs exactly, no false PASS on the adversarial suite; run counts pinned. 🔍
 - **M3e: Output and store.** Records with `claim`, `next`, tags and `not_modeled`; the terminal table; `--format json` (unstable); `--explain`, `--at`, `--deep`; the per-revision store (`.spicy/checks/<rev>.json`) and `stale`.
   - **Done when:** snapshots of the CE amp and every suite case, as table and JSON. 🔍
-- **M3f: End to end.** `KnobTable` → knob space, `FlatContract` → plan, M1f's engine deck.
+- **M3f: End to end.** The flat design's knobs → knob space, `FlatContract` → plan, M1f's engine deck.
   - **Done when:** `spicy check circuits/ce_amp.spl` prints the plan's §2.8 table, equal to the answer key: bias FAIL at `worst_case` (6.5595 V) beside PASS at `sigma(3)` (6.2813 V); every other side PASS. Snapshot-tested. 🔍
 
 **Acceptance for all of M3:** no false PASS on the adversarial suite (9 cases, kept in the repo as ngspice decks; plan §8.2).

@@ -5,7 +5,8 @@ input_file: crates/spicy_lang/test_data/parser/err/unclosed_struct.spl
 ---
 File 0..68
   Block A 0..67
-    StmtError 14..39 "let r = Resistor { a: vcc"
+    Let r 14..39
+      ExprError 22..39 "Resistor { a: vcc"
     Let s 44..54
       Quantity 1e0 52..53 "1"
     Net n 59..65

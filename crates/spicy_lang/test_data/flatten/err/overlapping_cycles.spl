@@ -1,0 +1,23 @@
+// Two cycles through `A`: `A → B → C → A` and `A → C → A`. The search takes blocks and
+// placements in name order, so which one is reported, and what `Top` keeps of `A`,
+// doesn't depend on the order of the statements or the blocks (model.md E4).
+block Top {
+    port g: Ground;
+    let a = A { g };
+}
+
+block A {
+    port g: Ground;
+    let c = C { g };
+    let b = B { g };
+}
+
+block B {
+    port g: Ground;
+    let c = C { g };
+}
+
+block C {
+    port g: Ground;
+    let a = A { g };
+}

@@ -21,14 +21,14 @@ The parser gives us a tree of what the text **says**: names are just text, and `
 Elaboration has two steps, with two outputs:
 
 ```
- AST ───resolve───► Design ───flatten───► FlatDesign + KnobTable ───(M1e: lower)───► Lowered
+ AST ───resolve───► Design ───flatten───► FlatDesign (with its knobs) ───(M1e: lower)───► Lowered
  (spicy_lang)       (spicy_model)          (spicy_model)
 ```
 
 | Step | Question it answers | Output | Like |
 |---|---|---|---|
 | **resolve** | What does each name refer to? Are the units right? Is every pin bound? | **`Design`**: each block **once**, as written, with names resolved and values typed | slang's elaborated definitions, Modelica's class tree, rustc's HIR |
-| **flatten** | What does the whole circuit look like, with every placement expanded? | **`FlatDesign`**: every device by its path (`amp.r1`), nets merged, plus **`KnobTable`**: every toleranced value and assumption as a knob | Yosys `flatten`, Modelica's flat model, SPICE's subcircuit expansion |
+| **flatten** | What does the whole circuit look like, with every placement expanded? | **`FlatDesign`**: every device by its path (`amp.r1`), nets merged, and every toleranced value and assumption as a knob | Yosys `flatten`, Modelica's flat model, SPICE's subcircuit expansion |
 
 **Why two outputs and not one:** every reference keeps a *folded* form (one copy per definition) apart from the *unfolded* form (one copy per placement).
 - Errors in a definition are found and reported **once**, with its source position, even if the block is placed ten times. ngspice and Xyce only check after expanding subcircuits into text, so one mistake in a subcircuit placed N times gives N errors with no position.
@@ -267,6 +267,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
 **E14. Flatten eagerly, top-down, as a pure function.**
 - Each placement's path is its parent's path plus its own name.
 - Paths are stored as segments (`Vec` of names, or parent id + segment), never as a dotted string parsed back.
+  - *Exception, for now* (decided 2026-09-29): a problem's data holds its paths as dotted strings (`SeveralSources.sources: ["dual.o1", "dual.reg.out"]`), because nothing reads them as data yet. When the editor does, they become segments or ids into the flat design, whichever it needs (`research/flatten_decisions_2.md` D2).
 - A block that places itself, directly or through others, is an error showing the whole chain (`A → B → A`).
 
 *Why:* designs are small. Segments avoid the dotted-name ambiguity Yosys had to patch with a separate attribute.
@@ -366,7 +367,7 @@ The midpoint rule is the one choice here the references don't settle. It matches
 - Spade (global counters: no reuse).
 
 **E22. Positions live in a side table, `DesignSourceMap`, never in the data.**
-- `Design`, `FlatDesign` and `KnobTable` derive `PartialEq` without spans.
+- `Design` and `FlatDesign` derive `PartialEq` without spans.
 - So "nothing changed" is a cheap equality test after a whitespace or comment edit.
 
 *From:* rust-analyzer (a body's data and its source map are separate, so a whitespace edit changes only the map); pipeline.md decision 9.
@@ -426,7 +427,7 @@ pub struct Block {
     pub nets: Vec<Net>,               // NetId   (per block; ports are nets too)
     pub instances: Vec<Instance>,     // InstanceId (per block)
 }
-pub struct Port { pub signal: Option<SignalType> }  // name and span: its net's (port i is net i)
+pub struct Port { pub signal: Result<SignalType, Reported> }  // name and span: its net's (port i is net i)
 pub enum SignalType { Pin, Ground, Power(Role), Analog(Role) }
 pub struct Instance {
     pub name: Name,
@@ -443,18 +444,21 @@ pub enum QKind { Plain, TempPoint, Db }
 pub struct Contract { pub assumptions: Vec<Assumption>, pub measures: Vec<Measure>, pub specs: Vec<Spec> }
 pub enum MExpr { Probe(Probe), Const(Quantity), Call(MeasureFn, Vec<MExpr>), Binary(Op, Box<MExpr>, Box<MExpr>), … }
 
-pub struct FlatDesign {
-    pub instances: Vec<FlatInstance>, // the placement tree: path, block, parent
-    pub nets: Vec<FlatNet>,           // name, aliases, members (with face)
-    pub devices: Vec<FlatDevice>,     // path, part kind, pins → FlatNetId, fields → Exact | Knob(KnobId)
-    pub ground: FlatNetId,
-    pub contract: FlatContract,       // the top block's, with probes resolved to flat nets
+pub struct FlatDesign {                // ids into the Design, never names copied out of it
+    pub root: BlockId,
+    pub instances: Vec<FlatInstance>, // the placement tree: block, (parent, the `let` in it)
+    pub nets: Vec<FlatNet>,           // local nets (placement, NetId): the first names it, the rest are aliases
+    pub devices: Vec<FlatDevice>,     // part kind, (placement, `let`), pins → Result<FlatNetId, Reported>, fields
+    pub knobs: Vec<Knob>,             // source (a device's field), value, kind (Statistical | Range)
+    pub grounds: Vec<FlatNetId>,      // the nets with a `Ground` port; lowering needs exactly one
+    pub tainted: Option<Reported>,    // something in it is broken: not checked or simulated as a whole
+    pub contract: FlatContract,       // (M1d-5) the top block's, with probes resolved to flat nets
 }
-pub struct KnobTable { pub knobs: Vec<Knob> }   // path, kind (Range | Statistical), nominal, lo, hi
+pub struct Flat<'d> { pub design: &'d Design, pub data: &'d FlatDesign }  // names: path(), net_path(), knob_path()
 pub struct DesignSourceMap { … }      // every id → span, and provenance for flat items
 ```
 
-`Name` is an interned string; `Path` is a list of `Name`s, printed with `.` only at the edges.
+`Name` is an interned string; a `HierPath` is a list of names from the root (`left.r1`), printed with `.` only at the edges and built on demand from the ids, through `Flat` (rustc's `tcx.def_path_str(def_id)`).
 
 ---
 
@@ -469,7 +473,7 @@ pub struct DesignSourceMap { … }      // every id → span, and provenance for
   - 6 devices;
   - 6 nets: `vcc`, `gnd` (the Ground net), `input`, `output`, `base`, `emitter`;
   - tier-2 checks pass: `vcc` is a `Power<In>` port, so inside the block it's the source.
-- **KnobTable, 8 knobs:**
+- **Knobs, 8:**
 
 | Knob | Kind | Nominal | Spread |
 |---|---|---|---|
@@ -488,7 +492,7 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
 
 ## 6. Testing
 
-- **Case files** `test_data/model/{ok,err}/*.spl`, the same layout as the lexer and parser. Snapshots of three dumps (`Design`, `FlatDesign`, `KnobTable`), then the rendered diagnostics.
+- **Case files** `test_data/model/{ok,err}/*.spl`, the same layout as the lexer and parser. Snapshots of two dumps (`Design`, and `FlatDesign` with its knobs), then the rendered diagnostics.
 - **A coverage rule:** every error kind has a case.
 - **Two placements:** `Stereo` above. Separate `left.base`/`right.base`, a shared `v12`, separate knobs.
 - **Determinism:** shuffling the statements of every block gives byte-identical dumps. KiCad and atopile both shipped bugs here.
@@ -498,7 +502,8 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
   - every flat net has at least one member;
   - paths are unique;
   - every device pin points to an existing net;
-  - exactly one ground net, or an error.
+  - every placeholder's block is tainted;
+  - simulating a root gives its one ground net, or an error.
 - **End to end (M1e):** `ce_amp.spl` simulated through `Lowered` gives VC ≈ 5.52 V, as the equivalent SPICE deck does.
 
 *From:* RA's fixture-and-dump tests, OpenModelica's expected flat models, KiCad's golden netlists and its determinism tests.
@@ -514,7 +519,7 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
    - Two different things are easy to confuse:
      - an **isolated net**: nothing connects it to the rest of the circuit through any part;
      - a net that reaches ground only through capacitors, so it has **no DC path** (the input side of `c_in`, if nothing drives `input`).
-   - The check here is only the first, a topological one. An isolated net has no electrical meaning. In a simulation it gives a singular matrix: ngspice fails with "singular matrix", and so would our KLU solver.
+   - The check here is only the first, a topological one. An isolated net has no electrical meaning. In a simulation it gives a singular matrix. ngspice-42 prints "singular matrix: check node …", then goes on and reports the node at 0 V (measured 2026-09-28, `research/flatten_decisions.md` §C2), a silently wrong answer; our KLU solver would fail outright.
    - A warning, not an error, because while editing a half-finished schematic has isolated nets all the time. The design should still elaborate, and the editor still shows everything.
    - The engine (M3) refuses to *simulate* a design that still has one, with this warning as the reason, instead of a cryptic solver failure.
    - The no-DC-path case isn't a design error at all: the default bench drives `input`, so the path exists in simulation. If a bench leaves such a node floating, that's for lowering to report (M1e).
@@ -525,8 +530,8 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
 Where the first implementation differs from the text above, and why:
 - **The prelude's data is in `spicy_model`** (`prelude.rs`), not in `spicy_lang` as roadmap §2.5 had it. Flatten needs the signal roles, and lowering needs the part kinds; neither may depend on the language.
 - **How the code is laid out** (the standard for every stage from here on): `resolve()` reads as the passes, one comment each. Pass 1 builds each block's `Signature` (its ports by name), a read-only table in pass 2. Pass 2 gives each body a `BodyResolver` (as rust-analyzer gives each body an `ExprCollector`) that declares the body's names, then resolves each statement into a value (an instance, a merge) and stores it only if the statement owns its name, so a second definition, even a second block, is checked and dropped. Every name goes through one `Scope::declare` (rustc's `try_plant_decl`), and every part is added to the block together with its span (`BlockBuilder`, as rust-analyzer's `alloc_expr`).
-- **One problem type for every stage:** `Diag<K> { kind, span, related, fix }` in `spicy_lang::diagnostic`, generic over the stage's kind enum; `LexError`, `ParseError` and `ResolveError` are aliases (rustc has one `Diag`, Zig one `ErrorBundle`). Kinds carry typed data where there is some (`UnitMismatch` holds the expected `FieldType` and the found `Quantity`; the text is built when rendering).
-- **No `Reported` token yet (E7):** a name that doesn't resolve becomes `InstanceOf::Error`, an unbound pin `None`. The rule "the error has already been reported" holds by construction in the one place these are created. A token becomes worth it when several stages create placeholders.
+- **One problem type for every stage:** `Diag<K> { kind, span, related, fix }` in the `spicy_errors` crate, with its rendering beside it (2026-09-29, as rustc's `rustc_errors` holds `Diag` and its emitters; it sat in `spicy_model::diagnostic` for a day, with the rendering in `spicy_lang`), generic over the stage's kind enum; `LexError`, `ParseError` and `ResolveError` are aliases (rustc has one `Diag`, Zig one `ErrorBundle`). Kinds carry typed data where there is some (`UnitMismatch` holds the expected `FieldType` and the found `Quantity`; the text is built when rendering).
+- **The `Reported` token (E7), added 2026-09-29** once resolve and flatten both made placeholders. `Reported` is rustc's `ErrorGuaranteed`: a zero-size proof, made only by reporting an error (`Diag::report`) or by finding one a stage already reported (`Reported::among`, rustc's `DiagCtxt::has_errors`). The rule: `None` means absent, and "broken, and the user was told" holds the proof: `Port.signal: Result<SignalType, Reported>`, `Instance.pins: Vec<Result<NetId, Reported>>`, `FieldValue::Invalid(Reported)` (a wrong value, or a required field not written), `InstanceOf::Error(Reported)`, and `Block.tainted: Option<Reported>` (rustc's `tainted_by_errors`). A block is tainted when parsing its body reported an error (the parser's `Body::broken`), when a lexer or resolve error lies inside it, and when it's the first of two blocks with one name. Parse errors count by the body that reported them, not by position, as rustc taints the body whose checking reported one: a missing `}` is found at the next item but breaks the block left open. The parser's error nodes hold the proof too (`ExprKind::Error(Reported)`, `StmtKind::Error(Reported)`, `ItemKind::Error(Reported)`). A later stage has to meet `Err(Reported)` to get past a placeholder, so lowering can't quietly simulate a broken circuit.
 - **The temperature errors (E13) come with contracts (M1d-5).** No part field takes a temperature, so `± 5°C`, `± 5%` on a temperature and a bare temperature can only occur in `assume`. They're added and tested there.
 - **One mistake, one error:**
   - a misnamed field (`resistance:` where `value:` is missing) is one error with the rename as its fix;
@@ -541,12 +546,59 @@ Where the first implementation differs from the text above, and why:
   - the shorthand `C { gnd }` is fixed as `gnd: gnd1`, keeping the pin.
 - **Duplicates are checked, not merged (E7):** a second block, port, `net`, `let` or binding (`value: 1k, value: 5V`) of a name is reported and still checked for its own mistakes, but never enters the design or overwrites the first.
 - **An unknown field written twice** (`valu: 1k, valu: 2k`) is one misspelling: both are reported, the rename rule counts it once, and only the first gets the fix (renaming both would give `value` twice).
-- **A port with a wrong type stays a port** (`signal: None`), so its uses resolve and aren't reported again.
+- **A port with a wrong type stays a port** (`signal: Err(Reported)`), so its uses resolve and aren't reported again.
 - **A value the parser already flagged isn't typed** (`1k +- 1%`, `a ± b ± c`): what the parser built is a guess.
 - **Spreads can be scaled** by a plain factor: `2 * (1k ± 1%)` and `(10k ± 500) / 2`, as the parser's help for `2 * 1k ± 1%` suggests. Adding to a spread, or dividing by one, is `SpreadInArithmetic`.
 - **A tolerance is relative only when written with `%`:** `± 1%`, `± (1%)` and `± 2 * 0.5%` alike. Anything else is absolute, in the nominal's unit: `47k ± 50` is ±50 Ω, and `± (1V / 1V)` is a plain 1 (±1 on `beta`, a unit mismatch on a resistance), not ±100%.
 - **Suggestions are budgeted** (64 per file): each looks at every name in scope, so thousands of unknown names would be quadratic. Names are looked up by hash.
 
-## 9. Found along the way
+## 9. Flatten: the plan (M1d-4, first version)
+
+From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, Verilator, rustc, Spade) and `research/flatten_circuit.md` (our `spicy_parser`, atopile, KiCad, Modelica, Xyce, ngspice). Decided 2026-09-28.
+
+**Where it lives.** Flatten is in `spicy_model` (`flat.rs` holds the types, `flatten/` the passes), so the engine and the editor can flatten a `Design` without the language. The problem type sits below both: `Diag<K>`, `DiagKind`, `Fix`, `Severity`, `Reported` and the rendering are the `spicy_errors` crate, `Span` is `spicy_span`, and the `id!` macro is `spicy_index`, small crates that `spicy_model` and `spicy_lang` depend on, as rustc has `rustc_errors`, `rustc_span` and `rustc_index` (decided 2026-09-29). `spicy_lang::elaborate` runs resolve, then flatten, and holds the case-file tests (`test_data/flatten/{ok,err}`).
+
+**The passes**, one comment each in `flatten()`:
+1. **Recursion, once per design.** A depth-first search over the `InstanceOf::Block` edges, with an on-stack set, so a diamond (A places B twice) isn't reported. Each cycle is reported once, with its chain (`A → B → A`), at the placement that closes it (CIRCT's `CheckRecursiveInstantiation`, Spade's traceback). It is a pass of its own because `A` and `B` placing each other leaves no root, so a walk from the roots would never see the cycle (`flatten_circuit.md` §3.1). Later passes skip a placement that is part of a cycle. The search takes blocks, and each block's placements, in name order: when cycles overlap, which placement closes one (what's reported, and what's cut) would otherwise depend on statement order.
+2. **Roots.** Every unplaced block is a root (§7 question 2), flattened on its own, in name order.
+3. **The instance tree.** Placements are expanded top-down, **children in name order**, so shuffling statements gives the same ids (Yosys sorts by name, Spade has `MonoKey`). `FlatInstance { block, origin: Option<LocalInstance> }`, `None` only for the root. A `LocalInstance { at, instance }` is one `let` inside a placement, as a `LocalNet { at, net }` is one net inside it (rustc's `HirId` is an owner and a local id). A name is looked up in the `Design` through the `let` it came from, and a path is rebuilt from parent pointers when something is reported or printed (slang, CIRCT's `dbg.scope`, rustc's `def_path_str`), never stored, and never a dotted string. (A first version stored every path, and took 20 s to flatten 10 000 nested levels; now it's 4 ms. Dropping the copied names, 2026-09-29, made flatten another 20–36% faster.) **A size limit:** past `MAX_PLACEMENTS` (a million), the tree stops growing and the root is reported (`E-size`, at the placement that went over) instead of flattened. Recursion is found exactly, so this is no depth limit (rustc's `recursion_limit`) but a size one: a block placed twice in a block placed twice, 20 deep, is a million placements from 20 lines, and the editor flattens on every edit.
+4. **Joins.** A union-find over dense entries, `base[instance] + NetId` (Yosys `SigMap`), with one union per port binding and per `net x = [..]`.
+5. **Naming.** In each group, the smallest key `(depth, rank, path)` wins. The rank is: port, then merge target (the `x` of `net x = […]`), then net. Every other entry is an alias. Depth comes first, as in KiCad's ranking test (`ZZZ_SHALLOW` beats `AAA_DEEP`) and Verilator's "the outer net survives". The path is compared without being built: placements are numbered in tree order, so at equal depth `(placement, local name)` orders exactly as the paths do. Nets are numbered in order of their winning key, so a shuffle of statements gives the same nets. (The `FlatDesign` keeps resolve's per-block ids for provenance, which follow declaration order, so the shuffle test compares the flat dump, which is everything by path.) The merge-target rank was decided 2026-09-28.
+6. **Devices and knobs.** Devices are numbered placement by placement, in tree order, and each placement's parts in name order. Each field is `Exact`, `Knob`, `Unset` or `Invalid(Reported)`. A given value that varies becomes a knob; a spread of nothing (`± 0%`, `200..=200`) is `Exact`, as ngspice's `agauss` returns the nominal for one (decided 2026-09-29). A `Knob` holds where it comes from (`KnobSource::Field { device, field }`), its `Value` and its kind; its path, its identity (`left.r1.value`, Xyce's per-instance `X1:param`), is built from the source, not stored, so a deep hierarchy stays linear. The kind follows where the knob came from, not how its spread is written: a part's `± 1%` and its `100..=300` are both statistical (language.md §5.4). Range knobs come from `assume`. The knobs are in the `FlatDesign`: the numbers that change per run are the engine's, not a second table's (decided 2026-09-29).
+7. **The ground nets**, as their own step, on every root: every net with a `Ground` port, as plain facts. Lowering makes the one ground net node 0 (E20); that there's exactly one is checked when the root is simulated (below).
+8. **The block's own checks** (E18 tier 2), after every root is flattened, on each root with nothing broken in it. One helper per rule:
+
+   | Check | Computed as | Points at, and paths from |
+   |---|---|---|
+   | Several power sources (error) | 2 or more innermost sources meet (see *Innermost*) | the join where they meet (`o2: seven`), with where the first comes in as related; from the placement the join is in |
+   | No power source (error) | sinks and no source on the net | where the first innermost sink comes in at the net's top (`vcc: rail`); from the net's top; only the innermost sinks listed |
+   | Shorted part (warning) | a two-pin part with both pins on one net | its `let`; from its placement |
+
+   **The checks for simulating a root** (decided 2026-09-29, as Modelica checks every class on its own but balances only the model it simulates, spec §4.8): exactly one ground net (0: the root's name; 2+: the second net, with the first as related), and isolated nets (a component of the device graph not connected to ground; the root's ports with a role count as connected, since the bench drives its inputs and loads its outputs, language.md §8.5; a warning at the component's first net, with paths from the placement the nets are all in). They run in `check_simulation`, which lowering calls first and which returns the ground net, and which the tests call on every root. A library block, which only a board places, needn't be a whole circuit on its own: a snubber across two `Pin`s, or an ADC with separate `agnd` and `dgnd`, has no error.
+
+   **Faces:** a port seen from inside its block (`Inside`) exists only at the root. Every placed port is seen from outside. Roles: `Power<In>` inside and `Power<Out>` outside are sources, and `Power<In>` outside is a sink. If every block's own `Power<In>` counted as a source from inside, `Stereo`'s `v12` would get three sources (`flatten_circuit.md` §3.3). This is Modelica's rule that connection sets are formed per level.
+
+   **Innermost:** a `Power<Out>` passed up a level is one source. A supply that exports its regulator's output puts `sup.v5` and `sup.reg.out` on one net. So only the innermost members of a net count: a placed block's port with another member inside the block is passing it on, as KiCad counts a net's pins and not its sheet pins. Each innermost port counts, as KiCad, Modelica and atopile count them: two outputs of one block on one rail are two sources (decided 2026-09-29), and so is an output with nothing behind it next to one fed by a regulator. Both rules come from one replay of the net's joins, each placement's inside before the placement (`power.rs`): a placed block's port is gathered when it's bound, and only if nothing inside the block is behind that port. Where sources meet in a placement is one problem, at the first join there that brings sources to where there already are some, listing every source that meets there: two regulators tied inside a block are reported there, two outputs of a block tied on a board at the board's binding. Outputs tied together inside their block with nothing behind them are one net there, so one source (KiCad's stacked pins). (Cutting the circuit into levels at the power ports, Modelica's connection sets, was tried and dropped: a supply that also ties a plain `sense` pin to its output would count its regulator twice.)
+
+   **Each problem once** (E23): a check reports per placement, with its paths from the problem's scope. A problem is what it says (`FlattenProblem`) apart from where it is (`InBlock`), as slang keeps an instance and a count beside a diagnostic's arguments (`ASTDiagMap.cpp`). Flatten groups the reports of one problem (its span, related span and what it says) into one, and says where it is: "(in `Mid`)" when every placement of `Mid` has it, since it's then the block's own; "(in 2 of 3 placements of `Mid`, e.g. `a`)" when some do; nothing for a problem of the root itself. The count is over every root checked (over the one root simulated, for a simulation check): a placement in a broken root was never looked at.
+
+   **Complete circuits only** (E7): a root isn't checked or simulated as a whole if it's tainted (`FlatDesign::tainted`): a block in it with an error inside (`Block::tainted`), or a placement cut for recursion. A statement the parser couldn't read, a second `let` or binding, or a merged net that doesn't resolve leaves no placeholder, and the checks would report the damage.
+
+**Provenance** needs no side table in v1. A flat instance or device keeps `(parent, InstanceId)` and a net keeps its local nets `(FlatInstanceId, NetId)`, so every name comes from the `Design` and every span from the `DesignSourceMap` (rustc's `UsageMap` style: ids, not copied spans). A flat design is read through one `Copy` handle, `Flat { design, data }`, made once, so it's never read against another `Design` (rustc's `TyCtxt`, decided 2026-09-29). Recording the cause of each join, for "why are these one net?", comes with the editor.
+
+**Not in this version:** the contract. `assume` knobs (`vcc.v`, `temp`) and the flat contract come with contract resolution (M1d-5), so `ce_amp` flattens to its 6 part knobs.
+
+**Tests:**
+- `ce_amp` as the root: 6 devices, 6 nets, 6 knobs;
+- `Stereo`: `v12` with aliases `left.vcc` and `right.vcc`, one source, separate `left.base` and `right.base`, separate knobs;
+- the ranking cases: depth over name, port over net, the merge target, three levels deep;
+- a shuffle of statements and blocks that must give `==` results and byte-identical dumps;
+- stability: adding an unrelated part changes no other name;
+- recursion: self-placement, `A ↔ B` with no root reported once, the diamond not reported;
+- one error case per check, a shorted part placed twice giving one warning, and a problem in one of three placements saying which;
+- resolve errors upstream add no flatten errors;
+- fuzz invariants: no panic, unique paths, every pin on an existing net.
+
+## 10. Found along the way
 
 - **`spicy_parser` subcircuit parameter precedence** (`subcircuit_phase.rs:321-325`): a subcircuit's local `.param` overrides the value given on the `X` line. Xyce does the opposite, and ngspice is unconfirmed. To check against ngspice when it's installed.

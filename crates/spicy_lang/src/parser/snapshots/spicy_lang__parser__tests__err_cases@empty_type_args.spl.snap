@@ -5,7 +5,8 @@ input_file: crates/spicy_lang/test_data/parser/err/empty_type_args.spl
 ---
 File 0..41
   Block A 0..40
-    StmtError 14..26 "port p: A<>;"
+    Port p 14..26
+      TypeError 22..25 "A<>"
     Net ok 31..38
 
 --- errors ---

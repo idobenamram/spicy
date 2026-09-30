@@ -1,0 +1,12 @@
+// Exactly one ground net (model.md E20): there are no global nets.
+block NoGround {
+    port a: Pin;
+    port b: Pin;
+    let r = Resistor { a, b, value: 1k };
+}
+
+block TwoGrounds {
+    port g1: Ground;
+    port g2: Ground;
+    let r = Resistor { a: g1, b: g2, value: 1k };
+}

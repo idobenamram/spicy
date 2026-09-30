@@ -8,6 +8,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
 2. **[walkthrough.md](walkthrough.md)**: one amplifier followed through the whole engine, with real numbers. The best introduction to how the engine thinks.
 3. **[engine.md](engine.md)**: the engine design (current: v4, on ngspice: every corner, inside-the-box guards, the 3σ-point search).
    - **[engine_plan.md](engine_plan.md)**: the engine MVP plan on ngspice, from three research rounds (accepted 2026-09-27: decisions D-A to D-F).
+   - **[engine_types.md](engine_types.md)**: the M3a design note: the engine's types, the `Backend` trait, stages and driver, run table, verdict functions, report schema, the ngspice worker, and the test suite layout (draft for review).
 4. **[language.md](language.md)**: the circuit language (v0.1).
    - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
    - **[model.md](model.md)**: elaboration, from syntax tree to flat design: `Design`, `FlatDesign`, knobs, nets, units, checks; compared with compilers, hardware elaborators, Modelica and circuit tools.
@@ -43,6 +44,13 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [engine_position_agent.md](research/engine_position_agent.md): the engine as the AI agent's instrument; every agent flow end to end
     - [engine_position_scale.md](research/engine_position_scale.md): 8 to 302 knobs; cones, worker pools, transient cost
     - [engine_position_alternatives.md](research/engine_position_alternatives.md): the loop against screening, response surfaces and sampling
+  - After the MVP (round 4: next circuits through the current design, on ngspice):
+    - [next_synthesis.md](research/next_synthesis.md): the findings by layer (language, model, export, engine, types, backend, report), each with problem, scenario, impact, fix; the seams to add now; the circuit ladder. Start here.
+    - [next_precision_analog.md](research/next_precision_analog.md), [next_power.md](research/next_power.md), [next_mixed_signal.md](research/next_mixed_signal.md), [next_time_domain.md](research/next_time_domain.md), [next_boards.md](research/next_boards.md)
+  - Contracts rethought (round 5: specs, setups, loads, faults, hierarchy):
+    - [contract_options.md](research/contract_options.md): the three options compared, the common core, a possible hybrid. Start here.
+    - Options: [contract_option_a_datasheet.md](research/contract_option_a_datasheet.md), [contract_option_b_testbench.md](research/contract_option_b_testbench.md), [contract_option_c_interface.md](research/contract_option_c_interface.md)
+    - Research: [contract_references.md](research/contract_references.md), [contract_ee_practice.md](research/contract_ee_practice.md) (sources, loads and setups for non-specialists; the reference board), [contract_hierarchy.md](research/contract_hierarchy.md) (reusing a child's results), [contract_tool_gaps.md](research/contract_tool_gaps.md) (what today's tools can't do, G1–G19, faults)
   - Data pipeline:
     - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
     - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured

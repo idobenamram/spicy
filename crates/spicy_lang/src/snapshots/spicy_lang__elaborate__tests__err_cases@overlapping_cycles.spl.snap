@@ -1,0 +1,22 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/overlapping_cycles.spl
+---
+root Top
+  net g (ground)  aliases a.g, a.c.g
+
+--- errors ---
+E-recursion RecursivePlacement 487..488 "A" related 322..323
+
+--- rendered ---
+error[E-recursion]: `A` places itself: A → B → C → A
+   --> overlapping_cycles.spl:22:13
+   |
+ 9 | block A {
+   |       - defined here
+   .
+22 |     let a = A { g };
+   |             ^ places `A` again
+   |
+   = note: a block can't contain itself, directly or through others

@@ -1,0 +1,27 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/err/cycle_below_root.spl
+---
+root EnterA
+  net g (ground)  aliases a.g
+root EnterB
+  net g (ground)  aliases b.g
+root EnterC
+  net g (ground)  aliases c.g
+  Resistor c.r a→g b→g value=1000 Ω
+
+--- errors ---
+E-recursion RecursivePlacement 766..767 "A" related 487..488
+
+--- rendered ---
+error[E-recursion]: `A` places itself: A → B → C → A
+   --> cycle_below_root.spl:34:13
+   |
+20 | block A {
+   |       - defined here
+   .
+34 |     let a = A { g };
+   |             ^ places `A` again
+   |
+   = note: a block can't contain itself, directly or through others

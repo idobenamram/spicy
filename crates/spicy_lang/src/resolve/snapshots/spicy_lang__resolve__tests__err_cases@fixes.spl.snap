@@ -35,6 +35,7 @@ block A 139..140
   r6 = Resistor 808..810
     a → vcc
     b → gnd
+    value = <invalid>
   r7 = Resistor 866..868
     a → <unbound>
     b → gnd
@@ -50,6 +51,7 @@ block A 139..140
   r10 = Resistor 1107..1110
     a → vcc
     b → gnd
+    value = <invalid>
   r11 = <error> 1185..1188
 
 --- errors ---

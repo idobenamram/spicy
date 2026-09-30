@@ -1,4 +1,4 @@
-use spicy_model::span::Span;
+use spicy_span::Span;
 
 /// Index of a token in [`Tokens`].
 pub type TokenIdx = u32;

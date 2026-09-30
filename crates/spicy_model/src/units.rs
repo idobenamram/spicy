@@ -324,6 +324,13 @@ impl Value {
             Spread::Range { lo, hi } => (lo, hi),
         }
     }
+
+    /// Whether it can be anything but its nominal: a spread of nothing (`± 0%`, `± 0V`,
+    /// `200..=200`) doesn't vary, as ngspice's `agauss` returns the nominal for one.
+    pub fn varies(&self) -> bool {
+        let (lo, hi) = self.bounds();
+        lo != hi
+    }
 }
 
 impl fmt::Display for Value {
@@ -458,6 +465,24 @@ mod tests {
             }
         );
         assert_eq!(range.bounds(), (-3000.0, -1000.0));
+    }
+
+    #[test]
+    fn a_spread_of_nothing_does_not_vary() {
+        let v = |spread| Value {
+            nominal: Quantity::new(1000.0, Dimension::OHM),
+            spread,
+        };
+        assert!(!v(Spread::Exact).varies());
+        assert!(!v(Spread::Rel(0.0)).varies());
+        assert!(!v(Spread::Abs(0.0)).varies());
+        let point = Spread::Range {
+            lo: 1000.0,
+            hi: 1000.0,
+        };
+        assert!(!v(point).varies());
+        assert!(v(Spread::Rel(0.01)).varies());
+        assert!(v(Spread::Abs(5.0)).varies());
     }
 
     #[test]

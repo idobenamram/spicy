@@ -164,7 +164,7 @@ externals/    reference repos (gitignored)
 The engine MVP runs on ngspice (ngspice-42 with KLU, installed). The details are in `engine_plan.md` §4 (the backend) and §5 (what the export must emit); this section is the summary.
 
 **Input.** ngspice only reads SPICE netlists, so this is where the netlist export lives. The exporter turns a flat design plus a knob point into ngspice's SPICE dialect:
-- element names derived from model paths (`amp.r1` → `R_amp_r1`), with a table mapping them back;
+- element names derived from model paths (`amp.r1` → `R.amp.r1`, ngspice's own scheme for flattened names; `netlist_writer.md`), with a table mapping them back;
 - `.model` cards for transistors;
 - `.temp`;
 - the analyses the engine asked for.
@@ -411,7 +411,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
     - simulated natively, the operating point gives VC ≈ 5.52 V;
     - on ngspice, with the D-A model at TNOM 25 °C, VC = 5.503227 V (`engine_plan.md` §2.1). 🔍
 - **M1f: SPICE export** (formerly the first half of M4).
-  - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R_amp_r1`).
+  - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R.amp.r1`). Design: `netlist_writer.md` (decided 2026-09-30): `spicy_parser` became `spicy_netlist`, with a reader and a writer.
   - `spicy export`.
   - **Two export modes** (`engine_plan.md` §5, the engine's contract): the **numeric** export at one knob point, and the **engine deck** (`EngineDeck`: a `.param` per knob, `.temp {…}`, `.options` as an input, one `.model QM_<path>` per BJT named apart from its instance `Q_<path>`, no analyses, plus the knob and probe maps).
   - **Needs first, done 2026-09-30** (data only, no temperature physics): `Params.temp`, a `tnom` on every model, `BjtModel` `xtb`, `xti`, `eg`, `DiodeModel` `eg`, `xti`, and the solver options the source asked for (`engine_plan.md` §5.2); `spicy_netlist` accepts those model parameters, BJT `temp`/`dtemp`, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).

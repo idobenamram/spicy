@@ -18,6 +18,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
    - **[circuit.md](circuit.md)**: the circuit data model (`spicy_circuit`): today's flow traced through the code, and each design choice checked against ngspice, Xyce, Gnucap, OSDI/VACASK and compilers.
+   - **[netlist_writer.md](netlist_writer.md)**: the SPICE netlist writer (M1f's numeric export): names, numbers, what gets written, and the round-trip test (decided 2026-09-30).
 7. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
 
 ## Reference

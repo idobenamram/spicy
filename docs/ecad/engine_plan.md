@@ -122,26 +122,26 @@ What the M1f exporter hands the engine for `ce_amp.spl`. Checked on ngspice-42 *
 .temp {k0}
 V_vcc   vcc   0 DC {k1}                 ; default bench: Power<In> port vcc
 V_input input 0 DC 0 AC 1               ; default bench: Analog<In> port input
-R_r1 vcc base {k2}
-R_r2 base 0 {k3}
-R_rc vcc output {k4}
-R_re emitter 0 {k5}
-C_c_in base input {k6}                  ; Electrolytic p = base, n = input
-Q_q1 output base emitter QM_q1
+r1 vcc base {k2}
+r2 base 0 {k3}
+rc vcc output {k4}
+re emitter 0 {k5}
+c_in base input {k6}                    ; Electrolytic p = base, n = input
+q1 output base emitter QM_q1
 .model QM_q1 NPN(IS=1e-14 BF={k7} XTB=1.5 XTI=3 EG=1.11)
 ```
 
 | Knob | `.param` | Unit conversion | Target | Read-back vector |
 |---|---|---|---|---|
-| `temp` | `k0` | K → °C (−273.15) | circuit temperature | `@q_q1[temp]` |
+| `temp` | `k0` | K → °C (−273.15) | circuit temperature | `@q1[temp]` |
 | `vcc.v` | `k1` | — | `V_vcc` DC | `@v_vcc[dc]` |
-| `r1.value` … `re.value` | `k2` … `k5` | — | `R_r1` … resistance | `@r_r1[resistance]` … |
-| `c_in.value` | `k6` | — | `C_c_in` capacitance | `@c_c_in[capacitance]` |
+| `r1.value` … `re.value` | `k2` … `k5` | — | `r1` … resistance | `@r1[resistance]` … |
+| `c_in.value` | `k6` | — | `c_in` capacitance | `@c_in[capacitance]` |
 | `q1.beta` | `k7` | — | model `QM_q1`, BF | `@qm_q1[bf]` |
 
-- **The model name differs from the instance name.** With both named `Q_q1`, ngspice resolves `@q_q1[bf]` to the instance and answers "no such parameter" (found when the first draft's deck was re-run in review).
+- **The model name differs from the instance name.** With both named `q1`, ngspice resolves `@q1[bf]` to the instance and answers "no such parameter" (found when the first draft's deck was re-run in review).
 - **Parameters are knob ids** (`k0` … `k7`), with a comment giving each path. ngspice lowercases names, so path-derived names like `a.b_c` and `a_b.c` could collide.
-- **The probe map** turns `output.v` into `v(output)`, and names the device records to read (`@q_q1[ic]`, `[ib]`, `[vbe]`, `[vbc]`, `[gm]`, `[gmu]`). The engine computes `h` as `v(output)/v(input)`; it never assumes the source is exactly 1 V.
+- **The probe map** turns `output.v` into `v(output)`, and names the device records to read (`@q1[ic]`, `[ib]`, `[vbe]`, `[vbc]`, `[gm]`, `[gmu]`). The engine computes `h` as `v(output)/v(input)`; it never assumes the source is exactly 1 V.
 - The deck carries **no analyses**; the worker sends them per request.
 
 ### 1.5 The structures, traced on the CE amp
@@ -150,7 +150,7 @@ Q_q1 output base emitter QM_q1
  ce_amp.spl:12   let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };
    M1d           FlatDevice r1: Resistor a→vcc b→base, value = Knob#2
                  Knob#2 "r1.value": statistical, nominal 47 kΩ, 46.53k … 47.47k
-   M1f           R_r1 vcc base {k2}   · knob map: r1.value → k2, read-back @r_r1[resistance]
+   M1f           r1 vcc base {k2}     · knob map: r1.value → k2, read-back @r1[resistance]
    engine        KnobSpace: ε(r1) ∈ [-1, 1], x = 47k + 470·ε; in the cone of every measure
  ce_amp.spl:27   spec bias: dc(output.v) in 4.5V..=6.5V;
    M1d           Spec bias: Call(Dc, Probe(output, V)), In 4.5 V..=6.5 V, confidence sigma(3) (default)
@@ -486,7 +486,7 @@ Recommended (decision D-B): the libngspice worker, one per core when batches are
  alterparam k0=-10 · … · alterparam k7=100                set every knob (the deck keeps a .param per knob)
  reset                                                      rebuild the circuit: every run is cold and pure
  op                                                         operating point
- read v(output) v(base) v(emitter) … @q_q1[ic|ib|vbe|vbc|gm|gmu] · read-backs
+ read v(output) v(base) v(emitter) … @q1[ic|ib|vbe|vbc|gm|gmu] · read-backs
  ac lin 1 1000 1000 · read v(output), v(input)              one exact point per at(f)
  ac dec 50 0.1 1e5 · read frequency, v(output), v(input)    the sweep for f_low
  destroy all                                                drop the plots
@@ -550,7 +550,7 @@ pub fn engine_deck(design: &FlatDesign, knobs: &KnobTable, options: &SpiceOption
 ```
 
 - **Names:**
-  - elements follow roadmap §3 (`R_r1`, `Q_q1`), with collisions checked;
+  - elements are named by the netlist writer's rule (`netlist_writer.md` §2): `r1` and `q1` keep their names, `amp.r1` becomes `R.amp.r1`, and the writer resolves collisions;
   - each BJT whose model field is a knob gets its own `.model QM_<path>`, named apart from the instance;
   - parameters are knob ids `k0 … kN` with a path comment.
 - **Options are an input.** The engine asks for two decks, one with engine tolerances and one with tight tolerances.

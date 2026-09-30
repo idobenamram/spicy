@@ -507,6 +507,8 @@ M3a–M3e run on hand-written ngspice decks and hand-built contracts, so they do
 - **M7:** Statistics: board yield, importance sampling (engine v3 §4.4).
 - **M8:** Parameter layer and sensitivities in our simulator (transposed KLU solve, DC/AC adjoint).
 - **Later:** language growth (generics, loops, interfaces, modules), automatic checks, the editor and the agent (plan §7, §9.3).
+- **Later: our own temperature model.** The richest temperature behavior we have (datasheet curves, measured tempcos, later Verilog-A) lives in the part description, above `spicy_circuit`, which only carries SPICE-style parameters (TNOM, XTB, XTI, EG). Per part, the backend either **pre-applies** our law (hands the simulator values at the run's temperature, with TNOM = T) or **passes through** the SPICE parameters (vendor models it can't see into). Needs a research round first: VBIC/HICUM/BSIM temperature modeling, how Spectre and Xyce do it, fitting datasheet curves, and whether pre-applying covers internal effects such as junction capacitances. Not MVP.
+- **Later: when specs run.** Tiers (live, save, idle, commit, CI, nightly, manual) placed by the engine's cost estimate, a `#[run(…)]` override, "gate by meaning, schedule by cost", and verdicts stored by cone fingerprint so fresh vs stale is exact. Designed in `research/runs_language.md`, measured in `research/runs_cost_tiers.md`. Not MVP: `spicy check` runs everything.
 
 ---
 

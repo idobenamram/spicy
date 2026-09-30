@@ -308,3 +308,4 @@ contract SensorBoard {
 5. Second implementations (parked).
 6. The exact spelling of measure methods, to settle while writing the language.
 7. The implementation review's 7 grammar questions (§8 of that file), to settle when the front-end reaches them.
+8. **When specs run** (not MVP). The likely addition is one attribute, `#[run(ci | nightly | manual)]`, on top of automatic tiers from the engine's cost estimate. Design: `runs_language.md`; measurements: `runs_cost_tiers.md`.

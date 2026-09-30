@@ -56,10 +56,18 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [contract_syntax_v4.md](research/contract_syntax_v4.md) and its reviews: [consistency](research/contract_v4_review_consistency.md), [novice](research/contract_v4_review_novice.md), [implementation](research/contract_v4_review_implementation.md)
     - [contract_syntax_v3.md](research/contract_syntax_v3.md): the previous draft, with what changed from draft 2 and why.
     - [contract_syntax_v2.md](research/contract_syntax_v2.md) and its reviews: [semantics](research/contract_v2_review_semantics.md), [syntax](research/contract_v2_review_syntax.md), [engine](research/contract_v2_review_engine.md), [usability](research/contract_v2_review_usability.md)
+  - When and how specs run (round 7):
+    - [runs_language.md](research/runs_language.md): three options and the recommendation ("gate by meaning, schedule by cost"), the result store, CI and the agent. Start here.
+    - [runs_cost_tiers.md](research/runs_cost_tiers.md): measured costs on ngspice, the cost estimator, the tiers, incremental re-checks
+    - [runs_references.md](research/runs_references.md): how software and hardware verification decide what runs when
   - Data pipeline:
     - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
     - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured
     - [data_model_survey.md](research/data_model_survey.md): how ngspice, Xyce, Gnucap, OSDI/VACASK, MLIR and data-oriented compilers lay out circuit data, with citations
+    - Temperatures, solver options and names in `spicy_circuit`, checked before they were built (the `Conditions` struct they review became `Params.temp` plus a TNOM per model, `engine_plan.md` §5.2):
+      - [circuit_conditions_simulators.md](research/circuit_conditions_simulators.md): how ngspice, Xyce, Gnucap and VACASK hold the circuit temperature, TNOM, options and names
+      - [circuit_conditions_compilers.md](research/circuit_conditions_compilers.md): where compilers and modeling tools keep conditions, options and names
+      - [circuit_conditions_engine.md](research/circuit_conditions_engine.md): what the engine and the exporter need from `spicy_circuit`
   - Language proposals:
     - [language_core.md](research/language_core.md)
     - [language_specs.md](research/language_specs.md)

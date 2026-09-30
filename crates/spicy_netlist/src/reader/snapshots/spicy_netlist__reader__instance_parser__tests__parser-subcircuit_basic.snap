@@ -1,0 +1,127 @@
+---
+source: crates/spicy_netlist/src/reader/instance_parser.rs
+assertion_line: 1267
+expression: deck
+---
+Deck {
+    title: "basic subcircuit",
+    node_mapping: NodeMapping {
+        nodes: [
+            NodeName(
+                "0",
+            ),
+            NodeName(
+                "vcc",
+            ),
+            NodeName(
+                "in",
+            ),
+            NodeName(
+                "out",
+            ),
+        ],
+    },
+    commands: [],
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
+                name: "X1.R1",
+                span: Span {
+                    start: 57,
+                    end: 68,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    2,
+                ),
+                negative: NodeIndex(
+                    3,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                        scaled: 1000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ],
+        capacitors: [
+            CapacitorSpec {
+                name: "X1.C2",
+                span: Span {
+                    start: 70,
+                    end: 84,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    3,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                capacitance: Some(
+                    Value {
+                        value: 0.1,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                        scaled: 1e-7,
+                    },
+                ),
+                model: None,
+                mname: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                ic: None,
+            },
+        ],
+        inductors: [],
+        diodes: [],
+        voltage_sources: [
+            IndependentSourceSpec {
+                name: "X1.V1",
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                            scaled: 5.0,
+                        },
+                    ),
+                ),
+                ac: None,
+            },
+        ],
+        current_sources: [],
+        bjts: [],
+    },
+}

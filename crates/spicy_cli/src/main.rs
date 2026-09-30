@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use spicy_parser::{ParseOptions, lower, parse};
+use spicy_netlist::reader::{ParseOptions, lower, parse};
 use spicy_simulate::SimulationConfig;
 
 use crate::batch::RawOutput;

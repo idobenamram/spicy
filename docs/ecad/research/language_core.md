@@ -571,7 +571,7 @@ A number literal is `digits(.digits)?(e[+-]?digits)?` with an optional **glued**
 
 | Rule | Example | Note |
 |---|---|---|
-| Prefixes are SI and **case-sensitive** | `m` = 10⁻³, `M` = 10⁶, `k` = 10³, `u`/`µ` = 10⁻⁶ | SPICE is the opposite: `M` = milli, `Meg` = mega (our own netlist parser: `crates/spicy_parser/src/netlist_types.rs:244-246`). `1Meg` is rejected with a fix-it; `.spicy` import converts |
+| Prefixes are SI and **case-sensitive** | `m` = 10⁻³, `M` = 10⁶, `k` = 10³, `u`/`µ` = 10⁻⁶ | SPICE is the opposite: `M` = milli, `Meg` = mega (our own netlist parser: `crates/spicy_netlist/src/reader/netlist_types.rs:244-246`). `1Meg` is rejected with a fix-it; `.spicy` import converts |
 | Prefix-only literals take their unit from the expected type | `value: 47k` in a `Resistor` is `Ohm` | Like Rust integer literal inference. Without an expected type: error "`10k` needs a unit here" |
 | `K` is kelvin, not kilo | `value: 1K` on a resistor → "expected `Ohm`, found `Kelvin`; did you mean `1k`?" | The most common habit carried over from case-insensitive SPICE |
 | RKM codes (IEC 60062) | `4k7` = 4.7k, `4R7` = 4.7 Ω, `2u2` | Accepted on input |

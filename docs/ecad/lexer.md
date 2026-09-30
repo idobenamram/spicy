@@ -302,7 +302,7 @@ These must hold for **any** `&str`:
 They're checked in three places:
 - **On every case file.** Free, runs with the suite.
 - **A seeded random test in `cargo test`:** a hand-written xorshift generator, 10 000 inputs of up to 48 pieces each. The alphabet is weighted, as in Zig: mostly the characters that matter (`0-9 k m M . = ± + / - * ( ) { } ; : _ µ Ω ° % " "` and newline), some random Unicode. Deterministic, dependency-free, and runs in CI on stable.
-- **A cargo-fuzz target** next to the existing `fuzz_spicy_parser`, for long runs on nightly.
+- **A cargo-fuzz target** next to the existing `fuzz_spicy_netlist`, for long runs on nightly.
 
 ### 7.4 Speed
 

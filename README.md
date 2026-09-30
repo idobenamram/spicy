@@ -6,7 +6,7 @@ Spicy is a small Rust project for  running basic circuit simulations using Modif
 
 ## Crates
 
-- Parser: see `crates/spicy_parser` ([README](crates/spicy_parser/README.md))
+- Netlists (SPICE reader): see `crates/spicy_netlist` ([README](crates/spicy_netlist/README.md))
 - Simulator: see `crates/spicy_simulate` ([README](crates/spicy_simulate/README.md))
 - CLI/TUI: see `crates/spicy_cli` ([README](crates/spicy_cli/README.md))
 
@@ -23,7 +23,7 @@ cargo run -p spicy_cli -- --tui crates/spicy_simulate/tests/op_dc/simple_resisto
 Run the test suites:
 
 ```bash
-cargo test -p spicy_parser
+cargo test -p spicy_netlist
 cargo test -p spicy_simulate
 ```
 

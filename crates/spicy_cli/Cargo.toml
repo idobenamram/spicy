@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 spicy_circuit = { path = "../spicy_circuit" }
-spicy_parser = { path = "../spicy_parser" }
+spicy_netlist = { path = "../spicy_netlist" }
 spicy_simulate = { path = "../spicy_simulate" }
 ratatui = "0.30.0"
 crossterm = "0.29.0"

@@ -488,7 +488,7 @@ pub part Q2N3904: Npn {
 }
 ```
 
-**The model problem.** A commonly circulated vendor-style `Q2N3904` model (`Is=6.734f Xti=3 Eg=1.11 Vaf=74.03 Bf=416.4 … Rb=10`; I did not verify its original source) is rejected by our simulator: `Parse error: invalid param: Xti` (tested with our binary, `q2n3904.spicy`). Our parser accepts only IS, BF, BR, NF and NR for BJTs (`crates/spicy_parser/src/netlist_models.rs`). So the agent must:
+**The model problem.** A commonly circulated vendor-style `Q2N3904` model (`Is=6.734f Xti=3 Eg=1.11 Vaf=74.03 Bf=416.4 … Rb=10`; I did not verify its original source) is rejected by our simulator: `Parse error: invalid param: Xti` (tested with our binary, `q2n3904.spicy`). Our parser accepts only IS, BF, BR, NF and NR for BJTs (`crates/spicy_netlist/src/reader/netlist_models.rs`). So the agent must:
 - call `capabilities()` before attaching a model;
 - either keep the generic Ebers–Moll with the datasheet's β range, or route to ngspice (M4);
 - tag the verdict **model-conditional** if parameters are dropped.

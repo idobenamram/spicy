@@ -1,5 +1,5 @@
 [package]
-name = "spicy_parser-fuzz"
+name = "spicy-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2024"
@@ -9,13 +9,13 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-spicy_parser = {path = "../crates/spicy_parser"}
+spicy_netlist = {path = "../crates/spicy_netlist"}
 spicy_lang = {path = "../crates/spicy_lang"}
 
 
 [[bin]]
-name = "fuzz_spicy_parser"
-path = "fuzz_targets/spicy_parser.rs"
+name = "fuzz_spicy_netlist"
+path = "fuzz_targets/spicy_netlist.rs"
 test = false
 doc = false
 bench = false

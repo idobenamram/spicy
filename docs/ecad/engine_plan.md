@@ -573,7 +573,7 @@ pub fn engine_deck(design: &FlatDesign, knobs: &KnobTable, options: &SpiceOption
 
 The temperature fields are carried, not simulated yet (temperature support is M2c).
 
-### 5.3 `spicy_parser`: what it must accept
+### 5.3 `spicy_netlist`: what it must accept
 
 **Done (2026-09-30).** It accepts:
 - **On model cards:** `XTB`, `XTI`, `EG`, `TNOM` on `NPN`/`PNP`; `EG`, `XTI`, `TNOM` on `D`; `TNOM` on `R`, `C`, `L`. TNOM is in °C, stored in K. BJT instances also take `temp` and `dtemp`.
@@ -584,8 +584,8 @@ The temperature fields are carried, not simulated yet (temperature support is M2
 ### 5.4 M1e and M1f, and the round trip
 
 - **M1e** lowers a bare `Npn` to `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: 298.15 }` (decision D-A), sets `Params.temp` from the `temp` knob, and builds the default bench.
-- **M1f, numeric export** (a knob point): writes `.temp`, `.options tnom=…`, and full model cards. *Done when:* export → `spicy_parser` → lower gives the same `Circuit` + `Params` + options (roadmap M1f, extended by the options).
-- **M1f, engine deck** (§5.1). *Done when:* the deck at its nominal `.param` values, parsed by `spicy_parser` (which already evaluates `.param` and `{…}`), lowers to the same result as the numeric export at nominal; ngspice's read-back of every knob at nominal and at one corner equals the requested values.
+- **M1f, numeric export** (a knob point): writes `.temp`, `.options tnom=…`, and full model cards. *Done when:* export → `spicy_netlist` → lower gives the same `Circuit` + `Params` + options (roadmap M1f, extended by the options).
+- **M1f, engine deck** (§5.1). *Done when:* the deck at its nominal `.param` values, parsed by `spicy_netlist` (which already evaluates `.param` and `{…}`), lowers to the same result as the numeric export at nominal; ngspice's read-back of every knob at nominal and at one corner equals the requested values.
 - **Dependencies:** §5.2 and §5.3 are done. They were data only (no temperature physics), so they didn't pull M2c forward.
 
 ---
@@ -878,7 +878,7 @@ Each step ends in a review (🔍), as roadmap §8 describes. M3a–M3e run on th
 ```
  language track (another session)                       engine track (this plan)
  §5.2 spicy_circuit: xtb/xti/eg/tnom, temp (done)          M3a design note + EngineDeck type
- §5.3 spicy_parser: those params, .temp, .options (done)          │
+ §5.3 spicy_netlist: those params, .temp, .options (done)          │
  M1d elaborate: FlatDesign, KnobTable, FlatContract        M3b backend ─► M3c worst_case ─► M3d sigma(3)
  M1e lower: default bench, DEFAULT Npn MODEL ◄─ D-A                                     ─► M3e output
  M1f export: numeric + engine deck (§5.4)                         │

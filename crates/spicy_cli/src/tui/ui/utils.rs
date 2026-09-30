@@ -4,8 +4,8 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Span as UiSpan;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Text};
-use spicy_parser::Span;
-use spicy_parser::error::SpicyError;
+use spicy_netlist::reader::Span;
+use spicy_netlist::reader::error::SpicyError;
 
 pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let vertical = Layout::default()

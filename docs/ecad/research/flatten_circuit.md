@@ -1,12 +1,12 @@
 # Research: Circuit Tools for Flatten (M1d-4)
 
 > 2026-09-27 · Reference report for `model.md` §3.5–3.7 (E14–E23), the flatten step.
-> Revisions: our `spicy_parser` at `3e8cedd`, atopile `619eda7` (`externals/atopile`), KiCad `cda6040f`, Xyce `6243c62`, ngspice `56a152c7`, Modelica spec `18f00b1`, OpenModelica `41a658f`.
+> Revisions: our `spicy_netlist` at `3e8cedd`, atopile `619eda7` (`externals/atopile`), KiCad `cda6040f`, Xyce `6243c62`, ngspice `56a152c7`, Modelica spec `18f00b1`, OpenModelica `41a658f`.
 > **Verified in source** unless marked *(recall)*. The companion report `model_circuit_tools.md` covers the same tools for the whole stage; this one is only about flatten.
 
 ## 1. What each tool does
 
-**Our `spicy_parser`** (`subcircuit_phase.rs:279-336`, `expr.rs:247-271`)
+**Our `spicy_netlist`** (`subcircuit_phase.rs:279-336`, `expr.rs:247-271`)
 - **Naming:** a device inside `X1` becomes `X1.R1`. An internal node becomes `X1.mid`. A port is *replaced* by the parent's node string (`node_mapping` lookup, `expr.rs:260-264`). So the name "highest in the hierarchy wins" by construction, and nothing records that `X1.in` existed. There is no union-find and no alias.
 - **Ground:** `"0"` is never prefixed (`expr.rs:265`). This is the one global node.
 - **Numbering:** nodes are numbered by first appearance (`node_mapping.rs:5-6`), so the numbers depend on statement order.
@@ -64,7 +64,7 @@
 
 ## 2. Answers by question
 
-| | spicy_parser | atopile | KiCad | Modelica | Xyce/ngspice |
+| | spicy_netlist | atopile | KiCad | Modelica | Xyce/ngspice |
 |---|---|---|---|---|---|
 | **1. Naming** | substitution: the parent's node wins | (forced, depth, name), sorted by stable key | (strength, priority, depth, alphabetical) | the path is the name | mangled prefix strings |
 | **2. Members** | none kept | interfaces on a bus | pins and labels per subgraph | (variable, face, source) | nodes |
@@ -136,9 +136,9 @@ Worked examples:
 - Each `FieldValue::Given(v)` whose spread isn't `Exact` becomes `Knob(id)`, with path = device path + field name (`left.r1.value`). An exact value becomes `Exact(q)`. `Unset` and `Invalid` get no knob.
 - Knobs are numbered in path order.
 - This is Xyce's `X1:param` without the per-instance re-resolution, because values stay in the `KnobTable` (E17).
-- When blocks get parameters, the instance's argument wins (Xyce), not `spicy_parser`'s order.
+- When blocks get parameters, the instance's argument wins (Xyce), not `spicy_netlist`'s order.
 
-**3.6 What to share with `spicy_parser`.** No code: it is string-based, case-insensitive and stops at the first error. Keep only its conventions:
+**3.6 What to share with `spicy_netlist`.** No code: it is string-based, case-insensitive and stops at the first error. Keep only its conventions:
 - `.`-joined display paths;
 - the port takes the outer node;
 - a stack for cycles, but report the chain it already holds.

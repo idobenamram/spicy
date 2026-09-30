@@ -1,0 +1,163 @@
+---
+source: crates/spicy_netlist/src/reader/instance_parser.rs
+assertion_line: 1325
+expression: deck
+---
+Deck {
+    title: "basic diode",
+    node_mapping: NodeMapping {
+        nodes: [
+            NodeName(
+                "0",
+            ),
+            NodeName(
+                "in",
+            ),
+            NodeName(
+                "out",
+            ),
+        ],
+    },
+    commands: [],
+    devices: Devices {
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [
+            DiodeSpec {
+                name: "D1",
+                span: Span {
+                    start: 44,
+                    end: 124,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                model_name: "Dmod",
+                model: DiodeModel {
+                    is: Some(
+                        Value {
+                            value: 1.0,
+                            exponent: Some(
+                                -14.0,
+                            ),
+                            suffix: None,
+                            scaled: 1e-14,
+                        },
+                    ),
+                    n: Some(
+                        Value {
+                            value: 1.0,
+                            exponent: None,
+                            suffix: None,
+                            scaled: 1.0,
+                        },
+                    ),
+                    rs: Some(
+                        Value {
+                            value: 2.0,
+                            exponent: None,
+                            suffix: None,
+                            scaled: 2.0,
+                        },
+                    ),
+                    eg: None,
+                    xti: None,
+                    tnom: None,
+                },
+                area: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 2.0,
+                    },
+                ),
+                m: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 3.0,
+                    },
+                ),
+                pj: Some(
+                    Value {
+                        value: 4.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 4.0,
+                    },
+                ),
+                off: Some(
+                    true,
+                ),
+                ic: Some(
+                    Value {
+                        value: 0.7,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 0.7,
+                    },
+                ),
+                temp: Some(
+                    Value {
+                        value: 25.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 25.0,
+                    },
+                ),
+                dtemp: Some(
+                    Value {
+                        value: 5.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 5.0,
+                    },
+                ),
+                lm: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 1.0,
+                    },
+                ),
+                wm: Some(
+                    Value {
+                        value: 2.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 2.0,
+                    },
+                ),
+                lp: Some(
+                    Value {
+                        value: 3.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 3.0,
+                    },
+                ),
+                wp: Some(
+                    Value {
+                        value: 4.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 4.0,
+                    },
+                ),
+            },
+        ],
+        voltage_sources: [],
+        current_sources: [],
+        bjts: [],
+    },
+}

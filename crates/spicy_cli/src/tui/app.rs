@@ -1,5 +1,5 @@
 use spicy_circuit::Lowered;
-use spicy_parser::error::SpicyError;
+use spicy_netlist::reader::error::SpicyError;
 use spicy_simulate::{
     DcSweepResult, OperatingPointResult, SimulationConfig, TransientResult, Unknown, unknowns,
 };

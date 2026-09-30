@@ -48,7 +48,7 @@ Two more rules from the same sources:
           └───────────────────────┘   └───────────────────────┬──────────┘
                                                               │ spicy_backends::lower   (once per design)
                                                               ▼
-SPICE ──spicy_parser──► Deck ──lower (SPICE rules)──► ┌── spicy_circuit ──────────────────┐
+SPICE ──spicy_netlist──► Deck ──lower (SPICE rules)──► ┌── spicy_circuit ──────────────────┐
                                                       │ Circuit    wiring (+ names table)  │ once per design
                                                       │ Params     model + instance values │ nominal + one per run
                                                       │ Analysis, SolverOptions            │ per request
@@ -74,7 +74,7 @@ Read it top to bottom:
 
 | Struct | Crate | Built by, when | Lives | Its job, which nothing else can do |
 |---|---|---|---|---|
-| `Deck` (`*Spec`, `Command`) | `spicy_parser` | parse, per SPICE file | until lowered (the CLI keeps it for error snippets) | What the netlist literally said. It holds SPICE's precedence ("instance beats `.model` beats default") and which values were given. **Only SPICE needs this, so SPICE-specific duplication lives here** |
+| `Deck` (`*Spec`, `Command`) | `spicy_netlist` | parse, per SPICE file | until lowered (the CLI keeps it for error snippets) | What the netlist literally said. It holds SPICE's precedence ("instance beats `.model` beats default") and which values were given. **Only SPICE needs this, so SPICE-specific duplication lives here** |
 | `Tokens` + `Ast` | `spicy_lang` | lex + parse, per edit | until the next edit | What the text said. `Tokens` holds every token, whitespace and comments included, so the file is reproducible byte for byte; `Ast` is typed, with a byte span on every node. Together they serve the formatter, editor/AI edits (replace a node's span) and error recovery. Spans live on AST nodes because this layer *is* syntax; from `Design` down they move to side tables (§10 #9). Why not a lossless tree: roadmap §4.4 |
 | `Design` + `DesignSourceMap` | `spicy_model` | after parse, per edit | per design revision | Blocks as written (defined once, placed many times), values with spreads, names resolved, units checked. Spans go in a side table |
 | `FlatDesign` + `KnobTable` | `spicy_model` | elaboration, per edit | per design revision | Hierarchy flattened. The one place that says which knob feeds which field. Holds no knob values |
@@ -143,7 +143,7 @@ That's why the language doesn't reuse `ResistorParams` as its part type. The sam
 | Kind of default | Examples | Home |
 |---|---|---|
 | **Physics** (part of a device's equations) | Gummel–Poon `BR = 1`, `NF = 1` | `Default` impls on `spicy_circuit`'s parameter structs, shared by both front-ends |
-| **SPICE dialect** | instance-over-model precedence; `scale` (`m` and `area` stay instance parameters, applied by the simulator: `circuit.md` §4.5); the fallback for a missing resistance (1 mΩ in ngspice, 1 kΩ in Xyce [XYCE]) | Only in `spicy_parser`'s lowering |
+| **SPICE dialect** | instance-over-model precedence; `scale` (`m` and `area` stay instance parameters, applied by the simulator: `circuit.md` §4.5); the fallback for a missing resistance (1 mΩ in ngspice, 1 kΩ in Xyce [XYCE]) | Only in `spicy_netlist`'s lowering |
 | **Depending on other values or the analysis** | an AC resistance that defaults to the DC one; a pulse rise time that defaults to the time step | Resolved per run, because a knob may change what they depend on |
 
 **SPICE never lowers into `Design`.** Forcing the primary model to represent `.model` cards and subcircuit parameter semantics would push SPICE's duplication into the core. If people want SPICE designs in the editor, the right tool is a SPICE → `.spl` importer.
@@ -237,7 +237,7 @@ We go one step at a time and review each.
 |---|---|---|
 | **1. Cleanup** | Fix the subcircuit bug (§11), apply `m`/`scale`, align defaults with ngspice, and move CLI concerns (the `simulate()` dispatcher, raw-file config, AC printing) out of `spicy_simulate`, with tests guarding the behavior. Each fix starts from a failing test | ✅ Done, committed |
 | 2. Stamp locations out of devices | Stamp indices move into parallel arrays owned by a `Plan`; transient history becomes indexed. No snapshot changes | Deferred: a speed-up that matters once the engine runs many simulations |
-| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | ✅ Done (design: `circuit.md`): 3a `spicy_circuit` + lowering; 3b the simulator reads it (results bit-identical on every test netlist); 3c the parser no longer allocates branch rows |
+| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Analysis`; `spicy_netlist::reader::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | ✅ Done (design: `circuit.md`): 3a `spicy_circuit` + lowering; 3b the simulator reads it (results bit-identical on every test netlist); 3c the parser no longer allocates branch rows |
 | 4. One `Plan` + `Workspace` per circuit | Shared by all analyses of a circuit; reused across runs | Deferred, with step 2 |
 | 5. Temperature | Adds `Derived`. The first deliberate result changes: thermal voltage becomes kT/q | To discuss |
 
@@ -275,7 +275,7 @@ The engine MVP runs on ngspice (roadmap decision D-B, `engine_plan.md`), so the 
 | The simulator library owned CLI concerns (`simulate()` dispatcher, raw-file config, the raw writer) and AC printed to stdout on every frequency | `lib.rs`, `raw_writer.rs`, `ac.rs` | ✅ Fixed in step 1: all moved to `spicy_cli` (`batch.rs`, `raw.rs`); `SimulationConfig` only configures the solver; AC results have a named type (`AcResult`). Guarded by end-to-end tests of the binary written before the move, which passed unchanged after it. They now run `batch::run` directly: `mod tests` in `spicy_cli/src/batch.rs`, helpers in `spicy_cli/src/test_utils.rs` |
 | The raw writer had no tests | `raw.rs` | ✅ Step 1: `batch::run` writes the raw file for op/DC/transient/AC and the test reads it back (header exactly; values exactly against the library run in-process) |
 | Thermal voltage is a constant 0.02585 V; ngspice uses kT/q (0.025865 V at 27 °C) | `devices/diode.rs`, `devices/bjt.rs` | Step 5 (temperature), as the first deliberate result change |
-| **New:** a node named `gnd` isn't ground. ngspice rewrites `gnd` to `0` everywhere (`inp_fix_gnd_name`, `inpcom.c`) | `spicy_parser` | Not planned: we don't need `gnd` support |
+| **New:** a node named `gnd` isn't ground. ngspice rewrites `gnd` to `0` everywhere (`inp_fix_gnd_name`, `inpcom.c`) | `spicy_netlist` | Not planned: we don't need `gnd` support |
 | **New:** with `--raw`, every analysis writes to the same `<file>.raw`, so a netlist with `.op` and `.dc` keeps only the last result | `spicy_cli/src/batch.rs` | Later: not important for now |
 | **New:** the raw writer silently ignores write errors (`let _ = …`) | `spicy_cli/src/batch.rs` | Later: not important for now |
 | **New:** a source's DC value came from evaluating its waveform at t = 0 with a zero step and stop time: a SIN without a frequency divided by zero and the operating point diverged; a PULSE with an explicit zero rise time gave V2 instead of V1 | `devices/waveform.rs` | ✅ Fixed in step 3b, test-first: the DC value follows ngspice (`vsrcload.c`): V1 for PULSE and EXP, VO + VA·sin(phase) for SIN |
@@ -286,7 +286,7 @@ The engine MVP runs on ngspice (roadmap decision D-B, `engine_plan.md`), so the 
 | Keyword matching folds each word into a 16-byte stack buffer, and nothing checks that every keyword fits: a longer keyword added later would never match | `netlist_types.rs` (`Keyword`) | Open: TODO; keyword tables (roadmap, parser follow-ups) |
 | `.model` cards inside a subcircuit are global, evaluated at the top level; ngspice gives each instance its own copy. `.SUBCKT` definitions nested in a `.SUBCKT`, and `.global`, aren't supported | `subcircuit_phase.rs` | Open (out of scope of the subcircuit fixes) |
 | **New:** `.ac lin 1 1k 1k` (a single frequency) panics on an assertion that `fstop > fstart`; ngspice accepts it | `ac.rs` | Later, with the AC work (roadmap M2d) |
-| `spicy_simulate` still depends on `spicy_parser` (it reads `Deck`), and on `clap` (for its two helper binaries) | `spicy_simulate/Cargo.toml` | ✅ Fixed. `clap` is optional, behind the `klu-tools` feature the KLU binaries require. Since step 3b the simulator reads `spicy_circuit`; the parser is only a test dependency |
+| `spicy_simulate` still depends on `spicy_netlist` (it reads `Deck`), and on `clap` (for its two helper binaries) | `spicy_simulate/Cargo.toml` | ✅ Fixed. `clap` is optional, behind the `klu-tools` feature the KLU binaries require. Since step 3b the simulator reads `spicy_circuit`; the parser is only a test dependency |
 | Topology is rebuilt for every analysis | `dc.rs`, `ac.rs`, `trans.rs` | Steps 2 and 4 (deferred) |
 | AC is dense, allocates per frequency, and ignores transistors | `ac.rs` | Roadmap M2d |
 | Transient history is keyed by device name | `trans.rs` | ✅ Fixed in step 3b: indexed by capacitor, since names left the simulator |

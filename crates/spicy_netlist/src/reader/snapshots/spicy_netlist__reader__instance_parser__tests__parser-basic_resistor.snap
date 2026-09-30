@@ -1,0 +1,726 @@
+---
+source: crates/spicy_netlist/src/reader/instance_parser.rs
+assertion_line: 1267
+expression: deck
+---
+Deck {
+    title: "basic resistor",
+    node_mapping: NodeMapping {
+        nodes: [
+            NodeName(
+                "0",
+            ),
+            NodeName(
+                "in",
+            ),
+            NodeName(
+                "out",
+            ),
+        ],
+    },
+    commands: [],
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
+                name: "R1",
+                span: Span {
+                    start: 15,
+                    end: 26,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                        scaled: 1000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R2",
+                span: Span {
+                    start: 28,
+                    end: 44,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.1234,
+                        exponent: None,
+                        suffix: Some(
+                            Tera,
+                        ),
+                        scaled: 1123400000000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R3",
+                span: Span {
+                    start: 46,
+                    end: 58,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: -10.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: -10.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R4",
+                span: Span {
+                    start: 60,
+                    end: 71,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 0.5,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 0.5,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R5",
+                span: Span {
+                    start: 73,
+                    end: 86,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.25,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 1.25,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R6",
+                span: Span {
+                    start: 88,
+                    end: 102,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            3.0,
+                        ),
+                        suffix: None,
+                        scaled: 2500.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R6",
+                span: Span {
+                    start: 104,
+                    end: 118,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            3.0,
+                        ),
+                        suffix: None,
+                        scaled: 2500.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R7",
+                span: Span {
+                    start: 120,
+                    end: 135,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 2.5,
+                        exponent: Some(
+                            -3.0,
+                        ),
+                        suffix: None,
+                        scaled: 0.0025,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R8",
+                span: Span {
+                    start: 137,
+                    end: 151,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: -3.0,
+                        exponent: Some(
+                            6.0,
+                        ),
+                        suffix: None,
+                        scaled: -3000000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R9",
+                span: Span {
+                    start: 153,
+                    end: 165,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 10.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                        scaled: 10000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R10",
+                span: Span {
+                    start: 167,
+                    end: 182,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 47.0,
+                        exponent: None,
+                        suffix: Some(
+                            Mega,
+                        ),
+                        scaled: 47000000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R11",
+                span: Span {
+                    start: 184,
+                    end: 196,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Milli,
+                        ),
+                        scaled: 0.001,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R12",
+                span: Span {
+                    start: 198,
+                    end: 212,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 220.0,
+                        exponent: None,
+                        suffix: Some(
+                            Micro,
+                        ),
+                        scaled: 0.00022,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R13",
+                span: Span {
+                    start: 214,
+                    end: 227,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 33.0,
+                        exponent: None,
+                        suffix: Some(
+                            Nano,
+                        ),
+                        scaled: 3.3e-8,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R14",
+                span: Span {
+                    start: 229,
+                    end: 243,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 4.7,
+                        exponent: None,
+                        suffix: Some(
+                            Pico,
+                        ),
+                        scaled: 4.7e-12,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R15",
+                span: Span {
+                    start: 245,
+                    end: 257,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 8.0,
+                        exponent: None,
+                        suffix: Some(
+                            Femto,
+                        ),
+                        scaled: 8e-15,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R16",
+                span: Span {
+                    start: 259,
+                    end: 271,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Atto,
+                        ),
+                        scaled: 1e-18,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R17",
+                span: Span {
+                    start: 273,
+                    end: 289,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.2,
+                        exponent: Some(
+                            -3.0,
+                        ),
+                        suffix: None,
+                        scaled: 0.0012,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R18",
+                span: Span {
+                    start: 291,
+                    end: 306,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 0.123,
+                        exponent: None,
+                        suffix: Some(
+                            Giga,
+                        ),
+                        scaled: 123000000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+            ResistorSpec {
+                name: "R19",
+                span: Span {
+                    start: 308,
+                    end: 324,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    2,
+                ),
+                resistance: Some(
+                    Value {
+                        value: -0.99,
+                        exponent: None,
+                        suffix: Some(
+                            Tera,
+                        ),
+                        scaled: -990000000000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        voltage_sources: [],
+        current_sources: [],
+        bjts: [],
+    },
+}

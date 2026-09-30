@@ -2317,6 +2317,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
+name = "spicy-fuzz"
+version = "0.0.0"
+dependencies = [
+ "libfuzzer-sys",
+ "spicy_lang",
+ "spicy_netlist",
+]
+
+[[package]]
 name = "spicy_circuit"
 version = "0.1.0"
 dependencies = [
@@ -2336,7 +2345,7 @@ dependencies = [
  "ratatui",
  "rmp",
  "spicy_circuit",
- "spicy_parser",
+ "spicy_netlist",
  "spicy_simulate",
 ]
 
@@ -2373,7 +2382,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spicy_parser"
+name = "spicy_netlist"
 version = "0.1.0"
 dependencies = [
  "insta",
@@ -2383,15 +2392,6 @@ dependencies = [
  "spicy_circuit",
  "thiserror 2.0.16",
  "unscanny",
-]
-
-[[package]]
-name = "spicy_parser-fuzz"
-version = "0.0.0"
-dependencies = [
- "libfuzzer-sys",
- "spicy_lang",
- "spicy_parser",
 ]
 
 [[package]]
@@ -2405,7 +2405,7 @@ dependencies = [
  "ndarray-linalg",
  "rstest",
  "spicy_circuit",
- "spicy_parser",
+ "spicy_netlist",
  "thiserror 2.0.16",
 ]
 

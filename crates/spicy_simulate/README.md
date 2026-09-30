@@ -1,6 +1,6 @@
 # Spicy Simulate
 
-MNA-based circuit analyzers for Spicy. Consumes a `spicy_parser::parser::Deck` and computes results for various analyses.
+MNA-based circuit analyzers for Spicy. Reads a `spicy_circuit` circuit (`Circuit` + `Params`) and computes results for various analyses.
 
 ## Analyses
 
@@ -11,17 +11,12 @@ MNA-based circuit analyzers for Spicy. Consumes a `spicy_parser::parser::Deck` a
 ## API sketch
 
 ```rust
-use spicy_parser::parser::parse;
-use spicy_simulate::{simulate_op, simulate_dc, simulate_ac, SimulationConfig};
+use spicy_netlist::reader::{ParseOptions, lower, parse};
+use spicy_simulate::{SimulationConfig, dc::simulate_op};
 
-let deck = parse(include_str!("../tests/op_dc/simple_resistor.spicy"))?;
-let op = simulate_op(&deck, &SimulationConfig::default())?;
-println!("OP voltages: {:?}", op.voltages);
-
-// For DC sweep, extract the .DC command from the deck
-// let dc_res = simulate_dc(&deck, &dc_cmd);
-
-// For AC, call simulate_ac(&deck, &ac_cmd)
+let mut options = ParseOptions::new_with_source("divider.spicy", netlist);
+let lowered = lower(&parse(&mut options)?)?;
+let op = simulate_op(&lowered.circuit, &lowered.params, &SimulationConfig::default())?;
 ```
 
 ## Example netlists

@@ -12,7 +12,7 @@
 - **For spicy, three moves matter most:**
   1. Move stamp indices, names/spans and transient history **out of the device structs**, into side tables owned by the stage that computes them.
   2. Make the simulator-facing circuit a **template whose values change per run**. Topology, the sparsity pattern and the KLU symbolic analysis are then built once per design and shared read-only by parallel runs.
-  3. Keep every SPICE-ism inside `spicy_parser`'s lowering: `Option` specs, `.model` inheritance, dialect defaults.
+  3. Keep every SPICE-ism inside `spicy_netlist`'s lowering: `Option` specs, `.model` inheritance, dialect defaults.
 - **Correction to the brief:** ngspice does *not* change values without re-setup. Every `run` rebuilds the matrix. Xyce `.STEP` and VACASK do avoid the rebuild.
 
 ## 1. Compilers
@@ -136,7 +136,7 @@ The full proposal, merged with the red-team's measurements, is `../pipeline.md`.
 - Results by ID, with names added at the edge.
 
 **Rules:**
-- **SPICE defaults and `.model` merging** live in `spicy_parser`'s lowering.
+- **SPICE defaults and `.model` merging** live in `spicy_netlist`'s lowering.
   - Equation defaults (e.g. Gummel–Poon BR = 1) are `Default` impls on the shared parameter structs.
   - Dialect defaults (the missing-R fallback, precedence, `m`, `scale`, `tnom`) belong only to the SPICE front-end.
 - **Don't lower SPICE into the design model.** A SPICE → `.spl` importer is the right tool if needed.
@@ -163,7 +163,7 @@ The full proposal, merged with the red-team's measurements, is `../pipeline.md`.
 | 8 | Workspace | `spicy_simulate` | per worker | reused across runs | `DEVload`; OSDI `eval`/`load` |
 | 9 | Transient state | `spicy_simulate` | per step | one transient | `CKTstates`; OSDI `prev/next_state` |
 | 10 | Results by ID → named | `spicy_simulate` → `spicy_backends` | per analysis | the engine's | rustc `SourceInfo`; Cranelift `srclocs` |
-| — | SPICE `Deck` | `spicy_parser` | parse | until lowered | ngspice given bits |
+| — | SPICE `Deck` | `spicy_netlist` | parse | until lowered | ngspice given bits |
 
 ## 5. Uncertainties
 

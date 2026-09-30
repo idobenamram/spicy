@@ -1,0 +1,129 @@
+---
+source: crates/spicy_netlist/src/reader/instance_parser.rs
+assertion_line: 1267
+expression: deck
+---
+Deck {
+    title: "AC test with voltage source DC and AC",
+    node_mapping: NodeMapping {
+        nodes: [
+            NodeName(
+                "0",
+            ),
+            NodeName(
+                "out",
+            ),
+        ],
+    },
+    commands: [
+        Ac(
+            AcCommand {
+                span: Span {
+                    start: 74,
+                    end: 89,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                ac_sweep_type: Lin(
+                    3,
+                ),
+                fstart: Value {
+                    value: 10.0,
+                    exponent: None,
+                    suffix: None,
+                    scaled: 10.0,
+                },
+                fstop: Value {
+                    value: 100.0,
+                    exponent: None,
+                    suffix: None,
+                    scaled: 100.0,
+                },
+            },
+        ),
+    ],
+    devices: Devices {
+        resistors: [
+            ResistorSpec {
+                name: "R1",
+                span: Span {
+                    start: 62,
+                    end: 72,
+                    source_index: SourceFileId(
+                        0,
+                    ),
+                },
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: Some(
+                            Kilo,
+                        ),
+                        scaled: 1000.0,
+                    },
+                ),
+                model: None,
+                ac: None,
+                m: None,
+                scale: None,
+                temp: None,
+                dtemp: None,
+                tc1: None,
+                tc2: None,
+                noisy: None,
+            },
+        ],
+        capacitors: [],
+        inductors: [],
+        diodes: [],
+        voltage_sources: [
+            IndependentSourceSpec {
+                name: "V1",
+                positive: NodeIndex(
+                    1,
+                ),
+                negative: NodeIndex(
+                    0,
+                ),
+                dc: Some(
+                    Constant(
+                        Value {
+                            value: 5.0,
+                            exponent: None,
+                            suffix: None,
+                            scaled: 5.0,
+                        },
+                    ),
+                ),
+                ac: Some(
+                    Phasor {
+                        mag: Value {
+                            value: 1.5,
+                            exponent: None,
+                            suffix: None,
+                            scaled: 1.5,
+                        },
+                        phase: Some(
+                            Value {
+                                value: 45.0,
+                                exponent: None,
+                                suffix: None,
+                                scaled: 45.0,
+                            },
+                        ),
+                    },
+                ),
+            },
+        ],
+        current_sources: [],
+        bjts: [],
+    },
+}

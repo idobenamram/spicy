@@ -24,11 +24,11 @@ A check of a clean checkout of `master` (2026-09-25):
 | **CI** | Triggered on pushes to `main`, but the branch is `master`. **Fixed in M0** |
 | **Formatting** | `cargo fmt --check` failed in 19 existing files. **Formatted in M0** |
 | **Clippy** | The current clippy (1.98) reports ~90 warnings in existing code, mostly the KLU solver and the TUI. CI treats them as warnings |
-| **Parser** (`spicy_parser`) | SPICE netlists: R, C, L, D, Q, V, I, subcircuits, `.model`, `.param`, `{}` expressions; `.op .dc .ac .tran`, `.temp`, `.options` (TNOM and solver tolerances) |
+| **Parser** (`spicy_netlist`) | SPICE netlists: R, C, L, D, Q, V, I, subcircuits, `.model`, `.param`, `{}` expressions; `.op .dc .ac .tran`, `.temp`, `.options` (TNOM and solver tolerances) |
 | **Simulator** (`spicy_simulate`) | DC op and sweep, transient (fixed step), AC; KLU sparse solver |
 | | BJT: Ebers–Moll (IS, BF, BR, NF, NR). **No temperature dependence.** No Early effect, no junction capacitances |
 | | AC: dense; **stamps only R/C/L and sources**, so transistors are ignored |
-| | Reads `spicy_parser::Deck` directly. Each device resolves its SPICE parameters and defaults itself (`from_spec`) |
+| | Reads `spicy_netlist::reader::Deck` directly. Each device resolves its SPICE parameters and defaults itself (`from_spec`) |
 | **Amplifier check** | The walkthrough amplifier converges: VC = 5.52 V nominal; 6.22 V at the worst corner (25 °C), in line with the walkthrough's model |
 
 **Our simulator is enough for the MVP.** It needs two contained features: temperature, and AC at the operating point (§6, M2). ngspice comes right after the MVP (M4), as a cross-check and for devices we don't have yet.
@@ -46,7 +46,7 @@ Agreed: our simulator shouldn't need a netlist. The language produces a design m
                            │
                            │  lower(design, knob point)      per run, in memory, no text
                            ▼
-SPICE ──spicy_parser──►  spicy_circuit::Circuit  ──►  spicy_simulate  (op · dc · ac · tran)
+SPICE ──spicy_netlist──►  spicy_circuit::Circuit  ──►  spicy_simulate  (op · dc · ac · tran)
                            │
                            └──►  SPICE netlist export  ──►  ngspice (the engine's first backend, M3) / a file to share or debug
 ```
@@ -68,14 +68,14 @@ It has no knobs and no analyses. Analyses are requests to the simulator's API.
 
 **Why not have the simulator parse `.spl` itself:** a simulator shouldn't contain a language front-end. "Natively" means it consumes the model's lowered circuit directly. The language's job ends at `spicy_model`.
 
-**Cost:** a behavior-preserving refactor of existing code. The per-device parameter resolution moves out of `spicy_simulate` (`from_spec`) into a lowering step in `spicy_parser` (Deck → Circuit). The now-stable snapshot tests must stay byte-identical through the refactor, which proves nothing changed. This is M2a.
+**Cost:** a behavior-preserving refactor of existing code. The per-device parameter resolution moves out of `spicy_simulate` (`from_spec`) into a lowering step in `spicy_netlist` (Deck → Circuit). The now-stable snapshot tests must stay byte-identical through the refactor, which proves nothing changed. This is M2a.
 
 ### 2.2 Crates
 
 ```
 crates/
   spicy_circuit/    (exists)  simulator-ready circuit form: nodes, devices, origins
-  spicy_parser/     (exists)  SPICE netlists → spicy_circuit (plus the analysis commands in the file)
+  spicy_netlist/     (exists)  SPICE netlists → spicy_circuit (plus the analysis commands in the file)
   spicy_simulate/   (exists)  our simulator; reads spicy_circuit only
   spicy_cli/        (exists)  CLI + TUI; gains a `check` command
 
@@ -95,7 +95,7 @@ Dependencies (arrows mean "depends on"; no cycles):
                   ┌──────────┼──────────────┐
              spicy_lang   spicy_engine   spicy_backends ───► spicy_simulate ──► spicy_circuit
                   │        │      │            │                                   ▲
-                  └──► spicy_model ◄┘                            spicy_parser ─────┘
+                  └──► spicy_model ◄┘                            spicy_netlist ─────┘
                            ▲                                (SPICE front-end, used by the CLI)
                            └────────────── spicy_backends ───► spicy_engine   (implements its Backend trait)
 ```
@@ -253,7 +253,7 @@ It has 8 knobs:
 
 | Choice | Recommendation | Why |
 |---|---|---|
-| Lexer | **Hand-written**, like `spicy_parser`'s (std only, or the tiny `unscanny` it already uses). **No `logos`** | §4.4 |
+| Lexer | **Hand-written**, like `spicy_netlist`'s (std only, or the tiny `unscanny` it already uses). **No `logos`** | §4.4 |
 | Parser | **Hand-written** recursive descent, with a Pratt loop for expressions. Design borrowed from Spade (§4.5), code written from scratch | §4.4, §4.5 |
 | Syntax tree | **A typed AST with byte spans on every node, plus the lexer's full token list (whitespace and comments included).** No lossless tree, no `rowan` | §4.4 |
 | Diagnostics | **`codespan-reporting`**, see the comparison below | The only new crate the front-end adds |
@@ -292,9 +292,9 @@ It has 8 knobs:
   Spaces and the `// top` comment aren't in the tree. They stay in the token list.
 - **CST (concrete syntax tree, "lossless").** Every character is a leaf: `WHITESPACE "    "`, `LET_KW "let"`, `WHITESPACE " "`, `IDENT "r1"`, … `SEMI ";"`, `WHITESPACE "  "`, `COMMENT "// top"`. Joining the leaves gives back the file. The nodes are untyped, so a typed layer (`LetStmt::name()`) is written on top. `rowan` is the library rust-analyzer uses for this.
 
-**What we chose:** an AST with a span on every node, **plus the lexer's full token list**, whitespace and comments included, exactly as `spicy_parser`'s lexer already keeps whitespace and newline tokens. The file is always reproducible byte for byte from the tokens. This is Zig's design: `zig fmt` formats from the AST plus the token list. Go's `gofmt` works from an AST plus a comment list.
+**What we chose:** an AST with a span on every node, **plus the lexer's full token list**, whitespace and comments included, exactly as `spicy_netlist`'s lexer already keeps whitespace and newline tokens. The file is always reproducible byte for byte from the tokens. This is Zig's design: `zig fmt` formats from the AST plus the token list. Go's `gofmt` works from an AST plus a comment list.
 
-`spicy_parser` is the same kind: a hand-written lexer, then phases that build typed structures (`Deck`) directly. It has no syntax-tree layer that keeps the source.
+`spicy_netlist` is the same kind: a hand-written lexer, then phases that build typed structures (`Deck`) directly. It has no syntax-tree layer that keeps the source.
 
 | | **AST + spans + token list** (chosen) | **CST with `rowan`** |
 |---|---|---|
@@ -306,14 +306,14 @@ It has 8 knobs:
 | Formatting one statement without reflowing others (language_editor_mapping R14) | Format only the edited statement's span | Same |
 | Moving code together with its comments, keeping odd hand formatting | Harder | Its real strength |
 | Incremental reparsing on every keystroke | Not needed: a design file reparses from scratch in far less time than a keystroke | Its other strength, for very large codebases |
-| Used by | rustc, Go, Zig, Spade, `spicy_parser` | rust-analyzer, Roslyn (C#), Swift |
+| Used by | rustc, Go, Zig, Spade, `spicy_netlist` | rust-analyzer, Roslyn (C#), Swift |
 
 **Why this replaces the earlier "lossless from day one":** the three things lossless was meant for (precise edits, a formatter, error recovery) all work from spans plus the token list. The fear was that retrofitting would mean rewriting the parser. The MVP grammar is about 15 rules, so a rewrite would cost days, not a redesign. And if we ever need a CST, it doesn't require `rowan`: a plain `Node { kind, children }` over our tokens is a small amount of our own code.
 
 **Why no `logos`.** logos (Spade's lexer) turns regexes on an enum into a lexer at compile time. It saves typing for many simple tokens, but:
 - **Our hard tokens are the ones it doesn't help with.** Unit literals (`47k`, `4k7`, `10kΩ`, `1µF`, `5%`), `100..=300` (the lexer must not read `100.` as a decimal), `±` and `+/-`, and nested `/* */` comments all need hand-written code either way. Even Spade handles block comments outside logos, in its parser.
 - **It's a proc-macro crate**, so it pulls a compile-time stack (syn, quote, regex-syntax, …) into the build.
-- **A hand lexer for about 40 token kinds is a few hundred lines,** in the same style as `spicy_parser`'s (`crates/spicy_parser/src/lexer.rs`).
+- **A hand lexer for about 40 token kinds is a few hundred lines,** in the same style as `spicy_netlist`'s (`crates/spicy_netlist/src/reader/lexer.rs`).
 
 ### 4.5 What we take from Spade, and what we don't
 
@@ -338,7 +338,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
 
 | Layer | How it's tested |
 |---|---|
-| Lexer / parser | Snapshot of the syntax tree per construct; snapshot of rendered diagnostics per error; fuzzing (like the existing `spicy_parser` fuzz target) |
+| Lexer / parser | Snapshot of the syntax tree per construct; snapshot of rendered diagnostics per error; fuzzing (like the existing `spicy_netlist` fuzz target) |
 | Elaboration | Snapshot of the elaborated model; one test per semantic error (unbound pin, wrong unit, two sources on a rail) |
 | `spicy_circuit` refactor | **Existing snapshots must stay byte-identical** |
 | Lowering | Snapshot of the lowered `Circuit` per knob point |
@@ -372,7 +372,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
 **Why this order** (agreed 2026-09-26):
 - Each step has its own tests and review.
 - The export gives two checks that need neither ngspice nor the engine:
-  - the exported text, parsed back by `spicy_parser`, must give the same `Circuit` + `Params`;
+  - the exported text, parsed back by `spicy_netlist`, must give the same `Circuit` + `Params`;
   - simulating it must give VC ≈ 5.52 V (§1).
 
 **Steps:**
@@ -414,9 +414,9 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
   - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R_amp_r1`).
   - `spicy export`.
   - **Two export modes** (`engine_plan.md` §5, the engine's contract): the **numeric** export at one knob point, and the **engine deck** (`EngineDeck`: a `.param` per knob, `.temp {…}`, `.options` as an input, one `.model QM_<path>` per BJT named apart from its instance `Q_<path>`, no analyses, plus the knob and probe maps).
-  - **Needs first, done 2026-09-30** (data only, no temperature physics): `Params.temp`, a `tnom` on every model, `BjtModel` `xtb`, `xti`, `eg`, `DiodeModel` `eg`, `xti`, and the solver options the source asked for (`engine_plan.md` §5.2); `spicy_parser` accepts those model parameters, BJT `temp`/`dtemp`, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
+  - **Needs first, done 2026-09-30** (data only, no temperature physics): `Params.temp`, a `tnom` on every model, `BjtModel` `xtb`, `xti`, `eg`, `DiodeModel` `eg`, `xti`, and the solver options the source asked for (`engine_plan.md` §5.2); `spicy_netlist` accepts those model parameters, BJT `temp`/`dtemp`, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
   - **Done when:**
-    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params` + options;
+    - round trip: `ce_amp.spl` → export → `spicy_netlist` → lower gives the same `Circuit` + `Params` + options;
     - the engine deck at nominal lowers to the same result as the numeric export, and ngspice reads back every knob's requested value at nominal and at one corner;
     - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`);
     - the exported amplifier simulates to the same VC. 🔍
@@ -430,7 +430,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
 > **Superseded ordering:** `pipeline.md` §9 now defines the order of this work, as smaller steps each reviewed on its own: (1) cleanup, (2) stamp locations out of devices, (3) `spicy_circuit`, (4) one plan per circuit, (5) temperature. Steps 2 and 4 are deferred: they're a speed-up that matters once the engine runs many simulations. The items below stay as the list of what must eventually be done.
 
 - **M2a: Extract `spicy_circuit`.** ✅ Done as pipeline step 3 (`circuit.md`); results stayed bit-identical.
-  - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_parser`.
+  - Move parameter resolution from `spicy_simulate`'s `from_spec` into a Deck → Circuit lowering in `spicy_netlist`.
   - `spicy_simulate` then reads only `spicy_circuit`.
   - Behavior-preserving: **every existing snapshot stays byte-identical.** 🔍
 - **M2b: Model → Circuit lowering.** Moved to M1e.
@@ -456,8 +456,8 @@ Found while fixing the SPICE parser. None is needed for the MVP; each gets done 
 
 | Item | Why it matters | Where |
 |---|---|---|
-| **Keyword tables** instead of the 16-byte keyword buffer | Nothing checks the buffer's limit: a keyword longer than 16 characters, added later, would never match. Tables (name → meaning, matched case-insensitively) remove the limit and list every supported keyword in one place, the way ngspice declares device parameters (`bjt.c`, `BJTmPTable`) | TODO in `spicy_parser/src/netlist_types.rs` (`Keyword`) |
-| **Model coverage** | We accept 5 BJT and 3 diode model parameters; ngspice's parameter tables have 154 and 104 entries. Real vendor models (`VAF`, `IKF`, `CJE`, …) are rejected with `invalid param`. Support them, or accept and ignore them with a warning | `spicy_parser/src/netlist_models.rs` |
+| **Keyword tables** instead of the 16-byte keyword buffer | Nothing checks the buffer's limit: a keyword longer than 16 characters, added later, would never match. Tables (name → meaning, matched case-insensitively) remove the limit and list every supported keyword in one place, the way ngspice declares device parameters (`bjt.c`, `BJTmPTable`) | TODO in `spicy_netlist/src/netlist_types.rs` (`Keyword`) |
+| **Model coverage** | We accept 5 BJT and 3 diode model parameters; ngspice's parameter tables have 154 and 104 entries. Real vendor models (`VAF`, `IKF`, `CJE`, …) are rejected with `invalid param`. Support them, or accept and ignore them with a warning | `spicy_netlist/src/netlist_models.rs` |
 | **Subcircuit scoping gaps** | `.model` cards inside a subcircuit are global; nested `.SUBCKT` definitions and `.global` aren't supported | `subcircuit_phase.rs`; `pipeline.md` §11 |
 | **Parse allocations** | Parsing a 10,000-line netlist allocates 44.5 MB (about 4.4 KB per line): e.g. parameter lists rebuilt per device, a token vector per statement, subcircuit bodies cloned per instance. Profile before optimizing | parser |
 

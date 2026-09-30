@@ -1,7 +1,7 @@
-# Research: Circuit Tools (atopile, ngspice/Xyce, KiCad, spicy_parser) for the Elaboration Stage
+# Research: Circuit Tools (atopile, ngspice/Xyce, KiCad, spicy_netlist) for the Elaboration Stage
 
 > 2026-09-27 · Research report for `model.md` (M1d).
-> Revisions: atopile `619eda7f` (2026-03-11, local `externals/atopile`), ngspice `56a152c7` (2026-09-25), Xyce `6243c628` (2026-09-21), KiCad `cda6040f` (2026-09-27, GitHub mirror), spicy_parser at `101c711`.
+> Revisions: atopile `619eda7f` (2026-03-11, local `externals/atopile`), ngspice `56a152c7` (2026-09-25), Xyce `6243c628` (2026-09-21), KiCad `cda6040f` (2026-09-27, GitHub mirror), spicy_netlist at `101c711`.
 > Verified facts in §1–7; lessons in §8 are opinion.
 
 ## 1. Stages and names
@@ -37,7 +37,7 @@ Names after expansion:
 - Pass 2 re-reads the definition's text once per X line (`N_IO_DistToolDefault.C:970-1163`).
 - Names use `:`, as in `X1:R1` (`N_IO_DistToolBase.C:822`).
 
-**spicy_parser** runs its phases in order (`lib.rs:152-158`):
+**spicy_netlist** runs its phases in order (`lib.rs:152-158`):
 1. includes;
 2. statements;
 3. brace placeholders;
@@ -65,8 +65,8 @@ Names: `X1.R1`, and `X1.mid` for an internal node (`expr.rs:247-271`).
 - **Per-instance parameter precedence:**
   - **Xyce:** an X-line value always beats a `params:` default and a local `.param`. X-line expressions are evaluated in the caller's scope, and lookup follows the enclosing *definition*, i.e. lexically (`CircuitContext.C:1165-1180, 2618-2640`; `DistToolDefault.C:1140-1156`).
   - **ngspice:** walks a stack of scopes in expansion order, i.e. dynamically (`numparam/xpressn.c:377-395`).
-  - **spicy_parser:** walks outward through the scopes that placed the instance, like ngspice (`expr.rs:416-443`).
-- **Probable spicy_parser bug:** `subcircuit_phase.rs:321-325` merges the defaults, then the instance values, then the local `.param`s. So a local `.param R=2k` beats an instance's `R=1k`, the reverse of Xyce.
+  - **spicy_netlist:** walks outward through the scopes that placed the instance, like ngspice (`expr.rs:416-443`).
+- **Probable spicy_netlist bug:** `subcircuit_phase.rs:321-325` merges the defaults, then the instance values, then the local `.param`s. So a local `.param R=2k` beats an instance's `R=1k`, the reverse of Xyce.
   - `tests/subcircuit_inputs/subcircuits.spicy` has exactly this case (`X2 … R=1k`, with a local `.param R=2k`).
   - ngspice's behavior here is unconfirmed.
   - Related: a `.model` inside a subcircuit goes into the global table (`:99-101`), and nested `.subckt` definitions aren't supported (`:92`).
@@ -99,7 +99,7 @@ Names: `X1.R1`, and `X1.mid` for an internal node (`expr.rs:247-271`).
 - **Ground:**
   - ngspice auto-inserts `.global gnd` and rewrites `gnd` to `0` (`inpcom.c:1941-1946, 2377`);
   - Xyce leaves `0`, `$G…` and `.GLOBAL` nodes unprefixed (`DistToolBase.C:760-802`);
-  - spicy_parser keeps only `"0"` global (`netlist_types.rs:162-166`) and has no `.global`.
+  - spicy_netlist keeps only `"0"` global (`netlist_types.rs:162-166`) and has no `.global`.
 - Xyce keeps an **alias map** from a port path (`X1:IN`) to the outer node, so `V(X1:IN)` resolves after flattening (`DistToolDefault.C:1036-1054`).
 
 **KiCad**
@@ -135,7 +135,7 @@ Names: `X1.R1`, and `X1.mid` for an internal node (`expr.rs:247-271`).
 - **SPICE:** plain numbers, evaluated after flattening:
   - ngspice: numparam pass 2;
   - Xyce: at context resolution;
-  - spicy_parser: `ScopeRef::evaluate`, when the instance is parsed.
+  - spicy_netlist: `ScopeRef::evaluate`, when the instance is parsed.
 
   Tolerances exist only as random-parameter functions (Xyce).
 - **KiCad:** values are strings.
@@ -168,7 +168,7 @@ Names: `X1.R1`, and `X1.mid` for an internal node (`expr.rs:247-271`).
   - a global in a port list that doesn't match;
   - model not found;
   - duplicate device names, checked *after* flattening, on the flat name (`N_IO_CircuitBlock.C:879`).
-- **spicy_parser:**
+- **spicy_netlist:**
   - `NotFound`, `ArityMismatch`, `NoNodes`, `PlacesItself` (`error.rs:212-237`), plus `CyclicParameter` and `UnknownIdentifier`;
   - recursion is found by cycle detection on the stack (`subcircuit_phase.rs:300`), which is better than ngspice;
   - no duplicate-device-name check, and `NotFound`/`ArityMismatch` carry no span.
@@ -185,7 +185,7 @@ Names: `X1.R1`, and `X1.mid` for an internal node (`expr.rs:247-271`).
 
 - **ngspice:** golden-output circuits end to end (`tests/regression/subckt-processing/global-1.cir`, `lib-processing/scope-*.cir`). The flattened netlist itself is never compared.
 - **Xyce:** in-tree GTest unit tests; the regression suite lives in a separate Xyce_Regression repository.
-- **spicy_parser:**
+- **spicy_netlist:**
   - insta JSON snapshots of the whole expanded deck per input (`subcircuit_phase.rs:348-381`);
   - unit tests of `Scope` naming (`expr.rs:590-623`).
 - **atopile:**
@@ -222,7 +222,7 @@ Net naming is a real problem everywhere: KiCad and atopile use total, determinis
    - atopile's sets lose the nominal and treat every literal as uncorrelated, so they can't express a lot or tempco tracking.
    - Xyce's per-instance `X1:param` globals are the same idea as our knobs.
    - Check units in `Design`, and keep knob values out of `FlatDesign`.
-7. **Block parameters (`r: Tol<Ohm>`):** the instance's argument wins, evaluated lexically in the caller (Xyce's precedence). Separately, fix or document spicy_parser's order at `subcircuit_phase.rs:321-325`.
+7. **Block parameters (`r: Tol<Ohm>`):** the instance's argument wins, evaluated lexically in the caller (Xyce's precedence). Separately, fix or document spicy_netlist's order at `subcircuit_phase.rs:321-325`.
 8. **Cycle detection with the whole chain in the error** (`A → B → A`).
 9. **Checks at elaboration:**
    - every pin bound exactly once;

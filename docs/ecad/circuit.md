@@ -37,11 +37,11 @@ Q1 out base emit QN
 
 | # | Stage | What happens to the example | Code |
 |---|---|---|---|
-| 1 | Parse | Statements → includes → `{}` expressions → subcircuits collected and flattened (`X1.mid`) → instances | `spicy_parser/src/lib.rs:149-162` |
+| 1 | Parse | Statements → includes → `{}` expressions → subcircuits collected and flattened (`X1.mid`) → instances | `spicy_netlist/src/lib.rs:149-162` |
 | 2 | Nodes | Numbered by first appearance: ground 0, vcc 1, base 2, out 3, emit 4 | `node_mapping.rs:45-66` |
 | 3 | Branch rows | **The parser** gives each voltage source and inductor an MNA branch row as it reads it: VCC → branch 1 | `instance_parser.rs:634, 957` |
 | 4 | Models | `.model QN` is looked up by name and **cloned into each instance** that uses it | `instance_parser.rs:774, 863` |
-| 5 | Deck | `ResistorSpec { name, span, nodes, resistance: Some(2k), m: Some(2), … }`, and so on: every value an `Option<Value>` | `spicy_parser/src/devices/` |
+| 5 | Deck | `ResistorSpec { name, span, nodes, resistance: Some(2k), m: Some(2), … }`, and so on: every value an `Option<Value>` | `spicy_netlist/src/devices/` |
 | 6 | Devices, **per analysis** | `Devices::from_spec` resolves defaults (IS = 1e-16), folds `m`/`scale`/`area` (RE → 1000 Ω), clones names | `spicy_simulate/src/devices/mod.rs:29-47` |
 | 7 | Pattern, **per analysis** | `setup_pattern` builds the sparsity pattern and writes matrix positions into each device's `stamp` field | `matrix.rs:80-105`, `setup_pattern.rs` |
 | 8 | Newton loop | Each iteration: clear the matrix, stamp every device (linear ones too), KLU analyze (first time) → factor or refactor, solve, check convergence | `trans.rs:62-100`, `dc.rs:21-50` |
@@ -239,7 +239,7 @@ Step 1's work carries over: `from_spec` *is* the simulator's derive step today. 
 
 ```
 parse ─► Deck                  unchanged: SPICE as written
-          │ spicy_parser::lower                                 once per netlist
+          │ spicy_netlist::reader::lower                                 once per netlist
           ▼
 Circuit   nodes 0..4 (0 = ground)                               structure, shared
           resistors  #0 1–2   #1 2–0   #2 1–3   #3 4–0          all use ResistorModel #0 (default)
@@ -321,7 +321,7 @@ pub enum Analysis {
 
 **Step 3:**
 - The `spicy_circuit` crate: ids, `Circuit`, `Params`, `CircuitNames`, `Analysis`. Every kind has a model table and an instance table: R, C and L models hold their temperature coefficients (and the resistor's default geometry).
-- `spicy_parser::lower(&Deck)`: SPICE precedence and defaults, one model per card (merged by value for R/C/L), `scale` folded, names resolved (the DC sweep source) with span errors. The parser stops allocating branch rows.
+- `spicy_netlist::reader::lower(&Deck)`: SPICE precedence and defaults, one model per card (merged by value for R/C/L), `scale` folded, names resolved (the DC sweep source) with span errors. The parser stops allocating branch rows.
 - The simulator builds its devices from `Circuit` + `Params` (its derive step applies `m`, `area`, `1/r`) and drops its parser dependency. It assigns branch rows itself. Matrix positions stay inside its devices for now (step 2 is deferred).
 - Snapshots stay identical, except the reviewed reordering of branch currents (§4.4).
 

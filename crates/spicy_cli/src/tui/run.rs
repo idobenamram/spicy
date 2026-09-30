@@ -13,7 +13,7 @@ use crate::tui::nvim::{NvimEvent, NvimState};
 use crate::tui::term::setup_terminal;
 use crate::tui::ui::{main_layout, netlist_layout, ui};
 use crate::tui::worker::{SimCmd, SimMsg, apply_sim_update, worker_loop};
-use spicy_parser::{ParseOptions, parse};
+use spicy_netlist::reader::{ParseOptions, parse};
 
 fn refresh_netlist(app: &mut App, path: &Path) {
     let input = match fs::read_to_string(path) {

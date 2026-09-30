@@ -1,0 +1,138 @@
+---
+source: crates/spicy_netlist/src/reader/lower.rs
+assertion_line: 762
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 4,
+        resistors: [
+            Resistor {
+                positive: NodeId(
+                    2,
+                ),
+                negative: NodeId(
+                    3,
+                ),
+                model: ResistorModelId(
+                    0,
+                ),
+            },
+        ],
+        capacitors: [
+            Capacitor {
+                positive: NodeId(
+                    3,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+                model: CapacitorModelId(
+                    0,
+                ),
+            },
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            TwoTerminal {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    0,
+                ),
+            },
+        ],
+        isources: [],
+    },
+    params: Params {
+        temp: 300.15,
+        resistor_models: [
+            ResistorModel {
+                tc1: 0.0,
+                tc2: 0.0,
+                default_width: 1e-5,
+                default_length: 1e-5,
+                tnom: 300.15,
+            },
+        ],
+        resistors: [
+            ResistorParams {
+                r: 1000.0,
+                r_ac: None,
+                m: 1.0,
+                temperature: Offset(
+                    0.0,
+                ),
+                noisy: true,
+            },
+        ],
+        capacitor_models: [
+            CapacitorModel {
+                tc1: 0.0,
+                tc2: 0.0,
+                tnom: 300.15,
+            },
+        ],
+        capacitors: [
+            CapacitorParams {
+                c: 1e-7,
+                m: 1.0,
+                ic: 0.0,
+                temperature: Offset(
+                    0.0,
+                ),
+            },
+        ],
+        inductor_models: [],
+        inductors: [],
+        diode_models: [],
+        diodes: [],
+        bjt_models: [],
+        bjts: [],
+        vsources: [
+            SourceParams {
+                waveform: Dc(
+                    5.0,
+                ),
+                ac: Phasor {
+                    magnitude: 0.0,
+                    phase: 0.0,
+                },
+            },
+        ],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic subcircuit",
+        nodes: [
+            "0",
+            "vcc",
+            "in",
+            "out",
+        ],
+        resistors: [
+            "X1.R1",
+        ],
+        capacitors: [
+            "X1.C2",
+        ],
+        inductors: [],
+        diodes: [],
+        bjts: [],
+        vsources: [
+            "X1.V1",
+        ],
+        isources: [],
+        diode_models: [],
+        bjt_models: [],
+    },
+    analyses: [],
+    options: SolverOptions {
+        reltol: None,
+        vntol: None,
+        abstol: None,
+    },
+}

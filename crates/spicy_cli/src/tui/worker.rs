@@ -10,7 +10,7 @@ use spicy_simulate::{
 use crate::tui::app::{App, ResultNames};
 use crate::tui::ui::format_error_snippet;
 use spicy_circuit::Analysis;
-use spicy_parser::{ParseOptions, SourceMap, error::SpicyError, lower, parse};
+use spicy_netlist::reader::{ParseOptions, SourceMap, error::SpicyError, lower, parse};
 
 #[derive(Clone, Debug)]
 pub enum SimCmd {

@@ -970,7 +970,7 @@ psrr_ti: -ac(vout.v / vin.ripple).at(100kHz).db()   min 36dB   on VendorPsrr;
 How it stays checked:
 1. **The DUT is ours.** The `X1` line is replaced by the exported `Ldo3v3` subcircuit, so our parts, our knobs and our read-backs are used. A fixture that doesn't contain the named DUT is an error.
 2. **Ports are bound by node name.** A missing node is an error at `prepare`, on the nominal run (T4).
-3. **The bench is compared with `operating`.** The parser (spicy_parser already reads SPICE) finds the elements on DUT ports. Recognized ones (V, I, R, C, a PWL) are checked against the operating ranges: `VIN DC 4.3` ∈ 3.6–5.5 V. Anything it can't interpret (a B-source, a vendor macromodel) tags the rows `fixture-unchecked`, and their PASS reads "PASS (raw fixture)".
+3. **The bench is compared with `operating`.** The parser (spicy_netlist already reads SPICE) finds the elements on DUT ports. Recognized ones (V, I, R, C, a PWL) are checked against the operating ranges: `VIN DC 4.3` ∈ 3.6–5.5 V. Anything it can't interpret (a B-source, a vendor macromodel) tags the rows `fixture-unchecked`, and their PASS reads "PASS (raw fixture)".
 4. **No analyses or `.meas` from the deck.** The worker sends analyses per request (engine_plan §1.4), and measures are written in the row. A deck with `.control`, analyses or `.meas` is rejected with a fix-it. This keeps "never `meas`" (plan §4.3) and makes the measure visible in the table.
 5. **The deck text is hashed into the block key** (and `rev`), so an edit to the file makes verdicts `stale`.
 

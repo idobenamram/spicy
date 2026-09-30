@@ -23,7 +23,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use spicy_circuit::Lowered;
-use spicy_parser::{ParseOptions, lower, parse};
+use spicy_netlist::reader::{ParseOptions, lower, parse};
 
 use crate::devices::Devices;
 use crate::unknowns::{Layout, Unknown, unknowns};

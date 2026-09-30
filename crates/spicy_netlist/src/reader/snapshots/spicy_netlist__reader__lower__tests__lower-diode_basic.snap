@@ -1,0 +1,95 @@
+---
+source: crates/spicy_netlist/src/reader/lower.rs
+assertion_line: 762
+expression: lowered
+---
+Lowered {
+    circuit: Circuit {
+        node_count: 3,
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [
+            Diode {
+                positive: NodeId(
+                    1,
+                ),
+                negative: NodeId(
+                    2,
+                ),
+                model: DiodeModelId(
+                    0,
+                ),
+            },
+        ],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    params: Params {
+        temp: 300.15,
+        resistor_models: [],
+        resistors: [],
+        capacitor_models: [],
+        capacitors: [],
+        inductor_models: [],
+        inductors: [],
+        diode_models: [
+            DiodeModel {
+                is: 1e-14,
+                n: 1.0,
+                rs: 2.0,
+                eg: 1.11,
+                xti: 3.0,
+                tnom: 300.15,
+            },
+        ],
+        diodes: [
+            DiodeParams {
+                area: 2.0,
+                m: 3.0,
+                pj: 4.0,
+                lm: 1.0,
+                wm: 2.0,
+                lp: 3.0,
+                wp: 4.0,
+                off: true,
+                ic: 0.7,
+                temperature: Fixed(
+                    298.15,
+                ),
+            },
+        ],
+        bjt_models: [],
+        bjts: [],
+        vsources: [],
+        isources: [],
+    },
+    names: CircuitNames {
+        title: "basic diode",
+        nodes: [
+            "0",
+            "in",
+            "out",
+        ],
+        resistors: [],
+        capacitors: [],
+        inductors: [],
+        diodes: [
+            "D1",
+        ],
+        bjts: [],
+        vsources: [],
+        isources: [],
+        diode_models: [
+            "Dmod",
+        ],
+        bjt_models: [],
+    },
+    analyses: [],
+    options: SolverOptions {
+        reltol: None,
+        vntol: None,
+        abstol: None,
+    },
+}

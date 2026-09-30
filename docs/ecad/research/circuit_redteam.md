@@ -80,7 +80,7 @@ What the numbers say:
 
 | Stage | Resistor / BJT | Owner | Lifetime | Job only it can do |
 |---|---|---|---|---|
-| SPICE spec | `ResistorSpec` + `ResistorModel`; `BjtSpec` + `BjtModel` (unchanged) | spicy_parser | parse → lower | As-written SPICE; precedence staging; given-ness |
+| SPICE spec | `ResistorSpec` + `ResistorModel`; `BjtSpec` + `BjtModel` (unchanged) | spicy_netlist | parse → lower | As-written SPICE; precedence staging; given-ness |
 | Language | schema-driven instance with value `47k ± 1%` | spicy_model | per edit | Spreads, knobs, spans |
 | Given parameters | `ResistorParams { r, tc1, tc2, … }`, `BjtParams { polarity, is, bf, … }`: `Copy`, SI units, no strings. Wiring is stored separately | spicy_circuit | params per run; wiring per design | Backend-neutral simulator input; the unit of knob variation; the ngspice export level |
 | Derived | `ResistorEval { g, … }`, `BjtEval { is_t, bf_t, … }` | spicy_simulate | per run × temperature | Temperature equations, and defaults that depend on other parameters, computed once per run. **Only added once temperature exists** |
@@ -102,7 +102,7 @@ What the numbers say:
 
 1. **Guard.** Golden tests for the raw writer, and a dump of today's `from_spec` output.
 2. **Create `spicy_circuit`,** unused at first.
-3. **Add `spicy_parser::lower(&Deck)`,** copying `from_spec` verbatim, bugs included. A bitwise differential test checks it against step 1's dump.
+3. **Add `spicy_netlist::reader::lower(&Deck)`,** copying `from_spec` verbatim, bugs included. A bitwise differential test checks it against step 1's dump.
 4. **Inside the simulator:** stamp indices move to parallel arrays; the trapezoidal map becomes an indexed `Vec`.
 5. **The simulator reads the circuit.** The dispatcher, raw-file config and `Deck` handling move to `spicy_cli`. Simulator tests use the parser as a dev-dependency, so no `.snap` changes.
 6. **Drop the parser from the simulator's dependencies.** CI checks the dependency direction.

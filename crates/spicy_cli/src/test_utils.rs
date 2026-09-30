@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use spicy_circuit::{Analysis, Lowered};
-use spicy_parser::{ParseOptions, lower, parse};
+use spicy_netlist::reader::{ParseOptions, lower, parse};
 use spicy_simulate::{SimulationConfig, ac::simulate_ac};
 
 /// A fresh temporary directory for one test, removed when dropped.

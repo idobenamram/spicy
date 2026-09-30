@@ -6,7 +6,7 @@
 > - **Compilers:** rustc `b373574e`, rust-analyzer `86493cee`, Spade `177e5c4`
 > - **Hardware elaborators:** slang `97a2b64`, Yosys `30d6257`, FIRRTL spec `afee1ba`, CIRCT `048afe0`, Chisel `14b890c`
 > - **Modelica:** language spec `18f00b1` (3.7-dev), OpenModelica `41a658f`, Modelica Standard Library (MSL) `4c40388`
-> - **Circuit tools:** atopile `619eda7`, ngspice `56a152c7`, Xyce `6243c628`, KiCad `cda6040f`, our `spicy_parser`
+> - **Circuit tools:** atopile `619eda7`, ngspice `56a152c7`, Xyce `6243c628`, KiCad `cda6040f`, our `spicy_netlist`
 > Full reports: `research/model_compilers.md`, `model_hdl.md`, `model_modelica.md`, `model_circuit_tools.md`, `model_units.md`.
 > - **Units:** uom `a465bcc`, Unitful.jl `550d5f1`, pint `e4042bb`, F# units of measure (Kennedy, "Types for Units-of-Measure"), OpenModelica's unit checker, atopile
 
@@ -97,7 +97,7 @@ FlatDesign (top = Stereo)
 ```
 
 What happened, in terms of the references:
-- **Paths:** each placement's name is prefixed (`left.r1`), as Yosys (`cellname.childname`), Modelica (`amp.r1.R`) and our own `spicy_parser` (`X1.R1`) do.
+- **Paths:** each placement's name is prefixed (`left.r1`), as Yosys (`cellname.childname`), Modelica (`amp.r1.R`) and our own `spicy_netlist` (`X1.R1`) do.
 - **Nets:** a port binding (`vcc: v12`) *joins* the child's port net with the parent's net. All joins go into a union-find, the same structure as Yosys's `SigMap`, Modelica's connection sets and KiCad's new connectivity engine. Each resulting group is one net.
 - **Net names:** the name declared highest in the hierarchy wins (`v12`, not `left.vcc`), as KiCad (shortest sheet path) and atopile (hierarchy ranking) do. Every other name stays an **alias**, so a probe like `left.vcc.v` still finds its net, as Xyce's alias map does.
 - **Knobs:** each leaf part field with a spread becomes its **own** knob per placement (`left.r1.value`, `right.r1.value`), because they are two physical resistors.
@@ -275,7 +275,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
 *From:*
 - Yosys `flatten` (prefixing, refuses recursion);
 - CIRCT's inliner (top-down, so each prefix is known at once);
-- `spicy_parser`'s cycle check, which already beats ngspice's depth limit of 21.
+- `spicy_netlist`'s cycle check, which already beats ngspice's depth limit of 21.
 
 **E15. Nets: a union-find, then naming.**
 - Every (instance path, local net or port) is an entry.
@@ -554,7 +554,7 @@ Where the first implementation differs from the text above, and why:
 
 ## 9. Flatten: the plan (M1d-4, first version)
 
-From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, Verilator, rustc, Spade) and `research/flatten_circuit.md` (our `spicy_parser`, atopile, KiCad, Modelica, Xyce, ngspice). Decided 2026-09-28.
+From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, Verilator, rustc, Spade) and `research/flatten_circuit.md` (our `spicy_netlist`, atopile, KiCad, Modelica, Xyce, ngspice). Decided 2026-09-28.
 
 **Where it lives.** Flatten is in `spicy_model` (`flat.rs` holds the types, `flatten/` the passes), so the engine and the editor can flatten a `Design` without the language. The problem type sits below both: `Diag<K>`, `DiagKind`, `Fix`, `Severity`, `Reported` and the rendering are the `spicy_errors` crate, `Span` is `spicy_span`, and the `id!` macro is `spicy_index`, small crates that `spicy_model` and `spicy_lang` depend on, as rustc has `rustc_errors`, `rustc_span` and `rustc_index` (decided 2026-09-29). `spicy_lang::elaborate` runs resolve, then flatten, and holds the case-file tests (`test_data/flatten/{ok,err}`).
 
@@ -601,4 +601,4 @@ From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, 
 
 ## 10. Found along the way
 
-- **`spicy_parser` subcircuit parameter precedence** (`subcircuit_phase.rs:321-325`): a subcircuit's local `.param` overrides the value given on the `X` line. Xyce does the opposite, and ngspice is unconfirmed. To check against ngspice when it's installed.
+- **`spicy_netlist` subcircuit parameter precedence** (`subcircuit_phase.rs:321-325`): a subcircuit's local `.param` overrides the value given on the `X` line. Xyce does the opposite, and ngspice is unconfirmed. To check against ngspice when it's installed.

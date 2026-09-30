@@ -1,6 +1,7 @@
 # Elaboration: from Syntax Tree to Flat Design (M1d)
 
 > 2026-09-27 · Design note for roadmap M1d. **Status:** agreed 2026-09-27; implementation starting with *resolve*.
+> 2026-09-30: examples and syntax updated to v5 (syntax_v5_plan.md).
 > What happens between the parser's syntax tree and the simulator-ready circuit: the stages, every structure, the checks, and the tests. Every decision says where it comes from.
 > Research round (2026-09-27), five reports, each claim checked against the source:
 > - **Compilers:** rustc `b373574e`, rust-analyzer `86493cee`, Spade `177e5c4`
@@ -42,36 +43,45 @@ Elaboration has two steps, with two outputs:
 A board that places the amplifier twice shows everything flattening does. (`ce_amp.spl` alone is the special case with no placements.)
 
 ```rust
-block CeAmp { … as in circuits/ce_amp.spl … }      // ports vcc, gnd, input, output; nets base, emitter
+// CeAmp as in circuits/ce_amp.spl (§5): env ambient, block, circuit, setup Operating, contract.
+pub block CeAmp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+circuit CeAmp { … }                                 // nets base, emitter; parts r1 … q1
 
-block Stereo {
-    port v12: Power<In>;
-    port gnd: Ground;
-    port left_in: Analog<In>;
-    port right_in: Analog<In>;
-    port left_out: Analog<Out>;
-    port right_out: Analog<Out>;
+pub block Stereo {
+    v12: Power<In>,
+    gnd: Ground,
+    left_in: Analog<In>,
+    right_in: Analog<In>,
+    left_out: Analog<Out>,
+    right_out: Analog<Out>,
+}
+
+circuit Stereo {
     let left  = CeAmp { vcc: v12, gnd, input: left_in,  output: left_out };
     let right = CeAmp { vcc: v12, gnd, input: right_in, output: right_out };
 }
 ```
 
+A block is two items: its header (the ports) and its `circuit` of the same name (the nets and parts).
+
 ### Step 1, resolve: each block once
 
 ```
 Design
-  block CeAmp                                   ports: vcc Power<In>, gnd Ground, input Analog<In>, output Analog<Out>
-    nets     base, emitter
+  block CeAmp                                   ports (header): vcc Power<In>, gnd Ground, input Analog<In>, output Analog<Out>
+    nets     base, emitter                      (circuit)
     r1   part Resistor  a→vcc  b→base   value = 47 kΩ ± 1% (relative)
     …
     q1   part Npn       c→output b→base e→emitter   beta = 100..=300 (ratio)
-    contract: assume temp ∈ 263.15 K..=333.15 K, assume vcc.v ∈ 12 V ± 5%, measure h, specs bias/gain/bass
   block Stereo
     left   block CeAmp  vcc→v12  gnd→gnd  input→left_in  output→left_out
     right  block CeAmp  vcc→v12  gnd→gnd  input→right_in output→right_out
+  contract CeAmp                                matched to its block; contents in the next phase (§3.8)
 ```
 
 Nothing is copied yet. `r1` exists once, inside `CeAmp`. Units are known: `47k` became 47 kΩ because `Resistor.value` expects ohms.
+
+Each header and its circuit become one `Block`, so the `Design` is the same as before v5. `ce_amp.spl`'s `setup Operating for CeAmp` and its contract are matched to `CeAmp`. They, and its `env ambient`, aren't elaborated yet (§3.8).
 
 ### Step 2, flatten: every placement expanded, nets merged
 
@@ -91,8 +101,8 @@ FlatDesign (top = Stereo)
   knobs
     left.r1.value    statistical  47 kΩ ± 1%
     right.r1.value   statistical  47 kΩ ± 1%      ← its own knob: two real resistors
-    v12.v            range        (from Stereo's contract)
-    temp             range
+    v12.v            range        (from Stereo's default setup; next phase)
+    ambient          range        (the env that setup's `temp:` names; next phase)
     …
 ```
 
@@ -136,7 +146,7 @@ Each decision has **why** and **from**. Items marked *(later)* are designed now 
 
 **E3. Roots: every block that no other block places is flattened on its own.**
 - In a file with `CeAmp` and `Stereo`, `Stereo` places `CeAmp`, so `Stereo` is the only root.
-- A file with `CeAmp` and a separate `PowerSupply` that nothing places has two roots, and each gets its own `FlatDesign`, checked standalone with its own default bench (language §8.5). That's what "check this block's contract" means anyway.
+- A file with `CeAmp` and a separate `PowerSupply` that nothing places has two roots, and each gets its own `FlatDesign`, checked standalone with its own default setup (`setup = …;` in its contract; before v5, a default bench derived from its assumptions, language §8.5). That's what "check this block's contract" means anyway.
 - `--top X` narrows it to one.
 - A file whose blocks all place each other has no root, which can only happen through recursion (E14): an error.
 
@@ -146,13 +156,16 @@ For `ce_amp.spl`, `CeAmp` is the only root, and paths are relative to it (`r1`, 
 ### 3.2 Resolve: names
 
 **E4. Two passes.**
-1. *Collect:* every block's name and its **signature** (its ports and their types) from every item.
-2. *Bodies:* resolve every statement.
+1. *Collect:*
+   - every block's name, and its **signature** (its ports and their types) from its header;
+   - each `circuit`, `contract` and `setup` matched to its block by name: a circuit or contract by its own name, a setup by the name after `for`. Setup names are per block, so every block can have its own `Operating`.
+2. *Bodies:* resolve every statement of every circuit.
 
-Inside a body, collect all `port`, `net` and `let` names first too.
+Inside a circuit, collect all `net` and `let` names first too. The ports come from the header.
 
 *Why:* it's what makes order irrelevant (language principle P4):
 - a block can be placed above its definition;
+- a circuit, contract or setup can come before its block's header;
 - a net can be used before its `net` line;
 - a feedback loop needs no forward declaration.
 
@@ -162,7 +175,9 @@ Inside a body, collect all `port`, `net` and `let` names first too.
 - **Kinds:** part kinds (`Resistor`), blocks (`CeAmp`), signal types (`Power`).
 - **Values:** ports, nets, instances, measures, `env` quantities.
 
-Lookup goes from the block's body, to the file's items, to the prelude last. A name found in the wrong namespace gets a typed error ("`vcc` is a port, not a part kind").
+Setup names are apart from both, per block (E4).
+
+Lookup goes from the block (its header's ports, its circuit's nets and instances), to the file's items, to the prelude last. A name found in the wrong namespace gets a typed error ("`vcc` is a port, not a part kind").
 *Why:* a precise error for the most common confusion, and the prelude never shadows your own names. *From:* rustc (type/value namespaces, prelude searched last), Spade (`NotAUnit`, `IsAType` errors).
 
 **E6. A `let` is classified by what its value resolves to.**
@@ -237,7 +252,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
   - a function argument (`at(1kHz)`);
   - an endpoint of `..=`;
   - the nominal of `±`;
-  - the bound of a relation (`… in 4.6 ± 5%` → the measure's unit).
+  - the bound of a relation (`… within 4.6 ± 5%` → the measure's unit).
 - Anywhere else a bare number is dimensionless.
 - Computed values follow the same rule, by tracking whether a sub-expression is still unitless (refined while implementing):
   - If everything in it is unitless, the result is unitless and takes the expected unit at the end: `2 * 4.7k` and `1k + 2k` in a `value:` are 9.4 kΩ and 3 kΩ.
@@ -256,7 +271,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
   - a `°C` value is a *point* (an absolute temperature);
   - point − point is a *difference*, and point ± difference is a point;
   - point + point, and point × anything, are errors;
-  - a difference is written in K (`temp + 15K`, `25°C ± 5K`); `± 5°C` gets an error with the fix `± 5K`.
+  - a difference is written in K (`25°C + 15K`, `25°C ± 5K`); `± 5°C` gets an error with the fix `± 5K`.
 
   *From:* uom (separate point and interval types), pint and Unitful (their errors for offset units).
 - **`%` and `ppm`:** after `±` they are always **relative** (`4.6 ± 5%` means ±0.23); anywhere else they are plain factors (0.01, 1e-6). *From:* atopile's tolerance rule, uom's and pint's `percent` = 0.01.
@@ -294,8 +309,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
 
 **E16. Knobs are created at leaf part fields, one per placement.**
 - Every field whose value has a spread becomes a knob named by its flat field path (`left.r1.value`).
-- Every `assume` on a top-level port quantity becomes a range knob (`vcc.v`).
-- `temp` is the one environment knob, shared by everything.
+- *Superseded by setups (v5), and moved to the next phase:* the range knobs of `assume` (`vcc.v`) and the one `temp` knob. A range knob now comes from a setup field with a range or `±` (`vcc: Supply { v: 12V ± 5% }` gives `vcc.v`), and `temp` becomes the `env ambient` that a setup's `temp:` names (one knob, `ambient`). Designed in `research/contract_v4_review_implementation.md` §3.4–§3.5.
 - The knob records its nominal:
   - the written nominal for `±`;
   - the **midpoint** for a range. `beta: 100..=300` has nominal 200, as in the walkthrough.
@@ -323,7 +337,7 @@ The midpoint rule is the one choice here the references don't settle. It matches
 
 | Tier | When | Checks |
 |---|---|---|
-| **1. Per definition** (in resolve) | Once per block | Unknown names, wrong namespace, unit mismatches, pins bound exactly once, unknown or duplicate fields, duplicate names in a block, a statement's value of the wrong kind |
+| **1. Per definition** (in resolve) | Once per block | Unknown names, wrong namespace, unit mismatches, pins bound exactly once, unknown or duplicate fields, duplicate names in a block, a statement's value of the wrong kind; a circuit, contract or setup for no block, a second circuit, a placed block with no circuit (§8) |
 | **2. Per flat net** (after flatten) | Once per design | Two `Power` sources on one net; a `Power<In>` with no source; no `Ground` net, or more than one; a two-terminal part with both pins on one net (warning); an isolated net, connected to nothing else through any part (warning; see §7, question 4) |
 
 *Why:*
@@ -385,13 +399,15 @@ The midpoint rule is the one choice here the references don't settle. It matches
 
 ### 3.8 The contract
 
+*Status (v5):* resolve today only matches each contract and setup to its block, and the `Contract` is empty. What they contain is resolved in the next phase.
+
 **E24. The contract is resolved like a body, into typed expressions over probes.**
-- An `assume` becomes a condition on a port quantity or on `temp`, and a knob (E16).
+- *Superseded by setups (v5):* the `assume` statements. The environment is now a `setup S for X { … }`, and the contract names its default one (`setup = Operating;`). How a setup's fields and the `env`s it names become conditions and knobs is designed in `research/contract_v4_review_implementation.md` §3.4–§3.5, not here.
 - A measure (`let h = ac(output.v / input.v)`) becomes a typed expression:
   - probes (`output.v` resolves to a net's voltage);
   - analysis calls (`ac`, `dc`);
   - methods (`.at`, `.mag`, `.f_low`) from a small table of built-in measure functions with declared argument and result units.
-- A spec becomes its relation, bound and confidence attribute.
+- A spec becomes its relation (`within`, `<=`, `>=`), bound and confidence attribute.
 
 In the MVP only the top block's contract is analyzed. Sub-block contracts are resolved and kept, for the composition checks later (language §8.8).
 *Why:* the engine (M3) needs measures as values it can compute, with units checked (a spec comparing a gain with 30 Hz is an error now, not at run time). *From:* language §8.4, engine_flows.md. Modelica has no counterpart.
@@ -407,7 +423,7 @@ The MVP has no structural constructs, so it's recorded only for now.
 ### 3.9 Incremental work
 
 **E26. For the MVP, recompute everything on every edit,** which takes microseconds at this size. Each step is a pure function with outputs that implement `PartialEq`, so rust-analyzer-style caching can be added later without restructuring.
-*Invariant to keep:* editing one block's body never changes another block's signature.
+*Invariant to keep:* editing one block's circuit never changes another block's signature (its header).
 *From:* rust-analyzer (salsa; "typing inside a body never invalidates global data"). Spade's language server does the whole-project collection each time.
 
 ---
@@ -418,14 +434,14 @@ The MVP has no structural constructs, so it's recorded only for now.
 // spicy_model
 
 pub struct Design {
-    pub blocks: Vec<Block>,           // BlockId = index
-    pub contracts: Vec<Contract>,     // one per block that has one
+    pub blocks: Vec<Block>,           // BlockId = index; a header and its circuit, as one
+    pub contracts: Vec<Option<Contract>>, // indexed like blocks
 }
 pub struct Block {
     pub name: Name,
-    pub ports: Vec<Port>,             // PortId  (per block)
-    pub nets: Vec<Net>,               // NetId   (per block; ports are nets too)
-    pub instances: Vec<Instance>,     // InstanceId (per block)
+    pub ports: Vec<Port>,             // PortId  (per block), from the header
+    pub nets: Vec<Net>,               // NetId   (per block; ports are nets too), from the circuit
+    pub instances: Vec<Instance>,     // InstanceId (per block), from the circuit
 }
 pub struct Port { pub signal: Result<SignalType, Reported> }  // name and span: its net's (port i is net i)
 pub enum SignalType { Pin, Ground, Power(Role), Analog(Role) }
@@ -441,7 +457,8 @@ pub struct Quantity { pub si: f64, pub dim: Dimension, pub kind: QKind }
 pub struct Dimension([i8; 6]);        // s m kg A K rad
 pub enum QKind { Plain, TempPoint, Db }
 
-pub struct Contract { pub assumptions: Vec<Assumption>, pub measures: Vec<Measure>, pub specs: Vec<Spec> }
+pub struct Contract {}                // empty until the next phase adds its default setup, measures and specs,
+                                      // and setups, envs and consts to `Design` (contract_v4_review_implementation.md §3.1)
 pub enum MExpr { Probe(Probe), Const(Quantity), Call(MeasureFn, Vec<MExpr>), Binary(Op, Box<MExpr>, Box<MExpr>), … }
 
 pub struct FlatDesign {                // ids into the Design, never names copied out of it
@@ -464,38 +481,77 @@ pub struct DesignSourceMap { … }      // every id → span, and provenance for
 
 ## 5. `ce_amp.spl` through the stage (what the tests will pin)
 
-- **Resolve:**
-  - 1 block (`CeAmp`), with 4 ports, 2 nets and 6 part instances;
+`circuits/ce_amp.spl`, without its doc comments:
+
+```rust
+env ambient: Temperature in -10°C..=60°C;
+
+pub block CeAmp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit CeAmp {
+    net base;
+    net emitter;
+    let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };
+    let r2 = Resistor { a: base, b: gnd, value: 10k ± 1% };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k ± 1% };
+    let re = Resistor { a: emitter, b: gnd, value: 1k ± 1% };
+    let c_in = Electrolytic { p: base, n: input, value: 1uF ± 20% };
+    let q1 = Npn { c: output, b: base, e: emitter, beta: 100..=300 };
+}
+
+setup Operating for CeAmp {
+    vcc: Supply { v: 12V ± 5% },
+    input: Signal { v: 0V },
+    output: Load {},
+    temp: ambient,
+}
+
+contract CeAmp {
+    setup = Operating;
+    let h = ac(output.v / input.v);
+    spec bias: dc(output.v) within 4.5V..=6.5V;
+    spec gain: h.at(1kHz).mag() within 4.6 ± 5%;
+    spec bass: h.f_low(-3dB) <= 30Hz;
+}
+```
+
+- **Resolve**, today:
+  - 1 block (`CeAmp`): 4 ports from its header; 2 nets besides the port nets, and 6 part instances, from its circuit;
   - every pin bound once;
   - units: 4 in Ω, 1 in F, 1 ratio;
-  - 1 contract, with 2 assumptions, 1 measure and 3 specs.
+  - the setup and the contract matched to `CeAmp`, their contents not read yet.
+- **Resolve**, next phase (`research/contract_v4_review_implementation.md` §4.2):
+  - 1 env: `ambient`, 263.15 … 333.15 K;
+  - 1 setup: `vcc.v` 12 V ± 5%, `input.v` 0 V (a point, so no knob), `output` an open load (unwritten is ideal), `temp: ambient`;
+  - 1 contract: default setup `Operating`, 1 measure, 3 specs.
 - **Flatten**, with `CeAmp` as the top:
   - 6 devices;
   - 6 nets: `vcc`, `gnd` (the Ground net), `input`, `output`, `base`, `emitter`;
-  - tier-2 checks pass: `vcc` is a `Power<In>` port, so inside the block it's the source.
-- **Knobs, 8:**
+  - tier-2 checks pass: `vcc` is a `Power<In>` port, so inside the block it's the source;
+  - 6 knobs, one per part field with a spread (§9).
+- **Knobs, 8,** once the setup is elaborated: flatten's 6, then the setup's `vcc.v` and the env's `ambient`, appended after them (`contract_v4_review_implementation.md` §3.5):
 
 | Knob | Kind | Nominal | Spread |
 |---|---|---|---|
-| `temp` | range | — | 263.15 … 333.15 K |
-| `vcc.v` | range | 12 V | ± 5% |
 | `r1.value` | statistical | 47 kΩ | ± 1% |
 | `r2.value` | statistical | 10 kΩ | ± 1% |
 | `rc.value` | statistical | 4.7 kΩ | ± 1% |
 | `re.value` | statistical | 1 kΩ | ± 1% |
 | `c_in.value` | statistical | 1 µF | ± 20% |
 | `q1.beta` | statistical | 200 | 100 … 300 |
+| `vcc.v` | range | 12 V | ± 5% |
+| `ambient` | range | — | 263.15 … 333.15 K |
 
-This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
+This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs. The counts are those of v0.1; only `temp` became `ambient`.
 
 ---
 
 ## 6. Testing
 
-- **Case files** `test_data/model/{ok,err}/*.spl`, the same layout as the lexer and parser. Snapshots of two dumps (`Design`, and `FlatDesign` with its knobs), then the rendered diagnostics.
+- **Case files** `test_data/{resolve,flatten}/{ok,err}/*.spl`, the same layout as the lexer and parser. Snapshots of two dumps (`Design`, and `FlatDesign` with its knobs), then the rendered diagnostics.
 - **A coverage rule:** every error kind has a case.
 - **Two placements:** `Stereo` above. Separate `left.base`/`right.base`, a shared `v12`, separate knobs.
-- **Determinism:** shuffling the statements of every block gives byte-identical dumps. KiCad and atopile both shipped bugs here.
+- **Determinism:** shuffling the statements of every circuit gives byte-identical dumps. KiCad and atopile both shipped bugs here.
 - **Stability:** adding an unrelated part leaves every other knob path unchanged.
 - **Invariants on random and fuzzed input:**
   - elaboration never panics;
@@ -522,17 +578,17 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs.
    - The check here is only the first, a topological one. An isolated net has no electrical meaning. In a simulation it gives a singular matrix. ngspice-42 prints "singular matrix: check node …", then goes on and reports the node at 0 V (measured 2026-09-28, `research/flatten_decisions.md` §C2), a silently wrong answer; our KLU solver would fail outright.
    - A warning, not an error, because while editing a half-finished schematic has isolated nets all the time. The design should still elaborate, and the editor still shows everything.
    - The engine (M3) refuses to *simulate* a design that still has one, with this warning as the reason, instead of a cryptic solver failure.
-   - The no-DC-path case isn't a design error at all: the default bench drives `input`, so the path exists in simulation. If a bench leaves such a node floating, that's for lowering to report (M1e).
+   - The no-DC-path case isn't a design error at all: the default setup drives `input` (`input: Signal { v: 0V }`), so the path exists in simulation. If a setup leaves such a node floating, that's for lowering to report (M1e).
 5. **Stable ids for layout:** **deferred.** It needs its own research on how the layout editor works and how a project stores layout data. Paths remain the identity for the MVP (E21).
 
 ## 8. Implementation notes (resolve, M1d-3)
 
 Where the first implementation differs from the text above, and why:
 - **The prelude's data is in `spicy_model`** (`prelude.rs`), not in `spicy_lang` as roadmap §2.5 had it. Flatten needs the signal roles, and lowering needs the part kinds; neither may depend on the language.
-- **How the code is laid out** (the standard for every stage from here on): `resolve()` reads as the passes, one comment each. Pass 1 builds each block's `Signature` (its ports by name), a read-only table in pass 2. Pass 2 gives each body a `BodyResolver` (as rust-analyzer gives each body an `ExprCollector`) that declares the body's names, then resolves each statement into a value (an instance, a merge) and stores it only if the statement owns its name, so a second definition, even a second block, is checked and dropped. Every name goes through one `Scope::declare` (rustc's `try_plant_decl`), and every part is added to the block together with its span (`BlockBuilder`, as rust-analyzer's `alloc_expr`).
+- **How the code is laid out** (the standard for every stage from here on): `resolve()` reads as the passes, one comment each. Pass 1 builds each block's `Signature` (its ports by name, from its header), a read-only table in pass 2. Pass 2 gives each circuit a `BodyResolver` (as rust-analyzer gives each body an `ExprCollector`) that declares the circuit's names, then resolves each statement into a value (an instance, a merge) and stores it only if the statement owns its name, so a second definition, even a second block or circuit, is checked and dropped. Every name goes through one `Scope::declare` (rustc's `try_plant_decl`), and every part is added to the block together with its span (`BlockBuilder`, as rust-analyzer's `alloc_expr`).
 - **One problem type for every stage:** `Diag<K> { kind, span, related, fix }` in the `spicy_errors` crate, with its rendering beside it (2026-09-29, as rustc's `rustc_errors` holds `Diag` and its emitters; it sat in `spicy_model::diagnostic` for a day, with the rendering in `spicy_lang`), generic over the stage's kind enum; `LexError`, `ParseError` and `ResolveError` are aliases (rustc has one `Diag`, Zig one `ErrorBundle`). Kinds carry typed data where there is some (`UnitMismatch` holds the expected `FieldType` and the found `Quantity`; the text is built when rendering).
-- **The `Reported` token (E7), added 2026-09-29** once resolve and flatten both made placeholders. `Reported` is rustc's `ErrorGuaranteed`: a zero-size proof, made only by reporting an error (`Diag::report`) or by finding one a stage already reported (`Reported::among`, rustc's `DiagCtxt::has_errors`). The rule: `None` means absent, and "broken, and the user was told" holds the proof: `Port.signal: Result<SignalType, Reported>`, `Instance.pins: Vec<Result<NetId, Reported>>`, `FieldValue::Invalid(Reported)` (a wrong value, or a required field not written), `InstanceOf::Error(Reported)`, and `Block.tainted: Option<Reported>` (rustc's `tainted_by_errors`). A block is tainted when parsing its body reported an error (the parser's `Body::broken`), when a lexer or resolve error lies inside it, and when it's the first of two blocks with one name. Parse errors count by the body that reported them, not by position, as rustc taints the body whose checking reported one: a missing `}` is found at the next item but breaks the block left open. The parser's error nodes hold the proof too (`ExprKind::Error(Reported)`, `StmtKind::Error(Reported)`, `ItemKind::Error(Reported)`). A later stage has to meet `Err(Reported)` to get past a placeholder, so lowering can't quietly simulate a broken circuit.
-- **The temperature errors (E13) come with contracts (M1d-5).** No part field takes a temperature, so `± 5°C`, `± 5%` on a temperature and a bare temperature can only occur in `assume`. They're added and tested there.
+- **The `Reported` token (E7), added 2026-09-29** once resolve and flatten both made placeholders. `Reported` is rustc's `ErrorGuaranteed`: a zero-size proof, made only by reporting an error (`Diag::report`) or by finding one a stage already reported (`Reported::among`, rustc's `DiagCtxt::has_errors`). The rule: `None` means absent, and "broken, and the user was told" holds the proof: `Port.signal: Result<SignalType, Reported>`, `Instance.pins: Vec<Result<NetId, Reported>>`, `FieldValue::Invalid(Reported)` (a wrong value, or a required field not written), `InstanceOf::Error(Reported)`, and `Block.tainted: Option<Reported>` (rustc's `tainted_by_errors`). A block is tainted when parsing its header or its circuit reported an error (the parser's `BlockDecl::broken`, `Body::broken`), when a lexer or resolve error lies inside either, and when it's the first of two blocks with one name. Parse errors count by the body that reported them, not by position, as rustc taints the body whose checking reported one: a missing `}` is found at the next item but breaks the block left open. The parser's error nodes hold the proof too (`ExprKind::Error(Reported)`, `StmtKind::Error(Reported)`, `ItemKind::Error(Reported)`). A later stage has to meet `Err(Reported)` to get past a placeholder, so lowering can't quietly simulate a broken circuit.
+- **The temperature errors (E13) come with setups and `env` (the next phase, M1d-5).** No part field takes a temperature, so `± 5°C`, `± 5%` on a temperature and a bare temperature can only occur in an `env` or a setup's `temp:`. They're added and tested there.
 - **One mistake, one error:**
   - a misnamed field (`resistance:` where `value:` is missing) is one error with the rename as its fix;
   - everything an instance is missing (pins, ports and required fields) is one error.
@@ -544,7 +600,11 @@ Where the first implementation differs from the text above, and why:
   - the `k` fix is offered only for a lone literal whose whole suffix is `K` (`47K`), not for `5mK` or `1K + 1K`;
   - net suggestions list nets only (an instance would give "not a net"), and field suggestions only the pins and fields not given yet whose value fits (a name for a pin, a number for a field);
   - the shorthand `C { gnd }` is fixed as `gnd: gnd1`, keeping the pin.
-- **Duplicates are checked, not merged (E7):** a second block, port, `net`, `let` or binding (`value: 1k, value: 5V`) of a name is reported and still checked for its own mistakes, but never enters the design or overwrites the first.
+- **Duplicates are checked, not merged (E7):** a second block, circuit, port, `net`, `let` or binding (`value: 1k, value: 5V`) of a name is reported and still checked for its own mistakes, but never enters the design or overwrites the first. A second contract, or a second setup of one name for one block, is a `Duplicate` too.
+- **Items matched to blocks (v5, 2026-09-30).** Resolve reads each block's ports from its header and its statements from its `circuit`, and builds the same `Design` as before: every resolve and flatten dump stayed byte-identical (syntax_v5_plan.md step 3). The new errors:
+  - `UnknownBlock` (`E-name`): a circuit, contract or setup for a block the file doesn't have, at the name (a setup's is the one after `for`);
+  - `NoCircuit` (`E-circuit`): placing a block that has no circuit, at the placement. A block with no circuit that nothing places is an interface, and no error;
+  - a second circuit for a block is a `Duplicate`, checked against the block's ports, then dropped.
 - **An unknown field written twice** (`valu: 1k, valu: 2k`) is one misspelling: both are reported, the rename rule counts it once, and only the first gets the fix (renaming both would give `value` twice).
 - **A port with a wrong type stays a port** (`signal: Err(Reported)`), so its uses resolve and aren't reported again.
 - **A value the parser already flagged isn't typed** (`1k +- 1%`, `a ± b ± c`): what the parser built is a guess.
@@ -564,7 +624,7 @@ From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, 
 3. **The instance tree.** Placements are expanded top-down, **children in name order**, so shuffling statements gives the same ids (Yosys sorts by name, Spade has `MonoKey`). `FlatInstance { block, origin: Option<LocalInstance> }`, `None` only for the root. A `LocalInstance { at, instance }` is one `let` inside a placement, as a `LocalNet { at, net }` is one net inside it (rustc's `HirId` is an owner and a local id). A name is looked up in the `Design` through the `let` it came from, and a path is rebuilt from parent pointers when something is reported or printed (slang, CIRCT's `dbg.scope`, rustc's `def_path_str`), never stored, and never a dotted string. (A first version stored every path, and took 20 s to flatten 10 000 nested levels; now it's 4 ms. Dropping the copied names, 2026-09-29, made flatten another 20–36% faster.) **A size limit:** past `MAX_PLACEMENTS` (a million), the tree stops growing and the root is reported (`E-size`, at the placement that went over) instead of flattened. Recursion is found exactly, so this is no depth limit (rustc's `recursion_limit`) but a size one: a block placed twice in a block placed twice, 20 deep, is a million placements from 20 lines, and the editor flattens on every edit.
 4. **Joins.** A union-find over dense entries, `base[instance] + NetId` (Yosys `SigMap`), with one union per port binding and per `net x = [..]`.
 5. **Naming.** In each group, the smallest key `(depth, rank, path)` wins. The rank is: port, then merge target (the `x` of `net x = […]`), then net. Every other entry is an alias. Depth comes first, as in KiCad's ranking test (`ZZZ_SHALLOW` beats `AAA_DEEP`) and Verilator's "the outer net survives". The path is compared without being built: placements are numbered in tree order, so at equal depth `(placement, local name)` orders exactly as the paths do. Nets are numbered in order of their winning key, so a shuffle of statements gives the same nets. (The `FlatDesign` keeps resolve's per-block ids for provenance, which follow declaration order, so the shuffle test compares the flat dump, which is everything by path.) The merge-target rank was decided 2026-09-28.
-6. **Devices and knobs.** Devices are numbered placement by placement, in tree order, and each placement's parts in name order. Each field is `Exact`, `Knob`, `Unset` or `Invalid(Reported)`. A given value that varies becomes a knob; a spread of nothing (`± 0%`, `200..=200`) is `Exact`, as ngspice's `agauss` returns the nominal for one (decided 2026-09-29). A `Knob` holds where it comes from (`KnobSource::Field { device, field }`), its `Value` and its kind; its path, its identity (`left.r1.value`, Xyce's per-instance `X1:param`), is built from the source, not stored, so a deep hierarchy stays linear. The kind follows where the knob came from, not how its spread is written: a part's `± 1%` and its `100..=300` are both statistical (language.md §5.4). Range knobs come from `assume`. The knobs are in the `FlatDesign`: the numbers that change per run are the engine's, not a second table's (decided 2026-09-29).
+6. **Devices and knobs.** Devices are numbered placement by placement, in tree order, and each placement's parts in name order. Each field is `Exact`, `Knob`, `Unset` or `Invalid(Reported)`. A given value that varies becomes a knob; a spread of nothing (`± 0%`, `200..=200`) is `Exact`, as ngspice's `agauss` returns the nominal for one (decided 2026-09-29). A `Knob` holds where it comes from (`KnobSource::Field { device, field }`), its `Value` and its kind; its path, its identity (`left.r1.value`, Xyce's per-instance `X1:param`), is built from the source, not stored, so a deep hierarchy stays linear. The kind follows where the knob came from, not how its spread is written: a part's `± 1%` and its `100..=300` are both statistical (language.md §5.4). Range knobs come from setups and `env`s, in the next phase. The knobs are in the `FlatDesign`: the numbers that change per run are the engine's, not a second table's (decided 2026-09-29).
 7. **The ground nets**, as their own step, on every root: every net with a `Ground` port, as plain facts. Lowering makes the one ground net node 0 (E20); that there's exactly one is checked when the root is simulated (below).
 8. **The block's own checks** (E18 tier 2), after every root is flattened, on each root with nothing broken in it. One helper per rule:
 
@@ -574,7 +634,7 @@ From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, 
    | No power source (error) | sinks and no source on the net | where the first innermost sink comes in at the net's top (`vcc: rail`); from the net's top; only the innermost sinks listed |
    | Shorted part (warning) | a two-pin part with both pins on one net | its `let`; from its placement |
 
-   **The checks for simulating a root** (decided 2026-09-29, as Modelica checks every class on its own but balances only the model it simulates, spec §4.8): exactly one ground net (0: the root's name; 2+: the second net, with the first as related), and isolated nets (a component of the device graph not connected to ground; the root's ports with a role count as connected, since the bench drives its inputs and loads its outputs, language.md §8.5; a warning at the component's first net, with paths from the placement the nets are all in). They run in `check_simulation`, which lowering calls first and which returns the ground net, and which the tests call on every root. A library block, which only a board places, needn't be a whole circuit on its own: a snubber across two `Pin`s, or an ADC with separate `agnd` and `dgnd`, has no error.
+   **The checks for simulating a root** (decided 2026-09-29, as Modelica checks every class on its own but balances only the model it simulates, spec §4.8): exactly one ground net (0: the root's name; 2+: the second net, with the first as related), and isolated nets (a component of the device graph not connected to ground; the root's ports with a role count as connected, since the default setup drives its inputs and loads its outputs, `contract_syntax_v5.md` §1.3 rule 1; a warning at the component's first net, with paths from the placement the nets are all in). They run in `check_simulation`, which lowering calls first and which returns the ground net, and which the tests call on every root. A library block, which only a board places, needn't be a whole circuit on its own: a snubber across two `Pin`s, or an ADC with separate `agnd` and `dgnd`, has no error.
 
    **Faces:** a port seen from inside its block (`Inside`) exists only at the root. Every placed port is seen from outside. Roles: `Power<In>` inside and `Power<Out>` outside are sources, and `Power<In>` outside is a sink. If every block's own `Power<In>` counted as a source from inside, `Stereo`'s `v12` would get three sources (`flatten_circuit.md` §3.3). This is Modelica's rule that connection sets are formed per level.
 
@@ -586,7 +646,7 @@ From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, 
 
 **Provenance** needs no side table in v1. A flat instance or device keeps `(parent, InstanceId)` and a net keeps its local nets `(FlatInstanceId, NetId)`, so every name comes from the `Design` and every span from the `DesignSourceMap` (rustc's `UsageMap` style: ids, not copied spans). A flat design is read through one `Copy` handle, `Flat { design, data }`, made once, so it's never read against another `Design` (rustc's `TyCtxt`, decided 2026-09-29). Recording the cause of each join, for "why are these one net?", comes with the editor.
 
-**Not in this version:** the contract. `assume` knobs (`vcc.v`, `temp`) and the flat contract come with contract resolution (M1d-5), so `ce_amp` flattens to its 6 part knobs.
+**Not in this version:** the contract. Its range knobs (`vcc.v`, and `ambient`, which was `temp`) now come from setups and `env`s, not `assume`. They and the flat contract come in the next phase (M1d-5; `research/contract_v4_review_implementation.md` §3.4–§3.5, §3.9), so `ce_amp` flattens to its 6 part knobs.
 
 **Tests:**
 - `ce_amp` as the root: 6 devices, 6 nets, 6 knobs;

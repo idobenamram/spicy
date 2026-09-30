@@ -4,7 +4,7 @@
 >
 > **Scope:** syntax only. The exporter comes next, then the engine; both are out of this plan. Grammar details follow `research/contract_v4_review_implementation.md` ("[IR]"), §2.
 >
-> **Status:** steps 1 to 4 done. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added.
+> **Status:** done (2026-09-30), all five steps. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added. The open points found on the way are in §3.
 
 ---
 
@@ -87,7 +87,7 @@ We do them together, one at a time.
 ### Step 2: expressions
 
 - **`within`** is the limit operator, at level 1. `in` is no longer an operator, so it ends an expression.
-- **Open ranges:** `..=b` (no lower end) and `a..` (no upper end, legal only before `,` `}` `)` `;`). `a..b` stays an error.
+- **Open ranges:** `..=b` (no lower end) and `a..` (no upper end, when nothing that could be an upper end follows: rustc's rule, so before `,` `}` `)` `]` `;` or a looser operator). `a..b` stays an error.
 - **Index:** `m[s]`, a postfix, in the same loop as `.` and `(`.
 - **Call arguments** can be named: `f_high(-3dB, ref: dc)`.
 - **No transitions** (decided 2026-09-30, replacing v5's `5mA -> 30mA`): a step's or a sweep's levels are named fields, like every other field, so a struct literal has no positional parts and no `->` token is needed. `Step { from: 5mA, to: 30mA, edge: 1us, at: 50us }`, `Sweep { from: 4.5V, to: 3.0V, step: 10mV }`.
@@ -138,14 +138,21 @@ We do them together, one at a time.
 
 ---
 
-## 2. Decisions to confirm
+## 2. Decisions
 
-| # | Question | Recommendation |
+| # | Question | Decided |
 |---|---|---|
 | **1** | The old syntax gets no migration messages: `port …;` or a limit written with `in` is an ordinary syntax error. Nothing outside this repo uses v0.1 | Yes, no migration messages |
 | **2** | Convert the files with a throwaway script, then review its diff | Yes |
 | **3** | `circuits/ce_amp.spl` in v5, with `env ambient` in the file itself (there are no multi-file projects yet), and its three specs as today (v5's internal `base_bias` goes in its own case file) | Yes |
 | **4** | Resolve in this plan covers only `block` + `circuit` (the same `Design` as today). Setups, `env`, `const` and contracts are parsed and matched to their blocks, but not elaborated until the next phase | Yes |
+| **5** | Steps 3 and 4 cover only the MVP subset | Yes (2026-09-30) |
+| **6** | Transitions: `5mA -> 30mA`, or named fields | Named fields, `Step { from, to, … }`, `Sweep { from, to, step }`; no `->` (2026-09-30) |
+| **7** | Ranges as one AST node | Yes: `Range { lo, hi }`, as rustc's (2026-09-30) |
+| **8** | When `setup` and `pub` start an item | Only before an item's own next token: a name after `setup`, an item keyword after `pub` (2026-09-30, after the step 4 review) |
+| **9** | What can be `pub` | Only a block or a spec. Elsewhere it's an error whose fix removes it (2026-09-30) |
+| **10** | The error for a circuit, contract or setup whose block doesn't exist | One kind, `UnknownBlock`, code `E-name` like `UnknownName` (2026-09-30) |
+| **11** | The `,` before a setup's `..Base`, when it lands | Required, as in Rust (2026-09-30) |
 
 ---
 
@@ -154,3 +161,13 @@ We do them together, one at a time.
 1. Setups, `env`, `const` and contracts elaborated (the MVP subset of [IR] §4.4).
 2. The exporter.
 3. The engine.
+
+**Open points found on the way**, to settle in the next phase:
+- **A block with no circuit that nothing places** is still a flatten root, and gets flatten's checks. [IR] §3.8 says such a block "can't be checked": flatten should skip it, or say so.
+- **A second circuit doesn't taint its block,** while a second block taints the first. For the same reason (which one was meant isn't known), a second circuit probably should.
+- **A root with no contract** (no default setup): how is it checked (model.md E3)?
+- **`ambient`'s nominal:** E16's midpoint rule would give 298.15 K.
+- **Strict comparisons:** the parser accepts `<` and `>` in a spec, while v5 lists `within`, `<=` and `>=` as the limits.
+- **Attribute arguments `name = value`** ([IR] G15) are needed for `#[outside(reason = …)]` and `#[check(A = …)]`.
+- **`fn`'s return type** (`-> Ohm`) needs a `->` token back, when `fn` arrives.
+- **In the research drafts:** v5 writes both `impl T for X {}` (§1.1) and `pub block X: T` (§2); v5 §4.7 cites "§8" of [IR] for its questions, which are in its §6; [IR] §4.2's `ce_amp` setup leaves out `input` and `output`, against v5 rule 1.3.1.

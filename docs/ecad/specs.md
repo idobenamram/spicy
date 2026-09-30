@@ -257,33 +257,42 @@ Summary of v2 Part B, as applied to specs:
 
 ---
 
-## 12. Text form (strawman)
+## 12. Text form
 
-```
-block Amp {
-    // assumptions → range knobs
-    assume temp  in -10°C..60°C
-    assume vcc   in 12V ± 5%
-    assume life  in 0..10 years
-    assume input: sine up to 100 mV, 20 Hz..20 kHz, source ≤ 1 kΩ
-    assume load on out: 10 kΩ
+The syntax is `language.md` §8 (v0.2, the syntax of `research/contract_syntax_v5.md`). The concepts above map onto it like this:
 
-    // ... parts and nets ...
+```rust
+env ambient: Temperature in -10°C..=60°C;       // a range knob of the whole project
+env life: Duration in 0y..=10y;
 
-    // guarantees → specs
-    spec bias = dc(V(out)) in 4.5V..6.5V          because "±1 V swing both ways"
-    spec gain = ac(V(out)/V(in), 1kHz) in 4.6 ± 5%
-    spec bass = ac(V(out)/V(in)).f_low(-3dB) <= 30Hz        yield 99.9%
-    spec clip = tran(input).thd(V(out)) < 1%                worst_case
+/// The world the block is checked in: its setup's ranges are range knobs.
+setup Operating for Amp {
+    vcc: Supply { v: 12V ± 5% },
+    input: Signal { v: 0V..=100mV, z: ..=1kΩ },
+    out: Load { r: 10kΩ },
+    temp: ambient,
+}
+
+contract Amp {
+    setup = Operating;
+    let h = ac(out.v / input.v);
+
+    /// ±1 V swing both ways.
+    pub spec bias: dc(out.v) within 4.5V..=6.5V;
+    spec gain: h.at(1kHz).mag() within 4.6 ± 5%;
+    #[confidence(yield(99.9%))]
+    spec bass: h.f_low(-3dB) <= 30Hz;
 }
 ```
+
+Transient specs (`tran(…)`, `thd`), confidence other than the default, and `life` as a knob are outside the MVP (`syntax_v5_plan.md`).
 
 ---
 
 ## 13. Open decisions
 
 1. **Default confidence:** `sigma 3` or `worst_case`.
-2. **Setups:** in the block's assumptions (proposed), or in separate testbench blocks that instantiate the design (the Cadence ADE style)?
+2. **Setups:** in the block's assumptions, or in separate testbench blocks that instantiate the design (the Cadence ADE style)? **Decided by v5:** a setup is its own item, `setup S for X { … }`, and a contract names its default one (`setup = S;`). It sets what's around the block without instantiating it.
 3. **Probe identity:** probes named by net (`V(out)`), or first-class named objects that survive renames?
 4. **Default distribution** for statistical knobs when a datasheet gives only min/max (e.g. transistor β): truncated normal with σ = range/6, or uniform?
 5. **Beginning vs end of life:** one spec over a `life` range knob (proposed), or separate specs?

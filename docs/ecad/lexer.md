@@ -1,6 +1,6 @@
 # Lexer Design (M1b)
 
-> 2026-09-26 · Design note for roadmap M1b. **Status:** implemented in `crates/spicy_lang`.
+> 2026-09-26 · Design note for roadmap M1b. **Status:** implemented in `crates/spicy_lang`. Updated 2026-09-30 for the v5 syntax (`syntax_v5_plan.md`): the keywords, strings, the units `h` and `y`.
 > How `spicy_lang` turns `.spl` text into tokens: the passes, the data types, the errors, and above all the tests. The token set itself is in `grammar.md` §2 and the unit rules in §5. Why hand-written: roadmap §4.4.
 > Sources read for this note (2026-09-26):
 > - Spade: `externals/spade/spade-ast/src/token.rs`, `spade-parser/src/lib.rs`, `spade-tests/`

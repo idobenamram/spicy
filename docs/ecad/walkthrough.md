@@ -128,8 +128,8 @@ So the temperature knob moves **both** β and VBE, and it's the **same** knob fo
 Mostly they don't have to. **Range knobs** are declared once per project or block. **Statistical tolerances** come with each part: typed in, or pulled from the datasheet or part library. **Links** between parts and range knobs (tempco, aging) come from part models; for a bare `Npn`, the engine uses a default model and prints it in every report (the Appendix). From `ce_amp.spl`:
 
 ```
-assume temp in -10°C..=60°C;                                        // range knob
-assume vcc.v in 12V ± 5%;                                           // range knob
+env ambient: Temperature in -10°C..=60°C;                           // range knob (the setup's `temp: ambient`)
+vcc: Supply { v: 12V ± 5% },                                        // range knob (an entry of `setup Operating`)
 let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };             // statistical knob
 let c_in = Electrolytic { p: base, n: input, value: 1uF ± 20% };    // (post-MVP: aging links it to life)
 let q1 = Npn { c: output, b: base, e: emitter, beta: 100..=300 };   // tempco from the default model

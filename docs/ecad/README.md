@@ -9,8 +9,9 @@ Design documents for the AI-native schematic and simulation editor built on spic
 3. **[engine.md](engine.md)**: the engine design (current: v4, on ngspice: every corner, inside-the-box guards, the 3σ-point search).
    - **[engine_plan.md](engine_plan.md)**: the engine MVP plan on ngspice, from three research rounds (accepted 2026-09-27: decisions D-A to D-F).
    - **[engine_types.md](engine_types.md)**: the M3a design note: the engine's types, the `Backend` trait, stages and driver, run table, verdict functions, report schema, the ngspice worker, and the test suite layout (draft for review).
-4. **[language.md](language.md)**: the circuit language (v0.1).
-   - **[grammar.md](grammar.md)**: the exact MVP grammar: tokens, keywords, EBNF, operator precedence, unit literals, syntax errors.
+4. **[language.md](language.md)**: the circuit language (v0.2: the syntax of [contract_syntax_v5.md](research/contract_syntax_v5.md)).
+   - **[syntax_v5_plan.md](syntax_v5_plan.md)**: how the front end moved to the v5 syntax: the steps, and the decisions made on the way (no `->`, one range node, when `setup` and `pub` start an item).
+   - **[grammar.md](grammar.md)**: the exact MVP grammar (v0.2): tokens, keywords, EBNF, operator precedence, unit literals, recovery, syntax errors.
    - **[model.md](model.md)**: elaboration, from syntax tree to flat design: `Design`, `FlatDesign`, knobs, nets, units, checks; compared with compilers, hardware elaborators, Modelica and circuit tools.
    - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests; compared with Spade, atopile, rustc, rust-analyzer and Zig.
    - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.

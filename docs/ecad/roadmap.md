@@ -199,23 +199,23 @@ The engine MVP runs on ngspice (ngspice-42 with KLU, installed). The details are
 | **Nets and pin binding:** `net name;`, `let name = Kind { pin: net, …, field: value };`, `net x = [a, b];` | — |
 | **Part kinds:** `Resistor`, `Capacitor`, `Electrolytic`, `Npn`, `Pnp` | Inductor, diodes, MOSFETs, IC parts, `part:` pinning, part records, `?` |
 | **Hierarchy:** placing a block inside another (`let amp = CeAmp { … }`), flattened in elaboration | Contract composition checks (guarantee ⊆ assumption) |
-| **Values:** SI literals with units (`47k`, `4.7kΩ`, `1uF`, `12V`, `-10°C`, `1kHz`, `-3dB`), `±` / `+/-` tolerances (relative and absolute), closed ranges `..=`, unit checking, arithmetic `+ - * /` | `from` derivations, `lot`, links (tempco, aging) |
-| **Contracts:** `assume` on `temp` and on port quantities (`vcc.v`), `let` measures, `spec name: measure rel bound;`, `#[confidence(worst_case / sigma(3))]` | Signal patterns (`Sine {…}`), loads, benches beyond the default, `where`, lints and waivers, automatic checks |
+| **Values:** SI literals with units (`47k`, `4.7kΩ`, `1uF`, `12V`, `-10°C`, `1kHz`, `-3dB`), `±` / `+/-` tolerances (relative and absolute), ranges `a..=b` (and open `..=b`, `a..` in setups), unit checking, arithmetic `+ - * /` | `from` derivations, `lot`, links (tempco, aging) |
+| **Contracts (v5 syntax, `syntax_v5_plan.md`):** `env` and `const`; `setup S for X { … }` with a port's source or load (`vcc: Supply { v: 12V ± 5% }`) and `temp`; in the contract `setup = S;`, `let` measures, `[pub] spec name: measure within / <= / >= bound;`, `#[confidence(worst_case / sigma(3))]` | Modes, events, derived setups (`..Base`), spec clauses (`with`, `for`, `on`, `in`), function-form specs, `rated`, signal patterns (`Sine {…}`), `where`, lints and waivers, automatic checks |
 | **Measures:** `dc(expr)`, `ac(expr)`, probes `net.v`, `port.v`; `.at(f)`, `.mag()`, `.f_low(-3dB)` | Transient, noise, current and power probes, the rest of the measurement library |
 | **Generics and loops:** none | `<const N>`, `for`, `if`, `match`, indexed lets |
 
 ### 4.2 The file the MVP must handle
 
-`circuits/ce_amp.spl`:
+`circuits/ce_amp.spl`, in the v5 syntax:
 
 ```rust
-/// Common-emitter audio stage (walkthrough §1).
-block CeAmp {
-    port vcc: Power<In>;
-    port gnd: Ground;
-    port input: Analog<In>;
-    port output: Analog<Out>;
+/// The temperature the amplifier works in, anywhere it's used.
+env ambient: Temperature in -10°C..=60°C;
 
+/// Common-emitter audio stage (walkthrough §1).
+pub block CeAmp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit CeAmp {
     net base;
     net emitter;
 
@@ -228,23 +228,30 @@ block CeAmp {
     let q1 = Npn { c: output, b: base, e: emitter, beta: 100..=300 };
 }
 
+/// The amplifier as it's used: a 12 V rail, a quiet input, an open output.
+setup Operating for CeAmp {
+    vcc: Supply { v: 12V ± 5% },
+    input: Signal { v: 0V },
+    output: Load {},
+    temp: ambient,
+}
+
 contract CeAmp {
-    assume temp in -10°C..=60°C;
-    assume vcc.v in 12V ± 5%;
+    setup = Operating;
 
     let h = ac(output.v / input.v);
 
     /// Room for the output to swing ±1 V without clipping.
-    spec bias: dc(output.v) in 4.5V..=6.5V;
+    spec bias: dc(output.v) within 4.5V..=6.5V;
     /// The next stage expects this level.
-    spec gain: h.at(1kHz).mag() in 4.6 ± 5%;
+    spec gain: h.at(1kHz).mag() within 4.6 ± 5%;
     /// Don't cut the bass.
     spec bass: h.f_low(-3dB) <= 30Hz;
 }
 ```
 
 It has 8 knobs:
-- **range:** `temp`, `vcc.v`;
+- **range:** `ambient` (the temperature, which the setup's `temp:` names), `vcc.v` (the setup's supply);
 - **statistical:** the `r1`, `r2`, `rc`, `re` and `c_in` values, and `q1.beta`.
 
 (The walkthrough's 9th knob, aging, needs links, which are post-MVP.)

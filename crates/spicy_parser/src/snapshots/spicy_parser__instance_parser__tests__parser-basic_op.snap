@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -54,6 +55,7 @@ Deck {
                         suffix: Some(
                             Kilo,
                         ),
+                        scaled: 10000.0,
                     },
                 ),
                 model: None,
@@ -90,6 +92,7 @@ Deck {
                         suffix: Some(
                             Micro,
                         ),
+                        scaled: 1e-6,
                     },
                 ),
                 model: None,
@@ -123,6 +126,7 @@ Deck {
                             suffix: Some(
                                 Milli,
                             ),
+                            scaled: 0.001,
                         },
                     ),
                 ),

@@ -174,17 +174,12 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
         suffix = ident_text.parse::<ValueSuffix>().ok();
     }
 
-    let value: f64 = number_str
-        .parse()
-        .map_err(|_| ParserError::InvalidNumericLiteral {
+    Value::from_literal(&number_str, exponent, suffix).ok_or_else(|| {
+        ParserError::InvalidNumericLiteral {
             span: cursor.peek_span(),
             lexeme: number_str,
-        })?;
-
-    Ok(Value {
-        value,
-        exponent,
-        suffix,
+        }
+        .into()
     })
 }
 

@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/lower.rs
+assertion_line: 722
 expression: lowered
 ---
 Lowered {
@@ -194,7 +195,7 @@ Lowered {
                         3e-6,
                     ),
                     width: Some(
-                        9.999999999999999e-6,
+                        1e-5,
                     ),
                     period: None,
                     count: 0,
@@ -219,7 +220,7 @@ Lowered {
                         4e-6,
                     ),
                     period: Some(
-                        9.999999999999999e-6,
+                        1e-5,
                     ),
                     count: 3,
                 },
@@ -243,7 +244,7 @@ Lowered {
                         2e-8,
                     ),
                     period: Some(
-                        5.0000000000000004e-8,
+                        5e-8,
                     ),
                     count: 0,
                 },
@@ -273,7 +274,7 @@ Lowered {
                     frequency: Some(
                         1000.0,
                     ),
-                    delay: 9.999999999999999e-6,
+                    delay: 1e-5,
                     damping: 100.0,
                     phase: 0.7853981633974483,
                 },
@@ -305,7 +306,7 @@ Lowered {
                         2e-6,
                     ),
                     fall_delay: Some(
-                        9.999999999999999e-6,
+                        1e-5,
                     ),
                     fall_tau: Some(
                         3e-6,
@@ -362,7 +363,7 @@ Lowered {
                         1e-6,
                     ),
                     fall_tau: Some(
-                        7.500000000000001e-10,
+                        7.5e-10,
                     ),
                 },
                 ac: Phasor {

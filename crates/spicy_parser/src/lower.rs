@@ -489,6 +489,50 @@ mod tests {
     }
 
     #[test]
+    fn values_are_read_correctly_rounded() {
+        let lowered =
+            lower_body("R1 a 0 4.69207e3\nR2 a 0 4.7k\nC1 a 0 100n\nC2 a 0 1.23456789e-11");
+        let expected = |text: &str| text.parse::<f64>().unwrap();
+        assert_eq!(lowered.params.resistors[0].r, expected("4692.07"));
+        assert_eq!(lowered.params.resistors[1].r, expected("4700"));
+        assert_eq!(lowered.params.capacitors[0].c, expected("100e-9"));
+        assert_eq!(lowered.params.capacitors[1].c, expected("1.23456789e-11"));
+    }
+
+    /// Any value printed in Rust's shortest round-trip form (`{:e}`, what an
+    /// exporter writes) must read back as the same `f64`, bit for bit.
+    #[test]
+    fn printed_values_read_back_bit_exact() {
+        let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let values: Vec<f64> = (0..2000)
+            .map(|_| {
+                let mantissa = 1.0 + (next() >> 11) as f64 / (1u64 << 53) as f64;
+                let exponent = (next() % 22) as i32 - 15;
+                mantissa * 10f64.powi(exponent)
+            })
+            .collect();
+        let body: String = values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| format!("R{i} a 0 {v:e}\n"))
+            .collect();
+        let lowered = lower_body(&body);
+        for (i, v) in values.iter().enumerate() {
+            assert_eq!(
+                lowered.params.resistors[i].r.to_bits(),
+                v.to_bits(),
+                "R{i}: {v:e}"
+            );
+        }
+    }
+
+    #[test]
     fn missing_resistance_defaults_to_one_milliohm() {
         let lowered = lower_body(".model RM R tc1=1m\nR1 a 0 mname=RM");
         assert_eq!(lowered.params.resistors[0].r, 1e-3);

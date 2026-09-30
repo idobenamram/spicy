@@ -350,7 +350,7 @@ impl Phasor {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum ValueSuffix {
     Tera,
     Giga,
@@ -367,20 +367,23 @@ pub enum ValueSuffix {
 }
 
 impl ValueSuffix {
-    pub fn scale(&self) -> f64 {
+    /// The suffix as a power of ten: `k` is 3, `n` is −9. An integer, so a value is
+    /// read as one decimal number (`4.7k` as `4.7e3`) rather than multiplied by an
+    /// inexact `1e3` or `1e-9`.
+    pub fn decimal_exponent(&self) -> i32 {
         match self {
-            ValueSuffix::Tera => 1e12,
-            ValueSuffix::Giga => 1e9,
-            ValueSuffix::Mega => 1e6,
-            ValueSuffix::Kilo => 1e3,
-            ValueSuffix::Milli => 1e-3,
-            ValueSuffix::Micro => 1e-6,
-            ValueSuffix::Nano => 1e-9,
-            ValueSuffix::Pico => 1e-12,
-            ValueSuffix::Femto => 1e-15,
-            ValueSuffix::Atto => 1e-18,
-            ValueSuffix::Degree => 1.0,
-            ValueSuffix::Radian => 1.0,
+            ValueSuffix::Tera => 12,
+            ValueSuffix::Giga => 9,
+            ValueSuffix::Mega => 6,
+            ValueSuffix::Kilo => 3,
+            ValueSuffix::Milli => -3,
+            ValueSuffix::Micro => -6,
+            ValueSuffix::Nano => -9,
+            ValueSuffix::Pico => -12,
+            ValueSuffix::Femto => -15,
+            ValueSuffix::Atto => -18,
+            ValueSuffix::Degree => 0,
+            ValueSuffix::Radian => 0,
         }
     }
 }

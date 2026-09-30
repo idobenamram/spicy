@@ -19,15 +19,46 @@ pub struct Value {
     pub value: f64,
     pub exponent: Option<f64>,
     pub suffix: Option<ValueSuffix>,
+    /// The number the three parts spell, correctly rounded: read once as a decimal,
+    /// not multiplied together, so `4.69207e3` is exactly 4692.07. The parts above
+    /// stay as the netlist wrote them.
+    scaled: f64,
 }
 
 impl Value {
     pub fn new(value: f64, exponent: Option<f64>, suffix: Option<ValueSuffix>) -> Self {
+        let shift = decimal_shift(exponent, suffix);
+        // `{:e}` is the shortest form that reads back as `value`, so shifting its
+        // exponent reads the same digits `shift` powers of ten over. Infinity and NaN
+        // have no digits, and scaling doesn't change them.
+        let scaled = if shift == 0 || !value.is_finite() {
+            value
+        } else {
+            shifted(&format!("{value:e}"), shift)
+        };
         Self {
             value,
             exponent,
             suffix,
+            scaled,
         }
+    }
+
+    /// A literal as the netlist wrote it: `digits` are its mantissa (`4.69207`,
+    /// `.5`, `-2`), read together with the exponent and suffix in one decimal parse.
+    pub(crate) fn from_literal(
+        digits: &str,
+        exponent: Option<f64>,
+        suffix: Option<ValueSuffix>,
+    ) -> Option<Self> {
+        let value = digits.parse().ok()?;
+        let scaled = shifted(digits, decimal_shift(exponent, suffix));
+        Some(Self {
+            value,
+            exponent,
+            suffix,
+            scaled,
+        })
     }
 
     pub fn zero() -> Self {
@@ -35,14 +66,7 @@ impl Value {
     }
 
     pub fn get_value(&self) -> f64 {
-        let mut value = self.value;
-        if let Some(exponent) = self.exponent {
-            value *= 10.0f64.powf(exponent);
-        }
-        if let Some(suffix) = &self.suffix {
-            value *= suffix.scale();
-        }
-        value
+        self.scaled
     }
 
     pub fn angle_radians(&self, default_degrees: bool) -> f64 {
@@ -59,6 +83,27 @@ impl Value {
             }
         }
     }
+}
+
+/// The power of ten an exponent and a suffix add together: `1.5e3k` is 6.
+fn decimal_shift(exponent: Option<f64>, suffix: Option<ValueSuffix>) -> i32 {
+    exponent.map_or(0, |e| e as i32) + suffix.map_or(0, |s| s.decimal_exponent())
+}
+
+/// `digits × 10^shift`, correctly rounded: the decimal is rewritten with its
+/// exponent moved and parsed once. `digits` is a decimal literal that already
+/// parses (a netlist's mantissa, or Rust's `{:e}` form, which carries an exponent).
+fn shifted(digits: &str, shift: i32) -> f64 {
+    let (mantissa, exponent) = match digits.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => {
+            let exponent: i32 = exponent.parse().expect("`{:e}` writes an integer exponent");
+            (mantissa, exponent)
+        }
+        None => (digits, 0),
+    };
+    format!("{mantissa}e{}", exponent.saturating_add(shift))
+        .parse()
+        .expect("a parsing decimal with a moved exponent still parses")
 }
 
 // Arithmetic operations for Value using fully-scaled numeric values.

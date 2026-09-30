@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/expression_phase.rs
+assertion_line: 110
 expression: json
 ---
 {
@@ -108,7 +109,8 @@ expression: json
               "Value": {
                 "value": 1.0,
                 "exponent": null,
-                "suffix": "Kilo"
+                "suffix": "Kilo",
+                "scaled": 1000.0
               }
             }
           }

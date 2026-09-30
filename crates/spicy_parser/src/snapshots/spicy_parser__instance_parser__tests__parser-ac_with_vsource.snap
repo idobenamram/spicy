@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -31,11 +32,13 @@ Deck {
                     value: 10.0,
                     exponent: None,
                     suffix: None,
+                    scaled: 10.0,
                 },
                 fstop: Value {
                     value: 100.0,
                     exponent: None,
                     suffix: None,
+                    scaled: 100.0,
                 },
             },
         ),
@@ -64,6 +67,7 @@ Deck {
                         suffix: Some(
                             Kilo,
                         ),
+                        scaled: 1000.0,
                     },
                 ),
                 model: None,
@@ -95,6 +99,7 @@ Deck {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                     ),
                 ),
@@ -104,12 +109,14 @@ Deck {
                             value: 1.5,
                             exponent: None,
                             suffix: None,
+                            scaled: 1.5,
                         },
                         phase: Some(
                             Value {
                                 value: 45.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 45.0,
                             },
                         ),
                     },

@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -46,6 +47,7 @@ Deck {
                                 -14.0,
                             ),
                             suffix: None,
+                            scaled: 1e-14,
                         },
                     ),
                     n: Some(
@@ -53,6 +55,7 @@ Deck {
                             value: 1.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 1.0,
                         },
                     ),
                     rs: Some(
@@ -60,6 +63,7 @@ Deck {
                             value: 2.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 2.0,
                         },
                     ),
                 },
@@ -68,6 +72,7 @@ Deck {
                         value: 2.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 2.0,
                     },
                 ),
                 m: Some(
@@ -75,6 +80,7 @@ Deck {
                         value: 3.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 3.0,
                     },
                 ),
                 pj: Some(
@@ -82,6 +88,7 @@ Deck {
                         value: 4.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 4.0,
                     },
                 ),
                 off: Some(
@@ -92,6 +99,7 @@ Deck {
                         value: 0.7,
                         exponent: None,
                         suffix: None,
+                        scaled: 0.7,
                     },
                 ),
                 temp: Some(
@@ -99,6 +107,7 @@ Deck {
                         value: 25.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 25.0,
                     },
                 ),
                 dtemp: Some(
@@ -106,6 +115,7 @@ Deck {
                         value: 5.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 5.0,
                     },
                 ),
                 lm: Some(
@@ -113,6 +123,7 @@ Deck {
                         value: 1.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 1.0,
                     },
                 ),
                 wm: Some(
@@ -120,6 +131,7 @@ Deck {
                         value: 2.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 2.0,
                     },
                 ),
                 lp: Some(
@@ -127,6 +139,7 @@ Deck {
                         value: 3.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 3.0,
                     },
                 ),
                 wp: Some(
@@ -134,6 +147,7 @@ Deck {
                         value: 4.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 4.0,
                     },
                 ),
             },

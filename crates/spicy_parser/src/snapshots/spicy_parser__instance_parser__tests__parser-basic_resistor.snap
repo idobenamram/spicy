@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -42,6 +43,7 @@ Deck {
                         suffix: Some(
                             Kilo,
                         ),
+                        scaled: 1000.0,
                     },
                 ),
                 model: None,
@@ -76,6 +78,7 @@ Deck {
                         suffix: Some(
                             Tera,
                         ),
+                        scaled: 1123400000000.0,
                     },
                 ),
                 model: None,
@@ -108,6 +111,7 @@ Deck {
                         value: -10.0,
                         exponent: None,
                         suffix: None,
+                        scaled: -10.0,
                     },
                 ),
                 model: None,
@@ -140,6 +144,7 @@ Deck {
                         value: 0.5,
                         exponent: None,
                         suffix: None,
+                        scaled: 0.5,
                     },
                 ),
                 model: None,
@@ -172,6 +177,7 @@ Deck {
                         value: 1.25,
                         exponent: None,
                         suffix: None,
+                        scaled: 1.25,
                     },
                 ),
                 model: None,
@@ -206,6 +212,7 @@ Deck {
                             3.0,
                         ),
                         suffix: None,
+                        scaled: 2500.0,
                     },
                 ),
                 model: None,
@@ -240,6 +247,7 @@ Deck {
                             3.0,
                         ),
                         suffix: None,
+                        scaled: 2500.0,
                     },
                 ),
                 model: None,
@@ -274,6 +282,7 @@ Deck {
                             -3.0,
                         ),
                         suffix: None,
+                        scaled: 0.0025,
                     },
                 ),
                 model: None,
@@ -308,6 +317,7 @@ Deck {
                             6.0,
                         ),
                         suffix: None,
+                        scaled: -3000000.0,
                     },
                 ),
                 model: None,
@@ -342,6 +352,7 @@ Deck {
                         suffix: Some(
                             Kilo,
                         ),
+                        scaled: 10000.0,
                     },
                 ),
                 model: None,
@@ -376,6 +387,7 @@ Deck {
                         suffix: Some(
                             Mega,
                         ),
+                        scaled: 47000000.0,
                     },
                 ),
                 model: None,
@@ -410,6 +422,7 @@ Deck {
                         suffix: Some(
                             Milli,
                         ),
+                        scaled: 0.001,
                     },
                 ),
                 model: None,
@@ -444,6 +457,7 @@ Deck {
                         suffix: Some(
                             Micro,
                         ),
+                        scaled: 0.00022,
                     },
                 ),
                 model: None,
@@ -478,6 +492,7 @@ Deck {
                         suffix: Some(
                             Nano,
                         ),
+                        scaled: 3.3e-8,
                     },
                 ),
                 model: None,
@@ -512,6 +527,7 @@ Deck {
                         suffix: Some(
                             Pico,
                         ),
+                        scaled: 4.7e-12,
                     },
                 ),
                 model: None,
@@ -546,6 +562,7 @@ Deck {
                         suffix: Some(
                             Femto,
                         ),
+                        scaled: 8e-15,
                     },
                 ),
                 model: None,
@@ -580,6 +597,7 @@ Deck {
                         suffix: Some(
                             Atto,
                         ),
+                        scaled: 1e-18,
                     },
                 ),
                 model: None,
@@ -614,6 +632,7 @@ Deck {
                             -3.0,
                         ),
                         suffix: None,
+                        scaled: 0.0012,
                     },
                 ),
                 model: None,
@@ -648,6 +667,7 @@ Deck {
                         suffix: Some(
                             Giga,
                         ),
+                        scaled: 123000000.0,
                     },
                 ),
                 model: None,
@@ -682,6 +702,7 @@ Deck {
                         suffix: Some(
                             Tera,
                         ),
+                        scaled: -990000000000.0,
                     },
                 ),
                 model: None,

@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/lower.rs
+assertion_line: 722
 expression: lowered
 ---
 Lowered {
@@ -353,7 +354,7 @@ Lowered {
                 noisy: true,
             },
             ResistorParams {
-                r: 0.00021999999999999998,
+                r: 0.00022,
                 r_ac: None,
                 m: 1.0,
                 temperature: Offset(
@@ -362,7 +363,7 @@ Lowered {
                 noisy: true,
             },
             ResistorParams {
-                r: 3.3000000000000004e-8,
+                r: 3.3e-8,
                 r_ac: None,
                 m: 1.0,
                 temperature: Offset(

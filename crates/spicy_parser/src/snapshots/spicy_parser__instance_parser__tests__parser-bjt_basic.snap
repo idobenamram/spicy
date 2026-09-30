@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -56,6 +57,7 @@ Deck {
                                 -16.0,
                             ),
                             suffix: None,
+                            scaled: 1e-16,
                         },
                     ),
                     bf: Some(
@@ -63,6 +65,7 @@ Deck {
                             value: 100.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 100.0,
                         },
                     ),
                     br: Some(
@@ -70,6 +73,7 @@ Deck {
                             value: 1.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 1.0,
                         },
                     ),
                     nf: None,
@@ -80,6 +84,7 @@ Deck {
                         value: 2.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 2.0,
                     },
                 ),
                 m: Some(
@@ -87,6 +92,7 @@ Deck {
                         value: 5.0,
                         exponent: None,
                         suffix: None,
+                        scaled: 5.0,
                     },
                 ),
                 off: Some(
@@ -97,6 +103,7 @@ Deck {
                         value: 0.7,
                         exponent: None,
                         suffix: None,
+                        scaled: 0.7,
                     },
                 ),
                 ic_vce: Some(
@@ -104,6 +111,7 @@ Deck {
                         value: 1.2,
                         exponent: None,
                         suffix: None,
+                        scaled: 1.2,
                     },
                 ),
             },

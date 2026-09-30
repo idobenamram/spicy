@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
+assertion_line: 1267
 expression: deck
 ---
 Deck {
@@ -40,6 +41,7 @@ Deck {
                             suffix: Some(
                                 Kilo,
                             ),
+                            scaled: 10000.0,
                         },
                     ),
                 ),
@@ -61,6 +63,7 @@ Deck {
                             suffix: Some(
                                 Kilo,
                             ),
+                            scaled: 10000.0,
                         },
                     ),
                 ),
@@ -82,6 +85,7 @@ Deck {
                             suffix: Some(
                                 Kilo,
                             ),
+                            scaled: 10000.0,
                         },
                     ),
                 ),
@@ -91,12 +95,14 @@ Deck {
                             value: 3.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 3.0,
                         },
                         phase: Some(
                             Value {
                                 value: 0.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 0.0,
                             },
                         ),
                     },
@@ -116,11 +122,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         voltage2: Value {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                         delay: None,
                         rise_time: None,
@@ -146,11 +154,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         voltage2: Value {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                         delay: Some(
                             Value {
@@ -159,6 +169,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-6,
                             },
                         ),
                         rise_time: Some(
@@ -168,6 +179,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 2e-6,
                             },
                         ),
                         fall_time: Some(
@@ -177,6 +189,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 3e-6,
                             },
                         ),
                         pulse_width: Some(
@@ -186,6 +199,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-5,
                             },
                         ),
                         period: None,
@@ -208,11 +222,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         voltage2: Value {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                         delay: Some(
                             Value {
@@ -221,6 +237,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-6,
                             },
                         ),
                         rise_time: Some(
@@ -230,6 +247,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 2e-6,
                             },
                         ),
                         fall_time: Some(
@@ -239,6 +257,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 2e-6,
                             },
                         ),
                         pulse_width: Some(
@@ -248,6 +267,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 4e-6,
                             },
                         ),
                         period: Some(
@@ -257,6 +277,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-5,
                             },
                         ),
                         number_of_pulses: Some(
@@ -280,11 +301,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         voltage2: Value {
                             value: 3.3,
                             exponent: None,
                             suffix: None,
+                            scaled: 3.3,
                         },
                         delay: Some(
                             Value {
@@ -293,6 +316,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 5e-9,
                             },
                         ),
                         rise_time: Some(
@@ -302,6 +326,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 1e-9,
                             },
                         ),
                         fall_time: Some(
@@ -311,6 +336,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 1e-9,
                             },
                         ),
                         pulse_width: Some(
@@ -320,6 +346,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 2e-8,
                             },
                         ),
                         period: Some(
@@ -329,6 +356,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 5e-8,
                             },
                         ),
                         number_of_pulses: None,
@@ -350,11 +378,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         amplitude: Value {
                             value: 1.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 1.0,
                         },
                         frequency: None,
                         delay: None,
@@ -378,11 +408,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         amplitude: Value {
                             value: 2.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 2.0,
                         },
                         frequency: Some(
                             Value {
@@ -391,6 +423,7 @@ Deck {
                                 suffix: Some(
                                     Kilo,
                                 ),
+                                scaled: 1000.0,
                             },
                         ),
                         delay: Some(
@@ -400,6 +433,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-5,
                             },
                         ),
                         damping_factor: Some(
@@ -407,6 +441,7 @@ Deck {
                                 value: 100.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 100.0,
                             },
                         ),
                         phase: Some(
@@ -414,6 +449,7 @@ Deck {
                                 value: 45.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 45.0,
                             },
                         ),
                     },
@@ -434,11 +470,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         pulsed_value: Value {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                         rise_delay_time: None,
                         rise_time_constant: None,
@@ -462,11 +500,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         pulsed_value: Value {
                             value: 5.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 5.0,
                         },
                         rise_delay_time: Some(
                             Value {
@@ -475,6 +515,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-6,
                             },
                         ),
                         rise_time_constant: Some(
@@ -484,6 +525,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 2e-6,
                             },
                         ),
                         fall_delay_time: Some(
@@ -493,6 +535,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-5,
                             },
                         ),
                         fall_time_constant: Some(
@@ -502,6 +545,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 3e-6,
                             },
                         ),
                     },
@@ -526,6 +570,7 @@ Deck {
                             suffix: Some(
                                 Milli,
                             ),
+                            scaled: 0.001,
                         },
                         voltage2: Value {
                             value: 2.0,
@@ -533,6 +578,7 @@ Deck {
                             suffix: Some(
                                 Milli,
                             ),
+                            scaled: 0.002,
                         },
                         delay: None,
                         rise_time: None,
@@ -558,11 +604,13 @@ Deck {
                             value: 0.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.0,
                         },
                         amplitude: Value {
                             value: 0.5,
                             exponent: None,
                             suffix: None,
+                            scaled: 0.5,
                         },
                         frequency: Some(
                             Value {
@@ -571,6 +619,7 @@ Deck {
                                 suffix: Some(
                                     Kilo,
                                 ),
+                                scaled: 2000.0,
                             },
                         ),
                         delay: Some(
@@ -580,6 +629,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-6,
                             },
                         ),
                         damping_factor: Some(
@@ -587,6 +637,7 @@ Deck {
                                 value: 0.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 0.0,
                             },
                         ),
                         phase: Some(
@@ -594,6 +645,7 @@ Deck {
                                 value: 0.0,
                                 exponent: None,
                                 suffix: None,
+                                scaled: 0.0,
                             },
                         ),
                     },
@@ -614,11 +666,13 @@ Deck {
                             value: 1.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 1.0,
                         },
                         pulsed_value: Value {
                             value: 4.0,
                             exponent: None,
                             suffix: None,
+                            scaled: 4.0,
                         },
                         rise_delay_time: Some(
                             Value {
@@ -627,6 +681,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 5e-9,
                             },
                         ),
                         rise_time_constant: Some(
@@ -636,6 +691,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 5e-10,
                             },
                         ),
                         fall_delay_time: Some(
@@ -645,6 +701,7 @@ Deck {
                                 suffix: Some(
                                     Micro,
                                 ),
+                                scaled: 1e-6,
                             },
                         ),
                         fall_time_constant: Some(
@@ -654,6 +711,7 @@ Deck {
                                 suffix: Some(
                                     Nano,
                                 ),
+                                scaled: 7.5e-10,
                             },
                         ),
                     },

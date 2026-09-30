@@ -30,7 +30,8 @@ pub struct Deck {
 #[derive(Debug)]
 pub(crate) struct ParamSlot<'s> {
     pub canonical: &'s str,
-    // pub aliases: Vec<&'s str>,
+    /// Other names ngspice accepts for the parameter (`r` for `resistance`).
+    pub aliases: &'s [&'s str],
     pub is_ident: bool,
     pub is_flag: bool,
 }
@@ -39,6 +40,7 @@ impl<'s> ParamSlot<'s> {
     pub fn ident(canonical: &'s str) -> Self {
         Self {
             canonical,
+            aliases: &[],
             is_ident: true,
             is_flag: false,
         }
@@ -47,6 +49,7 @@ impl<'s> ParamSlot<'s> {
     pub fn other(canonical: &'s str) -> Self {
         Self {
             canonical,
+            aliases: &[],
             is_ident: false,
             is_flag: false,
         }
@@ -55,9 +58,18 @@ impl<'s> ParamSlot<'s> {
     pub fn flag(canonical: &'s str) -> Self {
         Self {
             canonical,
+            aliases: &[],
             is_ident: true,
             is_flag: true,
         }
+    }
+
+    pub fn aliases(self, aliases: &'s [&'s str]) -> Self {
+        Self { aliases, ..self }
+    }
+
+    fn is_named(&self, name: &str) -> bool {
+        self.canonical == name || self.aliases.contains(&name)
     }
 }
 
@@ -106,11 +118,7 @@ impl<'s> ParamParser<'s> {
         let ident_str = token_text(self.input, ident);
 
         let name = keyword(ident_str);
-        let Some(param) = self
-            .params_order
-            .iter()
-            .find(|p| p.canonical == name.as_str())
-        else {
+        let Some(param) = self.params_order.iter().find(|p| p.is_named(name.as_str())) else {
             return Err(ParserError::InvalidParam {
                 param: ident_str.to_string(),
                 span: cursor.span,
@@ -432,7 +440,7 @@ impl<'s> InstanceParser<'s> {
         let mut resistor = ResistorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
-            ParamSlot::other("resistance"),
+            ParamSlot::other("resistance").aliases(&["r"]),
             ParamSlot::ident("mname"),
             ParamSlot::other("ac"),
             ParamSlot::other("m"),
@@ -537,7 +545,7 @@ impl<'s> InstanceParser<'s> {
         let mut capacitor = CapacitorSpec::new(name, cursor.span, positive_node, negative_node);
 
         let params_order = vec![
-            ParamSlot::other("capacitance"),
+            ParamSlot::other("capacitance").aliases(&["cap", "c"]),
             ParamSlot::ident("mname"),
             ParamSlot::other("m"),
             ParamSlot::other("scale"),

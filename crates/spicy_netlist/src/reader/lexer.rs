@@ -139,13 +139,15 @@ impl<'s> Lexer<'s> {
     }
 
     fn identifier(&mut self, first_char: char, start: usize) -> Result<Token, LexerError> {
-        // ensure first character is alphabetic, then consume remaining alphanumeric characters
+        // A letter, then letters, digits, `_` and `.`, as ngspice allows:
+        // vendor names like `Q2N3904_ON`, flattened names like `R.X1.R1`.
         if !first_char.is_alphabetic() {
             return Err(LexerError::InvalidIdentifierStart {
                 span: Span::new(start, start, self.source_index),
             });
         }
-        self.s.eat_while(|c: char| c.is_alphanumeric());
+        self.s
+            .eat_while(|c: char| c.is_alphanumeric() || c == '_' || c == '.');
         let identifier_end = self.s.cursor() - 1;
 
         Ok(Token::new(

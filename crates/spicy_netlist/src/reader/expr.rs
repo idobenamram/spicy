@@ -69,19 +69,9 @@ impl Value {
         self.scaled
     }
 
-    pub fn angle_radians(&self, default_degrees: bool) -> f64 {
-        let value = self.get_value();
-        match self.suffix {
-            Some(ValueSuffix::Degree) => value * PI / 180.0,
-            Some(ValueSuffix::Radian) => value,
-            _ => {
-                if default_degrees {
-                    value * PI / 180.0
-                } else {
-                    value
-                }
-            }
-        }
+    /// An angle, which SPICE writes in degrees, in radians.
+    pub fn angle_radians(&self) -> f64 {
+        self.get_value() * PI / 180.0
     }
 }
 

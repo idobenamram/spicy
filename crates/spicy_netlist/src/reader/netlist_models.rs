@@ -180,7 +180,10 @@ impl ResistorModel {
 
         for (ident, value) in params {
             match keyword(ident.text).as_str() {
-                "resistance" => model.resistance = Some(value),
+                // The card's names for the value, then the instance's: ngspice
+                // takes an instance parameter on a card as a default for the
+                // card's instances (res.c, inpgmod.c).
+                "r" | "res" | "resistance" => model.resistance = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
                 "w" => model.w = Some(value),
@@ -213,7 +216,10 @@ impl CapacitorModel {
 
         for (ident, value) in params {
             match keyword(ident.text).as_str() {
-                "cap" => model.cap = Some(value),
+                // As for resistors: the card's name, then the instance's. Not `c`:
+                // on a card ngspice reads it as the flag for the model's type and
+                // drops the value, leaving 0 F (cap.c).
+                "cap" | "capacitance" => model.cap = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
                 "tnom" => model.tnom = Some(value),
@@ -244,7 +250,8 @@ impl InductorModel {
 
         for (ident, value) in params {
             match keyword(ident.text).as_str() {
-                "ind" => model.inductance = Some(value),
+                // As for resistors: the card's name, then the instance's (ind.c).
+                "ind" | "inductance" => model.inductance = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
                 "tnom" => model.tnom = Some(value),

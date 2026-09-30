@@ -394,7 +394,6 @@ pub enum ValueSuffix {
     Femto,
     Atto,
     Degree,
-    Radian,
 }
 
 impl ValueSuffix {
@@ -414,7 +413,6 @@ impl ValueSuffix {
             ValueSuffix::Femto => -15,
             ValueSuffix::Atto => -18,
             ValueSuffix::Degree => 0,
-            ValueSuffix::Radian => 0,
         }
     }
 }
@@ -427,9 +425,6 @@ impl FromStr for ValueSuffix {
         // its first letters count. `meg` is checked before `m` (milli).
         if s.eq_ignore_ascii_case("deg") {
             return Ok(ValueSuffix::Degree);
-        }
-        if s.eq_ignore_ascii_case("rad") {
-            return Ok(ValueSuffix::Radian);
         }
         if s.get(..3)
             .is_some_and(|prefix| prefix.eq_ignore_ascii_case("meg"))

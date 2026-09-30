@@ -77,13 +77,14 @@ Each step comes with its own tests and is reviewed on its own.
 1. Rename `spicy_parser` to `spicy_netlist`, with the existing code in `reader`. **Done.**
 2. Fix the reader:
    - names may contain `_` and `.`;
-   - resistor cards accept ngspice's `r`/`res` for the default value (`res.c:62-63`); today only `resistance` is accepted, which in ngspice is an instance parameter;
+   - every spelling ngspice accepts for a value: `resistance`/`r` on a resistor line and `r`/`res`/`resistance` on its card, `capacitance`/`cap`/`c` on a capacitor line and `cap`/`capacitance` on its card, `inductance` on an inductor line and `ind`/`inductance` on its card (`res.c`, `cap.c`, `ind.c`). A card may carry the instance's name because ngspice takes any instance parameter on a card as a default for the card's instances (`inpgmod.c:159-170`). The exception is `c` on a capacitor card: there ngspice reads it as the flag for the model's type (`cap.c:57`) and silently drops the value, leaving 0 F, so the reader rejects it. Checked by running ngspice-42 on each spelling;
    - the `rad` suffix becomes an error, because ngspice reads `1.5rad` as 1.5 degrees.
 3. The writer, with the round-trip tests and the ngspice load check.
 4. `spicy export` in the CLI.
 
 ## 5. Not now
 
+- **Other instance parameters on a card:** ngspice's rule above covers every instance parameter except `m` and `level` (`.model DX D area=2` sets `area` for each diode using `DX`). The reader follows it only for the value; any other instance parameter on a card is still an error.
 - **Vendor models shipped as `.subckt`** (op-amps, regulators): `spicy_circuit` has no subcircuit devices, so they can't be written yet. A hierarchical export is a possible later mode.
 - **PWL sources:** `Waveform` has none.
 - **KiCad-style node names** (`/VCC`, `Net-(R1-Pad2)`): `-`, `/` and `(` inside names need a context-aware lexer.

@@ -456,9 +456,9 @@ fn source_params(spec: &IndependentSourceSpec) -> SourceParams {
     }
 }
 
-/// An angle in radians. SPICE reads angles in degrees unless marked `rad`.
+/// An angle in radians. SPICE writes angles in degrees.
 fn angle(value: &Option<Value>) -> f64 {
-    value.as_ref().map_or(0.0, |v| v.angle_radians(true))
+    value.as_ref().map_or(0.0, Value::angle_radians)
 }
 
 fn waveform(waveform: &WaveForm) -> Waveform {
@@ -762,6 +762,70 @@ mod tests {
             ["QA", "QB", "QC"],
             "each card's own spelling"
         );
+    }
+
+    /// Names may contain `_` and `.` after the first letter, as in ngspice:
+    /// vendor names like `Q2N3904_ON`, and flattened names like `R.X1.R1`
+    /// with its node `X1.mid`, which the writer produces.
+    #[test]
+    fn names_may_contain_underscores_and_dots() {
+        let lowered = lower_body(
+            ".model Q2N3904_ON NPN bf=150\nV_in in 0 1\nR_amp_r1 in n_1 1k\n\
+             R.X1.R1 n_1 X1.mid 2.5k\nQ.X1.Q1 X1.mid n_1 0 Q2N3904_ON",
+        );
+        let names = &lowered.names;
+        assert_eq!(names.vsources, ["V_in"]);
+        assert_eq!(names.resistors, ["R_amp_r1", "R.X1.R1"]);
+        assert_eq!(names.bjts, ["Q.X1.Q1"]);
+        assert_eq!(names.bjt_models, ["Q2N3904_ON"]);
+        assert_eq!(names.nodes, ["0", "in", "n_1", "X1.mid"]);
+        let r: Vec<f64> = lowered.params.resistors.iter().map(|r| r.r).collect();
+        assert_eq!(r, [1e3, 2.5e3]);
+    }
+
+    /// Every spelling ngspice accepts for a value (res.c, cap.c, ind.c). On a
+    /// card that includes the instance's name, which ngspice takes as a
+    /// default for the card's instances (inpgmod.c).
+    #[test]
+    fn value_spellings_match_ngspice() {
+        let lowered = lower_body(
+            ".model RA R r=1k\n.model RB R res=2k\n.model RC R resistance=3k\n\
+             R1 a 0 RA\nR2 a 0 RB\nR3 a 0 RC\nR4 a 0 resistance=4k\nR5 a 0 r=5k\n\
+             .model CA C cap=1n\n.model CB C capacitance=2n\n\
+             C1 a 0 CA\nC2 a 0 CB\nC3 a 0 capacitance=3n\nC4 a 0 cap=4n\nC5 a 0 c=5n\n\
+             .model LA L ind=1u\n.model LB L inductance=2u\n\
+             L1 a 0 LA\nL2 a 0 LB\nL3 a 0 inductance=3u",
+        );
+        let params = &lowered.params;
+        let r: Vec<f64> = params.resistors.iter().map(|r| r.r).collect();
+        assert_eq!(r, [1e3, 2e3, 3e3, 4e3, 5e3]);
+        let c: Vec<f64> = params.capacitors.iter().map(|c| c.c).collect();
+        assert_eq!(c, [1e-9, 2e-9, 3e-9, 4e-9, 5e-9]);
+        let l: Vec<f64> = params.inductors.iter().map(|l| l.l).collect();
+        assert_eq!(l, [1e-6, 2e-6, 3e-6]);
+    }
+
+    /// `res` names the value only on a card; ngspice rejects it on an instance.
+    #[test]
+    fn res_on_an_instance_is_an_error() {
+        let error = body_error("R1 a 0 res=2k");
+        assert!(error.to_string().contains("res"), "{error}");
+    }
+
+    /// On a card, ngspice reads `c` as the flag for the model's type and drops
+    /// the value, so the capacitor gets 0 F with no warning.
+    #[test]
+    fn c_on_a_capacitor_card_is_an_error() {
+        let error = body_error(".model CM C c=3n\nC1 a 0 CM");
+        assert!(error.to_string().contains("c"), "{error}");
+    }
+
+    /// ngspice reads `1.5rad` as 1.5 degrees, so the suffix is refused rather
+    /// than read differently from ngspice.
+    #[test]
+    fn the_rad_suffix_is_an_error() {
+        let error = body_error("V1 a 0 AC 1 1.5rad\nR1 a 0 1k");
+        assert!(error.to_string().contains("degrees"), "{error}");
     }
 
     #[test]

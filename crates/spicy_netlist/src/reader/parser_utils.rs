@@ -171,6 +171,9 @@ pub(crate) fn parse_value(cursor: &mut StmtCursor, src: &str) -> Result<Value, S
     {
         let ident = cursor.next().expect("just peeked");
         let ident_text = token_text(src, ident);
+        if ident_text.eq_ignore_ascii_case("rad") {
+            return Err(ParserError::RadianSuffix { span: ident.span }.into());
+        }
         suffix = ident_text.parse::<ValueSuffix>().ok();
     }
 

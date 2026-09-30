@@ -43,6 +43,7 @@ impl SpicyError {
                 | ParserError::InvalidParam { span, .. }
                 | ParserError::UnknownOption { span, .. }
                 | ParserError::TemperatureList { span }
+                | ParserError::RadianSuffix { span }
                 | ParserError::UnmatchedBrace { span }
                 | ParserError::EmptyExpressionInsideBraces { span }
                 | ParserError::MissingModel { span, .. }
@@ -145,6 +146,9 @@ pub enum ParserError {
 
     #[error("`.temp` takes one value: a list of temperatures is one run per temperature")]
     TemperatureList { span: Span },
+
+    #[error("angles are in degrees: ngspice ignores `rad` and reads `1.5rad` as 1.5 degrees")]
+    RadianSuffix { span: Span },
 
     #[error("invalid operation: {operation}")]
     InvalidOperation { operation: String, span: Span },

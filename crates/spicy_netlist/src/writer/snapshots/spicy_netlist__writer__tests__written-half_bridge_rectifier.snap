@@ -1,0 +1,14 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+half bridge rectifier
+.temp 27
+V1 ac 0 SIN(0 10 60)
+R1 out 0 r=1000
+C1 out 0 c=1e-5
+D1 ac out DIO
+.model DIO D is=1e-14 n=2 rs=0 eg=1.11 xti=3 tnom=27
+.tran 5e-4 0.1
+.end

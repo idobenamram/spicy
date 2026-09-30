@@ -1,0 +1,26 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+devices
+.temp 60
+.options reltol=1e-4 abstol=1e-15
+V1 in 0 DC 5
+R1 in a RM0 r=1000 temp=85
+R2 a 0 RM1 r=4700 ac=5000 m=2 dtemp=10 noisy=0
+R3 b 0 RM2 r=1000
+R4 in c RM2 r=1000
+C1 a 0 CM0 c=1e-5 m=3 ic=1.5
+L1 a b LM0 inductance=0.001 nt=10 ic=0.001
+D1 a 0 DX area=2 pj=1e-6 ic=0.6 dtemp=5 off
+Q1 c b 0 QP area=3 ic=0.7,0.3 temp=100 off
+.model RM0 R tc1=0.001 tc2=2e-6 w=1e-5 l=1e-5 tnom=50
+.model RM1 R tc1=0.001 tc2=0 w=1e-5 l=1e-5 tnom=25
+.model RM2 R tc1=0 tc2=0 w=1e-5 l=1e-5 tnom=25
+.model CM0 C tc1=0.003 tc2=0 tnom=25
+.model LM0 L tc1=0 tc2=0 tnom=35
+.model DX D is=2e-14 n=1.5 rs=0 eg=0.69 xti=2 tnom=25
+.model QP PNP is=1e-16 bf=80 br=1 nf=1 nr=1 xtb=1.5 xti=3 eg=1.11 tnom=30
+.op
+.end

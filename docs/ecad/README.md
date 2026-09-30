@@ -19,6 +19,7 @@ Design documents for the AI-native schematic and simulation editor built on spic
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
    - **[circuit.md](circuit.md)**: the circuit data model (`spicy_circuit`): today's flow traced through the code, and each design choice checked against ngspice, Xyce, Gnucap, OSDI/VACASK and compilers.
    - **[netlist_writer.md](netlist_writer.md)**: the SPICE netlist writer (M1f's numeric export): names, numbers, what gets written, and the round-trip test (decided 2026-09-30).
+   - **[netlist_reader.md](netlist_reader.md)**: how the SPICE reader should behave where ngspice, Xyce, Gnucap, LTspice, PSpice and HSPICE disagree (parked: netlists are a side path).
 7. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
 
 ## Reference
@@ -65,6 +66,10 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
     - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured
     - [data_model_survey.md](research/data_model_survey.md): how ngspice, Xyce, Gnucap, OSDI/VACASK, MLIR and data-oriented compilers lay out circuit data, with citations
+    - SPICE readers compared (behind `netlist_reader.md`):
+      - [netlist_readers_ngspice.md](research/netlist_readers_ngspice.md): 19 claims about ngspice's reader, checked in the source and by running ngspice-42
+      - [netlist_readers_xyce_gnucap.md](research/netlist_readers_xyce_gnucap.md): where Xyce and Gnucap differ
+      - [netlist_readers_commercial.md](research/netlist_readers_commercial.md): LTspice, PSpice, HSPICE, and what KiCad's exporter writes
     - Temperatures, solver options and names in `spicy_circuit`, checked before they were built (the `Conditions` struct they review became `Params.temp` plus a TNOM per model, `engine_plan.md` §5.2):
       - [circuit_conditions_simulators.md](research/circuit_conditions_simulators.md): how ngspice, Xyce, Gnucap and VACASK hold the circuit temperature, TNOM, options and names
       - [circuit_conditions_compilers.md](research/circuit_conditions_compilers.md): where compilers and modeling tools keep conditions, options and names

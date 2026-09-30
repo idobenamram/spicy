@@ -1,0 +1,18 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+push pull amplifier
+.temp 27
+VCC vcc 0 DC 12
+VEE vee 0 DC -12
+VIN in 0 SIN(0 3 1000)
+RIN in b r=1000
+RL out 0 r=100
+Q1 vcc b out QNPN
+Q2 vee b out QPNP
+.model QNPN NPN is=1e-16 bf=120 br=1 nf=1 nr=1 xtb=0 xti=3 eg=1.11 tnom=27
+.model QPNP PNP is=1e-16 bf=80 br=1 nf=1 nr=1 xtb=0 xti=3 eg=1.11 tnom=27
+.tran 5e-6 0.005
+.end

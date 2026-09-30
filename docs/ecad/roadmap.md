@@ -411,14 +411,14 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
     - simulated natively, the operating point gives VC ≈ 5.52 V;
     - on ngspice, with the D-A model at TNOM 25 °C, VC = 5.503227 V (`engine_plan.md` §2.1). 🔍
 - **M1f: SPICE export** (formerly the first half of M4).
-  - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R.amp.r1`). Design: `netlist_writer.md` (decided 2026-09-30): `spicy_parser` became `spicy_netlist`, with a reader and a writer.
+  - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R.amp.r1`). **Built 2026-09-30** (`spicy_netlist::writer`). Design: `netlist_writer.md` (decided 2026-09-30): `spicy_parser` became `spicy_netlist`, with a reader and a writer.
   - `spicy export`.
   - **Two export modes** (`engine_plan.md` §5, the engine's contract): the **numeric** export at one knob point, and the **engine deck** (`EngineDeck`: a `.param` per knob, `.temp {…}`, `.options` as an input, one `.model QM_<path>` per BJT named apart from its instance `Q_<path>`, no analyses, plus the knob and probe maps).
   - **Needs first, done 2026-09-30** (data only, no temperature physics): `Params.temp`, a `tnom` on every model, `BjtModel` `xtb`, `xti`, `eg`, `DiodeModel` `eg`, `xti`, and the solver options the source asked for (`engine_plan.md` §5.2); `spicy_netlist` accepts those model parameters, BJT `temp`/`dtemp`, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
   - **Done when:**
     - round trip: `ce_amp.spl` → export → `spicy_netlist` → lower gives the same `Circuit` + `Params` + options;
     - the engine deck at nominal lowers to the same result as the numeric export, and ngspice reads back every knob's requested value at nominal and at one corner;
-    - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`);
+    - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`). ✅ 2026-09-30, also for the reader's test netlists, each written netlist loading in ngspice-42 without a warning;
     - the exported amplifier simulates to the same VC. 🔍
 
   This step only depends on `spicy_circuit`, not on M1b–M1e, so it could also be built earlier or in parallel and tested on the existing `.spicy` files.

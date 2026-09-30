@@ -1,0 +1,11 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+basic subcircuit
+.temp 27
+V.X1.V1 vcc 0 DC 5
+R.X1.R1 in out r=1000
+C.X1.C2 out 0 c=1e-7
+.end

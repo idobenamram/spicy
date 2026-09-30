@@ -1,0 +1,10 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+basic diode
+.temp 27
+D1 in out Dmod area=2 m=3 pj=4 ic=0.7 temp=25 lm=1 wm=2 lp=3 wp=4 off
+.model Dmod D is=1e-14 n=1 rs=2 eg=1.11 xti=3 tnom=27
+.end

@@ -1,0 +1,11 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+title with params, expressions, and subcircuits
+.temp 27
+Rtop in out r=2000
+R.X1.R1 in out r=27000
+.op
+.end

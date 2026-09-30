@@ -1,0 +1,10 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+basic bjt
+.temp 27
+Q1 c b e Qmod area=2 m=5 ic=0.7,1.2 off
+.model Qmod NPN is=1e-16 bf=100 br=1 nf=1 nr=1 xtb=0 xti=3 eg=1.11 tnom=27
+.end

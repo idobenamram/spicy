@@ -1,0 +1,18 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+simple differential amplifier
+.temp 27
+VCC vcc 0 DC 5
+V1 inp 0 SIN(1.2 0.01 1000)
+V2 inn 0 SIN(1.2 0.01 1000 0 0 180)
+Rc1 vcc outp r=2000
+Rc2 vcc outn r=2000
+Re tail 0 r=1000
+Q1 outp inp tail QNPN
+Q2 outn inn tail QNPN
+.model QNPN NPN is=1e-16 bf=100 br=1 nf=1 nr=1 xtb=0 xti=3 eg=1.11 tnom=27
+.tran 1e-5 0.005
+.end

@@ -1,0 +1,10 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+stop after end
+.temp 27
+R1 in out r=1000
+.op
+.end

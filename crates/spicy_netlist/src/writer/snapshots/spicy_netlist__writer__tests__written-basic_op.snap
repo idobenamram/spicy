@@ -1,0 +1,12 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+basic operating point
+.temp 27
+I1 out 0 DC 0.001
+R1 in out r=10000
+C1 out 0 c=1e-6
+.op
+.end

@@ -1,0 +1,28 @@
+---
+source: crates/spicy_netlist/src/writer/mod.rs
+assertion_line: 692
+expression: written.text
+---
+basic resistor
+.temp 27
+R1 in out r=1000
+R2 in 0 r=1.1234e12
+R3 in out r=-10
+R4 in out r=0.5
+R5 in out r=1.25
+R6 in out r=2500
+R6_2 in out r=2500
+R7 in out r=0.0025
+R8 in out r=-3e6
+R9 in out r=10000
+R10 in out r=4.7e7
+R11 in out r=0.001
+R12 in out r=2.2e-4
+R13 in out r=3.3e-8
+R14 in out r=4.7e-12
+R15 in out r=8e-15
+R16 in out r=1e-18
+R17 in out r=0.0012
+R18 in out r=1.23e8
+R19 in out r=-9.9e11
+.end

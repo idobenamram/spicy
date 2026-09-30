@@ -2,61 +2,55 @@
 // the `sup.reg.out` behind it feed `five` once. It still is when it's passed through a
 // merged net (`merged`), a block of plain pins (`linked`), or alongside a plain pin
 // tied to the same rail (`sensed`): only the innermost source, the regulator, counts.
-block Reg {
-    port input: Power<In>;
-    port out: Power<Out>;
-    port gnd: Ground;
+block Reg { input: Power<In>, out: Power<Out>, gnd: Ground }
+
+circuit Reg {
     let r = Resistor { a: input, b: out, value: 10 };
 }
 
-block Supply {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port gnd: Ground;
+block Supply { input: Power<In>, v5: Power<Out>, gnd: Ground }
+
+circuit Supply {
     let reg = Reg { input, out: v5, gnd };
 }
 
-block Merged {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port gnd: Ground;
+block Merged { input: Power<In>, v5: Power<Out>, gnd: Ground }
+
+circuit Merged {
     net rail = [v5];
     let reg = Reg { input, out: rail, gnd };
 }
 
-block Link {
-    port a: Pin;
-    port b: Pin;
+block Link { a: Pin, b: Pin }
+
+circuit Link {
     net both = [a, b];
 }
 
-block Linked {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port gnd: Ground;
+block Linked { input: Power<In>, v5: Power<Out>, gnd: Ground }
+
+circuit Linked {
     net mid;
     let reg = Reg { input, out: mid, gnd };
     let link = Link { a: mid, b: v5 };
 }
 
-block Sensed {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port sense: Pin;
-    port gnd: Ground;
+block Sensed { input: Power<In>, v5: Power<Out>, sense: Pin, gnd: Ground }
+
+circuit Sensed {
     net out = [v5, sense];
     let reg = Reg { input, out, gnd };
 }
 
-block Load {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Load { vcc: Power<In>, gnd: Ground }
+
+circuit Load {
     let r = Resistor { a: vcc, b: gnd, value: 1k };
 }
 
-block Board {
-    port v12: Power<In>;
-    port gnd: Ground;
+block Board { v12: Power<In>, gnd: Ground }
+
+circuit Board {
     net five;
     net four;
     net three;

@@ -1,0 +1,30 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/pub_not_allowed.spl
+---
+File 0..184
+  pub Block A 112..134
+    Port p 126..132
+      Type Pin 129..132 "Pin"
+  Circuit A 136..164
+    Net n 156..162
+  Contract A 166..183
+
+--- errors ---
+E-syntax PubNotAllowed 136..139 "pub" fix 136..140 ""
+E-syntax PubNotAllowed 166..169 "pub" fix 166..170 ""
+
+--- rendered ---
+error[E-syntax]: only a block can be `pub`
+  --> pub_not_allowed.spl:5:1
+  |
+5 | pub circuit A {
+  | ^^^ remove `pub`
+
+error[E-syntax]: only a block can be `pub`
+  --> pub_not_allowed.spl:9:1
+  |
+9 | pub contract A {}
+  | ^^^ remove `pub`

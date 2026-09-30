@@ -1,21 +1,22 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/reserved_in_expression.spl
 ---
-File 0..78
-  Block A 0..77
-    Let x 14..27
-      ExprError 22..26 "true"
-    Let y 32..47
-      ExprError 40..46 "self.a"
-    StmtError 52..63 "let fn = 1;"
-    Net ok 68..75
+File 0..80
+  Circuit A 0..79
+    Let x 16..29
+      ExprError 24..28 "true"
+    Let y 34..49
+      ExprError 42..48 "self.a"
+    StmtError 54..65 "let fn = 1;"
+    Net ok 70..77
 
 --- errors ---
-E-reserved Reserved 22..26 "true"
-E-reserved Reserved 40..44 "self"
-E-reserved Reserved 56..58 "fn"
+E-reserved Reserved 24..28 "true"
+E-reserved Reserved 42..46 "self"
+E-reserved Reserved 58..60 "fn"
 
 --- rendered ---
 error[E-reserved]: `true` isn't supported yet

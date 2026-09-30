@@ -1,20 +1,21 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/bad_merge.spl
 ---
 block A 6..7
-  port p: Pin 19..20
-  net x 35..36
+  port p: Pin 10..11
+  net x 40..41
 
 --- errors ---
-E-binding BadMerge 39..40 "p"
+E-binding BadMerge 44..45 "p"
 
 --- rendered ---
 error[E-binding]: `net x = …` merges nets: write a list of nets
-  --> bad_merge.spl:3:13
+  --> bad_merge.spl:4:13
   |
-3 |     net x = p;
+4 |     net x = p;
   |             ^ not a list of nets
   |
   = help: `net x = [a, b];`

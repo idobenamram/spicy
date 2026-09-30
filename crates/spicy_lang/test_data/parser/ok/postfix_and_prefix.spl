@@ -1,4 +1,6 @@
-block P {
+block P {}
+
+circuit P {
     // Postfix binds tightest, then unary `-` (grammar.md §4.1 levels 6 and 7).
     let a = h.at(1kHz).mag();
     let b = -x.y(1)(2);

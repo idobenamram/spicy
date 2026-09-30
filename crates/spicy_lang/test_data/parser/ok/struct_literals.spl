@@ -1,8 +1,10 @@
-block S {
-    // A field may be a transition, anywhere among the named ones.
-    let a = Step { 5mA -> 30mA, edge: 1us, at: 50us };
-    let b = Step { on: vdd.i, 5mA -> 30mA, edge: 1us };
-    let c = Step { lo.v -> -hi.v };
+block S {}
+
+circuit S {
+    // Every field is named, a step's or a sweep's levels too.
+    let a = Step { from: 5mA, to: 30mA, edge: 1us, at: 50us };
+    let b = Step { on: vdd.i, from: 5mA, to: 30mA, edge: 1us };
+    let c = Sweep { from: 4.5V, to: 3.0V, step: 10mV };
     // Named generic arguments: `< IDENT =` starts them, so `<` is less-than anywhere
     // else. Each value ends at `>`, so a comparison in one needs parentheses.
     let d = GainStage<A = Mcp6001> { vin: sensor, gnd };

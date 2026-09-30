@@ -1,4 +1,6 @@
-block A {
+block A {}
+
+circuit A {
     let x = 5k;
     let y = f(1);
 }

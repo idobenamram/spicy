@@ -1,18 +1,19 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/wrong_namespace.spl
 ---
 block A 6..7
-  port vcc: Power<In> 19..22
-  r = <error> 43..44
+  port vcc: Power<In> 10..13
+  r = <error> 48..49
 
 --- errors ---
-E-name WrongNamespace 47..50 "vcc"
+E-name WrongNamespace 52..55 "vcc"
 
 --- rendered ---
 error[E-name]: `vcc` is a port, not a part kind or block
-  --> wrong_namespace.spl:3:13
+  --> wrong_namespace.spl:4:13
   |
-3 |     let r = vcc { a: vcc };
+4 |     let r = vcc { a: vcc };
   |             ^^^ expected a part kind or block

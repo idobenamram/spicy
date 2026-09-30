@@ -100,7 +100,6 @@ impl Scanner<'_> {
             b'.' if self.at("..=") => self.take(3, DotDotEq),
             b'.' if self.at("..") => self.take(2, DotDot),
             b':' if self.at("::") => self.take(2, ColonColon),
-            b'-' if self.at("->") => self.take(2, Arrow),
             b'<' if self.at("<=") => self.take(2, Le),
             b'>' if self.at(">=") => self.take(2, Ge),
             b'{' => self.take(1, LBrace),
@@ -232,7 +231,6 @@ fn keyword(word: &str) -> Option<TokenKind> {
         "env" => KwEnv,
         "const" => KwConst,
         "pub" => KwPub,
-        "port" => KwPort,
         "net" => KwNet,
         "let" => KwLet,
         "assume" => KwAssume,
@@ -384,8 +382,8 @@ mod tests {
         ".", "..", "..=", "=", "+", "-", "*", "/", "+/-", "±", "%", "µ", "μ", "Ω", "Ω", "°", "º",
         "(", ")", "{", "}", "[", "]", "<", ">", "<=", ">=", ",", ";", ":", "::", "#", "?", "//",
         "///", "////", "/*", "*/", " ", " ", " ", "\n", "\t", "\r", "let", "in", "net", "fn", "a",
-        "r1", "α", "−", ";", "\u{A0}", "\u{2009}", "\u{FEFF}", "\0", "\"", "§", "Meg", "->", "→",
-        "\\", "\\\"", "h", "y", "within", "setup", "circuit", "pub",
+        "r1", "α", "−", ";", "\u{A0}", "\u{2009}", "\u{FEFF}", "\0", "\"", "§", "Meg", "\\",
+        "\\\"", "h", "y", "within", "setup", "circuit", "pub",
     ];
 
     #[test]

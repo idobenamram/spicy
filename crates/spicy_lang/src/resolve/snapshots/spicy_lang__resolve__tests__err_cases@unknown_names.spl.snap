@@ -1,50 +1,51 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/unknown_names.spl
 ---
 block A 6..7
-  port vcc: Power<In> 19..22
-  net base 43..47
-  r1 = <error> 57..59
-  r2 = Resistor 110..112
+  port vcc: Power<In> 10..13
+  net base 48..52
+  r1 = <error> 62..64
+  r2 = Resistor 115..117
     a → vcc
     b → <unbound>
     value = 1000 Ω
-  r3 = <error> 163..165
-  r4 = <error> 192..194
+  r3 = <error> 168..170
+  r4 = <error> 197..199
 
 --- errors ---
-E-name UnknownName 62..69 "Resistr" fix 62..69 "Resistor"
-E-name UnknownName 137..140 "bas" fix 137..140 "base"
-E-name UnknownName 168..171 "Foo"
-E-name UnknownName 197..210 "std::Resistor"
+E-name UnknownName 67..74 "Resistr" fix 67..74 "Resistor"
+E-name UnknownName 142..145 "bas" fix 142..145 "base"
+E-name UnknownName 173..176 "Foo"
+E-name UnknownName 202..215 "std::Resistor"
 
 --- rendered ---
 error[E-name]: unknown part kind or block `Resistr`
-  --> unknown_names.spl:4:14
+  --> unknown_names.spl:5:14
   |
-4 |     let r1 = Resistr { a: vcc, b: base, value: 1k };
+5 |     let r1 = Resistr { a: vcc, b: base, value: 1k };
   |              ^^^^^^^ not defined
   |
   = help: did you mean `Resistor`?
 
 error[E-name]: unknown net, port or instance `bas`
-  --> unknown_names.spl:5:36
+  --> unknown_names.spl:6:36
   |
-5 |     let r2 = Resistor { a: vcc, b: bas, value: 1k };
+6 |     let r2 = Resistor { a: vcc, b: bas, value: 1k };
   |                                    ^^^ not defined
   |
   = help: did you mean `base`?
 
 error[E-name]: unknown part kind or block `Foo`
-  --> unknown_names.spl:6:14
+  --> unknown_names.spl:7:14
   |
-6 |     let r3 = Foo { a: vcc };
+7 |     let r3 = Foo { a: vcc };
   |              ^^^ not defined
 
 error[E-name]: unknown part kind or block `std::Resistor`
-  --> unknown_names.spl:7:14
+  --> unknown_names.spl:8:14
   |
-7 |     let r4 = std::Resistor { a: vcc, b: base, value: 1k };
+8 |     let r4 = std::Resistor { a: vcc, b: base, value: 1k };
   |              ^^^^^^^^^^^^^ not defined

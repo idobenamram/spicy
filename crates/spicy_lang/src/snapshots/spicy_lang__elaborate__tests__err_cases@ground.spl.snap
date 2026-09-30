@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/ground.spl
 ---
@@ -14,24 +15,24 @@ root TwoGrounds
 
 --- errors ---
 E-ground NoGround 74..82 "NoGround"
-E-ground SeveralGrounds 213..215 "g2" related 192..194
+E-ground SeveralGrounds 198..200 "g2" related 186..188
 
 --- rendered ---
 error[E-ground]: `NoGround` has no ground net
   --> ground.spl:2:7
   |
-2 | block NoGround {
+2 | block NoGround { a: Pin, b: Pin }
   |       ^^^^^^^^ no net here carries a `Ground` port
   |
-  = help: add `port gnd: Ground;` and bind the parts' return pins to it
+  = help: add a port `gnd: Ground` and bind the parts' return pins to it
 
 error[E-ground]: `TwoGrounds` has more than one ground net
-   --> ground.spl:10:10
-   |
- 9 |     port g1: Ground;
-   |          -- the first ground
-10 |     port g2: Ground;
-   |          ^^ a second ground
-   |
-   = note: the ground nets are `g1` and `g2`
-   = help: bind every `Ground` port to the same net
+  --> ground.spl:8:32
+  |
+8 | block TwoGrounds { g1: Ground, g2: Ground }
+  |                    --          ^^ a second ground
+  |                    |            
+  |                    the first ground
+  |
+  = note: the ground nets are `g1` and `g2`
+  = help: bind every `Ground` port to the same net

@@ -1,4 +1,4 @@
-block A {
+circuit A {
     let r = Resistor { a: vcc
     let s = 1;
     net n;

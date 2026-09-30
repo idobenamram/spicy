@@ -2,6 +2,7 @@
 //! lexer's.
 
 use super::ast::{BinOp, BodyKind};
+use super::expr::Infix;
 use spicy_errors::{Diag, DiagKind, Fix, Severity, Text};
 
 /// One problem the parser found.
@@ -17,17 +18,19 @@ pub enum ParseErrorKind {
     },
     /// #1: a statement that isn't closed by `;`.
     MissingSemi,
-    /// `block Child port a: Pin; }`: a body's statements without the `{` before them.
+    /// `circuit Child net a; }`: an item's contents without the `{` before them.
     MissingBrace,
     /// #21: `(`, `[` or `{` never closed; the opener is the error's `related` span.
     Unclosed { closer: &'static str },
-    /// Top-level text that isn't `block` or `contract`.
+    /// Top-level text that isn't an item.
     ExpectedItem { found: String },
+    /// `pub circuit A { … }`: only a block can be `pub`.
+    PubNotAllowed,
     /// #19: `fn`, `for`, … are reserved for later.
     Reserved { word: String },
     /// #18: `let net = …`
     KeywordAsName { keyword: String },
-    /// #20: `assume` in a `block`, `port` in a `contract`.
+    /// #20: `assume` in a `circuit`, `net` in a `contract`.
     WrongBody { stmt: &'static str, body: BodyKind },
     /// #17: `spec dc(out.v) within …;`
     SpecNeedsName,
@@ -39,7 +42,7 @@ pub enum ParseErrorKind {
     /// `(capacity / 2h) ± 10%` and `capacity / (2h ± 10%)`.
     AmbiguousTolerance { whole: String, part: String },
     /// #5, #6: `a < b < c`, `1 ± 2% ± 1%`, `a..=b..=c`. `op` is the second operator.
-    Chained { op: BinOp },
+    Chained { op: Infix },
     /// #7: `1V ± 1% ..= 2V`
     ToleranceInRange,
     /// #7: `x <= 1V..=2V`
@@ -65,6 +68,7 @@ impl ParseErrorKind {
         "MissingBrace",
         "Unclosed",
         "ExpectedItem",
+        "PubNotAllowed",
         "Reserved",
         "KeywordAsName",
         "WrongBody",
@@ -89,6 +93,7 @@ impl DiagKind for ParseErrorKind {
             ParseErrorKind::MissingBrace => "MissingBrace",
             ParseErrorKind::Unclosed { .. } => "Unclosed",
             ParseErrorKind::ExpectedItem { .. } => "ExpectedItem",
+            ParseErrorKind::PubNotAllowed => "PubNotAllowed",
             ParseErrorKind::Reserved { .. } => "Reserved",
             ParseErrorKind::KeywordAsName { .. } => "KeywordAsName",
             ParseErrorKind::WrongBody { .. } => "WrongBody",
@@ -120,6 +125,7 @@ impl DiagKind for ParseErrorKind {
             | ParseErrorKind::MissingBrace
             | ParseErrorKind::Unclosed { .. }
             | ParseErrorKind::ExpectedItem { .. }
+            | ParseErrorKind::PubNotAllowed
             | ParseErrorKind::SpecNeedsName
             | ParseErrorKind::FieldEquals
             | ParseErrorKind::TooDeep => "E-syntax",
@@ -156,7 +162,7 @@ impl DiagKind for ParseErrorKind {
             ),
             ParseErrorKind::MissingBrace => (
                 "expected `{`".to_string(),
-                "a body starts with `{` after the name".to_string(),
+                "`{` goes after the name".to_string(),
                 vec!["help: add `{` after the name".to_string()],
             ),
             ParseErrorKind::Unclosed { closer, .. } => (
@@ -165,9 +171,14 @@ impl DiagKind for ParseErrorKind {
                 vec![],
             ),
             ParseErrorKind::ExpectedItem { found } => (
-                format!("expected `block` or `contract`, found {found}"),
+                format!("expected an item, found {found}"),
                 "not an item".to_string(),
-                vec!["note: a file holds `block` and `contract` items".to_string()],
+                vec!["note: a file holds `block`, `circuit` and `contract` items".to_string()],
+            ),
+            ParseErrorKind::PubNotAllowed => (
+                "only a block can be `pub`".to_string(),
+                "remove `pub`".to_string(),
+                vec![],
             ),
             ParseErrorKind::Reserved { word } => (
                 format!("`{word}` isn't supported yet"),
@@ -181,8 +192,8 @@ impl DiagKind for ParseErrorKind {
             ),
             ParseErrorKind::WrongBody { stmt, body } => {
                 let (body, belongs) = match body {
-                    BodyKind::Block => ("block", "the contract"),
-                    BodyKind::Contract => ("contract", "the block"),
+                    BodyKind::Circuit => ("circuit", "the contract"),
+                    BodyKind::Contract => ("contract", "the circuit"),
                 };
                 (
                     format!("`{stmt}` doesn't belong in a `{body}`"),
@@ -215,8 +226,8 @@ impl DiagKind for ParseErrorKind {
             ),
             ParseErrorKind::Chained { op } => {
                 let (what, notes) = match op {
-                    BinOp::Range => ("ranges", vec![]),
-                    BinOp::Tol => ("tolerances", vec![]),
+                    Infix::Range => ("ranges", vec![]),
+                    Infix::Binary(BinOp::Tol) => ("tolerances", vec![]),
                     _ => (
                         "comparisons",
                         vec!["help: for a range, write `b within a..=c`".to_string()],

@@ -1,4 +1,6 @@
-block A {
+block A { net: Pin, ok: Pin }
+
+circuit A {
     let net = 1;
     net in;
     let r = f(net: 1);

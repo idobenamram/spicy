@@ -1,4 +1,4 @@
-block A {
+circuit A {
     let x = true;
     let y = self.a;
     let fn = 1;

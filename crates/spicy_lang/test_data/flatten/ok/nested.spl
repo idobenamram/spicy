@@ -1,18 +1,18 @@
 // Three levels: the outermost name survives, and every inner name is an alias.
-block Amp {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Amp { vcc: Power<In>, gnd: Ground }
+
+circuit Amp {
     let r = Resistor { a: vcc, b: gnd, value: 1k ± 5% };
 }
 
-block Stage {
-    port v12: Power<In>;
-    port gnd: Ground;
+block Stage { v12: Power<In>, gnd: Ground }
+
+circuit Stage {
     let left = Amp { vcc: v12, gnd };
 }
 
-block Board {
-    port rail: Power<In>;
-    port gnd: Ground;
+block Board { rail: Power<In>, gnd: Ground }
+
+circuit Board {
     let s = Stage { v12: rail, gnd };
 }

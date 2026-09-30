@@ -1,24 +1,25 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/recovery_brackets.spl
 ---
-File 0..109
-  Block A 0..108
-    Let x 14..30
-      ExprError 22..29 "f(a; b)"
-    Let y 35..50
-      ExprError 43..49 "[a; b]"
-    Let z 55..70
-      ExprError 63..70 "(1 + 2;"
-    Net after_paren 75..91
-    Let w 96..106
-      Quantity 1e0 104..105 "1"
+File 0..111
+  Circuit A 0..110
+    Let x 16..32
+      ExprError 24..31 "f(a; b)"
+    Let y 37..52
+      ExprError 45..51 "[a; b]"
+    Let z 57..72
+      ExprError 65..72 "(1 + 2;"
+    Net after_paren 77..93
+    Let w 98..108
+      Quantity 1e0 106..107 "1"
 
 --- errors ---
-E-syntax Expected 25..26 ";"
-E-syntax Expected 45..46 ";"
-E-syntax Expected 69..70 ";"
+E-syntax Expected 27..28 ";"
+E-syntax Expected 47..48 ";"
+E-syntax Expected 71..72 ";"
 
 --- rendered ---
 error[E-syntax]: expected `,` or `)`, found `;`

@@ -2,34 +2,40 @@
 // roots. The search enters the cycle at `A`, reports `A → B → C → A` once, at `C`'s
 // `let a`, and cuts only the cycle's three placements: each root keeps its own
 // placement, and stops at the cut one below it.
-block EnterA {
-    port g: Ground;
+block EnterA { g: Ground }
+
+circuit EnterA {
     let a = A { g };
 }
 
-block EnterB {
-    port g: Ground;
+block EnterB { g: Ground }
+
+circuit EnterB {
     let b = B { g };
 }
 
-block EnterC {
-    port g: Ground;
+block EnterC { g: Ground }
+
+circuit EnterC {
     let c = C { g };
 }
 
-block A {
-    port g: Ground;
+block A { g: Ground }
+
+circuit A {
     let b = B { g };
 }
 
-block B {
-    port g: Ground;
+block B { g: Ground }
+
+circuit B {
     let c = C { g };
 }
 
 // The part before the placement: the placement that closes the cycle is `a`, not `r`.
-block C {
-    port g: Ground;
+block C { g: Ground }
+
+circuit C {
     let r = Resistor { a: g, b: g, value: 1k };
     let a = A { g };
 }

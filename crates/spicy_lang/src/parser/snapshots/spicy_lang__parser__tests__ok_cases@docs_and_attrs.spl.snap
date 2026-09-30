@@ -1,0 +1,23 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1071
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/docs_and_attrs.spl
+---
+File 0..277
+  Block A 0..202
+    Doc 0..81 "/// Doc comments and attributes may interleave: the tree keeps them in two lists,"
+    Attr warn 82..89
+    Doc 90..135 "/// and the dump prints them in source order."
+    Port p 150..199
+      Attr a 150..154
+      Doc 159..176 "/// on a port too"
+      Attr b 181..188
+        Quantity 1e0 185..186 "1"
+      Type Pin 196..199 "Pin"
+  Circuit A 204..276
+    Net n 220..274
+      Attr a 220..224
+      Doc 229..251 "/// and on a statement"
+      Attr b 256..263
+        Quantity 1e0 260..261 "1"

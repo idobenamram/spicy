@@ -1,6 +1,6 @@
 fn helper() {}
 
-block A {
+circuit A {
     for i in 0..N {}
     net ok;
 }

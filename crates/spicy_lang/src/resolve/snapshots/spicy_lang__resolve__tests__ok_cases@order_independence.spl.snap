@@ -1,33 +1,34 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 568
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/order_independence.spl
 ---
 block Top 159..162
-  port v12: Power<In> 174..177
-  port gnd: Ground 199..202
-  net sig 282..285
-  net out 295..298
-  amp = block Amp 220..223
+  port v12: Power<In> 165..168
+  port gnd: Ground 181..184
+  net sig 280..283
+  net out 293..296
+  amp = block Amp 218..221
     vcc → v12
     gnd → gnd
     input → sig
     output → out
-block Amp 309..312
-  port vcc: Power<In> 324..327
-  port gnd: Ground 349..352
-  port input: Analog<In> 371..376
-  port output: Analog<Out> 399..405
-  net base 550..554
-  r = Resistor 428..429
+block Amp 307..310
+  port vcc: Power<In> 313..316
+  port gnd: Ground 329..332
+  port input: Analog<In> 342..347
+  port output: Analog<Out> 361..367
+  net base 528..532
+  r = Resistor 406..407
     a → vcc
     b → output
     value = 4700 Ω
-  c = Capacitor 484..485
+  c = Capacitor 462..463
     a → input
     b → base
     value = 0.0000001 F ± 10%
-  q = Npn 564..565
+  q = Npn 542..543
     c → output
     b → base
     e → gnd

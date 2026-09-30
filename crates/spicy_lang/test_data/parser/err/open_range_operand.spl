@@ -1,0 +1,15 @@
+// `a..` has no upper end only where no operator tighter than `..` follows it: a tighter
+// one would take the range as its operand, so it's read as the start of a missing
+// upper end ("expected an expression").
+contract C {
+    spec a: x within 1.. ± 5%;
+    spec b: x within 1.. + 2;
+    spec c: x within 1.. / 2..=3;
+    let d = 1.. + 2..;
+    let e = Load { r: a + 1.. * 2 };
+    // A looser operator takes it as its operand, and reports it.
+    spec f: 1.. < x;
+    spec g: x within 1.. ..=2;
+    // `-` can start the upper end, so `..` is half open.
+    spec h: x within 1.. - 2;
+}

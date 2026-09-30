@@ -1,0 +1,94 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1088
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/open_range_operand.spl
+---
+File 0..590
+  Contract C 213..589
+    StmtError 230..257 "spec a: x within 1.. ± 5%;"
+    StmtError 262..287 "spec b: x within 1.. + 2;"
+    StmtError 292..321 "spec c: x within 1.. / 2..=3;"
+    Let d 326..344
+      ExprError 334..343 "1.. + 2.."
+    Let e 349..381
+      ExprError 357..380 "Load { r: a + 1.. * 2 }"
+    Spec f Lt 452..468
+      Range a.. 460..463
+        Quantity 1e0 460..461 "1"
+      Path x 466..467 "x"
+    Spec g Within 473..499
+      Path x 481..482 "x"
+      Range a..=b 490..498
+        Range a.. 490..493
+          Quantity 1e0 490..491 "1"
+        Quantity 2e0 497..498 "2"
+    Spec h Within 562..587
+      Path x 570..571 "x"
+      Range a..=b 579..586
+        Quantity 1e0 579..580 "1"
+        Neg 583..586
+          Quantity 2e0 585..586 "2"
+
+--- errors ---
+E-syntax Expected 251..253 "±"
+E-syntax Expected 283..284 "+"
+E-syntax Expected 313..314 "/"
+E-syntax Expected 338..339 "+"
+E-syntax Expected 375..376 "*"
+E-spread RangeInComparison 460..463 "1.."
+E-chained Chained 494..497 "..="
+E-range HalfOpenRange 580..582 ".." fix 580..582 "..="
+
+--- rendered ---
+error[E-syntax]: expected an expression, found `±`
+  --> open_range_operand.spl:5:26
+  |
+5 |     spec a: x within 1.. ± 5%;
+  |                          ^ expected an expression
+
+error[E-syntax]: expected an expression, found `+`
+  --> open_range_operand.spl:6:26
+  |
+6 |     spec b: x within 1.. + 2;
+  |                          ^ expected an expression
+
+error[E-syntax]: expected an expression, found `/`
+  --> open_range_operand.spl:7:26
+  |
+7 |     spec c: x within 1.. / 2..=3;
+  |                          ^ expected an expression
+
+error[E-syntax]: expected an expression, found `+`
+  --> open_range_operand.spl:8:17
+  |
+8 |     let d = 1.. + 2..;
+  |                 ^ expected an expression
+
+error[E-syntax]: expected an expression, found `*`
+  --> open_range_operand.spl:9:31
+  |
+9 |     let e = Load { r: a + 1.. * 2 };
+  |                               ^ expected an expression
+
+error[E-spread]: compare with a single value
+   --> open_range_operand.spl:11:13
+   |
+11 |     spec f: 1.. < x;
+   |             ^^^ a range or tolerance here
+   |
+   = help: to require a value inside a range, use `within`
+
+error[E-chained]: ranges can't be chained
+   --> open_range_operand.spl:12:26
+   |
+12 |     spec g: x within 1.. ..=2;
+   |                          ^^^ second operator here
+
+error[E-range]: a range's end is written after `..=`
+   --> open_range_operand.spl:14:23
+   |
+14 |     spec h: x within 1.. - 2;
+   |                       ^^ write `..=`
+   |
+   = note: `a..` with nothing after it is a range with no upper end

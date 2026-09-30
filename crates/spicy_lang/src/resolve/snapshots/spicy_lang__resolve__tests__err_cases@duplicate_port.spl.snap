@@ -1,49 +1,50 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicate_port.spl
 ---
 block A 76..77
-  port p: Pin 89..90
-  port q: Power<In> 123..124
-  r = Resistor 167..168
+  port p: Pin 80..81
+  port q: Power<In> 96..97
+  r = Resistor 145..146
     a → p
     b → q
     value = 1000 Ω
 
 --- errors ---
-E-duplicate Duplicate 106..107 "p" related 89..90
-E-type BadSignalType 109..112 "Bus"
-E-duplicate Duplicate 146..147 "q" related 123..124
-E-name WrongNamespace 149..157 "Resistor"
+E-duplicate Duplicate 88..89 "p" related 80..81
+E-type BadSignalType 91..94 "Bus"
+E-duplicate Duplicate 110..111 "q" related 96..97
+E-name WrongNamespace 113..121 "Resistor"
 
 --- rendered ---
 error[E-duplicate]: port `p` is defined twice
-  --> duplicate_port.spl:4:10
+  --> duplicate_port.spl:2:19
   |
-3 |     port p: Pin;
-  |          - first defined here
-4 |     port p: Bus;
-  |          ^ second definition
+2 | block A { p: Pin, p: Bus, q: Power<In>, q: Resistor }
+  |           -       ^ second definition
+  |           |        
+  |           first defined here
 
 error[E-type]: `Bus` isn't a port type
-  --> duplicate_port.spl:4:13
+  --> duplicate_port.spl:2:22
   |
-4 |     port p: Bus;
-  |             ^^^ not a valid port type
+2 | block A { p: Pin, p: Bus, q: Power<In>, q: Resistor }
+  |                      ^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-duplicate]: port `q` is defined twice
-  --> duplicate_port.spl:6:10
+  --> duplicate_port.spl:2:41
   |
-5 |     port q: Power<In>;
-  |          - first defined here
-6 |     port q: Resistor;
-  |          ^ second definition
+2 | block A { p: Pin, p: Bus, q: Power<In>, q: Resistor }
+  |                           -             ^ second definition
+  |                           |              
+  |                           first defined here
 
 error[E-name]: `Resistor` is a part kind, not a port type
-  --> duplicate_port.spl:6:13
+  --> duplicate_port.spl:2:44
   |
-6 |     port q: Resistor;
-  |             ^^^^^^^^ expected a port type
+2 | block A { p: Pin, p: Bus, q: Power<In>, q: Resistor }
+  |                                            ^^^^^^^^ expected a port type

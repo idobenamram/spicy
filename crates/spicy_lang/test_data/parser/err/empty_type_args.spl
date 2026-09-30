@@ -1,4 +1,2 @@
-block A {
-    port p: A<>;
-    net ok;
-}
+// A port whose type doesn't parse keeps its name, and the ports after it are read on.
+block A { p: A<>, q: Pin }

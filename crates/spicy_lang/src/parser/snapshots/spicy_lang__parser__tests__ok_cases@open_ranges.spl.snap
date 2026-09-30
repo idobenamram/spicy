@@ -1,63 +1,68 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 957
+assertion_line: 1072
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/open_ranges.spl
 ---
-File 0..556
-  Contract R 0..555
+File 0..635
+  Contract R 0..634
     Spec a Within 100..126
       Path x 108..109 "x"
-      RangeTo 117..125
+      Range ..=b 117..125
         Quantity 5e-1 Ω 120..125 "0.5Ω"
     Spec b Within 131..156
       Path x 139..140 "x"
-      RangeFrom 148..155
+      Range a.. 148..155
         Quantity 1e4 Ω 148..153 "10kΩ"
     Let c 246..290
       StructLit Supply 254..289
         Field z 263..274
-          RangeTo 266..274
+          Range ..=b 266..274
             Quantity 5e-1 Ω 269..274 "0.5Ω"
         Field r 276..286
-          RangeFrom 279..286
+          Range a.. 279..286
             Quantity 1e4 Ω 279..284 "10kΩ"
     Let d 295..323
       StructLit Load 303..322
         Field r 310..320
-          RangeFrom 313..320
+          Range a.. 313..320
             Quantity 1e4 Ω 313..318 "10kΩ"
     Let e 328..351
       Call 336..350
         Path f 336..337 "f"
-        RangeFrom 338..342
+        Range a.. 338..342
           Quantity 1e0 V 338..340 "1V"
-        RangeTo 344..349
+        Range ..=b 344..349
           Quantity 2e0 V 347..349 "2V"
     Let g 356..376
       Array 364..375
-        RangeFrom 365..368
+        Range a.. 365..368
           Quantity 1e0 365..366 "1"
-        RangeTo 370..374
+        Range ..=b 370..374
           Quantity 2e0 373..374 "2"
     Spec h Within 449..476
       Path x 457..458 "x"
-      RangeTo 466..475
+      Range ..=b 466..475
         Binary Add 469..475
           Path v 469..470 "v"
           Quantity 1e0 V 473..475 "1V"
     Spec i Within 481..507
       Path x 489..490 "x"
-      RangeFrom 498..506
+      Range a.. 498..506
         Binary Sub 498..504
           Path v 498..499 "v"
           Quantity 1e0 V 502..504 "1V"
     Let j 512..553
       StructLit w 520..552
         Field window 524..550
-          RangeTo 532..550
+          Range ..=b 532..550
             Paren 535..550
               Binary Add 536..549
                 Field .end 536..544
                   Path drop 536..540 "drop"
                 Quantity 1e0 s 547..549 "1s"
+    Let k 610..632
+      StructLit G 618..631
+        Generic R 620..627
+          Range a.. 624..627
+            Quantity 1e0 624..625 "1"

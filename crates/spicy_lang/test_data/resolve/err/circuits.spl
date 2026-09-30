@@ -1,0 +1,19 @@
+// A block's circuit is the `circuit` of its name. A block without one is only an
+// interface: placing it is an error, but declaring it isn't (`Unused`).
+block Top { a: Pin, b: Pin }
+
+circuit Top {
+    let i = Interface { a, b };
+    let r = Resistor { a, b, value: 1k };
+}
+
+block Interface { a: Pin, b: Pin }
+
+block Unused { a: Pin }
+
+// A circuit for no block, and a second circuit for one.
+circuit Nowhere {
+    net n;
+}
+
+circuit Top {}

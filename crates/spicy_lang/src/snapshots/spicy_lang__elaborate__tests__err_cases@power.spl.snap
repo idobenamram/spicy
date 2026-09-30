@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/power.spl
 ---
@@ -20,25 +21,25 @@ root Unpowered
   Resistor load.r a→rail b→gnd value=1000 Ω
 
 --- errors ---
-W-short ShortedPart 243..292 "let r = Resistor { a: input, b: out, value: 10 };"
-E-power SeveralSources 644..652 "out: vcc" related 568..571
-E-power NoSource 819..828 "vcc: rail"
-E-power NoSource 1250..1259 "vcc: rail"
+W-short ShortedPart 238..287 "let r = Resistor { a: input, b: out, value: 10 };"
+E-power SeveralSources 643..651 "out: vcc" related 553..556
+E-power NoSource 831..840 "vcc: rail"
+E-power NoSource 1273..1282 "vcc: rail"
 
 --- rendered ---
 warning[W-short]: both pins of `r` are on one net (in `Regulator`)
-  --> power.spl:7:5
+  --> power.spl:6:5
   |
-7 |     let r = Resistor { a: input, b: out, value: 10 };
+6 |     let r = Resistor { a: input, b: out, value: 10 };
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted
 
 error[E-power]: net `vcc` has more than one power source
-   --> power.spl:21:39
+   --> power.spl:20:39
    |
-19 |     port vcc: Power<In>;
-   |          --- the first source
-20 |     port gnd: Ground;
-21 |     let reg = Regulator { input: vcc, out: vcc, gnd };
+17 | block TwoSources { vcc: Power<In>, gnd: Ground }
+   |                    --- the first source
+   .
+20 |     let reg = Regulator { input: vcc, out: vcc, gnd };
    |                                       ^^^^^^^^ a second source
    |
    = note: the sources are `vcc` and `reg.out`
@@ -53,9 +54,9 @@ error[E-power]: nothing powers net `rail`
    = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
 
 error[E-power]: nothing powers net `rail`
-   --> power.spl:44:23
+   --> power.spl:45:23
    |
-44 |     let pass = Pass { vcc: rail, gnd };
+45 |     let pass = Pass { vcc: rail, gnd };
    |                       ^^^^^^^^^ needs a power source
    |
    = note: `pass.inner.vcc` takes power from it

@@ -1,16 +1,15 @@
 // The root's own ports with a role are on the bench (language.md §8.5): it drives `vcc`
 // and loads `out`, so `vcc`, `load`, `out` and `n` aren't isolated. A placed block's
 // ports aren't on the bench: `s.i` and `s.o` are.
-block Stage {
-    port i: Analog<In>;
-    port o: Analog<Out>;
+block Stage { i: Analog<In>, o: Analog<Out> }
+
+circuit Stage {
     let r = Resistor { a: i, b: o, value: 1k };
 }
 
-block Bench {
-    port vcc: Power<In>;
-    port out: Analog<Out>;
-    port gnd: Ground;
+block Bench { vcc: Power<In>, out: Analog<Out>, gnd: Ground }
+
+circuit Bench {
     net load;
     net n;
     net m;

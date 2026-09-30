@@ -1,73 +1,74 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/signal_type_namespace.spl
 ---
 block A 6..7
-  port v: <error> 19..20
-  port w: <error> 41..42
-  port x: <error> 56..57
-  port y: <error> 78..79
-  port z: <error> 101..102
-  p = <error> 121..122
-  q = <error> 143..144
-block B 168..169
-  port i: Pin 181..182
+  port v: <error> 10..11
+  port w: <error> 23..24
+  port x: <error> 29..30
+  port y: <error> 42..43
+  port z: <error> 56..57
+  p = <error> 90..91
+  q = <error> 112..113
+block B 137..138
+  port i: Pin 141..142
 
 --- errors ---
-E-name WrongNamespace 22..30 "Resistor"
-E-name WrongNamespace 44..45 "B"
-E-type BadSignalType 59..62 "Foo"
-E-type BadSignalType 81..90 "Power<Up>"
-E-type BadSignalType 104..111 "Pin<In>"
-E-name WrongNamespace 125..130 "Power"
-E-name WrongNamespace 147..148 "v"
+E-name WrongNamespace 13..21 "Resistor"
+E-name WrongNamespace 26..27 "B"
+E-type BadSignalType 32..35 "Foo"
+E-type BadSignalType 45..54 "Power<Up>"
+E-type BadSignalType 59..66 "Pin<In>"
+E-name WrongNamespace 94..99 "Power"
+E-name WrongNamespace 116..117 "v"
 
 --- rendered ---
 error[E-name]: `Resistor` is a part kind, not a port type
-  --> signal_type_namespace.spl:2:13
+  --> signal_type_namespace.spl:1:14
   |
-2 |     port v: Resistor;
-  |             ^^^^^^^^ expected a port type
+1 | block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+  |              ^^^^^^^^ expected a port type
 
 error[E-name]: `B` is a block, not a port type
-  --> signal_type_namespace.spl:3:13
+  --> signal_type_namespace.spl:1:27
   |
-3 |     port w: B;
-  |             ^ expected a port type
+1 | block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+  |                           ^ expected a port type
 
 error[E-type]: `Foo` isn't a port type
-  --> signal_type_namespace.spl:4:13
+  --> signal_type_namespace.spl:1:33
   |
-4 |     port x: Foo<Bar>;
-  |             ^^^ not a valid port type
+1 | block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+  |                                 ^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Power` takes a role: `In` or `Out`
-  --> signal_type_namespace.spl:5:13
+  --> signal_type_namespace.spl:1:46
   |
-5 |     port y: Power<Up>;
-  |             ^^^^^^^^^ not a valid port type
+1 | block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+  |                                              ^^^^^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Pin` takes no role
-  --> signal_type_namespace.spl:6:13
+  --> signal_type_namespace.spl:1:60
   |
-6 |     port z: Pin<In>;
-  |             ^^^^^^^ not a valid port type
+1 | block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+  |                                                            ^^^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-name]: `Power` is a signal type, not a part kind or block
-  --> signal_type_namespace.spl:7:13
+  --> signal_type_namespace.spl:4:13
   |
-7 |     let p = Power {};
+4 |     let p = Power {};
   |             ^^^^^ expected a part kind or block
 
 error[E-name]: `v` is a port, not a part kind or block
-  --> signal_type_namespace.spl:8:13
+  --> signal_type_namespace.spl:5:13
   |
-8 |     let q = v { a: v };
+5 |     let q = v { a: v };
   |             ^ expected a part kind or block

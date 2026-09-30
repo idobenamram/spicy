@@ -1,19 +1,20 @@
 // A root that places a cycle: the cycle is reported, and the root, cut short where the
 // cycle closes, isn't checked as a whole. Checked, its `x` would be an isolated net.
-block Board {
-    port g: Ground;
+block Board { g: Ground }
+
+circuit Board {
     net x;
     let p = Ping { g, x };
 }
 
-block Ping {
-    port g: Ground;
-    port x: Pin;
+block Ping { g: Ground, x: Pin }
+
+circuit Ping {
     let pong = Pong { g, x };
 }
 
-block Pong {
-    port g: Ground;
-    port x: Pin;
+block Pong { g: Ground, x: Pin }
+
+circuit Pong {
     let ping = Ping { g, x };
 }

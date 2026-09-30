@@ -1,96 +1,96 @@
 // A root too large to flatten (the limit is a million placements): each level places
 // the one below four times, so 11 short blocks make 4^10 placements at the bottom.
 // Reported at the placement that goes over, and `L10` isn't flattened.
-block L0 {
-    port p: Pin;
-    port g: Ground;
+block L0 { p: Pin, g: Ground }
+
+circuit L0 {
     let r = Resistor { a: p, b: g, value: 1k };
 }
 
-block L1 {
-    port p: Pin;
-    port g: Ground;
+block L1 { p: Pin, g: Ground }
+
+circuit L1 {
     let a = L0 { p, g };
     let b = L0 { p, g };
     let c = L0 { p, g };
     let d = L0 { p, g };
 }
 
-block L2 {
-    port p: Pin;
-    port g: Ground;
+block L2 { p: Pin, g: Ground }
+
+circuit L2 {
     let a = L1 { p, g };
     let b = L1 { p, g };
     let c = L1 { p, g };
     let d = L1 { p, g };
 }
 
-block L3 {
-    port p: Pin;
-    port g: Ground;
+block L3 { p: Pin, g: Ground }
+
+circuit L3 {
     let a = L2 { p, g };
     let b = L2 { p, g };
     let c = L2 { p, g };
     let d = L2 { p, g };
 }
 
-block L4 {
-    port p: Pin;
-    port g: Ground;
+block L4 { p: Pin, g: Ground }
+
+circuit L4 {
     let a = L3 { p, g };
     let b = L3 { p, g };
     let c = L3 { p, g };
     let d = L3 { p, g };
 }
 
-block L5 {
-    port p: Pin;
-    port g: Ground;
+block L5 { p: Pin, g: Ground }
+
+circuit L5 {
     let a = L4 { p, g };
     let b = L4 { p, g };
     let c = L4 { p, g };
     let d = L4 { p, g };
 }
 
-block L6 {
-    port p: Pin;
-    port g: Ground;
+block L6 { p: Pin, g: Ground }
+
+circuit L6 {
     let a = L5 { p, g };
     let b = L5 { p, g };
     let c = L5 { p, g };
     let d = L5 { p, g };
 }
 
-block L7 {
-    port p: Pin;
-    port g: Ground;
+block L7 { p: Pin, g: Ground }
+
+circuit L7 {
     let a = L6 { p, g };
     let b = L6 { p, g };
     let c = L6 { p, g };
     let d = L6 { p, g };
 }
 
-block L8 {
-    port p: Pin;
-    port g: Ground;
+block L8 { p: Pin, g: Ground }
+
+circuit L8 {
     let a = L7 { p, g };
     let b = L7 { p, g };
     let c = L7 { p, g };
     let d = L7 { p, g };
 }
 
-block L9 {
-    port p: Pin;
-    port g: Ground;
+block L9 { p: Pin, g: Ground }
+
+circuit L9 {
     let a = L8 { p, g };
     let b = L8 { p, g };
     let c = L8 { p, g };
     let d = L8 { p, g };
 }
 
-block L10 {
-    port p: Pin;
-    port g: Ground;
+block L10 { p: Pin, g: Ground }
+
+circuit L10 {
     let a = L9 { p, g };
     let b = L9 { p, g };
     let c = L9 { p, g };

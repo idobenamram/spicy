@@ -1,18 +1,19 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/unclosed_struct.spl
 ---
-File 0..68
-  Block A 0..67
-    Let r 14..39
-      ExprError 22..39 "Resistor { a: vcc"
-    Let s 44..54
-      Quantity 1e0 52..53 "1"
-    Net n 59..65
+File 0..70
+  Circuit A 0..69
+    Let r 16..41
+      ExprError 24..41 "Resistor { a: vcc"
+    Let s 46..56
+      Quantity 1e0 54..55 "1"
+    Net n 61..67
 
 --- errors ---
-E-syntax Expected 44..47 "let"
+E-syntax Expected 46..49 "let"
 
 --- rendered ---
 error[E-syntax]: expected `,` or `}`, found `let`

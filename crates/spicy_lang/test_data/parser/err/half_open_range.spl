@@ -1,4 +1,4 @@
-block A {
+circuit A {
     let q = Npn { beta: 100..300 };
     // With no lower end too: `..300` is `..=300`.
     let p = Npn { beta: ..300 };

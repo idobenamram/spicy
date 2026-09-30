@@ -1,15 +1,18 @@
-block A {
-    port vcc Power;
+// A broken port is skipped to the next `,`, and the ports after it are read on.
+block A { vcc Power, gnd: Ground }
+
+circuit A {
     let r = Resistor { a: vcc b: base };
     let x = ;
     net ok;
     let y = (1 + 2;
     let z = 1 2;
-    // A field that isn't named must be a transition.
-    let t = Step { 5mA 30mA };
-    let u = Step { 5mA };
+    // Every field is named: a step's levels are `from:` and `to:`.
+    let u = Step { 5mA, to: 30mA };
     // Generic arguments are named, and a placement follows them.
     let v = G<A = X, B> {};
     let w = G<A = X>;
     let i = m[s;
+    // Two names in a row are a missing `,` (or `:`).
+    let j = Tlv755p { vin vout, gnd };
 }

@@ -1,42 +1,43 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 568
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/scaled_spreads.spl
 ---
 block Spreads 6..13
-  port a: Pin 25..26
-  port b: Pin 42..43
-  r1 = Resistor 58..60
+  port a: Pin 16..17
+  port b: Pin 24..25
+  r1 = Resistor 60..62
     a → a
     b → b
     value = 2000 Ω ± 1%
-  r2 = Resistor 113..115
+  r2 = Resistor 115..117
     a → a
     b → b
     value = 5000 Ω ± 250 Ω
-  r3 = Resistor 170..172
+  r3 = Resistor 172..174
     a → a
     b → b
     value = 47000 Ω ± 1%
-  r4 = Resistor 222..224
+  r4 = Resistor 224..226
     a → a
     b → b
     value = 47000 Ω ± 1%
-  r5 = Resistor 280..282
+  r5 = Resistor 282..284
     a → a
     b → b
     value = -2000 Ω ± 200 Ω
-  c1 = Capacitor 337..339
+  c1 = Capacitor 339..341
     a → a
     b → b
     value = 0.000001 F ± 10%
     rating = 25 V
-  q1 = Npn 406..408
+  q1 = Npn 408..410
     c → a
     b → b
     e → b
     beta = 200 (100..=300)
-  q2 = Npn 464..466
+  q2 = Npn 466..468
     c → a
     b → b
     e → b

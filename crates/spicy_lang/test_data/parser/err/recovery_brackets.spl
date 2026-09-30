@@ -1,4 +1,4 @@
-block A {
+circuit A {
     let x = f(a; b);
     let y = [a; b];
     let z = (1 + 2;

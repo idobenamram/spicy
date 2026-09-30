@@ -1,13 +1,13 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/spread_left_of_within.spl
 ---
 File 0..179
   Contract A 0..178
     Spec a Within 17..40
-      Binary Range 25..30
+      Range a..=b 25..30
         Quantity 1e0 25..26 "1"
         Quantity 2e0 29..30 "2"
       Path x 38..39 "x"
@@ -17,11 +17,11 @@ File 0..179
         Quantity 1e0 % 58..60 "1%"
       Path y 68..69 "y"
     Spec c Within 128..150
-      RangeTo 136..140
+      Range ..=b 136..140
         Quantity 2e0 139..140 "2"
       Path x 148..149 "x"
     Spec d Within 155..176
-      RangeFrom 163..166
+      Range a.. 163..166
         Quantity 1e0 163..164 "1"
       Path x 174..175 "x"
 

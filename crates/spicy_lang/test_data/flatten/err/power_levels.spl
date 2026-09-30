@@ -2,40 +2,35 @@
 // supply's `v5` meet inside `Double`, and are reported there; two supplies on one net
 // meet on the board. At one level each port counts: `Dual`'s two outputs on `seven`
 // are two sources (as KiCad, Modelica and atopile count them).
-block Reg {
-    port input: Power<In>;
-    port out: Power<Out>;
-    port gnd: Ground;
+block Reg { input: Power<In>, out: Power<Out>, gnd: Ground }
+
+circuit Reg {
     let r = Resistor { a: input, b: out, value: 10 };
 }
 
-block Double {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port gnd: Ground;
+block Double { input: Power<In>, v5: Power<Out>, gnd: Ground }
+
+circuit Double {
     let reg = Reg { input, out: v5, gnd };
     let reg2 = Reg { input, out: v5, gnd };
 }
 
-block Single {
-    port input: Power<In>;
-    port v5: Power<Out>;
-    port gnd: Ground;
+block Single { input: Power<In>, v5: Power<Out>, gnd: Ground }
+
+circuit Single {
     let reg = Reg { input, out: v5, gnd };
 }
 
-block Dual {
-    port input: Power<In>;
-    port o1: Power<Out>;
-    port o2: Power<Out>;
-    port gnd: Ground;
+block Dual { input: Power<In>, o1: Power<Out>, o2: Power<Out>, gnd: Ground }
+
+circuit Dual {
     let reg1 = Reg { input, out: o1, gnd };
     let reg2 = Reg { input, out: o2, gnd };
 }
 
-block Board {
-    port v12: Power<In>;
-    port gnd: Ground;
+block Board { v12: Power<In>, gnd: Ground }
+
+circuit Board {
     net five;
     net six;
     net seven;

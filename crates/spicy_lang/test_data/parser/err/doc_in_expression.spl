@@ -1,4 +1,4 @@
-block A {
+circuit A {
     let x = /// doc
         1;
     let y = f(/// doc

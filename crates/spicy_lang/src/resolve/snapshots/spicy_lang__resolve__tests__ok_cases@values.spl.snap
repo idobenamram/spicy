@@ -1,54 +1,55 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 568
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/values.spl
 ---
 block Values 6..12
-  port a: Pin 24..25
-  port b: Pin 41..42
-  r1 = Resistor 57..59
+  port a: Pin 15..16
+  port b: Pin 23..24
+  r1 = Resistor 58..60
     a → a
     b → b
     value = 47000 Ω ± 1%
-  r2 = Resistor 107..109
+  r2 = Resistor 108..110
     a → a
     b → b
     value = 4700 Ω
-  r3 = Resistor 153..155
+  r3 = Resistor 154..156
     a → a
     b → b
     value = 9400 Ω
-  r4 = Resistor 202..204
+  r4 = Resistor 203..205
     a → a
     b → b
     value = 3000 Ω
-  r5 = Resistor 250..252
+  r5 = Resistor 251..253
     a → a
     b → b
     value = 10000 Ω ± 50 Ω
-  r6 = Resistor 303..305
+  r6 = Resistor 304..306
     a → a
     b → b
     value = 47000 Ω
-  r7 = Resistor 349..351
+  r7 = Resistor 350..352
     a → a
     b → b
     value = 50 Ω
-  c1 = Electrolytic 397..399
+  c1 = Electrolytic 398..400
     p → a
     n → b
     value = 0.000001 F ± 20%
     rating = 25 V
-  c2 = Capacitor 471..473
+  c2 = Capacitor 472..474
     a → a
     b → b
     value = 0.000000022 F ± 5%
-  q1 = Npn 522..524
+  q1 = Npn 523..525
     c → a
     b → b
     e → b
     beta = 200 (100..=300)
-  q2 = Pnp 575..577
+  q2 = Pnp 576..578
     c → a
     b → b
     e → b

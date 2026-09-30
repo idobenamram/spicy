@@ -1,7 +1,7 @@
 /// A block with every statement form.
-block All {
-    port vcc: Power<In>;
-    port bus: Bus<Analog<In>, Pin,>;
+block All { vcc: Power<In>, bus: Bus<Analog<In>, Pin,> }
+
+circuit All {
     net base;
     net merged = [a, b];
     /// Rationale on a part.

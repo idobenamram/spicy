@@ -1,24 +1,25 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicate_let.spl
 ---
 block A 89..90
-  port v: Pin 102..103
-  port g: Ground 119..120
-  net x 138..139
-  r1 = Resistor 181..183
+  port v: Pin 93..94
+  port g: Ground 101..102
+  net x 134..135
+  r1 = Resistor 177..179
     a → v
     b → g
     value = 1000 Ω
   merge x = [v]
 
 --- errors ---
-E-duplicate Duplicate 155..156 "x" related 138..139
-E-name UnknownName 163..170 "nowhere"
-E-duplicate Duplicate 230..232 "r1" related 181..183
-E-binding UnknownField 269..272 "bad"
-E-duplicate Duplicate 287..288 "v" related 102..103
+E-duplicate Duplicate 151..152 "x" related 134..135
+E-name UnknownName 159..166 "nowhere"
+E-duplicate Duplicate 226..228 "r1" related 177..179
+E-binding UnknownField 265..268 "bad"
+E-duplicate Duplicate 283..284 "v" related 93..94
 
 --- rendered ---
 error[E-duplicate]: name `x` is defined twice
@@ -54,8 +55,8 @@ error[E-binding]: `Resistor` has no pin or field `bad`
 error[E-duplicate]: name `v` is defined twice
   --> duplicate_let.spl:9:9
   |
-3 |     port v: Pin;
-  |          - first defined here
+2 | block A { v: Pin, g: Ground }
+  |           - first defined here
   .
 9 |     let v = Resistor { a: g, b: v, value: 3k };
   |         ^ second definition

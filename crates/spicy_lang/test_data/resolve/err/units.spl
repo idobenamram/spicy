@@ -1,6 +1,6 @@
-block A {
-    port p: Pin;
-    port n: Pin;
+block A { p: Pin, n: Pin }
+
+circuit A {
     let r1 = Resistor { a: p, b: n, value: 10nF };
     let r2 = Resistor { a: p, b: n, value: 47K };
     let r3 = Resistor { a: p, b: n, value: 1V + 1A };

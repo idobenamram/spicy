@@ -1,14 +1,16 @@
 // Isolated nets on several levels are one warning, with paths from the placement they
 // are all in: the top of the first net (model.md §7 question 4). `n` is `Top`'s, and
 // `x` is inside `inner`, joined to `n` by a part.
-block Inner {
-    port p: Pin;
+block Inner { p: Pin }
+
+circuit Inner {
     net x;
     let r = Resistor { a: p, b: x, value: 1k };
 }
 
-block Top {
-    port g: Ground;
+block Top { g: Ground }
+
+circuit Top {
     net n;
     let inner = Inner { p: n };
 }

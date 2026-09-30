@@ -24,7 +24,6 @@ const TABLE: &[Lookalike] = &[
     entry('\u{037E}', "GREEK QUESTION MARK", ";", Some(TokenKind::Semi)),
     entry('\u{2264}', "LESS-THAN OR EQUAL TO", "<=", Some(TokenKind::Le)),
     entry('\u{2265}', "GREATER-THAN OR EQUAL TO", ">=", Some(TokenKind::Ge)),
-    entry('\u{2192}', "RIGHTWARDS ARROW", "->", Some(TokenKind::Arrow)),
     entry('\u{00D7}', "MULTIPLICATION SIGN", "*", Some(TokenKind::Star)),
     entry('\u{00B7}', "MIDDLE DOT", "*", Some(TokenKind::Star)),
     entry('\u{2215}', "DIVISION SLASH", "/", Some(TokenKind::Slash)),
@@ -71,8 +70,8 @@ mod tests {
     use super::super::scan;
     use super::{TABLE, TokenKind};
 
-    /// The parser reads a look-alike as the token its replacement lexes to (`→` as `->`,
-    /// `Arrow`), so it sees what the fix will write. `None` rows are spaces, nothing, or
+    /// The parser reads a look-alike as the token its replacement lexes to (`−` as `-`,
+    /// `Minus`), so it sees what the fix will write. `None` rows are spaces, nothing, or
     /// `°`, which the parser skips too.
     #[test]
     fn reads_as_is_the_replacement() {

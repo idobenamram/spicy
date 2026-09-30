@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/spread.spl
 ---
@@ -8,14 +8,14 @@ File 0..300
   Contract A 0..299
     Spec a Within 17..48
       Path x 25..26 "x"
-      Binary Range 34..47
+      Range a..=b 34..47
         Binary Tol 34..42
           Quantity 1e0 V 34..36 "1V"
           Quantity 1e0 % 40..42 "1%"
         Quantity 2e0 V 45..47 "2V"
     Spec b Le 53..74
       Path x 61..62 "x"
-      Binary Range 66..73
+      Range a..=b 66..73
         Quantity 1e0 V 66..68 "1V"
         Quantity 2e0 V 71..73 "2V"
     Spec c Gt 79..99
@@ -25,21 +25,21 @@ File 0..300
         Quantity 1e0 % 96..98 "1%"
     Spec d Le 188..207
       Path x 196..197 "x"
-      RangeTo 201..206
+      Range ..=b 201..206
         Quantity 2e0 V 204..206 "2V"
     Spec e Gt 212..230
-      RangeFrom 220..225
+      Range a.. 220..225
         Quantity 1e4 220..223 "10k"
       Path x 228..229 "x"
     Spec f Within 235..264
       Path x 243..244 "x"
-      RangeTo 252..263
+      Range ..=b 252..263
         Binary Tol 255..263
           Quantity 2e0 V 255..257 "2V"
           Quantity 1e0 % 261..263 "1%"
     Spec g Within 269..297
       Path x 277..278 "x"
-      RangeFrom 286..296
+      Range a.. 286..296
         Binary Tol 286..294
           Quantity 1e0 V 286..288 "1V"
           Quantity 1e0 % 292..294 "1%"

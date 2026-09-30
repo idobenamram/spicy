@@ -1,29 +1,42 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/unattached_doc.spl
 ---
-File 0..62
-  Block A 0..46
-    Net a 14..20
+File 0..125
+  Block B 0..59
+    Port a 14..20
+      Type Pin 17..20 "Pin"
+  Circuit A 61..109
+    Net a 77..83
 
 --- errors ---
-W-doc UnattachedDoc 25..44 "/// nothing follows"
-W-doc UnattachedDoc 47..61 "/// at the end"
+W-doc UnattachedDoc 26..57 "/// nothing follows here either"
+W-doc UnattachedDoc 88..107 "/// nothing follows"
+W-doc UnattachedDoc 110..124 "/// at the end"
 
 --- rendered ---
 warning[W-doc]: doc comment isn't attached to anything
   --> unattached_doc.spl:3:5
   |
-3 |     /// nothing follows
+3 |     /// nothing follows here either
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ nothing follows this doc comment
+  |
+  = help: move it before an item or a statement, or use `//`
+
+warning[W-doc]: doc comment isn't attached to anything
+  --> unattached_doc.spl:8:5
+  |
+8 |     /// nothing follows
   |     ^^^^^^^^^^^^^^^^^^^ nothing follows this doc comment
   |
   = help: move it before an item or a statement, or use `//`
 
 warning[W-doc]: doc comment isn't attached to anything
-  --> unattached_doc.spl:5:1
-  |
-5 | /// at the end
-  | ^^^^^^^^^^^^^^ nothing follows this doc comment
-  |
-  = help: move it before an item or a statement, or use `//`
+   --> unattached_doc.spl:10:1
+   |
+10 | /// at the end
+   | ^^^^^^^^^^^^^^ nothing follows this doc comment
+   |
+   = help: move it before an item or a statement, or use `//`

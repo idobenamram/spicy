@@ -1,19 +1,20 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/doc_in_expression.spl
 ---
-File 0..89
-  Block A 0..88
-    Let x 14..40
-      ExprError 22..39 "/// doc\n        1"
-    Let y 45..74
-      ExprError 53..73 "f(/// doc\n        2)"
-    Net ok 79..86
+File 0..91
+  Circuit A 0..90
+    Let x 16..42
+      ExprError 24..41 "/// doc\n        1"
+    Let y 47..76
+      ExprError 55..75 "f(/// doc\n        2)"
+    Net ok 81..88
 
 --- errors ---
-E-syntax Expected 22..29 "/// doc"
-E-syntax Expected 55..62 "/// doc"
+E-syntax Expected 24..31 "/// doc"
+E-syntax Expected 57..64 "/// doc"
 
 --- rendered ---
 error[E-syntax]: expected an expression, found `/// doc`

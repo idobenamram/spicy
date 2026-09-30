@@ -1,0 +1,9 @@
+// Only a block can be `pub`. Elsewhere it's reported, with its removal as the fix, and
+// the item is read on.
+pub block A { p: Pin }
+
+pub circuit A {
+    net n;
+}
+
+pub contract A {}

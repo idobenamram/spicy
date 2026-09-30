@@ -1,13 +1,8 @@
-block A {
-    port v: Resistor;
-    port w: B;
-    port x: Foo<Bar>;
-    port y: Power<Up>;
-    port z: Pin<In>;
+block A { v: Resistor, w: B, x: Foo<Bar>, y: Power<Up>, z: Pin<In> }
+
+circuit A {
     let p = Power {};
     let q = v { a: v };
 }
 
-block B {
-    port i: Pin;
-}
+block B { i: Pin }

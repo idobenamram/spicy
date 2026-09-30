@@ -1,84 +1,85 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 957
+assertion_line: 1072
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/statements.spl
 ---
-File 0..585
-  Block All 0..398
+File 0..583
+  Block All 0..95
     Doc 0..38 "/// A block with every statement form."
-    Port vcc 55..75
-      Type Power 65..74 "Power<In>"
-        Type In 71..73 "In"
-    Port bus 80..112
-      Type Bus 90..111 "Bus<Analog<In>, Pin,>"
-        Type Analog 94..104 "Analog<In>"
-          Type In 101..103 "In"
-        Type Pin 106..109 "Pin"
-    Net base 117..126
-    Net merged 131..151
-      Array 144..150
-        Path a 145..146 "a"
-        Path b 148..149 "b"
-    Let r1 156..241
-      Doc 156..180 "/// Rationale on a part."
-      StructLit Resistor 194..240
-        Field a 205..211
-          Path vcc 208..211 "vcc"
-        Field b 213..220
-          Path base 216..220 "base"
-        Field value 222..238
-          Binary Tol 229..238
-            Quantity 4.7e4 229..232 "47k"
-            Quantity 1e0 % 236..238 "1%"
-    Let amp 246..307
-      StructLit CeAmp 256..306
-        Field vcc (shorthand) 264..267
-        Field gnd (shorthand) 269..272
-        Field input 274..287
-          Path guitar 281..287 "guitar"
-        Field output 289..303
-          Path to_adc 297..303 "to_adc"
-    Let empty 312..335
-      StructLit Nothing 324..334
-    Let q 340..396
-      StructLit std::parts::Npn 348..395
-        Field c 366..372
-          Path out 369..372 "out"
-        Field b 374..381
-          Path base 377..381 "base"
-        Field e 383..393
-          Path emitter 386..393 "emitter"
-  Contract All 400..584
-    Let h 419..450
-      Call 427..449
-        Path ac 427..429 "ac"
-        Binary Div 430..448
-          Field .v 430..438
-            Path output 430..436 "output"
-          Field .v 441..448
-            Path input 441..446 "input"
-    Spec bias Within 455..538
-      Attr confidence 455..478
-        Call 468..476
-          Path sigma 468..473 "sigma"
-          Quantity 3e0 474..475 "3"
-      Attr warn 483..490
-      Call 506..518
-        Path dc 506..508 "dc"
-        Field .v 509..517
-          Path output 509..515 "output"
-      Binary Range 526..537
-        Quantity 4.5e0 V 526..530 "4.5V"
-        Quantity 6.5e0 V 533..537 "6.5V"
-    Spec calls Within 543..582
-      Call 555..558
-        Path f 555..556 "f"
-      Binary Range 566..581
-        Call 566..574
-          Path g 566..567 "g"
-          Path a 568..569 "a"
-          Path b 571..572 "b"
-        Call 577..581
-          Path h 577..578 "h"
-          Quantity 1e0 579..580 "1"
+    Port vcc 51..65
+      Type Power 56..65 "Power<In>"
+        Type In 62..64 "In"
+    Port bus 67..93
+      Type Bus 72..93 "Bus<Analog<In>, Pin,>"
+        Type Analog 76..86 "Analog<In>"
+          Type In 83..85 "In"
+        Type Pin 88..91 "Pin"
+  Circuit All 97..396
+    Net base 115..124
+    Net merged 129..149
+      Array 142..148
+        Path a 143..144 "a"
+        Path b 146..147 "b"
+    Let r1 154..239
+      Doc 154..178 "/// Rationale on a part."
+      StructLit Resistor 192..238
+        Field a 203..209
+          Path vcc 206..209 "vcc"
+        Field b 211..218
+          Path base 214..218 "base"
+        Field value 220..236
+          Binary Tol 227..236
+            Quantity 4.7e4 227..230 "47k"
+            Quantity 1e0 % 234..236 "1%"
+    Let amp 244..305
+      StructLit CeAmp 254..304
+        Field vcc (shorthand) 262..265
+        Field gnd (shorthand) 267..270
+        Field input 272..285
+          Path guitar 279..285 "guitar"
+        Field output 287..301
+          Path to_adc 295..301 "to_adc"
+    Let empty 310..333
+      StructLit Nothing 322..332
+    Let q 338..394
+      StructLit std::parts::Npn 346..393
+        Field c 364..370
+          Path out 367..370 "out"
+        Field b 372..379
+          Path base 375..379 "base"
+        Field e 381..391
+          Path emitter 384..391 "emitter"
+  Contract All 398..582
+    Let h 417..448
+      Call 425..447
+        Path ac 425..427 "ac"
+        Binary Div 428..446
+          Field .v 428..436
+            Path output 428..434 "output"
+          Field .v 439..446
+            Path input 439..444 "input"
+    Spec bias Within 453..536
+      Attr confidence 453..476
+        Call 466..474
+          Path sigma 466..471 "sigma"
+          Quantity 3e0 472..473 "3"
+      Attr warn 481..488
+      Call 504..516
+        Path dc 504..506 "dc"
+        Field .v 507..515
+          Path output 507..513 "output"
+      Range a..=b 524..535
+        Quantity 4.5e0 V 524..528 "4.5V"
+        Quantity 6.5e0 V 531..535 "6.5V"
+    Spec calls Within 541..580
+      Call 553..556
+        Path f 553..554 "f"
+      Range a..=b 564..579
+        Call 564..572
+          Path g 564..565 "g"
+          Path a 566..567 "a"
+          Path b 569..570 "b"
+        Call 575..579
+          Path h 575..576 "h"
+          Quantity 1e0 577..578 "1"

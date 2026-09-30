@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/recursion.spl
 ---
@@ -7,28 +8,28 @@ root Diamond
   net g (ground)  aliases left.g, right.g, left.leaf.g, right.leaf.g
 
 --- errors ---
-E-recursion RecursivePlacement 208..215 "Selfish" related 162..169
-E-recursion RecursivePlacement 452..456 "Ping" related 347..351
+E-recursion RecursivePlacement 219..226 "Selfish" related 162..169
+E-recursion RecursivePlacement 479..483 "Ping" related 358..362
 
 --- rendered ---
 error[E-recursion]: `Selfish` places itself: Selfish → Selfish
-  --> recursion.spl:5:17
+  --> recursion.spl:6:17
   |
-3 | block Selfish {
+3 | block Selfish { g: Ground }
   |       ------- defined here
-4 |     port g: Ground;
-5 |     let again = Selfish { g };
+  .
+6 |     let again = Selfish { g };
   |                 ^^^^^^^ places `Selfish` again
   |
   = note: a block can't contain itself, directly or through others
 
 error[E-recursion]: `Ping` places itself: Ping → Pong → Ping
-   --> recursion.spl:17:16
+   --> recursion.spl:20:16
    |
-10 | block Ping {
+11 | block Ping { g: Ground }
    |       ---- defined here
    .
-17 |     let ping = Ping { g };
+20 |     let ping = Ping { g };
    |                ^^^^ places `Ping` again
    |
    = note: a block can't contain itself, directly or through others

@@ -1,55 +1,45 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/wrong_body.spl
 ---
-File 0..127
-  Block A 0..74
-    Assume Within 14..44
-      Field .v 21..26
-        Path vcc 21..24 "vcc"
-      Binary Tol 34..43
-        Quantity 1.2e1 V 34..37 "12V"
-        Quantity 5e0 % 41..43 "5%"
-    Spec s Within 49..72
-      Path x 57..58 "x"
-      Binary Range 66..71
-        Quantity 1e0 66..67 "1"
-        Quantity 2e0 70..71 "2"
-  Contract A 76..126
-    Port vcc 93..113
-      Type Power 103..112 "Power<In>"
-        Type In 109..111 "In"
-    Net n 118..124
+File 0..104
+  Circuit A 0..76
+    Assume Within 16..46
+      Field .v 23..28
+        Path vcc 23..26 "vcc"
+      Binary Tol 36..45
+        Quantity 1.2e1 V 36..39 "12V"
+        Quantity 5e0 % 43..45 "5%"
+    Spec s Within 51..74
+      Path x 59..60 "x"
+      Range a..=b 68..73
+        Quantity 1e0 68..69 "1"
+        Quantity 2e0 72..73 "2"
+  Contract A 78..103
+    Net n 95..101
 
 --- errors ---
-E-wrong-body WrongBody 14..20 "assume"
-E-wrong-body WrongBody 49..53 "spec"
-E-wrong-body WrongBody 93..97 "port"
-E-wrong-body WrongBody 118..121 "net"
+E-wrong-body WrongBody 16..22 "assume"
+E-wrong-body WrongBody 51..55 "spec"
+E-wrong-body WrongBody 95..98 "net"
 
 --- rendered ---
-error[E-wrong-body]: `assume` doesn't belong in a `block`
+error[E-wrong-body]: `assume` doesn't belong in a `circuit`
   --> wrong_body.spl:2:5
   |
 2 |     assume vcc.v within 12V ± 5%;
   |     ^^^^^^ `assume` belongs in the contract
 
-error[E-wrong-body]: `spec` doesn't belong in a `block`
+error[E-wrong-body]: `spec` doesn't belong in a `circuit`
   --> wrong_body.spl:3:5
   |
 3 |     spec s: x within 1..=2;
   |     ^^^^ `spec` belongs in the contract
 
-error[E-wrong-body]: `port` doesn't belong in a `contract`
+error[E-wrong-body]: `net` doesn't belong in a `contract`
   --> wrong_body.spl:7:5
   |
-7 |     port vcc: Power<In>;
-  |     ^^^^ `port` belongs in the block
-
-error[E-wrong-body]: `net` doesn't belong in a `contract`
-  --> wrong_body.spl:8:5
-  |
-8 |     net n;
-  |     ^^^ `net` belongs in the block
+7 |     net n;
+  |     ^^^ `net` belongs in the circuit

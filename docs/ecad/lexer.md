@@ -108,7 +108,7 @@ atopile's unit decoding (`decode_symbol` in `Units.py`) is the same idea as ours
 | L1 | **Two passes:** `scan` (total, never fails) and `check` (diagnostics + quantity decoding) | Rust's split. Pass 1 is easy to make fast and to fuzz. Pass 2 can look across tokens (`10 kΩ`, `+-`) |
 | L2 | **Every byte is in exactly one token**, trivia included, and a zero-length `Eof` token closes the list | Byte-for-byte round trip (roadmap §4.4). The parser never needs to check for end of input separately |
 | L3 | **Struct-of-arrays:** `kinds: Vec<TokenKind>` (1 byte each) and `starts: Vec<u32>`. Token `i` covers `starts[i]..starts[i+1]` | Zig and rust-analyzer. 5 bytes per token, no spans stored twice, cache-friendly. `u32` caps a file at 4 GiB, which is checked on load |
-| L4 | **Multi-character operators are formed in pass 1** (`<=`, `..=`, `::`, `->`, `+/-`) | No macros, so there's no reason for rustc's single-character layer |
+| L4 | **Multi-character operators are formed in pass 1** (`<=`, `..=`, `::`, `+/-`) | No macros, so there's no reason for rustc's single-character layer |
 | L5 | **Quantities scan permissively:** a digit starts a `Quantity`, which then takes every letter, digit, `_`, `µ`, `μ`, `Ω`, `Ω`, `°`, `%` (and the `°` look-alikes `º` `˚`) glued to it. Pass 2 decodes it | Zig's approach. `4.7k7` and `47q` are one token each and get one precise error each, instead of confusing follow-on errors |
 | L6 | **The value is correctly rounded, with no allocation:** the digits are read as an integer and a power of ten (`100nF` → 100 × 10^-9), then **Clinger's fast path**: when the digits fit in 53 bits and the power is at most 22, one exact multiply or divide (100 / 1e9). Otherwise std's `str::parse::<f64>` runs the full algorithm. This is what Rust's `dec2flt` (`can_use_fast_path`) and Zig's `parse_float` (`isFastPath`) do internally | Multiplying by an inexact power loses the last bit: `100.0 * 1e-9` is `1.0000000000000001e-07`, but 100 / 1e9 is `1e-07`. Across 14 common values (1 … 680) × 8 prefixes, **26 of 112** such multiplications are off in the last bit. Exact values keep export round trips exact (`100n` prints back as `100n`). A test checks the fast path against std on 200 000 random inputs and on both sides of every limit |
 | L7 | **Unknown characters are one token per character** (`Unknown`), and the rest of the line keeps lexing | Rust's behavior (Zig skips to the end of the line). A look-alike fix applies to one character, and the parser still sees the tokens after it |
@@ -142,12 +142,12 @@ pub enum TokenKind {
     // significant
     DocComment,
     Ident, IdentNonAscii,
-    KwBlock, KwCircuit, KwSetup, KwContract, KwEnv, KwConst, KwPub, KwPort, KwNet, KwLet,
+    KwBlock, KwCircuit, KwSetup, KwContract, KwEnv, KwConst, KwPub, KwNet, KwLet,
     KwAssume, KwSpec, KwRated, KwEnsure, KwWithin, KwFor, KwIn, KwReserved,
     Quantity, Str, UnterminatedStr,
     LBrace, RBrace, LParen, RParen, LBracket, RBracket, Lt, Gt, Le, Ge,
     Comma, Semi, Colon, ColonColon, Dot, DotDot, DotDotEq, Eq,
-    Plus, Minus, Arrow, Star, Slash, PlusMinus, Pound, Question,
+    Plus, Minus, Star, Slash, PlusMinus, Pound, Question,
     Unknown,
     Eof,
 }
@@ -185,7 +185,7 @@ At each position, the first matching rule wins:
 | `"` | `Str` | To the closing `"` on the same line; `\"` and `\\` don't close it. Without a closing `"` before the end of the line: `UnterminatedStr`, up to the line end |
 | `+/-` | `PlusMinus` | Only when the three characters touch |
 | `±` | `PlusMinus` | |
-| `..=`, `..`, `::`, `->`, `<=`, `>=` | as named | Longest match first; `->` (`Arrow`) only when the two characters touch |
+| `..=`, `..`, `::`, `<=`, `>=` | as named | Longest match first |
 | one of `{}()[]<>,;:.=+-*/#?` | as named | |
 | anything else (including a lone `%`, `−`, `;`, U+00A0) | `Unknown` | One character |
 | end of input | `Eof` | Zero length |
@@ -234,7 +234,6 @@ rustc has 264 entries. We start with the ones that come from datasheets, PDFs an
 | `−` `–` `—` `‐` | minus sign, en dash, em dash, hyphen | `-` |
 | `;` | Greek question mark | `;` |
 | `≤` `≥` | | `<=` `>=` |
-| `→` | rightwards arrow | `->` |
 | `×` `·` | multiplication sign, middle dot | `*` |
 | `∕` `÷` | division slash, division sign | `/` |
 | `º` `˚` | masculine ordinal, ring above | `°`. `º` is a letter, so it only gets this fix inside a number's suffix (`10ºC` → `10°C`); elsewhere it reads as an identifier character |

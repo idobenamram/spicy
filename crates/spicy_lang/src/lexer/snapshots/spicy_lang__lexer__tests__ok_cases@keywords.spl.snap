@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/lexer/mod.rs
-assertion_line: 325
+assertion_line: 324
 expression: "dump(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/lexer/ok/keywords.spl
 ---
@@ -36,10 +36,8 @@ KwFor "for"
 Whitespace " "
 KwIn "in"
 Whitespace "\n"
-LineComment "// v0.1's keywords, until the parser stops reading them (syntax_v5_plan.md steps 3 and 4)."
+LineComment "// v0.1's keyword, until the parser stops reading it (syntax_v5_plan.md step 4)."
 Whitespace "\n"
-KwPort "port"
-Whitespace " "
 KwAssume "assume"
 Whitespace "\n"
 LineComment "// Reserved."
@@ -107,6 +105,8 @@ Whitespace " "
 Ident "bench"
 Whitespace " "
 Ident "param"
+Whitespace " "
+Ident "port"
 Whitespace "\n"
 Ident "mode"
 Whitespace " "

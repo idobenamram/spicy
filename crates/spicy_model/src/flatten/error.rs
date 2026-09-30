@@ -201,7 +201,7 @@ impl FlattenProblem {
                 format!("`{root}` has no ground net"),
                 "no net here carries a `Ground` port".to_string(),
                 vec![
-                    "help: add `port gnd: Ground;` and bind the parts' return pins to it"
+                    "help: add a port `gnd: Ground` and bind the parts' return pins to it"
                         .to_string(),
                 ],
             ),

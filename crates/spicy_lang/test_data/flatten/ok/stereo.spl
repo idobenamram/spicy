@@ -1,21 +1,18 @@
 // Two placements of one block (model.md §1): a shared supply, separate bases, and a
 // knob of its own for each placed resistor. `v12` is the only source on its net: a
 // placed block's `Power<In>` is a sink, seen from outside.
-block Amp {
-    port vcc: Power<In>;
-    port gnd: Ground;
-    port input: Analog<In>;
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In> }
+
+circuit Amp {
     net base;
     let r1 = Resistor { a: vcc, b: base, value: 47k ± 1% };
     let r2 = Resistor { a: base, b: gnd, value: 10k ± 1% };
     let c = Capacitor { a: input, b: base, value: 1u };
 }
 
-block Stereo {
-    port v12: Power<In>;
-    port gnd: Ground;
-    port left_in: Analog<In>;
-    port right_in: Analog<In>;
+block Stereo { v12: Power<In>, gnd: Ground, left_in: Analog<In>, right_in: Analog<In> }
+
+circuit Stereo {
     let left = Amp { vcc: v12, gnd, input: left_in };
     let right = Amp { vcc: v12, gnd, input: right_in };
 }

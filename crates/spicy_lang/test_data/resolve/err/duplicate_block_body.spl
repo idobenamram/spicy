@@ -1,9 +1,12 @@
-block A {
-    port p: Pin;
-}
+block A { p: Pin }
 
-// The second `A` isn't part of the design, but its mistakes are still reported.
-block A {
-    port q: Pin;
-    let r = Resistor { a: q, b: nowhere, value: 1k };
+circuit A {}
+
+// A second `block A` and a second `circuit A` aren't part of the design, but their
+// mistakes are still reported: the block's ports, and the circuit's statements against
+// the first block's ports.
+block A { q: Bus }
+
+circuit A {
+    let r = Resistor { a: p, b: nowhere, value: 1k };
 }

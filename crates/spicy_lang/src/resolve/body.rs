@@ -1,4 +1,4 @@
-//! Pass 2 for one block: its body, resolved by a [`BodyResolver`] of its own (as
+//! Pass 2 for one block: its circuit, resolved by a [`BodyResolver`] of its own (as
 //! rust-analyzer lowers each body with its own `ExprCollector`). The body has two passes
 //! of its own: every name it declares ([`BodyResolver::new`]), then every statement
 //! ([`BodyResolver::resolve`]), so statement order never matters (model.md E4).
@@ -21,9 +21,7 @@ use super::{
     BlockBuilder, NameKind, Namespace, ResolveError, ResolveErrorKind, Resolver, Scope, Signature,
     suggest, unknown_name,
 };
-use crate::parser::ast::{
-    self, Body, Expr, ExprKind, Field, Ident, NamedField, Stmt, StmtKind, StructLit,
-};
+use crate::parser::ast::{self, Expr, ExprKind, Field, Ident, Stmt, StmtKind, StructLit};
 
 /// What a name in a block's value namespace is (model.md E5).
 #[derive(Clone, Copy)]
@@ -86,7 +84,7 @@ impl Slots {
 
     /// Whether `field`'s value could go in slot `i`: a pin binds a net (a name), a
     /// field takes a number. A misspelled slot is one whose value fits it.
-    fn fits(self, field: &NamedField, i: usize) -> bool {
+    fn fits(self, field: &Field, i: usize) -> bool {
         let is_name = field
             .value
             .as_ref()
@@ -104,7 +102,7 @@ struct Bindings<'f> {
     /// Each field's value, once given.
     fields: Vec<Option<FieldValue>>,
     /// The fields that name no slot.
-    unknown: Vec<&'f NamedField<'f>>,
+    unknown: Vec<&'f Field<'f>>,
 }
 
 impl Bindings<'_> {
@@ -143,22 +141,22 @@ impl Bindings<'_> {
 
 impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     /// The body's first pass: its value namespace, from the signature's ports and every
-    /// net and instance the body declares. A net is only its name, so declaring it adds
-    /// it to the block (a net can be used before its line); an instance is added when
-    /// its statement is resolved.
+    /// net and instance the circuit's statements (`stmts`, none without a circuit)
+    /// declare. A net is only its name, so declaring it adds it to the block (a net can
+    /// be used before its line); an instance is added when its statement is resolved.
     pub(super) fn new(
         r: &'r mut Resolver<'p, 'src>,
         signatures: &'r [Signature<'src>],
         signature: &Signature<'src>,
         block: BlockBuilder,
-        body: &Body<'src>,
+        stmts: &[Stmt<'src>],
     ) -> Self {
         // Sized once for every name the body declares, so it never rehashes.
         let declares =
             |stmt: &&Stmt| matches!(stmt.kind, StmtKind::Net { .. } | StmtKind::Let { .. });
-        let count = signature.declared.len() + body.stmts.iter().filter(declares).count();
+        let count = signature.ports.declared.len() + stmts.iter().filter(declares).count();
         let mut declared = HashMap::with_capacity(count);
-        for (&name, &(port, at)) in &signature.declared {
+        for (&name, &(port, at)) in &signature.ports.declared {
             declared.insert(name, (ValueName::Net(block.block.port_net(port)), at));
         }
         let mut this = Self {
@@ -167,7 +165,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             r,
             signatures,
         };
-        for stmt in &body.stmts {
+        for stmt in stmts {
             match &stmt.kind {
                 StmtKind::Net { name, .. } => {
                     let net = NetId::new(this.block.block.nets.len());
@@ -195,8 +193,8 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
 
     /// The body's second pass: every statement, each stored if it owns its name.
     /// Returns the finished block and where each part of it was written.
-    pub(super) fn resolve(mut self, body: &Body<'src>) -> (Block, BlockSpans) {
-        for stmt in &body.stmts {
+    pub(super) fn resolve(mut self, stmts: &[Stmt<'src>]) -> (Block, BlockSpans) {
+        for stmt in stmts {
             match &stmt.kind {
                 StmtKind::Net {
                     name,
@@ -226,7 +224,10 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     /// The slot a field named `name` binds on `of`: a pin or port first, then a field.
     fn slot(&self, of: InstanceOf, name: &str) -> Option<usize> {
         match of {
-            InstanceOf::Block(b) => self.signatures[b.index()].get(name).map(|p| p.index()),
+            InstanceOf::Block(b) => self.signatures[b.index()]
+                .ports
+                .get(name)
+                .map(|p| p.index()),
             InstanceOf::Part(kind) => {
                 let pins = kind.pins();
                 let pin = pins.iter().position(|p| *p == name);
@@ -240,7 +241,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     fn slot_names(&self, of: InstanceOf) -> Vec<String> {
         match of {
             InstanceOf::Block(b) => {
-                let mut ports: Vec<_> = self.signatures[b.index()].iter().collect();
+                let mut ports: Vec<_> = self.signatures[b.index()].ports.iter().collect();
                 ports.sort_unstable_by_key(|&(_, port)| port);
                 ports
                     .into_iter()
@@ -262,7 +263,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
 
     /// How many ports block `b` has.
     fn port_count(&self, b: BlockId) -> usize {
-        self.signatures[b.index()].declared.len()
+        self.signatures[b.index()].ports.declared.len()
     }
 
     /// What a value name is, for messages: a port's net is "a port" (model.md E5).
@@ -379,7 +380,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         } = &**lit;
         spans.kind = path.span;
         if let (Some(first), Some(last)) = (generics.first(), generics.last()) {
-            let at = Span::new(first.name.span.start, last.value.span.end);
+            let at = Span::new(first.span.start, last.span.end);
             let what = "generic arguments";
             self.r.report(ResolveErrorKind::Unsupported { what }, at);
         }
@@ -389,11 +390,19 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                 pins: kind.pins().len(),
                 fields: kind.fields(),
             },
-            of @ InstanceOf::Block(b) => Slots {
-                of,
-                pins: self.port_count(b),
-                fields: &[],
-            },
+            of @ InstanceOf::Block(b) => {
+                // Its ports are still bound: the placement is checked as written.
+                if !self.signatures[b.index()].has_circuit {
+                    let block = self.r.path_text(path).to_string();
+                    self.r
+                        .report(ResolveErrorKind::NoCircuit { block }, path.span);
+                }
+                Slots {
+                    of,
+                    pins: self.port_count(b),
+                    fields: &[],
+                }
+            }
             // Reported; its fields aren't checked.
             of @ InstanceOf::Error(_) => return (instance(of, Vec::new(), Vec::new()), spans),
         };
@@ -451,12 +460,6 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             unknown: Vec::new(),
         };
         for field in fields {
-            let Field::Named(field) = field else {
-                let at = field.span();
-                let what = "a transition in a placement";
-                self.r.report(ResolveErrorKind::Unsupported { what }, at);
-                continue;
-            };
             let name = field.name.text;
             let Some(i) = self.slot(slots.of, name) else {
                 b.unknown.push(field);

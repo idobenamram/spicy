@@ -3,11 +3,11 @@
 //! becomes `Error` nodes that keep their spans, and every problem is collected.
 //!
 //! One function per rule of grammar.md §3, in this file's order: `file` → `item` →
-//! `body` → `stmts` → `stmt` → `port_stmt` … `spec_stmt`, then `expr` (`expr.rs`:
-//! `expr_bp` → `unary` → `postfix` → `primary`).
+//! `block_decl` → `port`, or `body` → `stmts` → `stmt` → `net_stmt` … `spec_stmt`, then
+//! `expr` (`expr.rs`: `expr_bp` → `unary` → `postfix` → `primary`).
 //!
 //! How an error travels (decision A8):
-//! - **Fatal:** a rule that can't go on records its error and returns `Err(Fatal)`. `?`
+//! - **Fatal:** a rule that can't go on records its error and returns `Err(Reported)`. `?`
 //!   carries it up to the nearest item or statement loop (`file`, `stmts`), which calls
 //!   `recover` to skip the broken text and stores an `Error` node in its place.
 //! - **Soft:** a problem that doesn't stop the rule (a missing `;`, a statement in the
@@ -21,6 +21,7 @@ mod error;
 mod expr;
 
 pub use error::{ParseError, ParseErrorKind};
+pub use expr::Infix;
 
 use codespan_reporting::diagnostic::Diagnostic;
 
@@ -29,8 +30,8 @@ use spicy_span::Span;
 
 use crate::lexer::{LexError, TokenIdx, TokenKind, Tokens, check, lookalike, scan};
 use ast::{
-    Attribute, BinOp, Body, BodyKind, Expr, ExprKind, File, Ident, Item, ItemKind, Node, Path,
-    Relation, Stmt, StmtKind, Type, TypeKind,
+    Attribute, BinOp, BlockDecl, BlockEntry, Body, BodyKind, Expr, ExprKind, File, Ident, Item,
+    ItemKind, Node, Path, Relation, Stmt, StmtKind, Type, TypeKind,
 };
 use spicy_errors::Render;
 
@@ -175,7 +176,7 @@ impl<'t, 'src> Parser<'t, 'src> {
     // --- Items -------------------------------------------------------------------
 
     /// `file = { item } EOF`. A broken item becomes an `ItemKind::Error` over the text
-    /// skipped up to the next `block` or `contract`.
+    /// skipped up to the next item.
     fn file(&mut self) -> File<'src> {
         let mut items = Vec::new();
         while self.peek() != TokenKind::Eof {
@@ -195,15 +196,28 @@ impl<'t, 'src> Parser<'t, 'src> {
         }
     }
 
-    /// `item = { DOC } { attribute } ( block | contract )`, or `None` when only doc
-    /// comments or attributes are left before the end of the file.
+    /// `item = { DOC } { attribute } [ "pub" ] ( block | circuit | contract )`, or `None`
+    /// when only doc comments or attributes are left before the end of the file. `pub`
+    /// on anything but a block is reported, and the item is read on.
     fn item(&mut self) -> PResult<Option<Item<'src>>> {
         let start = self.span().start;
         let (docs, attrs) = self.docs_and_attrs()?;
+        let public = self.eat(TokenKind::KwPub);
+        if let Some(public) = public
+            && self.peek() != TokenKind::KwBlock
+        {
+            let removal = Span::new(public.start, self.span().start);
+            let error = ParseError::new(ParseErrorKind::PubNotAllowed, public);
+            self.errors.push(error.with_fix(removal, ""));
+        }
         let kind = match self.peek() {
             TokenKind::KwBlock => {
                 self.bump();
-                ItemKind::Block(self.body(BodyKind::Block)?)
+                ItemKind::Block(self.block_decl(public)?)
+            }
+            TokenKind::KwCircuit => {
+                self.bump();
+                ItemKind::Circuit(self.body(BodyKind::Circuit)?)
             }
             TokenKind::KwContract => {
                 self.bump();
@@ -227,33 +241,105 @@ impl<'t, 'src> Parser<'t, 'src> {
         }))
     }
 
-    /// `Name { statements }`, after `block` or `contract`. A missing `}` at the end of
-    /// the file, or before the next item, is reported and the body ends there. A missing
-    /// `{` before the statements is reported with the insertion, and the body is read
-    /// on, so the block keeps its name (a soft error, like a missing `;`).
+    /// `Name { ports }`, after `block`. Each port is `name: Type`, separated by `,`; a
+    /// broken one becomes a `BlockEntry::Error` over the text skipped to the next `,`,
+    /// and the others are kept. The `{` and `}` are handled as a body's are.
+    fn block_decl(&mut self, public: Option<Span>) -> PResult<BlockDecl<'src>> {
+        use TokenKind::{Colon, Comma, DocComment, Ident, Pound};
+        let reported = self.errors.len();
+        let name = self.name()?;
+        let starts_port = |p: &Self| {
+            matches!(p.peek(), DocComment | Pound) || (p.peek() == Ident && p.nth(1) == Colon)
+        };
+        let open = self.open_brace(&name, starts_port)?;
+        let mut ports = Vec::new();
+        while !ends_body(self.peek()) {
+            let start = self.pos;
+            match self.port() {
+                Ok(Some(port)) => ports.push(port),
+                Ok(None) => break,
+                Err(reported) => {
+                    let span = self.recover(start, Level::Entry);
+                    ports.push(error_node(BlockEntry::Error(reported), span));
+                }
+            }
+            self.eat(Comma);
+        }
+        self.close_body(open);
+        let broken = Reported::among(&self.errors[reported..]);
+        Ok(BlockDecl {
+            public,
+            name,
+            ports,
+            broken,
+        })
+    }
+
+    /// `{ DOC } { attribute } name: Type`, up to the `,` or `}` after it, or `None` when
+    /// only doc comments or attributes are left before the `}`. A type that doesn't
+    /// parse becomes a `TypeKind::Error`, and the port keeps its name.
+    fn port(&mut self) -> PResult<Option<Node<'src, BlockEntry<'src>>>> {
+        let start = self.span().start;
+        let (docs, attrs) = self.docs_and_attrs()?;
+        if ends_body(self.peek()) {
+            self.unattached(&docs, &attrs, "a port after the attribute")?;
+            return Ok(None);
+        }
+        let name = self.name()?;
+        self.expect(TokenKind::Colon, "`:`")?;
+        let ty = self.rhs(Level::Entry, Self::ty, |reported, span| Type {
+            kind: TypeKind::Error(reported),
+            span,
+        });
+        Ok(Some(Node {
+            docs,
+            attrs,
+            kind: BlockEntry::Port { name, ty },
+            span: Span::new(start, self.prev_end()),
+        }))
+    }
+
+    /// `Name { statements }`, after `circuit` or `contract`.
     fn body(&mut self, which: BodyKind) -> PResult<Body<'src>> {
         let reported = self.errors.len();
         let name = self.name()?;
-        let open = match self.eat(TokenKind::LBrace) {
-            Some(open) => open,
-            None if starts_stmt(self.peek()) || self.peek() == TokenKind::RBrace => {
-                let at = Span::new(name.span.end, name.span.end);
-                let error = ParseError::new(ParseErrorKind::MissingBrace, name.span);
-                self.errors.push(error.with_fix(at, " {"));
-                at
-            }
-            None => return Err(self.expected("`{`")),
-        };
+        let open = self.open_brace(&name, |p| starts_stmt(p.peek()))?;
         let stmts = self.stmts(which);
-        if self.eat(TokenKind::RBrace).is_none() {
-            self.unclosed(open, "}");
-        }
+        self.close_body(open);
         let broken = Reported::among(&self.errors[reported..]);
         Ok(Body {
             name,
             stmts,
             broken,
         })
+    }
+
+    /// The `{` after an item's name. A missing one, when what follows starts the item's
+    /// contents (`starts_contents`) or is its `}`, is reported with the insertion and
+    /// the item is read on, so it keeps its name (a soft error, like a missing `;`).
+    fn open_brace(
+        &mut self,
+        name: &Ident,
+        starts_contents: impl Fn(&Self) -> bool,
+    ) -> PResult<Span> {
+        if let Some(open) = self.eat(TokenKind::LBrace) {
+            return Ok(open);
+        }
+        if !starts_contents(self) && self.peek() != TokenKind::RBrace {
+            return Err(self.expected("`{`"));
+        }
+        let at = Span::new(name.span.end, name.span.end);
+        let error = ParseError::new(ParseErrorKind::MissingBrace, name.span);
+        self.errors.push(error.with_fix(at, " {"));
+        Ok(at)
+    }
+
+    /// The `}` that closes an item opened at `open`. A missing one at the end of the
+    /// file, or before the next item, is reported, and the item ends there.
+    fn close_body(&mut self, open: Span) {
+        if self.eat(TokenKind::RBrace).is_none() {
+            self.unclosed(open, "}");
+        }
     }
 
     // --- Statements --------------------------------------------------------------
@@ -276,8 +362,8 @@ impl<'t, 'src> Parser<'t, 'src> {
         stmts
     }
 
-    /// `{ DOC } { attribute } ( port | net | let | assume | spec )`, or `None` when only
-    /// doc comments or attributes are left before the end of the body.
+    /// `{ DOC } { attribute } ( net | let | assume | spec )`, or `None` when only doc
+    /// comments or attributes are left before the end of the body.
     fn stmt(&mut self, body: BodyKind) -> PResult<Option<Stmt<'src>>> {
         use TokenKind::*;
         let start = self.span().start;
@@ -295,14 +381,13 @@ impl<'t, 'src> Parser<'t, 'src> {
         }
         // Each reads through its `;`.
         let kind = match keyword {
-            KwPort => self.port_stmt()?,
             KwNet => self.net_stmt()?,
             KwLet => self.let_stmt()?,
             KwAssume => self.assume_stmt()?,
             KwSpec => self.spec_stmt()?,
             kind if is_reserved(kind) => return Err(self.reserved()),
             _ => {
-                return Err(self.expected("a statement (`port`, `net`, `let`, `assume` or `spec`)"));
+                return Err(self.expected("a statement (`net`, `let`, `assume` or `spec`)"));
             }
         };
         Ok(Some(Stmt {
@@ -313,24 +398,12 @@ impl<'t, 'src> Parser<'t, 'src> {
         }))
     }
 
-    /// `port name: Type;`
-    fn port_stmt(&mut self) -> PResult<StmtKind<'src>> {
-        self.bump(); // `port`
-        let name = self.name()?;
-        self.expect(TokenKind::Colon, "`:`")?;
-        let ty = self.rhs(Self::ty, |reported, span| Type {
-            kind: TypeKind::Error(reported),
-            span,
-        });
-        Ok(StmtKind::Port { name, ty })
-    }
-
     /// `net name;` or `net name = merge;`
     fn net_stmt(&mut self) -> PResult<StmtKind<'src>> {
         self.bump(); // `net`
         let name = self.name()?;
         let merge = match self.eat(TokenKind::Eq) {
-            Some(_) => Some(self.rhs(Self::expr, error_expr)),
+            Some(_) => Some(self.rhs(Level::Value, Self::expr, error_expr)),
             None => {
                 self.semi()?;
                 None
@@ -344,28 +417,43 @@ impl<'t, 'src> Parser<'t, 'src> {
         self.bump(); // `let`
         let name = self.name()?;
         self.expect(TokenKind::Eq, "`=`")?;
-        let value = self.rhs(Self::expr, error_expr);
+        let value = self.rhs(Level::Value, Self::expr, error_expr);
         Ok(StmtKind::Let { name, value })
     }
 
-    /// A statement's right-hand side, then its `;`. When the value doesn't parse, or
-    /// something other than `;` follows it (`let z = 1 2;`), it becomes an `Error` node
-    /// over the text up to the statement's end, and the statement keeps its name: `net
-    /// base = [g g];` still declares `base`, so its uses aren't reported again (rustc:
-    /// "we still want a field even if its expr didn't parse").
+    /// A right-hand side, then what ends it: a statement's value and its `;`
+    /// (`Level::Value`), or a port's type and the `,` or `}` after it (`Level::Entry`).
+    /// When the value doesn't parse, or something else follows it (`let z = 1 2;`), it
+    /// becomes an `Error` node over the text up to the end, and its statement or port
+    /// keeps its name: `net base = [g g];` still declares `base`, so its uses aren't
+    /// reported again (rustc: "we still want a field even if its expr didn't parse").
     fn rhs<T>(
         &mut self,
+        level: Level,
         parse: impl FnOnce(&mut Self) -> PResult<T>,
         error: impl FnOnce(Reported, Span) -> T,
     ) -> T {
         let start = self.pos;
-        let value = parse(self).and_then(|value| self.semi().map(|()| value));
+        let value = parse(self).and_then(|value| self.end_of(level).map(|()| value));
         value.unwrap_or_else(|reported| {
-            let span = self.recover(start, Level::Value);
-            // The statement's `;`, if it has one: recovery stops before it.
-            self.eat(TokenKind::Semi);
+            let span = self.recover(start, level);
+            // The statement's `;`, if it has one: recovery stops before it. (An entry's
+            // `,` is its list's.)
+            if level == Level::Value {
+                self.eat(TokenKind::Semi);
+            }
             error(reported, span)
         })
+    }
+
+    /// What ends a right-hand side at `level` (see `rhs`): a statement's `;`, or the `,`
+    /// or `}` after an entry, which the entry's list reads.
+    fn end_of(&mut self, level: Level) -> PResult<()> {
+        match level {
+            Level::Value => self.semi(),
+            _ if self.peek() == TokenKind::Comma || ends_body(self.peek()) => Ok(()),
+            _ => Err(self.expected("`,` or `}`")),
+        }
     }
 
     /// `assume relation;`
@@ -431,12 +519,8 @@ impl<'t, 'src> Parser<'t, 'src> {
         }
         let next = self.peek();
         if starts_stmt(next) || ends_body(next) {
-            let end = self.prev_end();
             let last = self.span_at(self.pos - 1);
-            self.errors.push(
-                ParseError::new(ParseErrorKind::MissingSemi, last)
-                    .with_fix(Span::new(end, end), ";"),
-            );
+            self.error_inserting(ParseErrorKind::MissingSemi, last, ";");
             return Ok(());
         }
         Err(self.expected("`;`"))
@@ -444,16 +528,17 @@ impl<'t, 'src> Parser<'t, 'src> {
 
     // --- Recovery ----------------------------------------------------------------
 
-    /// Skips the rest of a broken statement or item that started at `start` and returns
-    /// the span of everything it covered (decision A8). It scans again from `start`, so
-    /// brackets opened before the error are known.
+    /// Skips the rest of a broken statement, item or entry that started at `start` and
+    /// returns the span of everything it covered (decision A8). It scans again from
+    /// `start`, so brackets opened before the error are known, and stops at the first of
+    /// its four rules that holds (in the loop, one match arm each).
     ///
     /// Brackets opened *before* the error point are assumed broken: a statement or item
     /// keyword at or after the error ends the statement even inside them, so an unclosed
     /// `Resistor {` doesn't swallow the rest of the block. Brackets opened *after* the
-    /// error are skipped whole (`for i in 0..N { … }`). A `;` ends the statement when no
-    /// bracket is open, and a `}` that closes the enclosing body ends it too. At least
-    /// one token is always consumed (unless at the end), so callers' loops progress.
+    /// error are skipped whole (`for i in 0..N { … }`). A statement's or item's first
+    /// token is always consumed (unless at the end), so callers' loops progress; a value
+    /// or an entry may be empty, and its list reads the `,` or `}` it stopped at.
     fn recover(&mut self, start: usize, level: Level) -> Span {
         use TokenKind::*;
         let failed_at = self.pos;
@@ -463,40 +548,47 @@ impl<'t, 'src> Parser<'t, 'src> {
             "`nested` restores the count, even on errors"
         );
         // Brackets open at the current token: `{` split by whether it was opened before
-        // or after the error; `(` and `[` only keep a `;` inside them from ending the
-        // statement.
+        // or after the error; `(` and `[` only keep a `;` or `,` inside them from ending
+        // the statement or entry.
         let (mut braces_before, mut braces_after, mut parens) = (0u32, 0u32, 0u32);
         while self.peek() != Eof {
-            let kind = self.peek();
-            let before_error = self.pos < failed_at;
-            // Never at `start` for a statement or item, so its first token is always
-            // consumed; a value may be empty (`let r =` before the next statement).
-            let at_or_after_error = !before_error && (self.pos > start || level == Level::Value);
-            // The next statement or item starts here.
-            if at_or_after_error && braces_after == 0 && level.resumes_at(kind) {
-                break;
-            }
-            // This statement ends here.
-            if level != Level::Item && braces_before == 0 && braces_after == 0 {
-                match kind {
-                    // The `}` that closes the body.
-                    RBrace => break,
-                    // The statement's `;`: a statement's recovery takes it, a value's
-                    // leaves it to its statement.
-                    Semi if parens == 0 => {
-                        if level == Level::Stmt {
-                            self.bump();
-                        }
-                        break;
-                    }
-                    // Strictly after the error: `let x = /// doc` isn't restarted at the
-                    // doc comment it failed on.
-                    DocComment | Pound if self.pos > failed_at => break,
-                    _ => {}
-                }
-            }
+            let (kind, at) = (self.peek(), self.pos);
+            // With no brace open: between items, or between a body's statements.
+            let outside = braces_before == 0 && braces_after == 0;
+            let in_body = outside && level != Level::Item;
+            // The four places it stops; no token fits more than one.
             match kind {
-                LBrace if before_error => braces_before += 1,
+                // 1. Before the next statement or item: at or after the error, outside the
+                // braces opened after it. Not at a statement's or item's own first token,
+                // so that is always consumed; a value or an entry may be empty (`let r =`
+                // before the next statement).
+                _ if level.resumes_at(kind)
+                    && at >= failed_at
+                    && braces_after == 0
+                    && (at > start || matches!(level, Level::Value | Level::Entry)) =>
+                {
+                    break;
+                }
+                // 2. Before the `}` that closes the body.
+                RBrace if in_body => break,
+                // 3. Before the doc comments and attributes of what comes next, which
+                // keeps them: strictly after the error, so `let x = /// doc` isn't
+                // restarted at the doc comment it failed on.
+                DocComment | Pound if outside && at > failed_at => break,
+                // 4. At the end of a statement (`;`) or an entry (`,`), with no bracket
+                // open: a statement's recovery takes its `;`; a value's leaves it to its
+                // statement, and an entry's `,` is its list's.
+                _ if in_body && parens == 0 && level.ends_at(kind) => {
+                    if level == Level::Stmt {
+                        self.bump();
+                    }
+                    break;
+                }
+                _ => {}
+            }
+            // Otherwise it's skipped, and the brackets it opens or closes are counted.
+            match kind {
+                LBrace if at < failed_at => braces_before += 1,
                 LBrace => braces_after += 1,
                 RBrace if braces_after > 0 => braces_after -= 1,
                 RBrace => braces_before = braces_before.saturating_sub(1),
@@ -529,10 +621,10 @@ impl<'t, 'src> Parser<'t, 'src> {
             kind if is_reserved(kind) => Err(self.reserved()),
             kind if is_keyword(kind) => {
                 let keyword = self.text().to_string();
+                let reported = self.fail(ParseErrorKind::KeywordAsName { keyword });
                 // Consumed, so recovery doesn't read it as the start of a statement.
-                let span = self.bump();
-                let kind = ParseErrorKind::KeywordAsName { keyword };
-                Err(ParseError::new(kind, span).report(&mut self.errors))
+                self.bump();
+                Err(reported)
             }
             _ => Err(self.expected("a name")),
         }
@@ -617,17 +709,17 @@ impl<'t, 'src> Parser<'t, 'src> {
         close: TokenKind,
         mut item: impl FnMut(&mut Self) -> PResult<T>,
     ) -> PResult<Vec<T>> {
-        let (closer, _, after_item) = closer_names(close);
         let mut out = Vec::new();
-        while self.eat(close).is_none() {
-            if self.peek() == TokenKind::Eof {
-                return Err(self.unclosed_or_expected(open, closer, after_item));
-            }
+        // Items, each followed by a `,` or the closer.
+        while self.peek() != close && self.peek() != TokenKind::Eof {
             out.push(item(self)?);
-            // After an item, a `,` or the closer.
-            if self.eat(TokenKind::Comma).is_none() && self.peek() != close {
-                return Err(self.unclosed_or_expected(open, closer, after_item));
+            if self.eat(TokenKind::Comma).is_none() {
+                break;
             }
+        }
+        if self.eat(close).is_none() {
+            let (closer, _, after_item) = closer_names(close);
+            return Err(self.unclosed_or_expected(open, closer, after_item));
         }
         Ok(out)
     }
@@ -655,11 +747,27 @@ impl<'t, 'src> Parser<'t, 'src> {
 
     // --- Errors ------------------------------------------------------------------
     //
-    // As Zig's `warn` and `fail`: `error_here` records a soft error at the current
-    // token, `fail` records one and returns the `Fatal` that unwinds.
+    // As Zig's `warn` and `fail`: the `error…` functions record a soft error, and parsing
+    // goes on; `fail` records one and returns the proof that unwinds (`Err(Reported)`).
 
     fn error(&mut self, kind: ParseErrorKind, span: Span) {
         self.errors.push(ParseError::new(kind, span));
+    }
+
+    /// Records a soft error at `span` whose fix inserts `text` right after it (the `;`
+    /// missing after a statement), and returns where `text` goes.
+    fn error_inserting(&mut self, kind: ParseErrorKind, span: Span, text: &'static str) -> Span {
+        let at = Span::new(span.end, span.end);
+        let error = ParseError::new(kind, span);
+        self.errors.push(error.with_fix(at, text));
+        at
+    }
+
+    /// Records a soft error at `span` whose fix writes `text` in its place (`..=` for `..`),
+    /// as every lexer fix does (`check::fixed`).
+    fn error_replacing(&mut self, kind: ParseErrorKind, span: Span, text: &'static str) {
+        let error = ParseError::new(kind, span);
+        self.errors.push(error.with_fix(span, text));
     }
 
     /// Records a soft error at the current token.
@@ -805,21 +913,37 @@ fn error_expr<'src>(reported: Reported, span: Span) -> Expr<'src> {
     }
 }
 
-/// Where `recover` resynchronizes: at the next statement or at the next item.
+/// What `recover` skips, which decides where it stops.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Level {
+    /// A whole item, up to the next one.
     Item,
+    /// A whole statement, through its `;` or up to the next statement or item.
     Stmt,
-    /// A statement's right-hand side: the rest of the statement, up to its `;`.
+    /// A statement's right-hand side: the rest of the statement, up to its `;`, which is
+    /// left to the statement. Unlike a statement, it may be empty.
     Value,
+    /// An entry of a comma list in braces (a block's port), or the rest of it after its
+    /// name: up to the next `,` or the `}`.
+    Entry,
 }
 
 impl Level {
     /// Whether `kind` starts what comes next at this level.
     fn resumes_at(self, kind: TokenKind) -> bool {
         match self {
-            Level::Item => starts_item(kind),
+            Level::Item | Level::Entry => starts_item(kind),
             Level::Stmt | Level::Value => starts_item(kind) || is_stmt_keyword(kind),
+        }
+    }
+
+    /// Whether `kind` ends what this level skips, with no bracket open: a statement's
+    /// `;`, an entry's `,`. (In an entry, a `;` is only skipped.)
+    fn ends_at(self, kind: TokenKind) -> bool {
+        match self {
+            Level::Item => false,
+            Level::Stmt | Level::Value => kind == TokenKind::Semi,
+            Level::Entry => kind == TokenKind::Comma,
         }
     }
 }
@@ -831,8 +955,8 @@ fn closer_names(close: TokenKind) -> (&'static str, &'static str, &'static str) 
         TokenKind::RParen => (")", "`)`", "`,` or `)`"),
         TokenKind::RBracket => ("]", "`]`", "`,` or `]`"),
         TokenKind::RBrace => ("}", "`}`", "`,` or `}`"),
-        // `A<B, C>`, the only other list.
-        _ => (">", "`>`", "`,` or `>`"),
+        TokenKind::Gt => (">", "`>`", "`,` or `>`"),
+        _ => unreachable!("{close:?} closes nothing"),
     }
 }
 
@@ -867,7 +991,6 @@ fn is_keyword(kind: TokenKind) -> bool {
             | KwEnv
             | KwConst
             | KwPub
-            | KwPort
             | KwNet
             | KwLet
             | KwAssume
@@ -887,24 +1010,24 @@ pub(super) fn is_reserved(kind: TokenKind) -> bool {
     use TokenKind::*;
     matches!(
         kind,
-        KwReserved | KwCircuit | KwSetup | KwEnv | KwConst | KwPub | KwRated | KwEnsure | KwFor
+        KwReserved | KwSetup | KwEnv | KwConst | KwRated | KwEnsure | KwFor
     )
 }
 
 fn starts_item(kind: TokenKind) -> bool {
-    matches!(kind, TokenKind::KwBlock | TokenKind::KwContract)
+    use TokenKind::*;
+    matches!(kind, KwPub | KwBlock | KwCircuit | KwContract)
 }
 
 fn is_stmt_keyword(kind: TokenKind) -> bool {
     use TokenKind::*;
-    matches!(kind, KwPort | KwNet | KwLet | KwAssume | KwSpec)
+    matches!(kind, KwNet | KwLet | KwAssume | KwSpec)
 }
 
 /// Which body a statement belongs in (`let` goes in both, so it has none).
 fn home_body(keyword: TokenKind) -> Option<(&'static str, BodyKind)> {
     match keyword {
-        TokenKind::KwPort => Some(("port", BodyKind::Block)),
-        TokenKind::KwNet => Some(("net", BodyKind::Block)),
+        TokenKind::KwNet => Some(("net", BodyKind::Circuit)),
         TokenKind::KwAssume => Some(("assume", BodyKind::Contract)),
         TokenKind::KwSpec => Some(("spec", BodyKind::Contract)),
         _ => None,
@@ -981,21 +1104,21 @@ mod tests {
     fn deep_and_long_input_does_not_overflow() {
         let cases = [
             format!(
-                "block B {{ port p: {}B{}; }}",
+                "block B {{ p: {}B{} }}",
                 "A<".repeat(20_000),
                 ">".repeat(20_000)
             ),
-            format!("block B {{ port p: {}B; }}", "A<".repeat(20_000)),
-            format!("block B {{ let x = a{}; }}", " + a".repeat(100_000)),
-            format!("block B {{ let x = a{}; }}", ".b".repeat(100_000)),
-            format!("block B {{ let x = f{}; }}", "()".repeat(100_000)),
-            format!("block B {{ let x = {}1; }}", "- ".repeat(20_000)),
+            format!("block B {{ p: {}B }}", "A<".repeat(20_000)),
+            format!("circuit B {{ let x = a{}; }}", " + a".repeat(100_000)),
+            format!("circuit B {{ let x = a{}; }}", ".b".repeat(100_000)),
+            format!("circuit B {{ let x = f{}; }}", "()".repeat(100_000)),
+            format!("circuit B {{ let x = {}1; }}", "- ".repeat(20_000)),
             format!(
-                "block B {{ let x = {}1{}; }}",
+                "circuit B {{ let x = {}1{}; }}",
                 "[".repeat(20_000),
                 "]".repeat(20_000)
             ),
-            format!("block B {{ let x = {}; }}", "R { a: ".repeat(20_000)),
+            format!("circuit B {{ let x = {}; }}", "R { a: ".repeat(20_000)),
         ];
         for src in &cases {
             let parsed = parse(src);
@@ -1016,19 +1139,19 @@ mod tests {
         // early, letting such trees reach twice the limit).
         for src in [
             format!(
-                "block B {{ let x = a{}{}; }}",
+                "circuit B {{ let x = a{}{}; }}",
                 ".b".repeat(600),
                 " + a".repeat(600)
             ),
             format!(
-                "block B {{ let x = -a{}{}; }}",
+                "circuit B {{ let x = -a{}{}; }}",
                 ".b".repeat(600),
                 " + a".repeat(600)
             ),
             // A chain grows above an operand already parsed: the second review found
             // `(…)` here pushed 600 levels down without an error.
             format!(
-                "block B {{ let x = a + (a{}){}; }}",
+                "circuit B {{ let x = a + (a{}){}; }}",
                 " + a".repeat(600),
                 " + a".repeat(600)
             ),
@@ -1044,7 +1167,7 @@ mod tests {
             );
         }
         // Below the limits, long chains are fine.
-        let sum = format!("block B {{ let x = a{}; }}", " + a".repeat(500));
+        let sum = format!("circuit B {{ let x = a{}; }}", " + a".repeat(500));
         assert!(parse(&sum).errors.is_empty());
     }
 
@@ -1062,8 +1185,9 @@ mod tests {
         assert!(elapsed.as_secs_f64() < 5.0, "took {elapsed:?}");
     }
 
-    /// Red team: every suggested fix, applied on its own, must remove the error it was
-    /// offered for (an editor or the AI applies fixes without a second look).
+    /// Red team: every suggested fix, applied on its own, removes the error it was
+    /// offered for and adds none (an editor or the AI applies fixes without a second
+    /// look), as resolve's fixes do.
     #[test]
     fn fixes_remove_their_error() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data");
@@ -1076,6 +1200,7 @@ mod tests {
                 }
                 let src = read(&path);
                 let parsed = parse(&src);
+                let before = problem_names(&src);
                 let fixes = parsed
                     .lex_errors
                     .iter()
@@ -1089,24 +1214,34 @@ mod tests {
                 for (name, fix) in fixes {
                     let mut fixed = src.clone();
                     fixed.replace_range(fix.span.range(), &fix.replacement);
-                    let again = parse(&fixed);
-                    let still = again
-                        .lex_errors
-                        .iter()
-                        .map(|e| (e.kind.name(), e.span.start))
-                        .chain(again.errors.iter().map(|e| (e.kind.name(), e.span.start)))
-                        .any(|(n, start)| n == name && start == fix.span.start);
-                    assert!(
-                        !still,
-                        "{}: fix {:?} for {name} didn't remove it",
+                    let mut expected = before.clone();
+                    let at = expected.iter().position(|&n| n == name).unwrap();
+                    expected.remove(at);
+                    assert_eq!(
+                        problem_names(&fixed),
+                        expected,
+                        "{}: fix {:?} for {name} at {}..{}",
                         path.display(),
-                        fix.replacement
+                        fix.replacement,
+                        fix.span.start,
+                        fix.span.end,
                     );
                     checked += 1;
                 }
             }
         }
         assert!(checked > 20, "only {checked} fixes checked");
+    }
+
+    /// Every lexer and parser problem of `src`, by name, sorted.
+    fn problem_names(src: &str) -> Vec<&'static str> {
+        let parsed = parse(src);
+        let lex = parsed.lex_errors.iter().map(|e| e.kind.name());
+        let mut names: Vec<&'static str> = lex
+            .chain(parsed.errors.iter().map(|e| e.kind.name()))
+            .collect();
+        names.sort_unstable();
+        names
     }
 
     /// Red team: both readings offered for an ambiguous `±` must parse without the
@@ -1151,13 +1286,26 @@ mod tests {
 
     /// A compact view of a parse, for the tests below: each item and statement as
     /// `kind "text"` (nested under its item), and each parse error as `Kind "text"`.
+    /// The invariants are checked on the way, so every source the tests write is.
     fn outline(src: &str) -> (Vec<String>, Vec<String>) {
+        check_parse_invariants(src);
         let parsed = parse(src);
         let text = |span: Span| src[span.range()].to_string();
         let mut nodes = Vec::new();
         for item in &parsed.file.items {
             let (kind, body) = match &item.kind {
-                ItemKind::Block(b) => ("block", Some(b)),
+                ItemKind::Block(decl) => {
+                    nodes.push(format!("block {}", decl.name.text));
+                    for port in &decl.ports {
+                        let kind = match port.kind {
+                            BlockEntry::Port { .. } => "port",
+                            BlockEntry::Error(_) => "port-error",
+                        };
+                        nodes.push(format!("  {kind} {:?}", text(port.span)));
+                    }
+                    continue;
+                }
+                ItemKind::Circuit(b) => ("circuit", Some(b)),
                 ItemKind::Contract(b) => ("contract", Some(b)),
                 ItemKind::Error(_) => ("item-error", None),
             };
@@ -1167,7 +1315,6 @@ mod tests {
             }
             for stmt in body.map_or(&[][..], |b| &b.stmts) {
                 let kind = match stmt.kind {
-                    StmtKind::Port { .. } => "port",
                     StmtKind::Net { .. } => "net",
                     StmtKind::Let { .. } => "let",
                     StmtKind::Assume { .. } => "assume",
@@ -1214,33 +1361,33 @@ mod tests {
         type Make = fn(usize) -> String;
         let cases: [(&str, usize, Make); 8] = [
             ("parens", 128, |n| {
-                format!("block B {{ let x = {}1{}; }}", "(".repeat(n), ")".repeat(n))
+                format!(
+                    "circuit B {{ let x = {}1{}; }}",
+                    "(".repeat(n),
+                    ")".repeat(n)
+                )
             }),
             ("minus", 128, |n| {
-                format!("block B {{ let x = {}1; }}", "- ".repeat(n))
+                format!("circuit B {{ let x = {}1; }}", "- ".repeat(n))
             }),
             ("types", 128, |n| {
-                format!(
-                    "block B {{ port p: {}B{}; }}",
-                    "A<".repeat(n),
-                    ">".repeat(n)
-                )
+                format!("block B {{ p: {}B{} }}", "A<".repeat(n), ">".repeat(n))
             }),
             ("attribute args", 128, |n| {
                 format!("#[a({}1{})] block B {{ }}", "(".repeat(n), ")".repeat(n))
             }),
             ("sum", 1024, |n| {
-                format!("block B {{ let x = a{}; }}", " + a".repeat(n))
+                format!("circuit B {{ let x = a{}; }}", " + a".repeat(n))
             }),
             ("fields", 1024, |n| {
-                format!("block B {{ let x = a{}; }}", ".b".repeat(n))
+                format!("circuit B {{ let x = a{}; }}", ".b".repeat(n))
             }),
             ("calls", 1024, |n| {
-                format!("block B {{ let x = f{}; }}", "()".repeat(n))
+                format!("circuit B {{ let x = f{}; }}", "()".repeat(n))
             }),
             ("minus, fields and sum", 512, |n| {
                 format!(
-                    "block B {{ let x = -a{}{}; }}",
+                    "circuit B {{ let x = -a{}{}; }}",
                     ".b".repeat(n),
                     " + a".repeat(n)
                 )
@@ -1259,46 +1406,54 @@ mod tests {
     fn follow_on_filter() {
         let none: [&str; 0] = [];
         // Right after the lexer error, across a space.
-        assert_eq!(errors("block A { let x = 1. ; }"), none);
+        assert_eq!(errors("circuit A { let x = 1. ; }"), none);
         // Everything after an unterminated comment, even two unclosed constructs.
-        assert_eq!(errors("block A { let x = f(1, /* never"), none);
+        assert_eq!(errors("circuit A { let x = f(1, /* never"), none);
         // An error before the comment is kept.
         assert_eq!(
-            errors("block A { let x = 1 /* never"),
+            errors("circuit A { let x = 1 /* never"),
             ["MissingSemi \"1\""]
         );
         // A later mistake, past other lexer errors, is kept.
         assert_eq!(
-            errors("block A { let a = .5; let b = c − d; let e = f g; }"),
+            errors("circuit A { let a = .5; let b = c − d; let e = f g; }"),
             ["Expected `;` \"g\""]
         );
     }
 
     /// Review: every list takes a trailing comma or none, may be empty (except type
-    /// arguments), names its own closer when a separator is missing, and reports an
-    /// unclosed list at the end of the file.
+    /// arguments, and generic arguments, which only `< name =` starts), names its own
+    /// closer when a separator is missing, and reports an unclosed list at the end of
+    /// the file.
     #[test]
     fn lists() {
         let none: [&str; 0] = [];
         for ok in [
-            "block A { let x = f(); let y = f(1, 2); let z = f(1, 2,); }",
-            "block A { let x = []; let y = [a, b]; let z = [a, b,]; }",
-            "block A { let x = R {}; let y = R { a: b, c }; let z = R { a: b, }; }",
-            "#[a()] #[b(1, 2)] #[c(1,)] block A { port p: A<B, C>; port q: A<B,>; }",
+            "circuit A { let x = f(); let y = f(1, 2); let z = f(1, 2,); }",
+            "circuit A { let x = f(a: 1, b: 2,); }",
+            "circuit A { let x = []; let y = [a, b]; let z = [a, b,]; }",
+            "circuit A { let x = R {}; let y = R { a: b, c }; let z = R { a: b, }; }",
+            "circuit A { let x = G<A = 1> {}; let y = G<A = 1, B = 2,> {}; }",
+            "#[a()] #[b(1, 2)] #[c(1,)] block A { p: A<B, C>, q: A<B,> }",
         ] {
             assert_eq!(errors(ok), none, "{ok}");
         }
         for (src, expected) in [
-            ("block A { let x = f(1 2); }", "Expected `,` or `)` \"2\""),
-            ("block A { let x = [1 2]; }", "Expected `,` or `]` \"2\""),
+            ("circuit A { let x = f(1 2); }", "Expected `,` or `)` \"2\""),
+            ("circuit A { let x = [1 2]; }", "Expected `,` or `]` \"2\""),
             (
-                "block A { let x = R { a: b c }; }",
+                "circuit A { let x = R { a: b c }; }",
                 "Expected `,` or `}` \"c\"",
             ),
-            ("block A { port p: A<B C>; }", "Expected `,` or `>` \"C\""),
-            ("block A { port p: A<>; }", "Expected a type \">\""),
-            ("block A { let x = f(1,", "Unclosed )"),
-            ("block A { let x = [1", "Unclosed ]"),
+            ("block A { p: A<B C> }", "Expected `,` or `>` \"C\""),
+            (
+                "circuit A { let x = G<A = 1 B = 2> {}; }",
+                "Expected `,` or `>` \"B\"",
+            ),
+            ("block A { p: A<> }", "Expected a type \">\""),
+            ("circuit A { let x = f(1,", "Unclosed )"),
+            ("circuit A { let x = [1", "Unclosed ]"),
+            ("circuit A { let x = G<A = 1", "Unclosed >"),
             ("#[a(1", "Unclosed )"),
             ("#[a", "Unclosed ]"),
         ] {
@@ -1306,26 +1461,28 @@ mod tests {
         }
     }
 
-    /// Every closer outside a list (`)` of a parenthesis, `]` of an attribute, `}` of a
-    /// body) reports "expected" when something else is there, and `Unclosed`, pointing
-    /// at its opener, at the end of the file. Constructs left open at the end give one
-    /// error, the innermost's.
+    /// Every closer outside a list (`)` of a parenthesis, `]` of an index or an
+    /// attribute, `}` of a body) reports "expected" when something else is there, and
+    /// `Unclosed`, pointing at its opener, at the end of the file. Constructs left open
+    /// at the end give one error, the innermost's.
     #[test]
     fn closers() {
         for (src, expected) in [
-            ("block A { let x = (1 2); }", &["Expected `)` \"2\""][..]),
-            ("block A { let x = (1", &["Unclosed )"]),
+            ("circuit A { let x = (1 2); }", &["Expected `)` \"2\""][..]),
+            ("circuit A { let x = (1", &["Unclosed )"]),
+            ("circuit A { let x = m[s t]; }", &["Expected `]` \"t\""]),
+            ("circuit A { let x = m[s", &["Unclosed ]"]),
             ("#[a b] block A { }", &["Expected `]` \"b\""]),
             ("#[a(1) b] block A { }", &["Expected `]` \"b\""]),
-            ("block A { net a;", &["Unclosed }"]),
-            ("block A { net a; contract A { }", &["Unclosed }"]),
-            ("block A { let x = f(1, [2", &["Unclosed ]"]),
-            ("block A { let x = R { a: (1", &["Unclosed )"]),
+            ("circuit A { net a;", &["Unclosed }"]),
+            ("circuit A { net a; contract A { }", &["Unclosed }"]),
+            ("circuit A { let x = f(1, [2", &["Unclosed ]"]),
+            ("circuit A { let x = R { a: (1", &["Unclosed )"]),
         ] {
             assert_eq!(errors(src), expected, "{src}");
         }
         // The related span is the opener.
-        let src = "block A { let x = f(1, [2";
+        let src = "circuit A { let x = f(1, [2";
         let parsed = parse(src);
         let related = parsed.errors[0].related.expect("an opener");
         assert_eq!(&src[related.range()], "[");
@@ -1338,16 +1495,16 @@ mod tests {
         let cases: [(&str, &[&str], &[&str]); 8] = [
             // A lone `;` is consumed, so the loop progresses.
             (
-                "block A { ; net ok; }",
-                &["block A", "  error \";\"", "  net \"net ok;\""],
-                &["Expected a statement (`port`, `net`, `let`, `assume` or `spec`) \";\""],
+                "circuit A { ; net ok; }",
+                &["circuit A", "  error \";\"", "  net \"net ok;\""],
+                &["Expected a statement (`net`, `let`, `assume` or `spec`) \";\""],
             ),
             // A `{` opened before the error is assumed broken: the next keyword ends
             // the statement inside it, and the body's `}` still closes the body.
             (
-                "block A { let r = R { a: 1 2 net ok; }",
+                "circuit A { let r = R { a: 1 2 net ok; }",
                 &[
-                    "block A",
+                    "circuit A",
                     "  let \"let r = R { a: 1 2\"",
                     "  net \"net ok;\"",
                 ],
@@ -1355,9 +1512,9 @@ mod tests {
             ),
             // A `{` opened after the error is skipped whole, keywords and all.
             (
-                "block A { for x { net inner; } net ok; }",
+                "circuit A { for x { net inner; } net ok; }",
                 &[
-                    "block A",
+                    "circuit A",
                     "  error \"for x { net inner; }\"",
                     "  net \"net ok;\"",
                 ],
@@ -1365,21 +1522,25 @@ mod tests {
             ),
             // An attribute the statement failed on doesn't restart it.
             (
-                "block A { let x = #[a] 1; net ok; }",
-                &["block A", "  let \"let x = #[a] 1;\"", "  net \"net ok;\""],
+                "circuit A { let x = #[a] 1; net ok; }",
+                &[
+                    "circuit A",
+                    "  let \"let x = #[a] 1;\"",
+                    "  net \"net ok;\"",
+                ],
                 &["Expected an expression \"#\""],
             ),
             // A keyword used as a name is skipped, not read as the next statement.
             (
-                "block A { let net = 1; net ok; }",
-                &["block A", "  error \"let net = 1;\"", "  net \"net ok;\""],
+                "circuit A { let net = 1; net ok; }",
+                &["circuit A", "  error \"let net = 1;\"", "  net \"net ok;\""],
                 &["KeywordAsName \"net\""],
             ),
             // A doc comment after the error starts the next statement, which keeps it.
             (
-                "block A { let x = fn\n/// doc\nnet ok; }",
+                "circuit A { let x = fn\n/// doc\nnet ok; }",
                 &[
-                    "block A",
+                    "circuit A",
                     "  let \"let x = fn\"",
                     "  net \"/// doc\\nnet ok;\" (doc)",
                 ],
@@ -1388,9 +1549,9 @@ mod tests {
             // A value that breaks leaves its statement, and the name it declares:
             // `base` is still a net, so its uses aren't reported again.
             (
-                "block A { net base = [g g]; net ok; }",
+                "circuit A { net base = [g g]; net ok; }",
                 &[
-                    "block A",
+                    "circuit A",
                     "  net \"net base = [g g];\"",
                     "  net \"net ok;\"",
                 ],
@@ -1399,9 +1560,83 @@ mod tests {
             // An empty value before the next statement is empty, inside its statement
             // (found by fuzzing: it was placed at the next statement).
             (
-                "block A { let j =\n    let k = 1; }",
-                &["block A", "  let \"let j =\"", "  let \"let k = 1;\""],
+                "circuit A { let j =\n    let k = 1; }",
+                &["circuit A", "  let \"let j =\"", "  let \"let k = 1;\""],
                 &["Expected an expression \"let\""],
+            ),
+        ];
+        for (src, nodes, errs) in cases {
+            let (got_nodes, got_errors) = outline(src);
+            assert_eq!(got_nodes, nodes, "{src}");
+            assert_eq!(got_errors, errs, "{src}");
+        }
+    }
+
+    /// Review: item recovery skips to the next item (so one error for `net x; fn f() …`),
+    /// but not to one inside braces opened after the error.
+    #[test]
+    fn item_recovery() {
+        let (nodes, errs) = outline("net x; fn f() { block inner {} } circuit A { net ok; }");
+        assert_eq!(
+            nodes,
+            [
+                "item-error \"net x; fn f() { block inner {} }\"",
+                "circuit A",
+                "  net \"net ok;\"",
+            ]
+        );
+        assert_eq!(errs, ["ExpectedItem \"net\""]);
+        // The next item keeps the doc comment and attribute written above it, as a
+        // statement does (the flow review found they were skipped with the broken text,
+        // and lost without a word). Inside braces opened after the error, they're skipped.
+        let src = "net x;\n/// The amp.\n#[a]\nblock A { }";
+        let parsed = parse(src);
+        let [broken, block] = &parsed.file.items[..] else {
+            panic!("{:#?}", parsed.file.items);
+        };
+        assert_eq!(&src[broken.span.range()], "net x;");
+        assert_eq!((block.docs.len(), block.attrs.len()), (1, 1));
+        assert_eq!(errors(src), ["ExpectedItem \"net\""]);
+        let src = "fn f() { /// inner\n #[a] } block A { }";
+        assert_eq!(
+            outline(src).0[0],
+            "item-error \"fn f() { /// inner\\n #[a] }\""
+        );
+    }
+
+    /// Review: what port recovery skips and where it stops, one rule per case. A broken
+    /// port ends at the next `,` or the `}` (a `;` is skipped), and a port whose type
+    /// doesn't parse keeps its name.
+    #[test]
+    fn port_recovery() {
+        let cases: [(&str, &[&str], &[&str]); 5] = [
+            (
+                "block A { a Pin, b: Pin }",
+                &["block A", "  port-error \"a Pin\"", "  port \"b: Pin\""],
+                &["Expected `:` \"Pin\""],
+            ),
+            (
+                "block A { a: , b: Pin }",
+                &["block A", "  port \"a:\"", "  port \"b: Pin\""],
+                &["Expected a name \",\""],
+            ),
+            // A `,` inside brackets opened after the error doesn't end the port.
+            (
+                "block A { a: X Y(c, d), b: Pin }",
+                &["block A", "  port \"a: X Y(c, d)\"", "  port \"b: Pin\""],
+                &["Expected `,` or `}` \"Y\""],
+            ),
+            // `;` between ports, as between statements, is skipped with the rest.
+            (
+                "block A { a: Pin; b: Pin }",
+                &["block A", "  port \"a: Pin; b: Pin\""],
+                &["Expected `,` or `}` \";\""],
+            ),
+            // A header left open ends at the next item.
+            (
+                "block A { a: Pin, circuit A {}",
+                &["block A", "  port \"a: Pin\"", "circuit A"],
+                &["Unclosed }"],
             ),
         ];
         for (src, nodes, errs) in cases {
@@ -1412,30 +1647,14 @@ mod tests {
         }
     }
 
-    /// Review: item recovery skips to the next `block` or `contract` (so one error for
-    /// `port x; fn f() …`), but not to one inside braces opened after the error.
-    #[test]
-    fn item_recovery() {
-        let (nodes, errs) = outline("port x; fn f() { block inner {} } block A { net ok; }");
-        assert_eq!(
-            nodes,
-            [
-                "item-error \"port x; fn f() { block inner {} }\"",
-                "block A",
-                "  net \"net ok;\"",
-            ]
-        );
-        assert_eq!(errs, ["ExpectedItem \"port\""]);
-    }
-
     /// Pieces for random input: mostly the language's own tokens, so the parser gets
     /// deep into its rules, plus some noise.
     const PIECES: &[&str] = &[
-        "block", "contract", "port", "net", "let", "assume", "spec", "in", "fn", " A", " r1",
-        " vcc", "Resistor", "{", "}", "(", ")", "[", "]", "<", ">", "<=", ">=", ",", ";", ":",
-        "::", ".", "..", "..=", "=", "+", "-", "*", "/", "±", "#", "?", " 47k", " 1%", " 3",
-        " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%", "\"", "α", "within", "->",
-        "\"s\"", "<A =",
+        "block", "circuit", "contract", "pub", "net", "let", "assume", "spec", "in", "fn", " A",
+        " r1", " vcc", "Resistor", "{", "}", "(", ")", "[", "]", "<", ">", "<=", ">=", ",", ";",
+        ":", "::", ".", "..", "..=", "=", "+", "-", "*", "/", "±", "#", "?", " 47k", " 1%", " 3",
+        " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%", "\"", "α", "within", "\"s\"",
+        "<A =",
     ];
 
     #[test]
@@ -1464,12 +1683,13 @@ mod tests {
             .items
             .iter()
             .map(|item| match &item.kind {
-                ItemKind::Block(b) => ("block", b.stmts.len()),
+                ItemKind::Block(decl) => ("block", decl.ports.len()),
+                ItemKind::Circuit(b) => ("circuit", b.stmts.len()),
                 ItemKind::Contract(b) => ("contract", b.stmts.len()),
                 ItemKind::Error(_) => ("error", 0),
             })
             .collect();
-        assert_eq!(counts, [("block", 12), ("contract", 6)]);
+        assert_eq!(counts, [("block", 4), ("circuit", 8), ("contract", 6)]);
         insta::assert_snapshot!(dump_parse("ce_amp.spl", src));
     }
 

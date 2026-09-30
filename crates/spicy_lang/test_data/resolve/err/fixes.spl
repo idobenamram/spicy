@@ -1,8 +1,8 @@
 // Every fix here is the single right answer: applied alone, it removes its error and
 // adds none (see `fixes_remove_their_error`).
-block A {
-    port vcc: Pin;
-    port gnd: Ground;
+block A { vcc: Pin, gnd: Ground }
+
+circuit A {
     net bb;
     net n1;
     let n2 = Resistor { a: vcc, b: gnd, value: 1k };

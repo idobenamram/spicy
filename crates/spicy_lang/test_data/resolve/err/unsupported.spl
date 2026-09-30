@@ -1,10 +1,10 @@
-// Parsed, but not resolved yet: generic arguments at a placement, and a transition as a
-// field. The rest of the placement is still checked (`s` is missing `b`).
-block A {
-    port p: Pin;
-    port n: Pin;
+// Parsed, but not resolved yet: generic arguments at a placement. The rest of the
+// placement is still checked (`s` is missing `b`).
+block A { p: Pin, n: Pin }
+
+circuit A {
     let r = Resistor<N = 2> { a: p, b: n, value: 1k };
-    let s = Resistor { a: p, 1 -> 2, value: 1k };
+    let s = Resistor<N = 2> { a: p, value: 1k };
     // The other new forms are values resolve doesn't take in a placement.
     let t = Resistor { a: p, b: n, value: ..=1k };
     let u = Resistor { a: p, b: n, value: "1k" };

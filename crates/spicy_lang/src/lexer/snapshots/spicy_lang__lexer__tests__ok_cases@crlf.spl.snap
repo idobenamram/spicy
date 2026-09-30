@@ -1,9 +1,17 @@
 ---
 source: crates/spicy_lang/src/lexer/mod.rs
+assertion_line: 324
 expression: "dump(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/lexer/ok/crlf.spl
 ---
 KwBlock "block"
+Whitespace " "
+Ident "A"
+Whitespace " "
+LBrace "{"
+RBrace "}"
+Whitespace "\r\n\r\n"
+KwCircuit "circuit"
 Whitespace " "
 Ident "A"
 Whitespace " "

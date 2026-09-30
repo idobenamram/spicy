@@ -10,8 +10,8 @@ use spicy_errors::{Diag, DiagKind, Render, render_plain};
 
 use crate::lexer::{LexError, TokenKind, check, scan};
 use crate::parser::ast::{
-    Arg, Attribute, Expr, ExprKind, Field, File, Item, ItemKind, Path, Relation, Stmt, StmtKind,
-    Transition, Type, TypeKind,
+    Arg, Attribute, BlockDecl, BlockEntry, Expr, ExprKind, File, Item, ItemKind, Path, Relation,
+    Stmt, StmtKind, Type, TypeKind,
 };
 use crate::parser::parse;
 
@@ -265,16 +265,22 @@ pub fn dump_parse(file_name: &str, src: &str) -> String {
 }
 
 /// Prints the tree, one line per node, and checks every node's span on the way: well
-/// formed, and inside its parent's. Nodes without a line of their own (names, paths) are
-/// checked too, and items and statements come in order without overlapping.
+/// formed, inside its parent's, and after the sibling before it (siblings come in
+/// order, without overlapping). Parts without a line of their own (names, paths and
+/// their segments) are checked the same way, in their place among the siblings.
 struct Printer<'a> {
     src: &'a str,
     out: String,
-    /// The spans of the nodes whose children are being printed, outermost first. Its
-    /// length is the indent.
-    parents: Vec<Span>,
-    /// The span of the last line printed: the parent of what `nested` prints.
-    last: Span,
+    /// The nodes whose children are being checked, outermost first. Its length is the
+    /// indent.
+    parents: Vec<Parent>,
+}
+
+/// A node whose children are being checked.
+struct Parent {
+    span: Span,
+    /// Where the next child may start: the end of the last one checked.
+    next: u32,
 }
 
 impl<'a> Printer<'a> {
@@ -283,32 +289,53 @@ impl<'a> Printer<'a> {
             src,
             out: String::new(),
             parents: Vec::new(),
-            last: Span::new(0, 0),
         }
     }
 
-    /// Checks a span that belongs inside `parent`.
-    fn check(&self, span: Span, parent: Span) {
+    /// Checks the span of the next child of the current parent: well formed, inside
+    /// the parent, and after the child before it.
+    fn check(&mut self, span: Span) {
         check_span(self.src, span, "node");
+        let Some(parent) = self.parents.last_mut() else {
+            return;
+        };
         assert!(
-            parent.start <= span.start && span.end <= parent.end,
-            "span {span:?} inside its parent {parent:?}"
+            parent.span.start <= span.start && span.end <= parent.span.end,
+            "span {span:?} inside its parent {:?}",
+            parent.span
         );
+        assert!(
+            parent.next <= span.start,
+            "span {span:?} after its previous sibling, which ends at {}",
+            parent.next
+        );
+        parent.next = span.end;
     }
 
-    /// Checks a path and its segments, inside `parent`.
-    fn check_path(&self, path: &Path, parent: Span) {
-        self.check(path.span, parent);
-        for seg in &path.segments {
-            self.check(seg.span, path.span);
-        }
+    /// Runs `children` with `span` as the parent: what they check lies inside it, in
+    /// order.
+    fn inside(&mut self, span: Span, children: impl FnOnce(&mut Self)) {
+        self.parents.push(Parent {
+            span,
+            next: span.start,
+        });
+        children(self);
+        self.parents.pop();
     }
 
+    /// A path and its segments, as the next child.
+    fn path(&mut self, path: &Path) {
+        self.check(path.span);
+        self.inside(path.span, |p| {
+            for seg in &path.segments {
+                p.check(seg.span);
+            }
+        });
+    }
+
+    /// One line, as the next child: `label start..end`, then the text if there is one.
     fn write(&mut self, label: &str, span: Span, text: Option<&str>) {
-        if let Some(&parent) = self.parents.last() {
-            self.check(span, parent);
-        }
-        self.last = span;
+        self.check(span);
         let _ = write!(
             self.out,
             "{:indent$}{label} {}..{}",
@@ -323,8 +350,10 @@ impl<'a> Printer<'a> {
         self.out.push('\n');
     }
 
-    fn line(&mut self, label: &str, span: Span) {
+    /// A node's line, then its children, indented under it.
+    fn node(&mut self, label: &str, span: Span, children: impl FnOnce(&mut Self)) {
         self.write(label, span, None);
+        self.inside(span, children);
     }
 
     /// A line that also shows the node's text (leaves and errors).
@@ -333,61 +362,78 @@ impl<'a> Printer<'a> {
         self.write(label, span, Some(&src[span.range()]));
     }
 
-    /// Prints `f`'s lines as children of the last line.
-    fn nested(&mut self, f: impl FnOnce(&mut Self)) {
-        self.parents.push(self.last);
-        f(self);
-        self.parents.pop();
-    }
-
     fn file(&mut self, file: &File) {
-        self.line("File", file.span);
-        siblings(file.items.iter().map(|i| i.span));
-        self.nested(|p| {
+        self.node("File", file.span, |p| {
             for item in &file.items {
                 p.item(item);
             }
         });
     }
 
+    /// The doc comments and attributes before an item or a statement, in source order:
+    /// the tree keeps them in two lists, and they may interleave (`/// a #[x] /// b`).
     fn docs_attrs(&mut self, docs: &[Span], attrs: &[Attribute]) {
-        for &d in docs {
-            self.leaf("Doc", d);
-        }
+        let mut docs = docs.iter().copied().peekable();
         for a in attrs {
-            self.line(&format!("Attr {}", path_text(&a.path)), a.span);
-            self.check_path(&a.path, a.span);
-            self.nested(|p| {
+            while let Some(d) = docs.next_if(|d| d.start < a.span.start) {
+                self.leaf("Doc", d);
+            }
+            self.node(&format!("Attr {}", path_text(&a.path)), a.span, |p| {
+                p.path(&a.path);
                 for e in a.args.iter().flatten() {
                     p.expr(e);
                 }
             });
         }
+        for d in docs {
+            self.leaf("Doc", d);
+        }
     }
 
     fn item(&mut self, item: &Item) {
         let (label, body) = match &item.kind {
-            ItemKind::Block(b) => ("Block", b),
+            ItemKind::Block(decl) => return self.block_decl(item, decl),
+            ItemKind::Circuit(b) => ("Circuit", b),
             ItemKind::Contract(b) => ("Contract", b),
             ItemKind::Error(_) => {
                 self.leaf("ItemError", item.span);
                 return;
             }
         };
-        self.line(&format!("{label} {}", body.name.text), item.span);
-        self.check(body.name.span, item.span);
-        siblings(body.stmts.iter().map(|s| s.span));
-        self.nested(|p| {
+        self.node(&format!("{label} {}", body.name.text), item.span, |p| {
             p.docs_attrs(&item.docs, &item.attrs);
+            p.check(body.name.span);
             for stmt in &body.stmts {
                 p.stmt(stmt);
             }
         });
     }
 
+    fn block_decl(&mut self, item: &Item, decl: &BlockDecl) {
+        let public = if decl.public.is_some() { "pub " } else { "" };
+        let label = format!("{public}Block {}", decl.name.text);
+        self.node(&label, item.span, |p| {
+            p.docs_attrs(&item.docs, &item.attrs);
+            if let Some(public) = decl.public {
+                p.check(public);
+            }
+            p.check(decl.name.span);
+            for port in &decl.ports {
+                let BlockEntry::Port { name, ty } = &port.kind else {
+                    p.leaf("PortError", port.span);
+                    continue;
+                };
+                p.node(&format!("Port {}", name.text), port.span, |p| {
+                    p.docs_attrs(&port.docs, &port.attrs);
+                    p.check(name.span);
+                    p.ty(ty);
+                });
+            }
+        });
+    }
+
     fn stmt(&mut self, stmt: &Stmt) {
         let (label, name) = match &stmt.kind {
-            StmtKind::Port { name, .. } => (format!("Port {}", name.text), Some(name)),
             StmtKind::Net { name, .. } => (format!("Net {}", name.text), Some(name)),
             StmtKind::Let { name, .. } => (format!("Let {}", name.text), Some(name)),
             StmtKind::Assume { relation } => (format!("Assume {:?}", relation.op), None),
@@ -399,14 +445,12 @@ impl<'a> Printer<'a> {
                 return;
             }
         };
-        self.line(&label, stmt.span);
-        if let Some(name) = name {
-            self.check(name.span, stmt.span);
-        }
-        self.nested(|p| {
+        self.node(&label, stmt.span, |p| {
             p.docs_attrs(&stmt.docs, &stmt.attrs);
+            if let Some(name) = name {
+                p.check(name.span);
+            }
             match &stmt.kind {
-                StmtKind::Port { ty, .. } => p.ty(ty),
                 StmtKind::Net { merge, .. } => {
                     if let Some(e) = merge {
                         p.expr(e);
@@ -421,6 +465,7 @@ impl<'a> Printer<'a> {
         });
     }
 
+    /// The two sides, as children of the statement: a relation has no span of its own.
     fn relation(&mut self, r: &Relation) {
         self.expr(&r.lhs);
         self.expr(&r.rhs);
@@ -432,8 +477,8 @@ impl<'a> Printer<'a> {
             return;
         };
         self.leaf(&format!("Type {}", path_text(path)), ty.span);
-        self.check_path(path, ty.span);
-        self.nested(|p| {
+        self.inside(ty.span, |p| {
+            p.path(path);
             for arg in args {
                 p.ty(arg);
             }
@@ -451,118 +496,87 @@ impl<'a> Printer<'a> {
             }
             ExprKind::Path(path) => {
                 self.leaf(&format!("Path {}", path_text(path)), e.span);
-                self.check_path(path, e.span);
+                self.inside(e.span, |p| p.path(path));
             }
             ExprKind::Str(_) => self.leaf("Str", e.span),
             ExprKind::Error(_) => self.leaf("ExprError", e.span),
             ExprKind::StructLit(lit) => {
-                self.line(&format!("StructLit {}", path_text(&lit.path)), e.span);
-                self.check_path(&lit.path, e.span);
-                self.nested(|p| {
+                let label = format!("StructLit {}", path_text(&lit.path));
+                self.node(&label, e.span, |p| {
+                    p.path(&lit.path);
                     for g in &lit.generics {
-                        let span = Span::new(g.name.span.start, g.value.span.end);
-                        p.line(&format!("Generic {}", g.name.text), span);
-                        p.check(g.name.span, span);
-                        p.nested(|p| p.expr(&g.value));
+                        p.node(&format!("Generic {}", g.name.text), g.span, |p| {
+                            p.check(g.name.span);
+                            p.expr(&g.value);
+                        });
                     }
                     for f in &lit.fields {
-                        match f {
-                            Field::Named(f) => {
-                                let shorthand = if f.value.is_none() {
-                                    " (shorthand)"
-                                } else {
-                                    ""
-                                };
-                                p.line(&format!("Field {}{shorthand}", f.name.text), f.span);
-                                p.check(f.name.span, f.span);
-                                if let Some(v) = &f.value {
-                                    p.nested(|p| p.expr(v));
-                                }
+                        let shorthand = if f.value.is_none() {
+                            " (shorthand)"
+                        } else {
+                            ""
+                        };
+                        let label = format!("Field {}{shorthand}", f.name.text);
+                        p.node(&label, f.span, |p| {
+                            p.check(f.name.span);
+                            if let Some(v) = &f.value {
+                                p.expr(v);
                             }
-                            Field::Transition(t) => p.transition(t),
-                        }
+                        });
                     }
                 });
             }
-            ExprKind::Paren(inner) => {
-                self.line("Paren", e.span);
-                self.nested(|p| p.expr(inner));
-            }
-            ExprKind::Neg(inner) => {
-                self.line("Neg", e.span);
-                self.nested(|p| p.expr(inner));
-            }
-            ExprKind::Array(items) => {
-                self.line("Array", e.span);
-                self.nested(|p| {
-                    for item in items {
-                        p.expr(item);
-                    }
-                });
-            }
+            ExprKind::Paren(inner) => self.node("Paren", e.span, |p| p.expr(inner)),
+            ExprKind::Neg(inner) => self.node("Neg", e.span, |p| p.expr(inner)),
+            ExprKind::Array(items) => self.node("Array", e.span, |p| {
+                for item in items {
+                    p.expr(item);
+                }
+            }),
             ExprKind::Field { base, name } => {
-                self.line(&format!("Field .{}", name.text), e.span);
-                self.check(name.span, e.span);
-                self.nested(|p| p.expr(base));
+                self.node(&format!("Field .{}", name.text), e.span, |p| {
+                    p.expr(base);
+                    p.check(name.span);
+                });
             }
-            ExprKind::Call { callee, args } => {
-                self.line("Call", e.span);
-                self.nested(|p| {
-                    p.expr(callee);
-                    for a in args {
-                        match a {
-                            Arg::Positional(v) => p.expr(v),
-                            Arg::Named { name, value } => {
-                                let span = Span::new(name.span.start, value.span.end);
-                                p.line(&format!("Arg {}", name.text), span);
-                                p.check(name.span, span);
-                                p.nested(|p| p.expr(value));
-                            }
-                            Arg::Transition(t) => p.transition(t),
+            ExprKind::Call { callee, args } => self.node("Call", e.span, |p| {
+                p.expr(callee);
+                for a in args {
+                    match a {
+                        Arg::Positional(v) => p.expr(v),
+                        Arg::Named { name, value, span } => {
+                            p.node(&format!("Arg {}", name.text), *span, |p| {
+                                p.check(name.span);
+                                p.expr(value);
+                            });
                         }
                     }
-                });
-            }
-            ExprKind::Index { base, index } => {
-                self.line("Index", e.span);
-                self.nested(|p| {
-                    p.expr(base);
-                    p.expr(index);
-                });
-            }
+                }
+            }),
+            ExprKind::Index { base, index } => self.node("Index", e.span, |p| {
+                p.expr(base);
+                p.expr(index);
+            }),
             ExprKind::Binary { op, lhs, rhs } => {
-                self.line(&format!("Binary {op:?}"), e.span);
-                self.nested(|p| {
+                self.node(&format!("Binary {op:?}"), e.span, |p| {
                     p.expr(lhs);
                     p.expr(rhs);
+                })
+            }
+            // The label shows which ends it has.
+            ExprKind::Range { lo, hi } => {
+                let label = match (lo, hi) {
+                    (Some(_), Some(_)) => "Range a..=b",
+                    (None, _) => "Range ..=b",
+                    (_, None) => "Range a..",
+                };
+                self.node(label, e.span, |p| {
+                    for end in lo.iter().chain(hi) {
+                        p.expr(end);
+                    }
                 });
             }
-            ExprKind::RangeTo(end) => {
-                self.line("RangeTo", e.span);
-                self.nested(|p| p.expr(end));
-            }
-            ExprKind::RangeFrom(start) => {
-                self.line("RangeFrom", e.span);
-                self.nested(|p| p.expr(start));
-            }
         }
-    }
-
-    fn transition(&mut self, t: &Transition) {
-        self.line("Transition", t.span);
-        self.nested(|p| {
-            p.expr(&t.from);
-            p.expr(&t.to);
-        });
-    }
-}
-
-/// Siblings come in order, without overlapping.
-fn siblings(spans: impl Iterator<Item = Span>) {
-    let mut prev_end = 0;
-    for s in spans {
-        assert!(s.start >= prev_end, "siblings in order, without overlap");
-        prev_end = s.end;
     }
 }
 

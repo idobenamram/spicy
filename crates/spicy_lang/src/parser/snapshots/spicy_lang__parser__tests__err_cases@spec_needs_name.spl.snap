@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/spec_needs_name.spl
 ---
@@ -9,7 +9,7 @@ File 0..79
     StmtError 17..47 "spec dc(out.v) within 1V..=2V;"
     Spec ok Within 52..76
       Path x 61..62 "x"
-      Binary Range 70..75
+      Range a..=b 70..75
         Quantity 1e0 70..71 "1"
         Quantity 2e0 74..75 "2"
 

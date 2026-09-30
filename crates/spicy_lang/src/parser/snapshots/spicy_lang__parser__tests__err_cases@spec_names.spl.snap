@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/spec_names.spl
 ---
@@ -11,7 +11,7 @@ File 0..129
     StmtError 75..97 "spec g x within 1..=2;"
     Spec ok Within 102..126
       Path x 111..112 "x"
-      Binary Range 120..125
+      Range a..=b 120..125
         Quantity 1e0 120..121 "1"
         Quantity 2e0 124..125 "2"
 

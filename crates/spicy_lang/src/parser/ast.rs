@@ -58,38 +58,60 @@ pub struct Node<'src, K> {
     pub span: Span,
 }
 
-/// One top-level item: a `block` or a `contract`.
+/// One top-level item: a `block`, a `circuit` or a `contract`.
 pub type Item<'src> = Node<'src, ItemKind<'src>>;
 
-/// What an item is. `block` and `contract` share their shape (a name and a list of
-/// statements); which statements are allowed in which is checked by the parser
-/// (`WrongBody`).
+/// What an item is. A block is its interface; its `circuit` and its `contract`, each
+/// named after it, are a name and a list of statements. Which statements are allowed in
+/// which body is checked by the parser (`WrongBody`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum ItemKind<'src> {
-    /// `block CeAmp { … }`: ports, nets and the parts inside.
-    Block(Body<'src>),
+    /// `pub block CeAmp { vcc: Power<In>, … }`: the ports, what a placement binds.
+    Block(BlockDecl<'src>),
+    /// `circuit CeAmp { … }`: the nets and the parts inside the block.
+    Circuit(Body<'src>),
     /// `contract CeAmp { … }`: the block's assumptions, measures and specs (language §8).
     Contract(Body<'src>),
     /// Text at the top level that couldn't be parsed as an item; the item's span covers
-    /// all of it, up to the next `block` or `contract`.
+    /// all of it, up to the next item.
     Error(Reported),
 }
 
-/// Which kind of body, without the body: the tag of `ItemKind::Block` and
+/// `[pub] block Name { ports }`, after the doc comments and attributes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BlockDecl<'src> {
+    /// The `pub`, if it's written. A single file has no outside yet, so nothing reads it.
+    pub public: Option<Span>,
+    pub name: Ident<'src>,
+    pub ports: Vec<Node<'src, BlockEntry<'src>>>,
+    /// The proof, if parsing the header reported an error, as [`Body::broken`].
+    pub broken: Option<Reported>,
+}
+
+/// One entry of a block's header.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BlockEntry<'src> {
+    /// `vcc: Power<In>`: a connection point on the block's boundary.
+    Port { name: Ident<'src>, ty: Type<'src> },
+    /// An entry that couldn't be parsed; its span covers the skipped text.
+    Error(Reported),
+}
+
+/// Which kind of body, without the body: the tag of `ItemKind::Circuit` and
 /// `ItemKind::Contract`, for code that needs to know which one it's in (the parser's
 /// `WrongBody` check) but not to hold it. Kept apart rather than folded into `ItemKind`
 /// (as rustc keeps `DefKind` apart from `ItemKind`), so matching an item stays
-/// `ItemKind::Block(body)`.
+/// `ItemKind::Circuit(body)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BodyKind {
-    Block,
+    Circuit,
     Contract,
 }
 
-/// `Name { statements }`: the part of a `block` or `contract` after its keyword.
+/// `Name { statements }`: the part of a `circuit` or `contract` after its keyword.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Body<'src> {
-    /// The block's name. A contract uses the name of the block it describes.
+    /// The name of the block it implements or describes.
     pub name: Ident<'src>,
     pub stmts: Vec<Stmt<'src>>,
     /// The proof, if parsing it reported an error: then something written may be
@@ -116,8 +138,6 @@ pub type Stmt<'src> = Node<'src, StmtKind<'src>>;
 /// What a statement is (grammar.md §3).
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind<'src> {
-    /// `port vcc: Power<In>;`: a connection point on the block's boundary.
-    Port { name: Ident<'src>, ty: Type<'src> },
     /// `net base;` declares an internal node; `net x = [a, b];` merges existing ones
     /// (`merge` is the right-hand side).
     Net {
@@ -179,8 +199,8 @@ pub enum TypeKind<'src> {
         path: Path<'src>,
         args: Vec<Type<'src>>,
     },
-    /// A type that couldn't be parsed (`port a: ;`). The port keeps its name, so its
-    /// uses aren't reported again.
+    /// A type that couldn't be parsed (`a: ,`). The port keeps its name, so its uses
+    /// aren't reported again.
     Error(Reported),
 }
 
@@ -234,32 +254,35 @@ pub enum ExprKind<'src> {
     },
     /// `-3dB`, `-x`
     Neg(Box<Expr<'src>>),
-    /// `a + b`, `12V ± 5%`, `4.5V..=6.5V`, `x within r`: every binary operator, including
-    /// tolerances and ranges (which are values, not special syntax).
+    /// `a + b`, `12V ± 5%`, `x within r`: every binary operator, including tolerances
+    /// (which are values, not special syntax).
     Binary {
         op: BinOp,
         lhs: Box<Expr<'src>>,
         rhs: Box<Expr<'src>>,
     },
-    /// `..=0.5Ω`: a range with no lower end.
-    RangeTo(Box<Expr<'src>>),
-    /// `10kΩ..`: a range with no upper end.
-    RangeFrom(Box<Expr<'src>>),
+    /// `4.5V..=6.5V`, or with an end left out: `..=0.5Ω` has no lower end, `10kΩ..` no
+    /// upper end. Never both: `..` alone isn't a range. One node for all three, as
+    /// rustc's `ExprKind::Range`.
+    Range {
+        lo: Option<Box<Expr<'src>>>,
+        hi: Option<Box<Expr<'src>>>,
+    },
     /// A value that couldn't be parsed, over the text skipped to the end of its
     /// statement: the statement keeps its name (`net base = [g g];` still declares
-    /// `base`). Or a number or string the lexer rejected (`47q`), which the lexer
-    /// reported.
+    /// `base`). Or a number the lexer rejected (`47q`), or a string it found
+    /// unterminated, which the lexer reported. A string with an unknown escape is still
+    /// a `Str`.
     Error(Reported),
 }
 
-/// Binary operators, loosest first (grammar.md §4.1).
+/// Binary operators, loosest first (grammar.md §4.1). `..=`, between `Rel` and `Tol`,
+/// builds an [`ExprKind::Range`] instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
     /// A comparison: `within`, `<`, `<=`, `>`, `>=`. Only valid at the top of an `assume`
     /// or `spec`, which takes it out as a typed [`Relation`].
     Rel(RelOp),
-    /// `..=`
-    Range,
     /// `±`, `+/-`
     Tol,
     Add,
@@ -283,41 +306,17 @@ pub struct StructLit<'src> {
 pub struct GenericArg<'src> {
     pub name: Ident<'src>,
     pub value: Expr<'src>,
-}
-
-/// One element of a struct literal.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Field<'src> {
-    /// `a: vcc`, `value: 47k ± 1%`, or the shorthand `gnd`.
-    Named(NamedField<'src>),
-    /// `5mA -> 30mA` in `Step { 5mA -> 30mA, edge: 1us }`.
-    Transition(Box<Transition<'src>>),
-}
-
-impl Field<'_> {
-    pub fn span(&self) -> Span {
-        match self {
-            Field::Named(field) => field.span,
-            Field::Transition(transition) => transition.span,
-        }
-    }
-}
-
-/// A pin binding (`a: vcc`), a parameter (`value: 47k ± 1%`), or the shorthand `gnd` for
-/// `gnd: gnd`.
-#[derive(Clone, Debug, PartialEq)]
-pub struct NamedField<'src> {
-    pub name: Ident<'src>,
-    /// `None` for the shorthand: the value is the net with the same name.
-    pub value: Option<Expr<'src>>,
     pub span: Span,
 }
 
-/// `from -> to`: what a step or a sweep goes between.
+/// One field of a struct literal: a pin binding (`a: vcc`), a parameter
+/// (`value: 47k ± 1%`, `from: 5mA` in a `Step`), or the shorthand `gnd` for `gnd: gnd`.
+/// Every field is named: a shape has no positional parts.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Transition<'src> {
-    pub from: Expr<'src>,
-    pub to: Expr<'src>,
+pub struct Field<'src> {
+    pub name: Ident<'src>,
+    /// `None` for the shorthand: the value is the net with the same name.
+    pub value: Option<Expr<'src>>,
     pub span: Span,
 }
 
@@ -330,7 +329,6 @@ pub enum Arg<'src> {
     Named {
         name: Ident<'src>,
         value: Expr<'src>,
+        span: Span,
     },
-    /// `4.5V -> 3.0V` in `Sweep(4.5V -> 3.0V)`.
-    Transition(Box<Transition<'src>>),
 }

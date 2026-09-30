@@ -9,7 +9,7 @@
 //! per level the same way).
 //!
 //! **Innermost:** a `Power<Out>` passed up a level is one source: a supply block that
-//! exports its regulator's output (`let reg = Reg { out: v5, … }`, `port v5:
+//! exports its regulator's output (`let reg = Reg { out: v5, … }`, with a port `v5:
 //! Power<Out>`) puts two `Power<Out>` members on the net, `sup.v5` and `sup.reg.out`.
 //! So only the innermost members of a net count ([`Replay`]): a placed block's port
 //! with a member behind it, inside the block, is passing that one on, as KiCad counts a

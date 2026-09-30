@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/placements.spl
 ---
@@ -27,39 +28,39 @@ root Two
   Resistor c.load.r a→c.rail b→gnd value=1000 Ω
 
 --- errors ---
-W-isolated IsolatedNets 315..316 "x"
-W-isolated IsolatedNets 315..316 "x"
-E-power NoSource 351..360 "vcc: rail"
-W-short ShortedPart 426..477 "let short = Resistor { a: gnd, b: gnd, value: 1k };"
+W-isolated IsolatedNets 321..322 "x"
+W-isolated IsolatedNets 321..322 "x"
+E-power NoSource 357..366 "vcc: rail"
+W-short ShortedPart 432..483 "let short = Resistor { a: gnd, b: gnd, value: 1k };"
 
 --- rendered ---
 warning[W-isolated]: `x` and `y` are connected to nothing that reaches ground (in `Mid`)
-   --> placements.spl:12:9
+   --> placements.spl:13:9
    |
-12 |     net x;
+13 |     net x;
    |         ^ isolated
    |
    = note: a simulation can't solve an isolated net
 
 warning[W-isolated]: `x` and `y` are connected to nothing that reaches ground (in `Mid`)
-   --> placements.spl:12:9
+   --> placements.spl:13:9
    |
-12 |     net x;
+13 |     net x;
    |         ^ isolated
    |
    = note: a simulation can't solve an isolated net
 
 error[E-power]: nothing powers net `rail` (in `Mid`)
-   --> placements.spl:14:23
+   --> placements.spl:15:23
    |
-14 |     let load = Load { vcc: rail, gnd };
+15 |     let load = Load { vcc: rail, gnd };
    |                       ^^^^^^^^^ needs a power source
    |
    = note: `load.vcc` takes power from it
    = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
 
 warning[W-short]: both pins of `short` are on one net (in `Mid`)
-   --> placements.spl:16:5
+   --> placements.spl:17:5
    |
-16 |     let short = Resistor { a: gnd, b: gnd, value: 1k };
+17 |     let short = Resistor { a: gnd, b: gnd, value: 1k };
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted

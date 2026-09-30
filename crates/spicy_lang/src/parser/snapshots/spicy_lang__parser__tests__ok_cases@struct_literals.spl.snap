@@ -1,67 +1,70 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 957
+assertion_line: 1072
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/struct_literals.spl
 ---
-File 0..676
-  Block S 0..675
-    Let a 81..131
-      StructLit Step 89..130
-        Transition 96..107
-          Quantity 5e-3 A 96..99 "5mA"
-          Quantity 3e-2 A 103..107 "30mA"
-        Field edge 109..118
-          Quantity 1e-6 s 115..118 "1us"
-        Field at 120..128
-          Quantity 5e-5 s 124..128 "50us"
-    Let b 136..187
-      StructLit Step 144..186
-        Field on 151..160
-          Field .i 155..160
-            Path vdd 155..158 "vdd"
-        Transition 162..173
-          Quantity 5e-3 A 162..165 "5mA"
-          Quantity 3e-2 A 169..173 "30mA"
-        Field edge 175..184
-          Quantity 1e-6 s 181..184 "1us"
-    Let c 192..223
-      StructLit Step 200..222
-        Transition 207..220
-          Field .v 207..211
-            Path lo 207..209 "lo"
-          Neg 215..220
-            Field .v 216..220
-              Path hi 216..218 "hi"
-    Let d 393..445
-      StructLit GainStage 401..444
-        Generic A 411..422
-          Path Mcp6001 415..422 "Mcp6001"
-        Field vin 426..437
-          Path sensor 431..437 "sensor"
-        Field gnd (shorthand) 439..442
-    Let e 450..500
-      StructLit GainStage 458..499
-        Generic A 468..479
-          Path Mcp6001 472..479 "Mcp6001"
-        Generic GAIN 481..494
-          Binary Mul 488..494
-            Quantity 2e0 488..489 "2"
-            Quantity 1e1 492..494 "10"
-    Let f 505..531
-      StructLit G 513..530
-        Generic N 515..526
-          Paren 519..526
-            Binary Rel(Gt) 520..525
-              Path a 520..521 "a"
-              Path b 524..525 "b"
-    Let g 536..550
-      Binary Rel(Lt) 544..549
-        Path x 544..545 "x"
-        Path y 548..549 "y"
-    Let h 616..673
-      StructLit Note 624..672
-        Field text 631..659
-          Str 637..659 "\"a \\\"quoted\\\" \\\\ word\""
-        Field empty 661..670
-          Str 668..670 "\"\""
+File 0..722
+  Block S 0..10
+  Circuit S 12..721
+    Let a 91..149
+      StructLit Step 99..148
+        Field from 106..115
+          Quantity 5e-3 A 112..115 "5mA"
+        Field to 117..125
+          Quantity 3e-2 A 121..125 "30mA"
+        Field edge 127..136
+          Quantity 1e-6 s 133..136 "1us"
+        Field at 138..146
+          Quantity 5e-5 s 142..146 "50us"
+    Let b 154..213
+      StructLit Step 162..212
+        Field on 169..178
+          Field .i 173..178
+            Path vdd 173..176 "vdd"
+        Field from 180..189
+          Quantity 5e-3 A 186..189 "5mA"
+        Field to 191..199
+          Quantity 3e-2 A 195..199 "30mA"
+        Field edge 201..210
+          Quantity 1e-6 s 207..210 "1us"
+    Let c 218..269
+      StructLit Sweep 226..268
+        Field from 234..244
+          Quantity 4.5e0 V 240..244 "4.5V"
+        Field to 246..254
+          Quantity 3e0 V 250..254 "3.0V"
+        Field step 256..266
+          Quantity 1e-2 V 262..266 "10mV"
+    Let d 439..491
+      StructLit GainStage 447..490
+        Generic A 457..468
+          Path Mcp6001 461..468 "Mcp6001"
+        Field vin 472..483
+          Path sensor 477..483 "sensor"
+        Field gnd (shorthand) 485..488
+    Let e 496..546
+      StructLit GainStage 504..545
+        Generic A 514..525
+          Path Mcp6001 518..525 "Mcp6001"
+        Generic GAIN 527..540
+          Binary Mul 534..540
+            Quantity 2e0 534..535 "2"
+            Quantity 1e1 538..540 "10"
+    Let f 551..577
+      StructLit G 559..576
+        Generic N 561..572
+          Paren 565..572
+            Binary Rel(Gt) 566..571
+              Path a 566..567 "a"
+              Path b 570..571 "b"
+    Let g 582..596
+      Binary Rel(Lt) 590..595
+        Path x 590..591 "x"
+        Path y 594..595 "y"
+    Let h 662..719
+      StructLit Note 670..718
+        Field text 677..705
+          Str 683..705 "\"a \\\"quoted\\\" \\\\ word\""
+        Field empty 707..716
+          Str 714..716 "\"\""

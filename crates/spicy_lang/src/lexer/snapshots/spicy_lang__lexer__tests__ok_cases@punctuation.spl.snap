@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/lexer/mod.rs
+assertion_line: 323
 expression: "dump(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/lexer/ok/punctuation.spl
 ---
@@ -43,8 +44,6 @@ Plus "+"
 Whitespace " "
 Minus "-"
 Whitespace " "
-Arrow "->"
-Whitespace " "
 Star "*"
 Whitespace " "
 Slash "/"
@@ -83,12 +82,6 @@ Dot "."
 Ident "mag"
 LParen "("
 RParen ")"
-Whitespace "\n"
-Quantity "5mA"
-Whitespace " "
-Arrow "->"
-Whitespace " "
-Quantity "30mA"
 Whitespace "\n"
 Ident "std"
 ColonColon "::"

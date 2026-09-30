@@ -1,31 +1,32 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/repeated_bindings.spl
 ---
 block A 6..7
-  port v: Pin 19..20
-  port g: Ground 36..37
-  r1 = Resistor 137..139
+  port v: Pin 10..11
+  port g: Ground 18..19
+  r1 = Resistor 133..135
     a → v
     b → g
     value = 1000 Ω
-  r2 = Resistor 197..199
+  r2 = Resistor 193..195
     a → v
     b → g
     value = 1000 Ω
-  r3 = Resistor 337..339
+  r3 = Resistor 333..335
     a → v
     b → g
     value = <invalid>
 
 --- errors ---
-E-duplicate Duplicate 176..185 "value: 5V" related 165..174
-E-unit UnitMismatch 183..185 "5V"
-E-duplicate Duplicate 225..235 "a: nowhere" related 213..217
-E-name UnknownName 228..235 "nowhere"
-E-binding UnknownField 365..369 "valu" fix 365..369 "value"
-E-binding UnknownField 375..379 "valu"
+E-duplicate Duplicate 172..181 "value: 5V" related 161..170
+E-unit UnitMismatch 179..181 "5V"
+E-duplicate Duplicate 221..231 "a: nowhere" related 209..213
+E-name UnknownName 224..231 "nowhere"
+E-binding UnknownField 361..365 "valu" fix 361..365 "value"
+E-binding UnknownField 371..375 "valu"
 
 --- rendered ---
 error[E-duplicate]: `value` is given twice

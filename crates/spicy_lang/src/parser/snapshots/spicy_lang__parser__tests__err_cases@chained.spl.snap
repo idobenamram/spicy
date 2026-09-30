@@ -1,11 +1,11 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/chained.spl
 ---
-File 0..106
-  Contract A 0..105
+File 0..239
+  Contract A 0..238
     Spec a Lt 17..35
       Binary Rel(Lt) 25..30
         Path x 25..26 "x"
@@ -20,16 +20,30 @@ File 0..106
         Quantity 1e0 % 68..70 "1%"
     Spec c Within 76..103
       Path x 84..85 "x"
-      Binary Range 93..102
-        Binary Range 93..98
+      Range a..=b 93..102
+        Range a..=b 93..98
           Quantity 1e0 93..94 "1"
           Quantity 2e0 97..98 "2"
         Quantity 3e0 101..102 "3"
+    Spec d Within 180..206
+      Path x 188..189 "x"
+      Range a..=b 197..205
+        Range ..=b 197..201
+          Quantity 1e0 200..201 "1"
+        Quantity 2e0 204..205 "2"
+    Spec e Within 211..236
+      Path x 219..220 "x"
+      Range a.. 228..235
+        Range a..=b 228..233
+          Quantity 1e0 228..229 "1"
+          Quantity 2e0 232..233 "2"
 
 --- errors ---
 E-chained Chained 31..32 "<"
 E-chained Chained 65..67 "±"
 E-chained Chained 98..101 "..="
+E-chained Chained 201..204 "..="
+E-chained Chained 233..235 ".."
 
 --- rendered ---
 error[E-chained]: comparisons can't be chained
@@ -51,3 +65,15 @@ error[E-chained]: ranges can't be chained
   |
 4 |     spec c: x within 1..=2..=3;
   |                           ^^^ second operator here
+
+error[E-chained]: ranges can't be chained
+  --> chained.spl:6:26
+  |
+6 |     spec d: x within ..=1..=2;
+  |                          ^^^ second operator here
+
+error[E-chained]: ranges can't be chained
+  --> chained.spl:7:27
+  |
+7 |     spec e: x within 1..=2..;
+  |                           ^^ second operator here

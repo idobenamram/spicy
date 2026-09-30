@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/expected_item.spl
 ---
@@ -11,10 +12,10 @@ File 0..28
 E-syntax ExpectedItem 0..3 "net"
 
 --- rendered ---
-error[E-syntax]: expected `block` or `contract`, found `net`
+error[E-syntax]: expected an item, found `net`
   --> expected_item.spl:1:1
   |
 1 | net stray;
   | ^^^ not an item
   |
-  = note: a file holds `block` and `contract` items
+  = note: a file holds `block`, `circuit` and `contract` items

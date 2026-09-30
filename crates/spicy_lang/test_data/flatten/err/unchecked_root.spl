@@ -1,18 +1,21 @@
 // A block's placements are counted in the roots checked only (model.md E23): `Two`
 // has an error inside, so it isn't checked as a whole, and `Mid`'s short, in its one
 // placement checked, is `Mid`'s own, not "1 of 2 placements".
-block Mid {
-    port gnd: Ground;
+block Mid { gnd: Ground }
+
+circuit Mid {
     let short = Resistor { a: gnd, b: gnd, value: 1k };
 }
 
-block One {
-    port gnd: Ground;
+block One { gnd: Ground }
+
+circuit One {
     let a = Mid { gnd };
 }
 
-block Two {
-    port gnd: Ground;
+block Two { gnd: Ground }
+
+circuit Two {
     let c = Mid { gnd };
     let broken = Nothing { gnd };
 }

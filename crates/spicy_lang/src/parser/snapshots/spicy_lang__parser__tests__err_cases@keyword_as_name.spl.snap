@@ -1,53 +1,66 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/keyword_as_name.spl
 ---
-File 0..91
-  Block A 0..90
-    StmtError 14..26 "let net = 1;"
-    StmtError 31..38 "net in;"
-    Let r 43..61
-      ExprError 51..60 "f(net: 1)"
-    Let s 66..88
-      ExprError 74..87 "G<let = 1> {}"
+File 0..124
+  Block A 0..29
+    PortError 10..18 "net: Pin"
+    Port ok 20..27
+      Type Pin 24..27 "Pin"
+  Circuit A 31..123
+    StmtError 47..59 "let net = 1;"
+    StmtError 64..71 "net in;"
+    Let r 76..94
+      ExprError 84..93 "f(net: 1)"
+    Let s 99..121
+      ExprError 107..120 "G<let = 1> {}"
 
 --- errors ---
-E-keyword KeywordAsName 18..21 "net"
-E-keyword KeywordAsName 35..37 "in"
-E-keyword KeywordAsName 53..56 "net"
-E-keyword KeywordAsName 76..79 "let"
+E-keyword KeywordAsName 10..13 "net"
+E-keyword KeywordAsName 51..54 "net"
+E-keyword KeywordAsName 68..70 "in"
+E-keyword KeywordAsName 86..89 "net"
+E-keyword KeywordAsName 109..112 "let"
 
 --- rendered ---
 error[E-keyword]: `net` is a keyword
-  --> keyword_as_name.spl:2:9
+  --> keyword_as_name.spl:1:11
   |
-2 |     let net = 1;
+1 | block A { net: Pin, ok: Pin }
+  |           ^^^ can't be used as a name
+  |
+  = help: choose another name
+
+error[E-keyword]: `net` is a keyword
+  --> keyword_as_name.spl:4:9
+  |
+4 |     let net = 1;
   |         ^^^ can't be used as a name
   |
   = help: choose another name
 
 error[E-keyword]: `in` is a keyword
-  --> keyword_as_name.spl:3:9
+  --> keyword_as_name.spl:5:9
   |
-3 |     net in;
+5 |     net in;
   |         ^^ can't be used as a name
   |
   = help: choose another name
 
 error[E-keyword]: `net` is a keyword
-  --> keyword_as_name.spl:4:15
+  --> keyword_as_name.spl:6:15
   |
-4 |     let r = f(net: 1);
+6 |     let r = f(net: 1);
   |               ^^^ can't be used as a name
   |
   = help: choose another name
 
 error[E-keyword]: `let` is a keyword
-  --> keyword_as_name.spl:5:15
+  --> keyword_as_name.spl:7:15
   |
-5 |     let s = G<let = 1> {};
+7 |     let s = G<let = 1> {};
   |               ^^^ can't be used as a name
   |
   = help: choose another name

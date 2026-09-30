@@ -56,22 +56,24 @@ impl Resolver<'_, '_> {
         field: &str,
     ) -> Result<Value, Reported> {
         let e = unparen(e);
+        if is_spread(e) && !expected.spread_allowed {
+            let kind = ResolveErrorKind::SpreadNotAllowed {
+                field: field.to_string(),
+            };
+            return Err(self.report(kind, e.span));
+        }
+        if let ExprKind::Range { lo, hi } = &e.kind {
+            return self.range(lo.as_deref(), hi.as_deref(), expected, e.span);
+        }
         let ExprKind::Binary { op, lhs, rhs } = &e.kind else {
             return self.scalar(e, expected).map(Value::exact);
         };
         match (op, has_spread(lhs), has_spread(rhs)) {
-            (BinOp::Tol | BinOp::Range, ..) if !expected.spread_allowed => {
-                let kind = ResolveErrorKind::SpreadNotAllowed {
-                    field: field.to_string(),
-                };
-                Err(self.report(kind, e.span))
-            }
             (BinOp::Tol, ..) => {
                 let nominal = self.scalar(lhs, expected)?;
                 let spread = self.tolerance(rhs, expected)?;
                 Ok(Value { nominal, spread })
             }
-            (BinOp::Range, ..) => self.range(lhs, rhs, expected, e.span),
             // Scaling a spread by a plain factor: `2 * (1k ± 1%)`, `(10k ± 5%) / 2`. The
             // parser's help for `2 * 1k ± 1%` suggests exactly this, so it must work.
             (BinOp::Mul | BinOp::Div, true, false) => {
@@ -91,14 +93,18 @@ impl Resolver<'_, '_> {
     }
 
     /// `lo..=hi`. Its nominal is the midpoint (model.md E16; agreed 2026-09-27):
-    /// `beta: 100..=300` is 200, as in the walkthrough.
+    /// `beta: 100..=300` is 200, as in the walkthrough. A range with an end left out
+    /// (`..=hi`, `lo..`) isn't a value yet.
     fn range(
         &mut self,
-        lo: &Expr,
-        hi: &Expr,
+        lo: Option<&Expr>,
+        hi: Option<&Expr>,
         expected: FieldType,
         at: Span,
     ) -> Result<Value, Reported> {
+        let (Some(lo), Some(hi)) = (lo, hi) else {
+            return Err(self.report(ResolveErrorKind::NotAValue, at));
+        };
         let lo = self.scalar(lo, expected)?;
         let hi = self.scalar(hi, expected)?;
         if lo.si > hi.si {
@@ -213,10 +219,7 @@ impl Resolver<'_, '_> {
                     ..t
                 })
             }
-            ExprKind::Binary {
-                op: BinOp::Tol | BinOp::Range,
-                ..
-            } => Err(self.report(ResolveErrorKind::SpreadInArithmetic, e.span)),
+            _ if is_spread(e) => Err(self.report(ResolveErrorKind::SpreadInArithmetic, e.span)),
             ExprKind::Binary {
                 op: op @ (BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div),
                 lhs,
@@ -332,20 +335,31 @@ fn has_percent(e: &Expr) -> bool {
     }
 }
 
-/// Whether `e` is a tolerance or range, possibly scaled: what `spread_value` handles.
+/// Whether `e` is a tolerance or a closed range, possibly scaled: what `spread_value`
+/// handles.
 fn has_spread(e: &Expr) -> bool {
-    match &unparen(e).kind {
-        ExprKind::Binary {
-            op: BinOp::Tol | BinOp::Range,
-            ..
-        } => true,
+    let e = unparen(e);
+    match &e.kind {
         ExprKind::Binary {
             op: BinOp::Mul | BinOp::Div,
             lhs,
             rhs,
         } => has_spread(lhs) || has_spread(rhs),
-        _ => false,
+        _ => is_spread(e),
     }
+}
+
+/// A tolerance or a closed range. An open range (`..=hi`, `lo..`) isn't a value yet, so
+/// it isn't a spread either: it gets `NotAValue`.
+fn is_spread(e: &Expr) -> bool {
+    matches!(
+        e.kind,
+        ExprKind::Binary { op: BinOp::Tol, .. }
+            | ExprKind::Range {
+                lo: Some(_),
+                hi: Some(_)
+            }
+    )
 }
 
 fn unparen<'e, 'src>(mut e: &'e Expr<'src>) -> &'e Expr<'src> {
@@ -368,7 +382,7 @@ mod tests {
     /// `Name "text"`, with ` fix "…"` when there is one.
     fn resolved(part: &str) -> String {
         let src =
-            format!("block A {{\n    port p: Pin;\n    port n: Pin;\n    let x = {part};\n}}\n");
+            format!("block A {{ p: Pin, n: Pin }}\n\ncircuit A {{\n    let x = {part};\n}}\n");
         let parsed = parse(&src);
         assert!(!parsed.has_errors(), "{part}: {:?}", parsed.errors);
         let resolved = resolve(&parsed);
@@ -502,7 +516,7 @@ mod tests {
     fn kelvin_for_kilo() {
         let with_note = |v: &str| {
             let src = format!(
-                "block A {{\n    port p: Pin;\n    port n: Pin;\n    let x = Resistor {{ a: p, b: n, value: {v} }};\n}}\n"
+                "block A {{ p: Pin, n: Pin }}\n\ncircuit A {{\n    let x = Resistor {{ a: p, b: n, value: {v} }};\n}}\n"
             );
             let errors = crate::testing::resolve_errors(&src);
             assert_eq!(errors.len(), 1, "{v}");

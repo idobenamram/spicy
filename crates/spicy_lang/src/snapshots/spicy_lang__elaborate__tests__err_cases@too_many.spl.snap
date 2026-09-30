@@ -1,10 +1,11 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/too_many.spl
 ---
 --- errors ---
-E-size TooManyPlacements 422..423 "b"
+E-size TooManyPlacements 416..417 "b"
 
 --- rendered ---
 error[E-size]: `L10` flattens to more than 1000000 placements

@@ -20,6 +20,7 @@ pub enum NameKind {
     Instance,
     /// A pin, a block's port as bound in a placement, or a part's field.
     Binding,
+    Circuit,
     Contract,
     Value,
 }
@@ -35,6 +36,7 @@ impl NameKind {
             NameKind::Net => "a net",
             NameKind::Instance => "an instance",
             NameKind::Binding => "a pin or field",
+            NameKind::Circuit => "a circuit",
             NameKind::Contract => "a contract",
             NameKind::Value => "a value",
         }
@@ -70,10 +72,12 @@ pub enum ResolveErrorKind {
         expected: &'static str,
     },
     /// Two of a name where one is allowed: two blocks, two ports, a net and an instance
-    /// named alike, two contracts for one block, a pin bound twice.
+    /// named alike, two circuits or contracts for one block, a pin bound twice.
     Duplicate { name: String, what: NameKind },
-    /// A `contract` for a block that doesn't exist.
-    ContractWithoutBlock { name: String },
+    /// A `circuit` or `contract` (`what`) for a block that doesn't exist.
+    WithoutBlock { what: NameKind, name: String },
+    /// A placed block that has no `circuit`: there's nothing inside it to place.
+    NoCircuit { block: String },
     /// A port type that isn't a signal type (`Bus`), or with the wrong arguments.
     BadSignalType { name: String, problem: &'static str },
     /// A `let` in a block whose value isn't a part or a block (`let x = 5k;`).
@@ -120,8 +124,8 @@ pub enum ResolveErrorKind {
     NegativeTolerance,
     /// `1k / 0`.
     DivisionByZero,
-    /// Syntax the parser reads but resolve doesn't handle yet: generic arguments, a
-    /// transition in a placement. `what` names it.
+    /// Syntax the parser reads but resolve doesn't handle yet: generic arguments at a
+    /// placement. `what` names it.
     Unsupported { what: &'static str },
 }
 
@@ -135,7 +139,8 @@ impl ResolveErrorKind {
         "UnknownName",
         "WrongNamespace",
         "Duplicate",
-        "ContractWithoutBlock",
+        "WithoutBlock",
+        "NoCircuit",
         "BadSignalType",
         "LetNotInstance",
         "UnknownField",
@@ -162,7 +167,8 @@ impl DiagKind for ResolveErrorKind {
             UnknownName { .. } => "UnknownName",
             WrongNamespace { .. } => "WrongNamespace",
             Duplicate { .. } => "Duplicate",
-            ContractWithoutBlock { .. } => "ContractWithoutBlock",
+            WithoutBlock { .. } => "WithoutBlock",
+            NoCircuit { .. } => "NoCircuit",
             BadSignalType { .. } => "BadSignalType",
             LetNotInstance => "LetNotInstance",
             UnknownField { .. } => "UnknownField",
@@ -187,7 +193,11 @@ impl DiagKind for ResolveErrorKind {
         match self {
             UnknownName { .. } | WrongNamespace { .. } => "E-name",
             Duplicate { .. } => "E-duplicate",
-            ContractWithoutBlock { .. } => "E-contract",
+            WithoutBlock {
+                what: NameKind::Contract,
+                ..
+            } => "E-contract",
+            WithoutBlock { .. } | NoCircuit { .. } => "E-circuit",
             BadSignalType { .. } => "E-type",
             LetNotInstance => "E-let",
             UnknownField { .. } | Missing { .. } | NotANet { .. } | BadMerge => "E-binding",
@@ -205,6 +215,7 @@ impl DiagKind for ResolveErrorKind {
     fn related_label(&self) -> &'static str {
         match self {
             ResolveErrorKind::Duplicate { what, .. } => match what {
+                NameKind::Circuit => "first circuit here",
                 NameKind::Contract => "first contract here",
                 NameKind::Binding => "first given here",
                 _ => "first defined here",
@@ -241,10 +252,11 @@ impl DiagKind for ResolveErrorKind {
                 vec![],
             ),
             Duplicate { name, what } => match what {
-                NameKind::Contract => (
-                    format!("block `{name}` has two contracts"),
-                    "second contract".to_string(),
-                    vec!["help: merge them into one `contract`".to_string()],
+                // One of each per block.
+                NameKind::Circuit | NameKind::Contract => (
+                    format!("block `{name}` has two {}s", what.noun()),
+                    format!("second {}", what.noun()),
+                    vec![format!("help: merge them into one `{}`", what.noun())],
                 ),
                 NameKind::Binding => (
                     format!("`{name}` is given twice"),
@@ -263,10 +275,23 @@ impl DiagKind for ResolveErrorKind {
                     vec![],
                 ),
             },
-            ContractWithoutBlock { name } => (
-                format!("contract for an unknown block `{name}`"),
-                "no block with this name".to_string(),
-                vec!["note: a contract describes the block of the same name".to_string()],
+            WithoutBlock { what, name } => {
+                let note = match what {
+                    NameKind::Contract => "note: a contract describes the block of the same name",
+                    _ => "note: a circuit is the inside of the block of the same name",
+                };
+                (
+                    format!("{} for an unknown block `{name}`", what.noun()),
+                    "no block with this name".to_string(),
+                    vec![note.to_string()],
+                )
+            }
+            NoCircuit { block } => (
+                format!("block `{block}` has no circuit"),
+                "placed here".to_string(),
+                vec![format!(
+                    "help: write `circuit {block} {{ … }}` with its nets and parts"
+                )],
             ),
             BadSignalType { name, problem } => (
                 format!("`{name}` {problem}"),

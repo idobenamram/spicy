@@ -1,6 +1,6 @@
-block A {
-    port p: Pin;
-    port n: Pin;
+block A { p: Pin, n: Pin }
+
+circuit A {
     // dB levels and temperatures aren't linear quantities.
     let r1 = Resistor { a: p, b: n, value: 2 * 3dB };
     let r2 = Resistor { a: p, b: n, value: -(10°C) };

@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/power_ports.spl
 ---
@@ -23,16 +24,16 @@ root Board
   Resistor tied.r a→eight b→gnd value=1000 Ω
 
 --- errors ---
-E-power SeveralSources 2019..2028 "o2: seven" related 2008..2017
-E-power NoSource 2151..2158 "a: rail"
-E-power NoSource 2200..2207 "p: line"
-E-power SeveralSources 2295..2303 "out: bus" related 2247..2255
+E-power SeveralSources 1968..1977 "o2: seven" related 1957..1966
+E-power NoSource 2100..2107 "a: rail"
+E-power NoSource 2149..2156 "p: line"
+E-power SeveralSources 2244..2252 "out: bus" related 2196..2204
 
 --- rendered ---
 error[E-power]: net `seven` has more than one power source
-   --> power_ports.spl:66:46
+   --> power_ports.spl:61:46
    |
-66 |     let dual = Dual { input: v12, o1: seven, o2: seven, gnd };
+61 |     let dual = Dual { input: v12, o1: seven, o2: seven, gnd };
    |                                   ---------  ^^^^^^^^^ a second source
    |                                   |           
    |                                   the first source
@@ -40,29 +41,29 @@ error[E-power]: net `seven` has more than one power source
    = note: the sources are `dual.o1` and `dual.reg.out`
 
 error[E-power]: nothing powers net `rail`
-   --> power_ports.spl:69:23
+   --> power_ports.spl:64:23
    |
-69 |     let pass = Pass { a: rail, b: rail, gnd };
+64 |     let pass = Pass { a: rail, b: rail, gnd };
    |                       ^^^^^^^ needs a power source
    |
    = note: `pass.inner.vcc` and `pass.b` take power from it
    = help: connect `rail` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
 
 error[E-power]: nothing powers net `line`
-   --> power_ports.spl:70:25
+   --> power_ports.spl:65:25
    |
-70 |     let plain = Plain { p: line, gnd };
+65 |     let plain = Plain { p: line, gnd };
    |                         ^^^^^^^ needs a power source
    |
    = note: `plain.load.vcc` takes power from it
    = help: connect `line` to a `Power<In>` port of this block, or to a placed block's `Power<Out>`
 
 error[E-power]: net `bus` has more than one power source
-   --> power_ports.spl:72:32
+   --> power_ports.spl:67:32
    |
-71 |     let r1 = Reg { input: v12, out: bus, gnd };
+66 |     let r1 = Reg { input: v12, out: bus, gnd };
    |                                -------- the first source
-72 |     let r2 = Reg { input: v12, out: bus, gnd };
+67 |     let r2 = Reg { input: v12, out: bus, gnd };
    |                                ^^^^^^^^ a second source
    |
    = note: the sources are `r1.out`, `r2.out` and `r3.out`

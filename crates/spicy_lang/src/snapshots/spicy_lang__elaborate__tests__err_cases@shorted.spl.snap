@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/shorted.spl
 ---
@@ -15,8 +16,8 @@ root Board
   Resistor two.r a→g b→g value=1000 Ω
 
 --- errors ---
-W-short ShortedPart 387..424 "let r = Resistor { a, b, value: 1k };"
-W-short ShortedPart 591..629 "let r = Capacitor { a, b, value: 1u };"
+W-short ShortedPart 388..425 "let r = Resistor { a, b, value: 1k };"
+W-short ShortedPart 601..639 "let r = Capacitor { a, b, value: 1u };"
 
 --- rendered ---
 warning[W-short]: both pins of `r` are on one net (in `Filter`)
@@ -26,7 +27,7 @@ warning[W-short]: both pins of `r` are on one net (in `Filter`)
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted
 
 warning[W-short]: both pins of `r` are on one net (in 1 of 3 placements of `Stage`, e.g. `second`)
-   --> shorted.spl:20:5
+   --> shorted.spl:21:5
    |
-20 |     let r = Capacitor { a, b, value: 1u };
+21 |     let r = Capacitor { a, b, value: 1u };
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ shorted

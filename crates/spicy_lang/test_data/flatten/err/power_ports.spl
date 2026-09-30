@@ -11,53 +11,48 @@
 //   block whose net it is, not inside `Plain`.
 // - Three regulators on `bus` meet in one placement: one problem, at the second, that
 //   lists all three (as atopile lists every source), not one problem per regulator.
-block Reg {
-    port input: Power<In>;
-    port out: Power<Out>;
-    port gnd: Ground;
+block Reg { input: Power<In>, out: Power<Out>, gnd: Ground }
+
+circuit Reg {
     let r = Resistor { a: input, b: out, value: 10 };
 }
 
-block Load {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Load { vcc: Power<In>, gnd: Ground }
+
+circuit Load {
     let r = Resistor { a: vcc, b: gnd, value: 1k };
 }
 
-block Dual {
-    port input: Power<In>;
-    port o1: Power<Out>;
-    port o2: Power<Out>;
-    port gnd: Ground;
+block Dual { input: Power<In>, o1: Power<Out>, o2: Power<Out>, gnd: Ground }
+
+circuit Dual {
     let reg = Reg { input, out: o2, gnd };
     let r = Resistor { a: o1, b: gnd, value: 1k };
 }
 
-block Tied {
-    port o1: Power<Out>;
-    port o2: Power<Out>;
-    port gnd: Ground;
+block Tied { o1: Power<Out>, o2: Power<Out>, gnd: Ground }
+
+circuit Tied {
     net both = [o1, o2];
     let r = Resistor { a: both, b: gnd, value: 1k };
 }
 
-block Pass {
-    port a: Power<In>;
-    port b: Power<In>;
-    port gnd: Ground;
+block Pass { a: Power<In>, b: Power<In>, gnd: Ground }
+
+circuit Pass {
     let inner = Load { vcc: a, gnd };
     let r = Resistor { a: b, b: gnd, value: 1k };
 }
 
-block Plain {
-    port p: Pin;
-    port gnd: Ground;
+block Plain { p: Pin, gnd: Ground }
+
+circuit Plain {
     let load = Load { vcc: p, gnd };
 }
 
-block Board {
-    port v12: Power<In>;
-    port gnd: Ground;
+block Board { v12: Power<In>, gnd: Ground }
+
+circuit Board {
     net seven;
     net eight;
     net rail;

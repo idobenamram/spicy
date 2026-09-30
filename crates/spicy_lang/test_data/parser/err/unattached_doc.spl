@@ -1,4 +1,9 @@
-block A {
+block B {
+    a: Pin,
+    /// nothing follows here either
+}
+
+circuit A {
     net a;
     /// nothing follows
 }

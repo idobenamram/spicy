@@ -1,9 +1,8 @@
-block A {
+circuit A {
     assume vcc.v within 12V ± 5%;
     spec s: x within 1..=2;
 }
 
 contract A {
-    port vcc: Power<In>;
     net n;
 }

@@ -1,33 +1,38 @@
 // A block can't contain itself (model.md E14). Each cycle is reported once, with its
 // chain; a block placed twice on the way (a diamond) is not a cycle.
-block Selfish {
-    port g: Ground;
+block Selfish { g: Ground }
+
+circuit Selfish {
     let again = Selfish { g };
 }
 
 // `Ping` and `Pong` place each other: neither is unplaced, so neither is a root, and
 // the cycle is still found.
-block Ping {
-    port g: Ground;
+block Ping { g: Ground }
+
+circuit Ping {
     let pong = Pong { g };
 }
 
-block Pong {
-    port g: Ground;
+block Pong { g: Ground }
+
+circuit Pong {
     let ping = Ping { g };
 }
 
-block Diamond {
-    port g: Ground;
+block Diamond { g: Ground }
+
+circuit Diamond {
     let left = Side { g };
     let right = Side { g };
 }
 
-block Side {
-    port g: Ground;
+block Side { g: Ground }
+
+circuit Side {
     let leaf = Leaf { g };
 }
 
-block Leaf {
-    port g: Ground;
-}
+block Leaf { g: Ground }
+
+circuit Leaf {}

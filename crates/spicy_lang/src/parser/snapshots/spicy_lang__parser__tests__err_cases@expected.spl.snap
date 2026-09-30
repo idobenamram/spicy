@@ -1,101 +1,104 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/expected.spl
 ---
-File 0..380
-  Block A 0..379
-    StmtError 14..29 "port vcc Power;"
-    Let r 34..70
-      ExprError 42..69 "Resistor { a: vcc b: base }"
-    Let x 75..84
-      ExprError 82..82 ""
-    Net ok 89..96
-    Let y 101..116
-      ExprError 109..116 "(1 + 2;"
-    Let z 121..133
-      ExprError 129..132 "1 2"
-    Let t 192..218
-      ExprError 200..217 "Step { 5mA 30mA }"
-    Let u 223..244
-      ExprError 231..243 "Step { 5mA }"
-    Let v 315..338
-      ExprError 323..337 "G<A = X, B> {}"
-    Let w 343..360
-      ExprError 351..359 "G<A = X>"
-    Let i 365..377
-      ExprError 373..377 "m[s;"
+File 0..565
+  Block A 81..115
+    PortError 91..100 "vcc Power"
+    Port gnd 102..113
+      Type Ground 107..113 "Ground"
+  Circuit A 117..564
+    Let r 133..169
+      ExprError 141..168 "Resistor { a: vcc b: base }"
+    Let x 174..183
+      ExprError 181..181 ""
+    Net ok 188..195
+    Let y 200..215
+      ExprError 208..215 "(1 + 2;"
+    Let z 220..232
+      ExprError 228..231 "1 2"
+    Let u 305..336
+      ExprError 313..335 "Step { 5mA, to: 30mA }"
+    Let v 407..430
+      ExprError 415..429 "G<A = X, B> {}"
+    Let w 435..452
+      ExprError 443..451 "G<A = X>"
+    Let i 457..469
+      ExprError 465..469 "m[s;"
+    Let j 528..562
+      ExprError 536..561 "Tlv755p { vin vout, gnd }"
 
 --- errors ---
-E-syntax Expected 23..28 "Power"
-E-syntax Expected 60..61 "b"
-E-syntax Expected 83..84 ";"
-E-syntax Expected 115..116 ";"
-E-syntax Expected 131..132 "2"
-E-syntax Expected 211..215 "30mA"
-E-syntax Expected 238..241 "5mA"
-E-syntax Expected 333..334 ">"
-E-syntax Expected 359..360 ";"
-E-syntax Expected 376..377 ";"
+E-syntax Expected 95..100 "Power"
+E-syntax Expected 159..160 "b"
+E-syntax Expected 182..183 ";"
+E-syntax Expected 214..215 ";"
+E-syntax Expected 230..231 "2"
+E-syntax Expected 320..323 "5mA"
+E-syntax Expected 425..426 ">"
+E-syntax Expected 451..452 ";"
+E-syntax Expected 468..469 ";"
+E-syntax Expected 550..554 "vout"
 
 --- rendered ---
 error[E-syntax]: expected `:`, found `Power`
-  --> expected.spl:2:14
+  --> expected.spl:2:15
   |
-2 |     port vcc Power;
-  |              ^^^^^ expected `:`
+2 | block A { vcc Power, gnd: Ground }
+  |               ^^^^^ expected `:`
 
 error[E-syntax]: expected `,` or `}`, found `b`
-  --> expected.spl:3:31
+  --> expected.spl:5:31
   |
-3 |     let r = Resistor { a: vcc b: base };
+5 |     let r = Resistor { a: vcc b: base };
   |                               ^ expected `,` or `}`
 
 error[E-syntax]: expected an expression, found `;`
-  --> expected.spl:4:13
+  --> expected.spl:6:13
   |
-4 |     let x = ;
+6 |     let x = ;
   |             ^ expected an expression
 
 error[E-syntax]: expected `)`, found `;`
-  --> expected.spl:6:19
+  --> expected.spl:8:19
   |
-6 |     let y = (1 + 2;
+8 |     let y = (1 + 2;
   |                   ^ expected `)`
 
 error[E-syntax]: expected `;`, found `2`
-  --> expected.spl:7:15
+  --> expected.spl:9:15
   |
-7 |     let z = 1 2;
+9 |     let z = 1 2;
   |               ^ expected `;`
 
-error[E-syntax]: expected `->`, found `30mA`
-  --> expected.spl:9:24
-  |
-9 |     let t = Step { 5mA 30mA };
-  |                        ^^^^ expected `->`
-
 error[E-syntax]: expected a name, found `5mA`
-   --> expected.spl:10:20
+   --> expected.spl:11:20
    |
-10 |     let u = Step { 5mA };
+11 |     let u = Step { 5mA, to: 30mA };
    |                    ^^^ expected a name
 
 error[E-syntax]: expected `=`, found `>`
-   --> expected.spl:12:23
+   --> expected.spl:13:23
    |
-12 |     let v = G<A = X, B> {};
+13 |     let v = G<A = X, B> {};
    |                       ^ expected `=`
 
 error[E-syntax]: expected `{`, found `;`
-   --> expected.spl:13:21
+   --> expected.spl:14:21
    |
-13 |     let w = G<A = X>;
+14 |     let w = G<A = X>;
    |                     ^ expected `{`
 
 error[E-syntax]: expected `]`, found `;`
-   --> expected.spl:14:16
+   --> expected.spl:15:16
    |
-14 |     let i = m[s;
+15 |     let i = m[s;
    |                ^ expected `]`
+
+error[E-syntax]: expected `,` or `}`, found `vout`
+   --> expected.spl:17:27
+   |
+17 |     let j = Tlv755p { vin vout, gnd };
+   |                           ^^^^ expected `,` or `}`

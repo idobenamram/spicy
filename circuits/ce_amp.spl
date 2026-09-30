@@ -1,10 +1,7 @@
 /// Common-emitter audio stage (walkthrough §1).
-block CeAmp {
-    port vcc: Power<In>;
-    port gnd: Ground;
-    port input: Analog<In>;
-    port output: Analog<Out>;
+pub block CeAmp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
 
+circuit CeAmp {
     net base;
     net emitter;
 

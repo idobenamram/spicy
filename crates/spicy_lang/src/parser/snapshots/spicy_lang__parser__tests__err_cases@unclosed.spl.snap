@@ -1,15 +1,16 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/unclosed.spl
 ---
-File 0..43
-  Block A 0..42
-    Let r 14..42
-      ExprError 22..42 "Resistor { a: f(1, 2"
+File 0..45
+  Circuit A 0..44
+    Let r 16..44
+      ExprError 24..44 "Resistor { a: f(1, 2"
 
 --- errors ---
-E-syntax Unclosed 43..43 "" related 37..38
+E-syntax Unclosed 45..45 "" related 39..40
 
 --- rendered ---
 error[E-syntax]: expected `)`

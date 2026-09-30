@@ -1,15 +1,13 @@
-block A {
-    port p: Pin;
-    port p: Pin;
+block A { p: Pin, p: Pin }
+
+circuit A {
     net n;
     net n;
     let r = Resistor { a: p, b: n, value: 1k, value: 2k };
     let r = Resistor { a: p, a: n, b: n, value: 1k };
 }
 
-block A {
-    port q: Pin;
-}
+block A { q: Pin }
 
 contract A {}
 contract A {}

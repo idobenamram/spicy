@@ -1,8 +1,8 @@
 // Nets that no part connects to ground (a warning, model.md §7 question 4). The root's
 // inputs count as connected: the bench drives them.
-block Island {
-    port g: Ground;
-    port input: Analog<In>;
+block Island { g: Ground, input: Analog<In> }
+
+circuit Island {
     net x;
     net y;
     net z;

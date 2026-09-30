@@ -2,4 +2,7 @@ contract A {
     spec a: x < y < z;
     spec b: x within 1 ± 2% ± 1%;
     spec c: x within 1..=2..=3;
+    // An open range is a range too: it can't be chained on either end.
+    spec d: x within ..=1..=2;
+    spec e: x within 1..=2..;
 }

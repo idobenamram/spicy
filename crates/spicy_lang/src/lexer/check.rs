@@ -452,14 +452,6 @@ mod tests {
         assert_eq!(names("\"a\\n"), ["UnterminatedString"]);
     }
 
-    /// `->` is not a minus: `-->` is `-` then `->`, with no double-minus error, and
-    /// `--->` has one, for its `--`.
-    #[test]
-    fn arrow_next_to_minus() {
-        assert_eq!(names("x-->y"), Vec::<&str>::new());
-        assert_eq!(errors("x--->y"), [("DoubleMinus", "--", None)]);
-    }
-
     /// A too-large integer ending in `.` gets one error, the number's own.
     #[test]
     fn too_large_integer_ending_in_point_is_one_error() {

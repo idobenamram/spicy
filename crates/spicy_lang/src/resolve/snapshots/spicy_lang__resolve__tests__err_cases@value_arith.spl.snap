@@ -1,69 +1,70 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/value_arith.spl
 ---
 block A 6..7
-  port p: Pin 19..20
-  port n: Pin 36..37
-  r1 = Resistor 112..114
+  port p: Pin 10..11
+  port n: Pin 18..19
+  r1 = Resistor 108..110
     a → p
     b → n
     value = <invalid>
-  r2 = Resistor 166..168
+  r2 = Resistor 162..164
     a → p
     b → n
     value = <invalid>
-  r3 = Resistor 281..283
+  r3 = Resistor 277..279
     a → p
     b → n
     value = <invalid>
-  r4 = Resistor 334..336
+  r4 = Resistor 330..332
     a → p
     b → n
     value = <invalid>
-  r5 = Resistor 435..437
+  r5 = Resistor 431..433
     a → p
     b → n
     value = <invalid>
-  r6 = Resistor 491..493
+  r6 = Resistor 487..489
     a → p
     b → n
     value = <invalid>
-  r7 = Resistor 608..610
+  r7 = Resistor 604..606
     a → p
     b → n
     value = <invalid>
-  r8 = Resistor 670..672
+  r8 = Resistor 666..668
     a → p
     b → n
     value = <invalid>
-  r9 = Resistor 731..733
+  r9 = Resistor 727..729
     a → p
     b → n
     value = <invalid>
-  r10 = Resistor 832..835
+  r10 = Resistor 828..831
     a → p
     b → n
     value = <invalid>
-  c1 = Capacitor 955..957
+  c1 = Capacitor 951..953
     a → p
     b → n
     value = 0.000001 F
     rating = <invalid>
 
 --- errors ---
-E-unit NotArithmetic 147..154 "2 * 3dB"
-E-unit UnitMismatch 201..209 "-(10°C)"
-E-value DivisionByZero 321..322 "0"
-E-value DivisionByZero 382..389 "(2 - 2)"
-E-value NegativeTolerance 476..479 "-1%"
-E-value NegativeTolerance 532..537 "-(50)"
-E-value SpreadInArithmetic 644..652 "1k ± 1%"
-E-value SpreadInArithmetic 705..719 "1k / (2 ± 1%)"
-E-value SpreadInArithmetic 766..781 "(1k ± 1%) * 1V"
-E-unit MixedUnits 868..876 "100 + 5%"
-E-value SpreadNotAllowed 1004..1013 "25V ± 1V"
+E-unit NotArithmetic 143..150 "2 * 3dB"
+E-unit UnitMismatch 197..205 "-(10°C)"
+E-value DivisionByZero 317..318 "0"
+E-value DivisionByZero 378..385 "(2 - 2)"
+E-value NegativeTolerance 472..475 "-1%"
+E-value NegativeTolerance 528..533 "-(50)"
+E-value SpreadInArithmetic 640..648 "1k ± 1%"
+E-value SpreadInArithmetic 701..715 "1k / (2 ± 1%)"
+E-value SpreadInArithmetic 762..777 "(1k ± 1%) * 1V"
+E-unit MixedUnits 864..872 "100 + 5%"
+E-value SpreadNotAllowed 1000..1009 "25V ± 1V"
 
 --- rendered ---
 error[E-unit]: dB levels can't be used in arithmetic here

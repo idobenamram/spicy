@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 957
+assertion_line: 1072
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/precedence.spl
 ---
@@ -13,7 +13,7 @@ File 0..431
         Quantity 5e0 % 123..125 "5%"
     Assume Within 131..167
       Path x 138..139 "x"
-      Binary Range 147..166
+      Range a..=b 147..166
         Binary Sub 147..155
           Path v 147..148 "v"
           Quantity 5e-1 V 151..155 "0.5V"

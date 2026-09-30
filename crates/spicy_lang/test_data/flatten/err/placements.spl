@@ -1,13 +1,14 @@
 // A problem inside a block is reported once, where it's written, however many
 // placements have it (model.md E23), under one root or several.
-block Load {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Load { vcc: Power<In>, gnd: Ground }
+
+circuit Load {
     let r = Resistor { a: vcc, b: gnd, value: 1k };
 }
 
-block Mid {
-    port gnd: Ground;
+block Mid { gnd: Ground }
+
+circuit Mid {
     net rail;
     net x;
     net y;
@@ -16,13 +17,15 @@ block Mid {
     let short = Resistor { a: gnd, b: gnd, value: 1k };
 }
 
-block One {
-    port gnd: Ground;
+block One { gnd: Ground }
+
+circuit One {
     let a = Mid { gnd };
     let b = Mid { gnd };
 }
 
-block Two {
-    port gnd: Ground;
+block Two { gnd: Ground }
+
+circuit Two {
     let c = Mid { gnd };
 }

@@ -1,4 +1,5 @@
-block A {
-    port vcc: Power<In>;
+block A { vcc: Power<In> }
+
+circuit A {
     let r = vcc { a: vcc };
 }

@@ -161,19 +161,24 @@ mod tests {
         }
     }
 
-    /// `src` with its blocks and contracts in a random order, and the statements of
-    /// every block too. The comments between items are left out.
+    /// `src` with its items in a random order, and the statements of every circuit and
+    /// contract too. The comments between items are left out.
     fn shuffled(src: &str, rng: &mut Rng) -> String {
         let mut items: Vec<String> = Vec::new();
         let mut item: Option<String> = None;
         for line in src.lines() {
-            if line.starts_with("block ") || line.starts_with("contract ") {
+            let starts = ["block ", "pub block ", "circuit ", "contract "]
+                .iter()
+                .any(|keyword| line.starts_with(keyword));
+            if starts {
                 item = Some(String::new());
             }
             if let Some(text) = &mut item {
                 text.push_str(line);
                 text.push('\n');
-                if line == "}" {
+                // A `}` alone ends an item, and so does one on its first line
+                // (`block A { p: Pin }`).
+                if line == "}" || (starts && line.ends_with('}')) {
                     items.extend(item.take());
                 }
             }
@@ -243,10 +248,10 @@ mod tests {
     /// E7): an unknown kind, an unbound pin, a port with a wrong type, a wrong value.
     #[test]
     fn resolve_errors_add_no_flatten_errors() {
-        let src = "block A {\n    port v: Power<In>;\n    port g: Ground;\n    port bad: Bus;\n    \
+        let src = "block A { v: Power<In>, g: Ground, bad: Bus }\n\ncircuit A {\n    \
                    let x = Nothing { a: v };\n    let r = Resistor { a: v, value: 1k };\n    \
                    let c = Capacitor { a: v, b: g, value: 5V };\n    let s = B { i: bad };\n}\n\n\
-                   block B {\n    port i: Power<In>;\n}\n";
+                   block B { i: Power<In> }\n\ncircuit B {}\n";
         let elaborated = elaborate(&parse(src));
         assert!(!elaborated.resolved.errors.is_empty());
         assert_eq!(flatten_errors(src), vec![], "{src}");
@@ -258,9 +263,9 @@ mod tests {
     /// the cause (model.md E7).
     #[test]
     fn dropped_statements_add_no_flatten_errors() {
-        let head = "block Load {\n    port vcc: Power<In>;\n    port gnd: Ground;\n    \
+        let head = "block Load { vcc: Power<In>, gnd: Ground }\n\ncircuit Load {\n    \
                     let r = Resistor { a: vcc, b: gnd, value: 1k };\n}\n\n\
-                    block T {\n    port v: Power<In>;\n    port g: Ground;\n    net x;\n";
+                    block T { v: Power<In>, g: Ground }\n\ncircuit T {\n    net x;\n";
         let bodies = [
             // A second `let r`, dropped: `x` would be isolated.
             "    let r = Resistor { a: v, b: g, value: 1k };\n    let r = Resistor { a: x, b: g, value: 1k };\n",
@@ -292,16 +297,16 @@ mod tests {
     /// breaks `A`, whose body is left open: `B` is still checked (its shorted `r`).
     #[test]
     fn a_syntax_error_breaks_its_own_block() {
-        let open_at_eof = "block A {\n    port g: Ground;\n    net x;\n    \
+        let open_at_eof = "block A { g: Ground }\n\ncircuit A {\n    net x;\n    \
                            let r = Resistor { a: x, b: x, value: 1k };\n    \
                            let r2 = Resistor { a: g";
         let elaborated = elaborate(&parse(open_at_eof));
         assert!(elaborated.resolved.design.blocks[0].tainted.is_some());
         assert_eq!(flatten_errors(open_at_eof), vec![], "{open_at_eof}");
 
-        let missing_brace = "block A {\n    port g: Ground;\n    net x;\n    \
+        let missing_brace = "block A { g: Ground }\n\ncircuit A {\n    net x;\n    \
                              let r = Resistor { a: x, b: x, value: 1k };\n\n\
-                             block B {\n    port g: Ground;\n    \
+                             block B { g: Ground }\n\ncircuit B {\n    \
                              let r = Resistor { a: g, b: g, value: 1k };\n}\n";
         let elaborated = elaborate(&parse(missing_brace));
         let [a, b] = &elaborated.resolved.design.blocks[..] else {
@@ -320,10 +325,10 @@ mod tests {
     /// as a whole (its shorted `r` and isolated `x` aren't reported).
     #[test]
     fn a_block_defined_twice_is_broken() {
-        let src = "block A {\n    port g: Ground;\n    net x;\n    \
+        let src = "block A { g: Ground }\n\ncircuit A {\n    net x;\n    \
                    let r = Resistor { a: x, b: x, value: 1k };\n}\n\n\
-                   block A {\n    port g: Ground;\n}\n\n\
-                   block T {\n    port g: Ground;\n    let a = A { g };\n}\n";
+                   block A { g: Ground }\n\n\
+                   block T { g: Ground }\n\ncircuit T {\n    let a = A { g };\n}\n";
         let elaborated = elaborate(&parse(src));
         assert!(elaborated.resolved.design.blocks[0].tainted.is_some());
         assert_eq!(flatten_errors(src), vec![], "{src}");
@@ -334,7 +339,7 @@ mod tests {
     /// shifts every later draw).
     #[test]
     fn a_zero_spread_is_exact() {
-        let src = "block T {\n    port g: Ground;\n    port p: Pin;\n    \
+        let src = "block T { g: Ground, p: Pin }\n\ncircuit T {\n    \
                    let r = Resistor { a: p, b: g, value: 1k ± 0% };\n    \
                    let q = Npn { c: p, b: p, e: g, beta: 200..=200 };\n}\n";
         let elaborated = elaborate(&parse(src));
@@ -351,9 +356,9 @@ mod tests {
     /// still checked as a whole.
     #[test]
     fn an_error_elsewhere_still_checks_the_root() {
-        let src = "block T {\n    port g: Ground;\n    net x;\n    \
+        let src = "block T { g: Ground }\n\ncircuit T {\n    net x;\n    \
                    let r = Resistor { a: x, b: x, value: 1k };\n}\n\n\
-                   block Other {\n    port g: Ground;\n    let n = Nothing { g };\n}\n";
+                   block Other { g: Ground }\n\ncircuit Other {\n    let n = Nothing { g };\n}\n";
         let mut names: Vec<&str> = flatten_errors(src).iter().map(|e| e.kind.name()).collect();
         names.sort();
         assert_eq!(names, ["IsolatedNets", "ShortedPart"]);
@@ -364,8 +369,8 @@ mod tests {
     /// up the tree rely on.
     #[test]
     fn ancestors_and_paths_from_a_scope() {
-        let src = "block C {\n    port p: Pin;\n}\n\nblock B {\n    port p: Pin;\n    \
-                   let c = C { p };\n}\n\nblock A {\n    port p: Pin;\n    let b = B { p };\n}\n";
+        let src = "block C { p: Pin }\n\ncircuit C {}\n\nblock B { p: Pin }\n\ncircuit B {\n    \
+                   let c = C { p };\n}\n\nblock A { p: Pin }\n\ncircuit A {\n    let b = B { p };\n}\n";
         let elaborated = elaborate(&parse(src));
         let [flat] = elaborated.roots().collect::<Vec<_>>()[..] else {
             panic!("one root")
@@ -391,11 +396,11 @@ mod tests {
     #[test]
     fn deep_hierarchy_stays_linear() {
         let mut src = String::from(
-            "block L0 {\n    port p: Pin;\n    port g: Ground;\n    let r = Resistor { a: p, b: g, value: 1k ± 1% };\n}\n",
+            "block L0 { p: Pin, g: Ground }\n\ncircuit L0 {\n    let r = Resistor { a: p, b: g, value: 1k ± 1% };\n}\n",
         );
         for i in 1..3000 {
             src.push_str(&format!(
-                "block L{i} {{\n    port p: Pin;\n    port g: Ground;\n    let inner = L{} {{ p, g }};\n}}\n",
+                "block L{i} {{ p: Pin, g: Ground }}\n\ncircuit L{i} {{\n    let inner = L{} {{ p, g }};\n}}\n",
                 i - 1
             ));
         }

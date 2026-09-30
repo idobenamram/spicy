@@ -19,6 +19,5 @@ let a：b;
 let a = b；
 let a = f（b）;
 let a = b ＋ c;
-let s = Step { 1V → 2V };
 let a = b c;
 let a = b c;

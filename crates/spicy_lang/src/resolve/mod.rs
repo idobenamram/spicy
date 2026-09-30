@@ -4,19 +4,19 @@
 //!
 //! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), read top
 //! to bottom in [`resolve`]:
-//! 1. **The file's names:** every block's name, then every block's [`Signature`] (its
-//!    ports), then the contracts. A block can be placed before its definition.
-//! 2. **The bodies:** each block's body, by a [`BodyResolver`](body::BodyResolver) of
-//!    its own, which has two passes of its own: every name the body declares, then
+//! 1. **The file's names:** every block's name, its circuit and contract (each named
+//!    after it), then every block's [`Signature`] (its ports). A block can be placed
+//!    before its definition.
+//! 2. **The circuits:** each block's circuit, by a [`BodyResolver`](body::BodyResolver)
+//!    of its own, which has two passes of its own: every name the circuit declares, then
 //!    every statement, so statement order never matters.
 //! 3. **What's broken:** every block with an error inside it is tainted
 //!    ([`Block::tainted`]), so flatten doesn't check a circuit with a part missing.
 //!
 //! Errors never stop the stage (E7): a name that doesn't resolve becomes a placeholder
 //! holding the proof it was reported (an `InstanceOf::Error`, an `Err` binding), reported
-//! once. A second definition of a
-//! name (a block, a port, a `net` or `let`) is checked for its own mistakes, then
-//! dropped: it never enters the design.
+//! once. A second definition of a name (a block, a circuit, a port, a `net` or `let`) is
+//! checked for its own mistakes, then dropped: it never enters the design.
 //!
 //! Contracts are only matched to their blocks here; their contents are resolved in the
 //! next step (roadmap M1d-5).
@@ -39,7 +39,7 @@ use spicy_span::Span;
 
 use crate::edit_distance::edit_distance;
 use crate::parser::Parsed;
-use crate::parser::ast::{self, Body, Ident, ItemKind, StmtKind};
+use crate::parser::ast::{self, BlockDecl, BlockEntry, Body, Ident, ItemKind};
 use body::BodyResolver;
 
 /// Everything resolving produces: the design, where each part of it was written, and
@@ -64,48 +64,77 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         suggestions_left: SUGGESTION_BUDGET,
     };
 
-    // Pass 1, the file's names: every block's name, then every block's ports, then the
-    // contracts. A block can be placed, and a port typed, before its definition.
-    let (bodies, block_spans, second_bodies) = r.declare_blocks();
-    let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) =
-        bodies.iter().map(|body| r.signature(body)).unzip();
-    let contracts = r.match_contracts(signatures.len());
+    // Pass 1, the file's names: every block's name, its circuit and contract, then
+    // every block's ports. A block can be placed, and a port typed, before its
+    // definition.
+    let (decls, block_spans, second_decls) = r.declare_blocks();
+    let (circuits, second_circuits) = r.match_to_blocks(NameKind::Circuit, decls.len());
+    let (contracts, _) = r.match_to_blocks(NameKind::Contract, decls.len());
+    let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) = decls
+        .iter()
+        .zip(&circuits)
+        .map(|(decl, circuit)| r.signature(decl, circuit.is_some()))
+        .unzip();
 
-    // Pass 2, the bodies: each block's nets, instances and merges.
+    // A second circuit of a block is checked against the block's ports (see below).
+    let second_starts: Vec<BlockBuilder> = second_circuits
+        .iter()
+        .map(|&(_, block)| starts[block.index()].clone())
+        .collect();
+
+    // Pass 2, the circuits: each block's nets, instances and merges.
     let mut design = Design {
-        contracts,
+        contracts: contracts.iter().map(|c| c.map(|_| Contract {})).collect(),
         ..Design::default()
     };
     let mut source_map = DesignSourceMap::default();
-    for ((signature, start), body) in signatures.iter().zip(starts).zip(&bodies) {
-        let body_resolver = BodyResolver::new(&mut r, &signatures, signature, start, body);
-        let (block, spans) = body_resolver.resolve(body);
+    for ((signature, start), circuit) in signatures.iter().zip(starts).zip(&circuits) {
+        let stmts = circuit.map_or(&[][..], |(body, _)| &body.stmts);
+        let body_resolver = BodyResolver::new(&mut r, &signatures, signature, start, stmts);
+        let (block, spans) = body_resolver.resolve(stmts);
         design.blocks.push(block);
         source_map.blocks.push(spans);
     }
-    // A second block of a name gets the same checks, for its own mistakes, then is
-    // dropped: it isn't part of the design.
-    for &(body, _) in &second_bodies {
-        let (signature, start) = r.signature(body);
-        BodyResolver::new(&mut r, &signatures, &signature, start, body).resolve(body);
+    // A second block or circuit of a name gets the same checks, for its own mistakes,
+    // then is dropped: it isn't part of the design.
+    for &(decl, _) in &second_decls {
+        r.signature(decl, false);
+    }
+    for (&(body, block), start) in second_circuits.iter().zip(second_starts) {
+        let signature = &signatures[block.index()];
+        BodyResolver::new(&mut r, &signatures, signature, start, &body.stmts).resolve(&body.stmts);
     }
 
     // Pass 3, what's broken: every block with an error in it (see `Block::tainted`).
-    // One its body's parse reported, since an error found at the next item (a missing
-    // `}`) is the open body's, not the next one's; or a lexer or resolve error inside it.
+    // One its header's or circuit's parse reported, since an error found at the next
+    // item (a missing `}`) is the open one's, not the next one's; or a lexer or resolve
+    // error inside either.
     let inside = ErrorStarts::default()
         .with(&parsed.lex_errors)
         .with(&r.errors);
-    let blocks = design.blocks.iter_mut().zip(&bodies).zip(block_spans);
-    for ((block, body), span) in blocks {
-        block.tainted = body.broken.or_else(|| inside.inside(span));
+    let blocks = design
+        .blocks
+        .iter_mut()
+        .zip(&decls)
+        .zip(block_spans)
+        .zip(&circuits);
+    for (((block, decl), span), circuit) in blocks {
+        let (circuit_broken, circuit_span) = match circuit {
+            Some((body, span)) => (body.broken, Some(*span)),
+            None => (None, None),
+        };
+        block.tainted = decl
+            .broken
+            .or(circuit_broken)
+            .or_else(|| inside.inside(span))
+            .or_else(|| circuit_span.and_then(|s| inside.inside(s)));
     }
     // A block defined twice: which definition was meant isn't known, so the first,
     // the one the design keeps, is broken too.
-    for (body, reported) in second_bodies {
+    for (decl, reported) in second_decls {
         let first = r
             .blocks
-            .get(body.name.text)
+            .get(decl.name.text)
             .expect("a second block has a first");
         design.blocks[first.index()].tainted.get_or_insert(reported);
     }
@@ -158,9 +187,15 @@ struct Resolver<'p, 'src> {
     suggestions_left: usize,
 }
 
+/// Each block's circuit or contract, if it has one, with the span of its item.
+type PerBlock<'p, 'src> = Vec<Option<(&'p Body<'src>, Span)>>;
+
 /// What the rest of the file sees of a block: its ports, by name, which a placement
-/// binds. Read-only in pass 2.
-type Signature<'src> = Scope<'src, PortId>;
+/// binds, and whether it has a circuit to place. Read-only in pass 2.
+struct Signature<'src> {
+    ports: Scope<'src, PortId>,
+    has_circuit: bool,
+}
 
 /// A block being built, with its source map: each part is added together with where it
 /// was written, so the two stay indexed alike (as rust-analyzer's `alloc_expr` records
@@ -338,37 +373,74 @@ impl<'p, 'src> Resolver<'p, 'src> {
     fn declare_blocks(
         &mut self,
     ) -> (
-        Vec<&'p Body<'src>>,
+        Vec<&'p BlockDecl<'src>>,
         Vec<Span>,
-        Vec<(&'p Body<'src>, Reported)>,
+        Vec<(&'p BlockDecl<'src>, Reported)>,
     ) {
         let (mut first, mut spans, mut second) = (Vec::new(), Vec::new(), Vec::new());
         for item in &self.parsed.file.items {
-            let ItemKind::Block(body) = &item.kind else {
+            let ItemKind::Block(decl) = &item.kind else {
                 continue;
             };
             let id = BlockId::new(first.len());
             let declared = self
                 .blocks
-                .declare(&body.name, id, NameKind::Block, &mut self.errors);
+                .declare(&decl.name, id, NameKind::Block, &mut self.errors);
             match declared {
                 Ok(()) => {
-                    first.push(body);
+                    first.push(decl);
                     spans.push(item.span);
                 }
-                Err(reported) => second.push((body, reported)),
+                Err(reported) => second.push((decl, reported)),
             }
         }
         (first, spans, second)
     }
 
+    /// Each of the `blocks` blocks' circuit or contract (`what`), the item of that kind
+    /// named after it, with the item's span. A second one of a name is a duplicate,
+    /// returned with its block; one for no block is reported.
+    fn match_to_blocks(
+        &mut self,
+        what: NameKind,
+        blocks: usize,
+    ) -> (PerBlock<'p, 'src>, Vec<(&'p Body<'src>, BlockId)>) {
+        let (mut first, mut second) = (vec![None; blocks], Vec::new());
+        let mut seen = Scope::default();
+        for item in &self.parsed.file.items {
+            let body = match (&item.kind, what) {
+                (ItemKind::Circuit(body), NameKind::Circuit)
+                | (ItemKind::Contract(body), NameKind::Contract) => body,
+                _ => continue,
+            };
+            let declared = seen.declare(&body.name, (), what, &mut self.errors);
+            match (self.blocks.get(body.name.text), declared) {
+                (Some(block), Ok(())) => first[block.index()] = Some((body, item.span)),
+                (Some(block), Err(_)) => second.push((body, block)),
+                (None, Ok(())) => {
+                    let kind = ResolveErrorKind::WithoutBlock {
+                        what,
+                        name: body.name.text.to_string(),
+                    };
+                    self.report(kind, body.name.span);
+                }
+                (None, Err(_)) => {}
+            }
+        }
+        (first, second)
+    }
+
     /// A block's signature, and the start of the block itself: its name, and its ports
     /// with their types and nets.
-    fn signature(&mut self, body: &Body<'src>) -> (Signature<'src>, BlockBuilder) {
-        let mut block = BlockBuilder::new(&body.name);
+    fn signature(
+        &mut self,
+        decl: &BlockDecl<'src>,
+        has_circuit: bool,
+    ) -> (Signature<'src>, BlockBuilder) {
+        let mut block = BlockBuilder::new(&decl.name);
         let mut ports = Scope::default();
-        for stmt in &body.stmts {
-            let StmtKind::Port { name, ty } = &stmt.kind else {
+        for port in &decl.ports {
+            let BlockEntry::Port { name, ty } = &port.kind else {
                 continue;
             };
             // Typed even when it's a second port of the name, for its own mistakes. A
@@ -382,34 +454,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
                 block.push_port(name, signal, ty.span);
             }
         }
-        (ports, block)
-    }
-
-    /// Each of the `blocks` blocks' contract: the `contract` of its name.
-    fn match_contracts(&mut self, blocks: usize) -> Vec<Option<Contract>> {
-        let mut contracts = vec![None; blocks];
-        let mut seen = Scope::default();
-        for item in &self.parsed.file.items {
-            let ItemKind::Contract(body) = &item.kind else {
-                continue;
-            };
-            if seen
-                .declare(&body.name, (), NameKind::Contract, &mut self.errors)
-                .is_err()
-            {
-                continue;
-            }
-            match self.blocks.get(body.name.text) {
-                Some(block) => contracts[block.index()] = Some(Contract {}),
-                None => {
-                    let kind = ResolveErrorKind::ContractWithoutBlock {
-                        name: body.name.text.to_string(),
-                    };
-                    self.report(kind, body.name.span);
-                }
-            }
-        }
-        contracts
+        (Signature { ports, has_circuit }, block)
     }
 
     /// A port's type: `Pin`, `Power<In>`. `Err` if it's wrong, reported, or didn't
@@ -436,7 +481,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
     ) -> Result<SignalType, ResolveError> {
         let name = self.path_text(path);
         if !SignalType::is_name(name) {
-            // `port v: Resistor;`: say what it is instead of "isn't a port type".
+            // `v: Resistor` as a port: say what it is instead of "isn't a port type".
             let is = if self.blocks.get(name).is_some() {
                 Some(NameKind::Block)
             } else {
@@ -580,8 +625,8 @@ mod tests {
         insta::assert_snapshot!(dump_resolve("ce_amp.spl", src));
     }
 
-    /// Statement order inside a block doesn't change what it means (model.md E4): every
-    /// order of `ce_amp.spl`'s block statements resolves to the same parts and bindings.
+    /// Statement order inside a circuit doesn't change what it means (model.md E4): every
+    /// order of `ce_amp.spl`'s circuit statements resolves to the same parts and bindings.
     #[test]
     fn statement_order_does_not_matter() {
         let src = include_str!("../../../../circuits/ce_amp.spl");
@@ -683,7 +728,7 @@ mod tests {
     /// place (red team B1: it used to overwrite the first instance's pins and value).
     #[test]
     fn a_duplicate_never_replaces_the_first() {
-        let src = "block B {\n    port v: Pin;\n    port g: Ground;\n    net x = [v];\n    net x = [g];\n    let r1 = Resistor { a: v, b: g, value: 1k };\n    let r1 = Resistor { a: g, b: v, value: 2k, bad: v };\n}\n";
+        let src = "block B { v: Pin, g: Ground }\n\ncircuit B {\n    net x = [v];\n    net x = [g];\n    let r1 = Resistor { a: v, b: g, value: 1k };\n    let r1 = Resistor { a: g, b: v, value: 2k, bad: v };\n}\n";
         let resolved = resolve(&parse(src));
         let b = &resolved.design.blocks[0];
         assert_eq!(b.instances.len(), 1);
@@ -704,7 +749,7 @@ mod tests {
     /// by hash, not by scanning (red team B9: 5000 unknowns took 20 s).
     #[test]
     fn many_unknown_names_stay_linear() {
-        let mut src = String::from("block B {\n    port v: Pin;\n");
+        let mut src = String::from("block B { v: Pin }\n\ncircuit B {\n");
         for i in 0..4000 {
             src.push_str(&format!(
                 "    net n{i};\n    let r{i} = Resistor {{ a: nope{i}, b: v, value: 1k }};\n"
@@ -719,24 +764,25 @@ mod tests {
         assert!(elapsed.as_secs_f64() < 2.0, "took {elapsed:?}");
     }
 
-    /// A second block of a name is resolved for its own errors, after the design's
-    /// blocks, then dropped: the design, its source map and its contracts hold the
-    /// first only, and placements bind the first's ports.
-    /// A statement whose value or type doesn't parse keeps its name, and a block whose
-    /// `{` is missing keeps its body, so nothing that uses them is reported again: only
-    /// the syntax error remains (rustc keeps a field whose expression didn't parse).
+    /// A statement whose value or a port whose type doesn't parse keeps its name, and a
+    /// block or circuit whose `{` is missing keeps its contents, so nothing that uses them
+    /// is reported again: only the syntax error remains (rustc keeps a field whose
+    /// expression didn't parse).
     #[test]
     fn a_broken_value_adds_no_resolve_errors() {
         let sources = [
             // `base` is still a net of `A`.
-            "block A {\n    port g: Ground;\n    net base = [g g];\n    \
+            "block A { g: Ground }\n\ncircuit A {\n    net base = [g g];\n    \
              let r = Resistor { a: base, b: g, value: 1k };\n}\n",
             // `a` is still a port of `Child`.
-            "block Child {\n    port a: ;\n    port g: Ground;\n}\n\n\
-             block Top {\n    port g: Ground;\n    let c = Child { a: g, g };\n}\n",
-            // `Child` is still a block.
-            "block Child\n    port a: Pin;\n}\n\n\
-             block Top {\n    port a: Pin;\n    let c = Child { a };\n}\n",
+            "block Child { a: , g: Ground }\n\ncircuit Child {}\n\n\
+             block Top { g: Ground }\n\ncircuit Top {\n    let c = Child { a: g, g };\n}\n",
+            // `Child` is still a block, with its port.
+            "block Child\n    a: Pin }\n\ncircuit Child {}\n\n\
+             block Top { a: Pin }\n\ncircuit Top {\n    let c = Child { a };\n}\n",
+            // `Child` still has its circuit.
+            "block Child { a: Pin }\n\ncircuit Child\n    net n;\n}\n\n\
+             block Top { a: Pin }\n\ncircuit Top {\n    let c = Child { a };\n}\n",
         ];
         for src in sources {
             assert!(parse(src).has_errors(), "{src}");
@@ -744,9 +790,14 @@ mod tests {
         }
     }
 
+    /// A second block or circuit of a name is resolved for its own errors, after the
+    /// design's blocks, then dropped: the design, its source map and its contracts hold
+    /// the first only, and placements bind the first's ports.
     #[test]
     fn a_second_block_is_checked_then_dropped() {
-        let src = "block A {\n    port p: Pin;\n}\nblock A {\n    port q: Bus;\n    let r = Resistor { a: q, b: nowhere, value: 1k };\n}\nblock B {\n    port x: Pin;\n    let a = A { p: x };\n}\ncontract A {}\n";
+        let src = "block A { p: Pin }\n\ncircuit A {}\n\nblock A { q: Bus }\n\n\
+                   circuit A {\n    let r = Resistor { a: p, b: nowhere, value: 1k };\n}\n\n\
+                   block B { x: Pin }\n\ncircuit B {\n    let a = A { p: x };\n}\n\ncontract A {}\n";
         let resolved = resolve(&parse(src));
         let design = &resolved.design;
         let names: Vec<&str> = design.blocks.iter().map(|b| b.name.as_str()).collect();
@@ -757,14 +808,18 @@ mod tests {
         assert_eq!(a.of, InstanceOf::Block(BlockId::new(0)));
         assert_eq!(a.pins, [Ok(NetId::new(0))]);
         let errors: Vec<_> = resolved.errors.iter().map(|e| e.kind.name()).collect();
-        assert_eq!(errors, ["Duplicate", "BadSignalType", "UnknownName"]);
+        assert_eq!(
+            errors,
+            ["Duplicate", "Duplicate", "BadSignalType", "UnknownName"]
+        );
     }
 
     /// `C { a }` where `a` is an instance: the shorthand names pin `a`, so the error
     /// says which pin, as `a: r1` does.
     #[test]
     fn shorthand_bound_to_an_instance_names_its_pin() {
-        let src = "block A {\n    port b: Pin;\n    let a = Resistor { a, b, value: 1k };\n}\n";
+        let src =
+            "block A { b: Pin }\n\ncircuit A {\n    let a = Resistor { a, b, value: 1k };\n}\n";
         let errors = resolve_errors(src);
         let kinds: Vec<_> = errors.iter().map(|e| &e.kind).collect();
         assert_eq!(
@@ -780,7 +835,7 @@ mod tests {
     /// unknown field, one missing slot) isn't a search, so it's offered past the budget.
     #[test]
     fn the_suggestion_budget_is_shared_and_renames_are_free() {
-        let mut src = String::from("block B {\n    port base: Pin;\n");
+        let mut src = String::from("block B { base: Pin }\n\ncircuit B {\n");
         for i in 0..40 {
             src.push_str(&format!(
                 "    let k{i} = Resistr {{}};\n    let r{i} = Resistor {{ a: bas, b: base, value: 1k }};\n"

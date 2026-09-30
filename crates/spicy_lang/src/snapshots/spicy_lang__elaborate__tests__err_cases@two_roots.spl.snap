@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/two_roots.spl
 ---
@@ -11,7 +12,7 @@ root Two
   Resistor f.r a→g b→g value=1000 Ω
 
 --- errors ---
-W-short ShortedPart 229..266 "let r = Resistor { a, b, value: 1k };"
+W-short ShortedPart 230..267 "let r = Resistor { a, b, value: 1k };"
 
 --- rendered ---
 warning[W-short]: both pins of `r` are on one net (in `Filter`)

@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/isolated.spl
 ---
@@ -15,9 +16,9 @@ root Island
   Resistor r a→z b→z value=1000 Ω
 
 --- errors ---
-W-isolated IsolatedNets 213..214 "x"
-W-isolated IsolatedNets 235..236 "z"
-W-short ShortedPart 400..443 "let r = Resistor { a: z, b: z, value: 1k };"
+W-isolated IsolatedNets 214..215 "x"
+W-isolated IsolatedNets 236..237 "z"
+W-short ShortedPart 401..444 "let r = Resistor { a: z, b: z, value: 1k };"
 
 --- rendered ---
 warning[W-isolated]: `x` and `y` are connected to nothing that reaches ground

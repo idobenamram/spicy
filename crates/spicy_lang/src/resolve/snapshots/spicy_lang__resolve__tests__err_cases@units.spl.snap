@@ -1,60 +1,61 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/units.spl
 ---
 block A 6..7
-  port p: Pin 19..20
-  port n: Pin 36..37
-  r1 = Resistor 52..54
+  port p: Pin 10..11
+  port n: Pin 18..19
+  r1 = Resistor 48..50
     a → p
     b → n
     value = <invalid>
-  r2 = Resistor 103..105
+  r2 = Resistor 99..101
     a → p
     b → n
     value = <invalid>
-  r3 = Resistor 153..155
+  r3 = Resistor 149..151
     a → p
     b → n
     value = <invalid>
-  r7 = Resistor 207..209
+  r7 = Resistor 203..205
     a → p
     b → n
     value = <invalid>
-  r4 = Resistor 266..268
+  r4 = Resistor 262..264
     a → p
     b → n
     value = <invalid>
-  r5 = Resistor 322..324
+  r5 = Resistor 318..320
     a → p
     b → n
     value = <invalid>
-  c1 = Capacitor 370..372
+  c1 = Capacitor 366..368
     a → p
     b → n
     value = 0.000001 F
     rating = <invalid>
-  r6 = Resistor 439..441
+  r6 = Resistor 435..437
     a → p
     b → n
     value = <invalid>
-  q1 = Npn 501..503
+  q1 = Npn 497..499
     c → p
     b → n
     e → n
     beta = <invalid>
 
 --- errors ---
-E-unit UnitMismatch 87..91 "10nF"
-E-unit UnitMismatch 138..141 "47K" fix 138..141 "47k"
-E-unit MixedUnits 188..195 "1V + 1A"
-E-unit MixedUnits 242..254 "1V / 1mA + 5"
-E-unit NotArithmetic 301..310 "10°C * 2"
-E-value NotAValue 357..358 "p"
-E-value SpreadNotAllowed 418..427 "25V ± 1%"
-E-value SpreadInArithmetic 475..483 "1k ± 1%"
-E-value RangeReversed 536..545 "300..=100"
+E-unit UnitMismatch 83..87 "10nF"
+E-unit UnitMismatch 134..137 "47K" fix 134..137 "47k"
+E-unit MixedUnits 184..191 "1V + 1A"
+E-unit MixedUnits 238..250 "1V / 1mA + 5"
+E-unit NotArithmetic 297..306 "10°C * 2"
+E-value NotAValue 353..354 "p"
+E-value SpreadNotAllowed 414..423 "25V ± 1%"
+E-value SpreadInArithmetic 471..479 "1k ± 1%"
+E-value RangeReversed 532..541 "300..=100"
 
 --- rendered ---
 error[E-unit]: expected `Ω` (a resistance), found `F` (a capacitance)

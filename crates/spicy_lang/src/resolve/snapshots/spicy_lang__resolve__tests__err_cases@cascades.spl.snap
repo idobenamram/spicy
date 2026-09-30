@@ -1,11 +1,12 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/cascades.spl
 ---
 block A 33..34
-  port vcc: <error> 113..116
-  port gnd: Ground 151..154
+  port vcc: <error> 108..111
+  port gnd: Ground 136..139
   r1 = Resistor 172..174
     a → vcc
     b → gnd
@@ -29,8 +30,8 @@ block A 33..34
     beta = <invalid>
 
 --- errors ---
-E-type BadSignalType 118..121 "Bus"
-E-duplicate Duplicate 132..135 "vcc" related 113..116
+E-type BadSignalType 113..116 "Bus"
+E-duplicate Duplicate 122..125 "vcc" related 108..111
 E-plus-minus PlusMinusTypo 339..341 "+-" fix 339..341 "±"
 E-chained Chained 404..406 "±"
 E-ambiguous-tolerance AmbiguousTolerance 460..466 "1k / 2"
@@ -38,48 +39,48 @@ E-spread ToleranceInRange 526..535 "100 ± 1%"
 
 --- rendered ---
 error[E-type]: `Bus` isn't a port type
-  --> cascades.spl:4:15
+  --> cascades.spl:4:10
   |
-4 |     port vcc: Bus;
-  |               ^^^ not a valid port type
+4 |     vcc: Bus,
+  |          ^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-duplicate]: port `vcc` is defined twice
-  --> cascades.spl:5:10
+  --> cascades.spl:5:5
   |
-4 |     port vcc: Bus;
-  |          --- first defined here
-5 |     port vcc: Pin;
-  |          ^^^ second definition
+4 |     vcc: Bus,
+  |     --- first defined here
+5 |     vcc: Pin,
+  |     ^^^ second definition
 
 error[E-plus-minus]: `+-` means `+ (-…)` in Rust
-  --> cascades.spl:9:51
-  |
-9 |     let r2 = Resistor { a: vcc, b: gnd, value: 1k +- 1% };
-  |                                                   ^^ not a tolerance
-  |
-  = help: for a tolerance write `±` or `+/-`
+   --> cascades.spl:12:51
+   |
+12 |     let r2 = Resistor { a: vcc, b: gnd, value: 1k +- 1% };
+   |                                                   ^^ not a tolerance
+   |
+   = help: for a tolerance write `±` or `+/-`
 
 error[E-chained]: tolerances can't be chained
-   --> cascades.spl:10:56
+   --> cascades.spl:13:56
    |
-10 |     let r3 = Resistor { a: vcc, b: gnd, value: 1k ± 1% ± 1% };
+13 |     let r3 = Resistor { a: vcc, b: gnd, value: 1k ± 1% ± 1% };
    |                                                        ^ second operator here
 
 error[E-ambiguous-tolerance]: ambiguous tolerance
-   --> cascades.spl:11:48
+   --> cascades.spl:14:48
    |
-11 |     let r4 = Resistor { a: vcc, b: gnd, value: 1k / 2 ± 10% };
+14 |     let r4 = Resistor { a: vcc, b: gnd, value: 1k / 2 ± 10% };
    |                                                ^^^^^^ does `±` apply to this whole expression?
    |
    = help: `(1k / 2) ± 10%` for a spread on the result
    = help: `1k / (2 ± 10%)` for a spread on one term
 
 error[E-spread]: a range endpoint can't carry a tolerance
-   --> cascades.spl:12:50
+   --> cascades.spl:15:50
    |
-12 |     let q1 = Npn { c: vcc, b: gnd, e: gnd, beta: 100 ± 1% ..= 300 };
+15 |     let q1 = Npn { c: vcc, b: gnd, e: gnd, beta: 100 ± 1% ..= 300 };
    |                                                  ^^^^^^^^ this endpoint has a tolerance
    |
    = help: use either a range `a..=b` or a tolerance `x ± t`

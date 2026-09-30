@@ -1,0 +1,16 @@
+/// Doc comments and attributes may interleave: the tree keeps them in two lists,
+#[warn]
+/// and the dump prints them in source order.
+block A {
+    #[a]
+    /// on a port too
+    #[b(1)]
+    p: Pin,
+}
+
+circuit A {
+    #[a]
+    /// and on a statement
+    #[b(1)]
+    net n;
+}

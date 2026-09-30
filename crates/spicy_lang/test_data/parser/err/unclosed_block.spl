@@ -1,5 +1,8 @@
-block A {
-    net a;
+// An item left open ends at the next item, which is read as usual.
+block A { a: Pin,
+
+circuit A {
+    net n;
 
 contract A {
     spec s: x within 1..=2;

@@ -1,27 +1,49 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicate_block_body.spl
 ---
 block A 6..7
-  port p: Pin 19..20
+  port p: Pin 10..11
 
 --- errors ---
-E-duplicate Duplicate 117..118 "A" related 6..7
-E-name UnknownName 170..177 "nowhere"
+E-duplicate Duplicate 240..241 "A" related 6..7
+E-type BadSignalType 247..250 "Bus"
+E-duplicate Duplicate 262..263 "A" related 28..29
+E-name UnknownName 298..305 "nowhere"
 
 --- rendered ---
 error[E-duplicate]: block `A` is defined twice
-  --> duplicate_block_body.spl:6:7
+  --> duplicate_block_body.spl:8:7
   |
-1 | block A {
+1 | block A { p: Pin }
   |       - first defined here
   .
-6 | block A {
+8 | block A { q: Bus }
   |       ^ second definition
 
-error[E-name]: unknown net, port or instance `nowhere`
-  --> duplicate_block_body.spl:8:33
+error[E-type]: `Bus` isn't a port type
+  --> duplicate_block_body.spl:8:14
   |
-8 |     let r = Resistor { a: q, b: nowhere, value: 1k };
-  |                                 ^^^^^^^ not defined
+8 | block A { q: Bus }
+  |              ^^^ not a valid port type
+  |
+  = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
+
+error[E-duplicate]: block `A` has two circuits
+   --> duplicate_block_body.spl:10:9
+   |
+ 3 | circuit A {}
+   |         - first circuit here
+   .
+10 | circuit A {
+   |         ^ second circuit
+   |
+   = help: merge them into one `circuit`
+
+error[E-name]: unknown net, port or instance `nowhere`
+   --> duplicate_block_body.spl:11:33
+   |
+11 |     let r = Resistor { a: p, b: nowhere, value: 1k };
+   |                                 ^^^^^^^ not defined

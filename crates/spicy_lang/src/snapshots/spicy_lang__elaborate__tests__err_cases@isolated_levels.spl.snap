@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 88
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/isolated_levels.spl
 ---
@@ -10,13 +11,13 @@ root Top
   Resistor inner.r a→n b→inner.x value=1000 Ω
 
 --- errors ---
-W-isolated IsolatedNets 358..359 "n"
+W-isolated IsolatedNets 374..375 "n"
 
 --- rendered ---
 warning[W-isolated]: `n` and `inner.x` are connected to nothing that reaches ground
-   --> isolated_levels.spl:12:9
+   --> isolated_levels.spl:14:9
    |
-12 |     net n;
+14 |     net n;
    |         ^ isolated
    |
    = note: a simulation can't solve an isolated net

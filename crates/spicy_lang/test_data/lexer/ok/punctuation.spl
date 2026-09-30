@@ -1,8 +1,7 @@
-{ } ( ) [ ] < > <= >= , ; : :: . .. ..= = + - -> * / ± +/- # ?
+{ } ( ) [ ] < > <= >= , ; : :: . .. ..= = + - * / ± +/- # ?
 a+/-b
 Foo<Tol<Ohm>>
 x<=y
 h.at(1kHz).mag()
-5mA -> 30mA
 std::prelude
 #[confidence(sigma(3))]

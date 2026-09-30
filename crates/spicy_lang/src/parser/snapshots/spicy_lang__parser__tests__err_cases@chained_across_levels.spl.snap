@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/chained_across_levels.spl
 ---
@@ -9,7 +9,7 @@ File 0..103
     Spec a Lt 17..39
       Binary Rel(Lt) 25..34
         Path x 25..26 "x"
-        Binary Range 29..34
+        Range a..=b 29..34
           Path y 29..30 "y"
           Path z 33..34 "z"
       Path w 37..38 "w"
@@ -23,7 +23,7 @@ File 0..103
             Path c 70..71 "c"
         Path d 75..76 "d"
     Spec c Lt 82..100
-      Binary Range 90..95
+      Range a..=b 90..95
         Path x 90..91 "x"
         Path y 94..95 "y"
       Path z 98..99 "z"

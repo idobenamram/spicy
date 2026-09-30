@@ -4,7 +4,7 @@
 >
 > **Scope:** syntax only. The exporter comes next, then the engine; both are out of this plan. Grammar details follow `research/contract_v4_review_implementation.md` ("[IR]"), §2.
 >
-> **Status:** steps 1 and 2 done. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added.
+> **Status:** steps 1, 2 and 3 done. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added.
 
 ---
 
@@ -73,7 +73,7 @@ We do them together, one at a time.
 
 ### Step 1: tokens
 
-- **New tokens:** `->` (`Arrow`, only when the two characters touch), and strings `"…"` on one line, with only `\"` and `\\` as escapes.
+- **New tokens:** strings `"…"` on one line, with only `\"` and `\\` as escapes. (v5's `->` was added, then dropped: see step 2.)
 - **Keywords:**
   - new: `circuit`, `setup`, `within`, `rated`, `ensure`;
   - promoted from reserved: `env`, `const`, `pub`, `for`;
@@ -81,7 +81,6 @@ We do them together, one at a time.
   - reserved: `trait`, `impl`;
   - no longer reserved: `bench` (v5 writes a test bench as a `setup`) and `param` (a parameter is a generic);
   - contextual, recognized only in their position: `mode`, `event`, `observe`, `emits`, `with`, `on`.
-- **Look-alike:** `→` reads as `->`.
 - **Units:** `y` (year) and `h` (hour).
 - **Tests:** the lexer's case files and snapshots, `keywords.spl`, plus a case for the new tokens. `lexer.md` is updated.
 
@@ -91,7 +90,8 @@ We do them together, one at a time.
 - **Open ranges:** `..=b` (no lower end) and `a..` (no upper end, legal only before `,` `}` `)` `;`). `a..b` stays an error.
 - **Index:** `m[s]`, a postfix, in the same loop as `.` and `(`.
 - **Call arguments** can be named: `f_high(-3dB, ref: dc)`.
-- **Struct fields** can be transitions: `Step { 5mA -> 30mA, edge: 1us }`.
+- **No transitions** (decided 2026-09-30, replacing v5's `5mA -> 30mA`): a step's or a sweep's levels are named fields, like every other field, so a struct literal has no positional parts and no `->` token is needed. `Step { from: 5mA, to: 30mA, edge: 1us, at: 50us }`, `Sweep { from: 4.5V, to: 3.0V, step: 10mV }`.
+- **One range node** (decided 2026-09-30): `Range { lo, hi }` for `a..=b`, `..=b` and `a..`, as rustc's `ExprKind::Range`.
 - **Named generic arguments at a placement:** `GainStage<A = Mcp6001> { … }`, recognized by `< IDENT =` ([IR] G4).
 - **Strings** as values.
 

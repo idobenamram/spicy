@@ -1,7 +1,7 @@
 // A second definition is checked for its own errors but never replaces the first.
-block A {
-    port v: Pin;
-    port g: Ground;
+block A { v: Pin, g: Ground }
+
+circuit A {
     net x = [v];
     net x = [g, nowhere];
     let r1 = Resistor { a: v, b: g, value: 1k };

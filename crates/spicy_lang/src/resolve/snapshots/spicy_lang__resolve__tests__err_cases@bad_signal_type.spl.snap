@@ -1,59 +1,60 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/bad_signal_type.spl
 ---
 block A 6..7
-  port a: <error> 19..20
-  port b: <error> 36..37
-  port c: <error> 55..56
-  port d: <error> 79..80
-  port e: <error> 102..103
+  port a: <error> 10..11
+  port b: <error> 18..19
+  port c: <error> 28..29
+  port d: <error> 43..44
+  port e: <error> 57..58
 
 --- errors ---
-E-type BadSignalType 22..25 "Bus"
-E-type BadSignalType 39..44 "Power"
-E-type BadSignalType 58..68 "Ground<In>"
-E-type BadSignalType 82..91 "Power<Up>"
-E-type BadSignalType 105..120 "Analog<In, Out>"
+E-type BadSignalType 13..16 "Bus"
+E-type BadSignalType 21..26 "Power"
+E-type BadSignalType 31..41 "Ground<In>"
+E-type BadSignalType 46..55 "Power<Up>"
+E-type BadSignalType 60..75 "Analog<In, Out>"
 
 --- rendered ---
 error[E-type]: `Bus` isn't a port type
-  --> bad_signal_type.spl:2:13
+  --> bad_signal_type.spl:1:14
   |
-2 |     port a: Bus;
-  |             ^^^ not a valid port type
+1 | block A { a: Bus, b: Power, c: Ground<In>, d: Power<Up>, e: Analog<In, Out> }
+  |              ^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Power` needs a role: `In` or `Out`
-  --> bad_signal_type.spl:3:13
+  --> bad_signal_type.spl:1:22
   |
-3 |     port b: Power;
-  |             ^^^^^ not a valid port type
+1 | block A { a: Bus, b: Power, c: Ground<In>, d: Power<Up>, e: Analog<In, Out> }
+  |                      ^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Ground` takes no role
-  --> bad_signal_type.spl:4:13
+  --> bad_signal_type.spl:1:32
   |
-4 |     port c: Ground<In>;
-  |             ^^^^^^^^^^ not a valid port type
+1 | block A { a: Bus, b: Power, c: Ground<In>, d: Power<Up>, e: Analog<In, Out> }
+  |                                ^^^^^^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Power` takes a role: `In` or `Out`
-  --> bad_signal_type.spl:5:13
+  --> bad_signal_type.spl:1:47
   |
-5 |     port d: Power<Up>;
-  |             ^^^^^^^^^ not a valid port type
+1 | block A { a: Bus, b: Power, c: Ground<In>, d: Power<Up>, e: Analog<In, Out> }
+  |                                               ^^^^^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`
 
 error[E-type]: `Analog` takes one role: `In` or `Out`
-  --> bad_signal_type.spl:6:13
+  --> bad_signal_type.spl:1:61
   |
-6 |     port e: Analog<In, Out>;
-  |             ^^^^^^^^^^^^^^^ not a valid port type
+1 | block A { a: Bus, b: Power, c: Ground<In>, d: Power<Up>, e: Analog<In, Out> }
+  |                                                             ^^^^^^^^^^^^^^^ not a valid port type
   |
   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`

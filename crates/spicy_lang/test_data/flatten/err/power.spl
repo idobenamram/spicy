@@ -1,29 +1,29 @@
 // Power roles (model.md E19): a root's own `Power<In>` and a placed block's `Power<Out>`
 // are sources; a placed block's `Power<In>` is a sink.
-block Regulator {
-    port input: Power<In>;
-    port out: Power<Out>;
-    port gnd: Ground;
+block Regulator { input: Power<In>, out: Power<Out>, gnd: Ground }
+
+circuit Regulator {
     let r = Resistor { a: input, b: out, value: 10 };
     let load = Resistor { a: out, b: gnd, value: 1k };
 }
 
-block Load {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Load { vcc: Power<In>, gnd: Ground }
+
+circuit Load {
     let r = Resistor { a: vcc, b: gnd, value: 1k };
 }
 
 // Two sources on `vcc`: the root's own port, and the regulator's output.
-block TwoSources {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block TwoSources { vcc: Power<In>, gnd: Ground }
+
+circuit TwoSources {
     let reg = Regulator { input: vcc, out: vcc, gnd };
 }
 
 // Nothing powers `rail`: the load takes power from it, and nothing gives any.
-block Unpowered {
-    port gnd: Ground;
+block Unpowered { gnd: Ground }
+
+circuit Unpowered {
     net rail;
     let load = Load { vcc: rail, gnd };
     let r = Resistor { a: rail, b: gnd, value: 1k };
@@ -32,14 +32,15 @@ block Unpowered {
 // Nothing powers `rail`, and the load on it is inside `pass`: `pass.vcc` only passes
 // the power on, so the load listed is `pass.inner.vcc` (as KiCad lists pins, not sheet
 // pins).
-block Pass {
-    port vcc: Power<In>;
-    port gnd: Ground;
+block Pass { vcc: Power<In>, gnd: Ground }
+
+circuit Pass {
     let inner = Load { vcc, gnd };
 }
 
-block PassedOn {
-    port gnd: Ground;
+block PassedOn { gnd: Ground }
+
+circuit PassedOn {
     net rail;
     let pass = Pass { vcc: rail, gnd };
     let r = Resistor { a: rail, b: gnd, value: 1k };

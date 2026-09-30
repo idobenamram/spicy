@@ -1,0 +1,54 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/circuits.spl
+---
+block Top 161..164
+  port a: Pin 167..168
+  port b: Pin 175..176
+  i = block Interface 207..208
+    a → a
+    b → b
+  r = Resistor 239..240
+    a → a
+    b → b
+    value = 1000 Ω
+block Interface 282..291
+  port a: Pin 294..295
+  port b: Pin 302..303
+block Unused 318..324
+  port a: Pin 327..328
+
+--- errors ---
+E-circuit NoCircuit 211..220 "Interface"
+E-circuit WithoutBlock 402..409 "Nowhere"
+E-duplicate Duplicate 434..437 "Top" related 193..196
+
+--- rendered ---
+error[E-circuit]: block `Interface` has no circuit
+  --> circuits.spl:6:13
+  |
+6 |     let i = Interface { a, b };
+  |             ^^^^^^^^^ placed here
+  |
+  = help: write `circuit Interface { … }` with its nets and parts
+
+error[E-circuit]: circuit for an unknown block `Nowhere`
+   --> circuits.spl:15:9
+   |
+15 | circuit Nowhere {
+   |         ^^^^^^^ no block with this name
+   |
+   = note: a circuit is the inside of the block of the same name
+
+error[E-duplicate]: block `Top` has two circuits
+   --> circuits.spl:19:9
+   |
+ 5 | circuit Top {
+   |         --- first circuit here
+   .
+19 | circuit Top {}
+   |         ^^^ second circuit
+   |
+   = help: merge them into one `circuit`

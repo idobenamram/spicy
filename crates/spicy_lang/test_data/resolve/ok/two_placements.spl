@@ -1,18 +1,19 @@
 block Stereo {
-    port v12: Power<In>;
-    port gnd: Ground;
-    port left_in: Analog<In>;
-    port right_in: Analog<In>;
-    port left_out: Analog<Out>;
-    port right_out: Analog<Out>;
+    v12: Power<In>,
+    gnd: Ground,
+    left_in: Analog<In>,
+    right_in: Analog<In>,
+    left_out: Analog<Out>,
+    right_out: Analog<Out>,
+}
+
+circuit Stereo {
     let left  = Stage { vcc: v12, gnd, input: left_in,  output: left_out };
     let right = Stage { vcc: v12, gnd, input: right_in, output: right_out };
 }
 
-block Stage {
-    port vcc: Power<In>;
-    port gnd: Ground;
-    port input: Analog<In>;
-    port output: Analog<Out>;
+block Stage { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Stage {
     let r = Resistor { a: input, b: output, value: 10k ± 1% };
 }

@@ -1,40 +1,40 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 549
+assertion_line: 594
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/unsupported.spl
 ---
-block A 170..171
-  port p: Pin 183..184
-  port n: Pin 200..201
-  r = Resistor 216..217
+block A 141..142
+  port p: Pin 145..146
+  port n: Pin 153..154
+  r = Resistor 183..184
     a → p
     b → n
     value = 1000 Ω
-  s = Resistor 271..272
+  s = Resistor 238..239
     a → p
     b → <unbound>
     value = 1000 Ω
-  t = Resistor 396..397
+  t = Resistor 362..363
     a → p
     b → n
     value = <invalid>
-  u = Resistor 447..448
+  u = Resistor 413..414
     a → p
     b → n
     value = <invalid>
-  v = Resistor 497..498
+  v = Resistor 463..464
     a → <unbound>
     b → n
     value = 1000 Ω
 
 --- errors ---
-E-unsupported Unsupported 229..234 "N = 2"
-E-binding Missing 275..283 "Resistor"
-E-unsupported Unsupported 292..298 "1 -> 2"
-E-value NotAValue 430..435 "..=1k"
-E-value NotAValue 481..485 "\"1k\""
-E-binding NotANet 515..519 "p[0]"
+E-unsupported Unsupported 196..201 "N = 2"
+E-binding Missing 242..250 "Resistor"
+E-unsupported Unsupported 251..256 "N = 2"
+E-value NotAValue 396..401 "..=1k"
+E-value NotAValue 447..451 "\"1k\""
+E-binding NotANet 481..485 "p[0]"
 
 --- rendered ---
 error[E-unsupported]: not supported yet: generic arguments
@@ -46,14 +46,14 @@ error[E-unsupported]: not supported yet: generic arguments
 error[E-binding]: `Resistor` is missing `b`
   --> unsupported.spl:7:13
   |
-7 |     let s = Resistor { a: p, 1 -> 2, value: 1k };
+7 |     let s = Resistor<N = 2> { a: p, value: 1k };
   |             ^^^^^^^^ needs `b`
 
-error[E-unsupported]: not supported yet: a transition in a placement
-  --> unsupported.spl:7:30
+error[E-unsupported]: not supported yet: generic arguments
+  --> unsupported.spl:7:22
   |
-7 |     let s = Resistor { a: p, 1 -> 2, value: 1k };
-  |                              ^^^^^^ not supported yet
+7 |     let s = Resistor<N = 2> { a: p, value: 1k };
+  |                      ^^^^^ not supported yet
 
 error[E-value]: expected a number
   --> unsupported.spl:9:43

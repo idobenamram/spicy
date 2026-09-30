@@ -1,19 +1,20 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/field_equals.spl
 ---
-File 0..55
-  Block A 0..54
-    Let r 14..52
-      StructLit Resistor 22..51
-        Field a 33..40
-          Path vcc 37..40 "vcc"
-        Field b 42..49
-          Path base 45..49 "base"
+File 0..57
+  Circuit A 0..56
+    Let r 16..54
+      StructLit Resistor 24..53
+        Field a 35..42
+          Path vcc 39..42 "vcc"
+        Field b 44..51
+          Path base 47..51 "base"
 
 --- errors ---
-E-syntax FieldEquals 35..36 "=" fix 35..36 ":"
+E-syntax FieldEquals 37..38 "=" fix 37..38 ":"
 
 --- rendered ---
 error[E-syntax]: fields use `:`, not `=`

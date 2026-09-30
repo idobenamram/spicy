@@ -1,49 +1,51 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1043
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/postfix_and_prefix.spl
 ---
-File 0..252
-  Block P 0..251
-    Let a 95..120
-      Call 103..119
-        Field .mag 103..117
-          Call 103..113
-            Field .at 103..107
-              Path h 103..104 "h"
-            Quantity 1e3 Hz 108..112 "1kHz"
-    Let b 125..144
-      Neg 133..143
-        Call 134..143
-          Call 134..140
-            Field .y 134..137
-              Path x 134..135 "x"
-            Quantity 1e0 138..139 "1"
-          Quantity 2e0 141..142 "2"
-    Let c 149..164
-      Neg 157..163
-        Neg 159..163
-          Quantity 3e0 dB 160..163 "3dB"
-    Let d 169..184
-      Binary Mul 177..183
-        Neg 177..179
-          Path a 178..179 "a"
-        Path b 182..183 "b"
-    Let e 189..216
-      Array 197..215
-        Paren 198..201
-          Path a 199..200 "a"
-        Array 203..210
-          Path b 204..205 "b"
-          Path c 207..208 "c"
-        Neg 212..214
-          Path d 213..214 "d"
-    Let f 221..249
-      StructLit R 229..248
-        Field v 233..246
-          Neg 236..246
-            Field .c 237..246
-              Paren 237..244
-                Binary Add 238..243
-                  Path a 238..239 "a"
-                  Path b 242..243 "b"
+File 0..266
+  Block P 0..10
+  Circuit P 12..265
+    Let a 109..134
+      Call 117..133
+        Field .mag 117..131
+          Call 117..127
+            Field .at 117..121
+              Path h 117..118 "h"
+            Quantity 1e3 Hz 122..126 "1kHz"
+    Let b 139..158
+      Neg 147..157
+        Call 148..157
+          Call 148..154
+            Field .y 148..151
+              Path x 148..149 "x"
+            Quantity 1e0 152..153 "1"
+          Quantity 2e0 155..156 "2"
+    Let c 163..178
+      Neg 171..177
+        Neg 173..177
+          Quantity 3e0 dB 174..177 "3dB"
+    Let d 183..198
+      Binary Mul 191..197
+        Neg 191..193
+          Path a 192..193 "a"
+        Path b 196..197 "b"
+    Let e 203..230
+      Array 211..229
+        Paren 212..215
+          Path a 213..214 "a"
+        Array 217..224
+          Path b 218..219 "b"
+          Path c 221..222 "c"
+        Neg 226..228
+          Path d 227..228 "d"
+    Let f 235..263
+      StructLit R 243..262
+        Field v 247..260
+          Neg 250..260
+            Field .c 251..260
+              Paren 251..258
+                Binary Add 252..257
+                  Path a 252..253 "a"
+                  Path b 256..257 "b"

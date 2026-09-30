@@ -11,4 +11,6 @@ contract R {
     spec h: x within ..=v + 1V;
     spec i: x within v - 1V..;
     let j = w { window: ..=(drop.end + 1s) };
+    // So is the `>` that closes generic arguments.
+    let k = G<R = 1..> {};
 }

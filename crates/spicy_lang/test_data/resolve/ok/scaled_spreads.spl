@@ -1,6 +1,6 @@
-block Spreads {
-    port a: Pin;
-    port b: Pin;
+block Spreads { a: Pin, b: Pin }
+
+circuit Spreads {
     let r1 = Resistor { a, b, value: 2 * (1k ± 1%) };
     let r2 = Resistor { a, b, value: (10k ± 500) / 2 };
     let r3 = Resistor { a, b, value: 47k ± (1%) };

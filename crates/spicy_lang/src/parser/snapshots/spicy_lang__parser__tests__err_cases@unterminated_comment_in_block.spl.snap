@@ -1,15 +1,16 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1059
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/unterminated_comment_in_block.spl
 ---
-File 0..60
-  Block A 0..26
-    Let x 14..26
-      ExprError 22..26 "f(1,"
+File 0..62
+  Circuit A 0..28
+    Let x 16..28
+      ExprError 24..28 "f(1,"
 
 --- errors ---
-E-unterminated-comment UnterminatedBlockComment 27..29 "/*"
+E-unterminated-comment UnterminatedBlockComment 29..31 "/*"
 
 --- rendered ---
 error[E-unterminated-comment]: unterminated block comment

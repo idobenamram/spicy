@@ -1,4 +1,5 @@
-block A {
-    port p: Pin;
+block A { p: Pin }
+
+circuit A {
     net x = p;
 }

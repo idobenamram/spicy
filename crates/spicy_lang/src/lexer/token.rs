@@ -27,7 +27,6 @@ pub enum TokenKind {
     KwEnv,
     KwConst,
     KwPub,
-    KwPort,
     KwNet,
     KwLet,
     KwAssume,
@@ -67,8 +66,6 @@ pub enum TokenKind {
     Eq,
     Plus,
     Minus,
-    /// `->`, the two characters touching: a transition (`5mA -> 30mA`).
-    Arrow,
     Star,
     Slash,
     /// `±` or `+/-`.

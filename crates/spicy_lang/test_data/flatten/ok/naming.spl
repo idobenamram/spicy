@@ -1,15 +1,14 @@
 // How a merged net is named (model.md §9, pass 5): the smallest key wins, comparing
 // depth, then rank (port, merge target, net), then the path.
-block Child {
-    port aaa: Pin;
-    port g: Ground;
+block Child { aaa: Pin, g: Ground }
+
+circuit Child {
     let r = Resistor { a: aaa, b: g, value: 1k };
 }
 
-block Top {
-    port g: Ground;
-    port p: Pin;
+block Top { g: Ground, p: Pin }
 
+circuit Top {
     // Depth first: `zzz` (depth 0) beats the child's port `c.aaa` (depth 1), although
     // `aaa` sorts first.
     net zzz;

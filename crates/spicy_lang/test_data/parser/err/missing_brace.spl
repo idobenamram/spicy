@@ -1,11 +1,15 @@
-// A body's statements without the `{` before them: a soft error, like a missing `;`.
-// It's reported with the insertion, and the body is read on, so `Child` keeps its name
-// and `Top`'s placement of it resolves.
+// An item's contents without the `{` before them: a soft error, like a missing `;`.
+// It's reported with the insertion, and the item is read on, so `Child` keeps its name
+// and its ports, and `Top`'s placement of it resolves.
 block Child
-    port a: Pin;
+    a: Pin }
+
+circuit Child
+    let r = Resistor { a, b: a, value: 1k };
 }
 
-block Top {
-    port a: Pin;
+block Top { a: Pin }
+
+circuit Top {
     let c = Child { a };
 }

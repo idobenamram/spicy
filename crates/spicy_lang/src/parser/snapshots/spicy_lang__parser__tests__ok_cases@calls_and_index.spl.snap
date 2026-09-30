@@ -1,69 +1,61 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 957
+assertion_line: 1072
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/ok/calls_and_index.spl
 ---
-File 0..390
-  Contract C 0..389
-    Let a 71..103
-      Call 79..102
-        Field .f_high 79..87
-          Path h 79..80 "h"
-        Neg 88..92
-          Quantity 3e0 dB 89..92 "3dB"
-        Arg ref 94..101
-          Path dc 99..101 "dc"
-    Let b 108..136
-      Call 116..135
-        Path Sweep 116..121 "Sweep"
-        Transition 122..134
-          Quantity 4.5e0 V 122..126 "4.5V"
-          Quantity 3e0 V 130..134 "3.0V"
-    Let c 141..169
-      Call 149..168
-        Path f 149..150 "f"
-        Arg x 151..155
-          Quantity 1e0 154..155 "1"
-        Transition 157..163
-          Quantity 2e0 157..158 "2"
-          Quantity 3e0 162..163 "3"
-        Path y 165..166 "y"
-    Let d 251..288
-      Call 259..287
-        Field .mag 259..285
-          Call 259..281
-            Field .at 259..275
-              Index 259..272
-                Call 259..268
-                  Path ac 259..261 "ac"
-                  Field .v 262..267
-                    Path out 262..265 "out"
-                Path dm 269..271 "dm"
-            Quantity 6e1 Hz 276..280 "60Hz"
-    Let e 293..343
-      Binary Div 301..342
-        Paren 301..334
-          Binary Sub 302..333
-            Index 302..316
-              Field .code 302..310
-                Path mcu 302..305 "mcu"
-              Path full 311..315 "full"
-            Index 319..333
-              Field .code 319..327
-                Path mcu 319..322 "mcu"
-              Path zero 328..332 "zero"
-        Quantity 1e-1 V 337..342 "100mV"
-    Let g 348..368
-      Index 356..367
-        Index 356..360
-          Path a 356..357 "a"
-          Path b 358..359 "b"
-        Binary Add 361..366
-          Path c 361..362 "c"
-          Quantity 1e0 365..366 "1"
-    Let k 373..387
-      Neg 381..386
-        Index 382..386
-          Path m 382..383 "m"
-          Path s 384..385 "s"
+File 0..345
+  Contract C 0..344
+    Let a 64..96
+      Call 72..95
+        Field .f_high 72..80
+          Path h 72..73 "h"
+        Neg 81..85
+          Quantity 3e0 dB 82..85 "3dB"
+        Arg ref 87..94
+          Path dc 92..94 "dc"
+    Let c 101..124
+      Call 109..123
+        Path f 109..110 "f"
+        Arg x 111..115
+          Quantity 1e0 114..115 "1"
+        Quantity 2e0 117..118 "2"
+        Path y 120..121 "y"
+    Let d 206..243
+      Call 214..242
+        Field .mag 214..240
+          Call 214..236
+            Field .at 214..230
+              Index 214..227
+                Call 214..223
+                  Path ac 214..216 "ac"
+                  Field .v 217..222
+                    Path out 217..220 "out"
+                Path dm 224..226 "dm"
+            Quantity 6e1 Hz 231..235 "60Hz"
+    Let e 248..298
+      Binary Div 256..297
+        Paren 256..289
+          Binary Sub 257..288
+            Index 257..271
+              Field .code 257..265
+                Path mcu 257..260 "mcu"
+              Path full 266..270 "full"
+            Index 274..288
+              Field .code 274..282
+                Path mcu 274..277 "mcu"
+              Path zero 283..287 "zero"
+        Quantity 1e-1 V 292..297 "100mV"
+    Let g 303..323
+      Index 311..322
+        Index 311..315
+          Path a 311..312 "a"
+          Path b 313..314 "b"
+        Binary Add 316..321
+          Path c 316..317 "c"
+          Quantity 1e0 320..321 "1"
+    Let k 328..342
+      Neg 336..341
+        Index 337..341
+          Path m 337..338 "m"
+          Path s 339..340 "s"

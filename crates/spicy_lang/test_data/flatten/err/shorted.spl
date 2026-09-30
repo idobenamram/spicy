@@ -2,27 +2,28 @@
 // are different ports of `Filter`, joined by the parent. Reported once for both
 // placements, as `Filter`'s own. In `Stage`, only one of three placements ties its
 // ports: it's said which, and how many (slang's "in 1 of 3 instances, e.g. …").
-block Filter {
-    port a: Pin;
-    port b: Pin;
+block Filter { a: Pin, b: Pin }
+
+circuit Filter {
     let r = Resistor { a, b, value: 1k };
 }
 
-block Board {
-    port g: Ground;
+block Board { g: Ground }
+
+circuit Board {
     let one = Filter { a: g, b: g };
     let two = Filter { a: g, b: g };
 }
 
-block Stage {
-    port a: Pin;
-    port b: Pin;
+block Stage { a: Pin, b: Pin }
+
+circuit Stage {
     let r = Capacitor { a, b, value: 1u };
 }
 
-block Bench {
-    port g: Ground;
-    port x: Pin;
+block Bench { g: Ground, x: Pin }
+
+circuit Bench {
     let first = Stage { a: g, b: x };
     let second = Stage { a: x, b: x };
     let third = Stage { a: x, b: g };

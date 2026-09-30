@@ -1,34 +1,35 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 582
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicates.spl
 ---
 block A 6..7
-  port p: Pin 19..20
-  net n 52..53
-  r = Resistor 74..75
+  port p: Pin 10..11
+  net n 48..49
+  r = Resistor 70..71
     a → p
     b → n
     value = 1000 Ω
 contract A
 
 --- errors ---
-E-duplicate Duplicate 36..37 "p" related 19..20
-E-duplicate Duplicate 63..64 "n" related 52..53
-E-duplicate Duplicate 112..121 "value: 2k" related 101..110
-E-duplicate Duplicate 133..134 "r" related 74..75
-E-duplicate Duplicate 154..158 "a: n" related 148..152
-E-duplicate Duplicate 188..189 "A" related 6..7
-E-duplicate Duplicate 235..236 "A" related 221..222
+E-duplicate Duplicate 18..19 "p" related 10..11
+E-duplicate Duplicate 59..60 "n" related 48..49
+E-duplicate Duplicate 108..117 "value: 2k" related 97..106
+E-duplicate Duplicate 129..130 "r" related 70..71
+E-duplicate Duplicate 150..154 "a: n" related 144..148
+E-duplicate Duplicate 184..185 "A" related 6..7
+E-duplicate Duplicate 221..222 "A" related 207..208
 
 --- rendered ---
 error[E-duplicate]: port `p` is defined twice
-  --> duplicates.spl:3:10
+  --> duplicates.spl:1:19
   |
-2 |     port p: Pin;
-  |          - first defined here
-3 |     port p: Pin;
-  |          ^ second definition
+1 | block A { p: Pin, p: Pin }
+  |           -       ^ second definition
+  |           |        
+  |           first defined here
 
 error[E-duplicate]: name `n` is defined twice
   --> duplicates.spl:5:9
@@ -65,18 +66,18 @@ error[E-duplicate]: `a` is given twice
 error[E-duplicate]: block `A` is defined twice
    --> duplicates.spl:10:7
    |
- 1 | block A {
+ 1 | block A { p: Pin, p: Pin }
    |       - first defined here
    .
-10 | block A {
+10 | block A { q: Pin }
    |       ^ second definition
 
 error[E-duplicate]: block `A` has two contracts
-   --> duplicates.spl:15:10
+   --> duplicates.spl:13:10
    |
-14 | contract A {}
+12 | contract A {}
    |          - first contract here
-15 | contract A {}
+13 | contract A {}
    |          ^ second contract
    |
    = help: merge them into one `contract`

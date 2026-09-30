@@ -1,29 +1,29 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 973
+assertion_line: 1088
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/half_open_range.spl
 ---
-File 0..233
-  Block A 0..232
-    Let q 14..45
-      StructLit Npn 22..44
-        Field beta 28..42
-          Binary Range 34..42
-            Quantity 1e2 34..37 "100"
-            Quantity 3e2 39..42 "300"
-    Let p 101..129
-      StructLit Npn 109..128
-        Field beta 115..126
-          RangeTo 121..126
-            Quantity 3e2 123..126 "300"
-    Let s 200..230
-      ExprError 208..230 "Npn { beta: 100..(1 };"
+File 0..235
+  Circuit A 0..234
+    Let q 16..47
+      StructLit Npn 24..46
+        Field beta 30..44
+          Range a..=b 36..44
+            Quantity 1e2 36..39 "100"
+            Quantity 3e2 41..44 "300"
+    Let p 103..131
+      StructLit Npn 111..130
+        Field beta 117..128
+          Range ..=b 123..128
+            Quantity 3e2 125..128 "300"
+    Let s 202..232
+      ExprError 210..232 "Npn { beta: 100..(1 };"
 
 --- errors ---
-E-range HalfOpenRange 37..39 ".." fix 37..39 "..="
-E-range HalfOpenRange 121..123 ".." fix 121..123 "..="
-E-syntax Expected 228..229 "}"
+E-range HalfOpenRange 39..41 ".." fix 39..41 "..="
+E-range HalfOpenRange 123..125 ".." fix 123..125 "..="
+E-syntax Expected 230..231 "}"
 
 --- rendered ---
 error[E-range]: a range's end is written after `..=`

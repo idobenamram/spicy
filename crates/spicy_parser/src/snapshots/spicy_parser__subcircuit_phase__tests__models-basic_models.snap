@@ -24,7 +24,8 @@ expression: json
           "exponent": -4.0,
           "suffix": null,
           "scaled": 0.0001
-        }
+        },
+        "tnom": null
       }
     },
     "Lslow": {
@@ -46,7 +47,8 @@ expression: json
           "exponent": -5.0,
           "suffix": null,
           "scaled": 0.00002
-        }
+        },
+        "tnom": null
       }
     },
     "mymodel1": {
@@ -60,7 +62,8 @@ expression: json
         "tc1": null,
         "tc2": null,
         "w": null,
-        "l": null
+        "l": null,
+        "tnom": null
       }
     },
     "mymodel2": {
@@ -74,7 +77,8 @@ expression: json
         "tc1": null,
         "tc2": null,
         "w": null,
-        "l": null
+        "l": null,
+        "tnom": null
       }
     },
     "mymodel3": {
@@ -88,7 +92,8 @@ expression: json
         "tc1": null,
         "tc2": null,
         "w": null,
-        "l": null
+        "l": null,
+        "tnom": null
       }
     },
     "mymodel4": {
@@ -102,7 +107,8 @@ expression: json
         "tc1": null,
         "tc2": null,
         "w": null,
-        "l": null
+        "l": null,
+        "tnom": null
       }
     },
     "mymodel5": {
@@ -116,7 +122,8 @@ expression: json
         "tc1": null,
         "tc2": null,
         "w": null,
-        "l": null
+        "l": null,
+        "tnom": null
       }
     },
     "R1": {
@@ -150,7 +157,8 @@ expression: json
           "exponent": null,
           "suffix": null,
           "scaled": 3.0
-        }
+        },
+        "tnom": null
       }
     }
   }

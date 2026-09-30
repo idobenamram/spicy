@@ -41,6 +41,8 @@ impl SpicyError {
                 | ParserError::InvalidCommandType { span, .. }
                 | ParserError::InvalidOperation { span, .. }
                 | ParserError::InvalidParam { span, .. }
+                | ParserError::UnknownOption { span, .. }
+                | ParserError::TemperatureList { span }
                 | ParserError::UnmatchedBrace { span }
                 | ParserError::EmptyExpressionInsideBraces { span }
                 | ParserError::MissingModel { span, .. }
@@ -137,6 +139,12 @@ pub enum ParserError {
 
     #[error("invalid param: {param}")]
     InvalidParam { param: String, span: Span },
+
+    #[error("unknown option '{option}': the options read are tnom, reltol, vntol, abstol")]
+    UnknownOption { option: String, span: Span },
+
+    #[error("`.temp` takes one value: a list of temperatures is one run per temperature")]
+    TemperatureList { span: Span },
 
     #[error("invalid operation: {operation}")]
     InvalidOperation { operation: String, span: Span },

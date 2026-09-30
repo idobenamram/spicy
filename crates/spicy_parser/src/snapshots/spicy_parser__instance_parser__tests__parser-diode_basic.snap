@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/instance_parser.rs
-assertion_line: 1269
+assertion_line: 1325
 expression: deck
 ---
 Deck {
@@ -67,6 +67,9 @@ Deck {
                             scaled: 2.0,
                         },
                     ),
+                    eg: None,
+                    xti: None,
+                    tnom: None,
                 },
                 area: Some(
                     Value {

@@ -16,6 +16,8 @@ pub struct BjtSpec {
     pub off: Option<bool>,
     pub ic_vbe: Option<Value>,
     pub ic_vce: Option<Value>,
+    pub temp: Option<Value>,
+    pub dtemp: Option<Value>,
 }
 
 impl BjtSpec {
@@ -41,6 +43,8 @@ impl BjtSpec {
             off: None,
             ic_vbe: None,
             ic_vce: None,
+            temp: None,
+            dtemp: None,
         }
     }
 
@@ -59,5 +63,13 @@ impl BjtSpec {
     pub fn set_ic(&mut self, vbe: Value, vce: Option<Value>) {
         self.ic_vbe = Some(vbe);
         self.ic_vce = vce;
+    }
+
+    pub fn set_temp(&mut self, value: Value) {
+        self.temp = Some(value);
+    }
+
+    pub fn set_dtemp(&mut self, value: Value) {
+        self.dtemp = Some(value);
     }
 }

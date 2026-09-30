@@ -559,29 +559,34 @@ pub fn engine_deck(design: &FlatDesign, knobs: &KnobTable, options: &SpiceOption
 
 ### 5.2 `spicy_circuit`: what the model tables must carry for D-A
 
-Following the existing pattern in `crates/spicy_circuit/src/params.rs`, every parameter the front-ends accept is carried, and the ones the simulator doesn't use yet say "Not simulated yet":
+**Done (2026-09-30).** Following the existing pattern in `crates/spicy_circuit/src/params.rs`, every parameter the front-ends accept is carried, and the ones the simulator doesn't use yet say "Not simulated yet". The first draft had a separate `Conditions { temp, tnom }` and `tnom: Option<f64>`. A reference check replaced it with ngspice's shape, where TNOM is a model parameter filled in when the model is built (`bjttemp.c:42`: `if(!model->BJTtnomGiven) model->BJTtnom = ckt->CKTnomTemp`):
 
 | Where | Field | Default | Doc |
 |---|---|---|---|
-| `BjtModel` | `xtb: f64` | 0.0 | forward/reverse β temperature exponent. Not simulated yet: temperature support (M2c) |
-| `BjtModel` | `xti: f64` | 3.0 | saturation-current temperature exponent. Not simulated yet |
-| `BjtModel` | `eg: f64` | 1.11 (eV) | energy gap for IS(T). Not simulated yet |
-| `BjtModel` | `tnom: Option<f64>` | `None` = the circuit's nominal temperature | parameter-measurement temperature (K). `Option` because its default depends on another value, the rule params.rs already states. Not simulated yet |
-| new `Conditions` (beside `Circuit` + `Params`; pipeline.md §3 names it, and it doesn't exist in code yet) | `temp: f64`, `tnom: f64` | 300.15 K each | the run's temperature and the circuit's nominal temperature. Not simulated yet |
+| `Params` | `temp: f64` | 300.15 K | the run's temperature: `.temp`, or the engine's temperature knob |
+| every model kind (R, C, L, D, Q) | `tnom: f64` | 300.15 K | the temperature the model's parameters were measured at (K): the card's TNOM, else `.options tnom`, else 27 °C, resolved at lowering |
+| `BjtModel` | `xtb: f64` | 0.0 | forward/reverse β temperature exponent |
+| `BjtModel`, `DiodeModel` | `xti: f64` | 3.0 | saturation-current temperature exponent |
+| `BjtModel`, `DiodeModel` | `eg: f64` | 1.11 (eV) | energy gap for IS(T) |
+| `BjtParams` | `temperature: DeviceTemperature` | the run's | per-device `temp`/`dtemp`, as on the other devices |
+| `Lowered` | `options: SolverOptions` | all unset | `reltol`, `vntol`, `abstol` as the source asked for them. They say how to solve, not what the circuit is, so whoever runs it decides |
+
+The temperature fields are carried, not simulated yet (temperature support is M2c).
 
 ### 5.3 `spicy_parser`: what it must accept
 
-Today it rejects XTB, XTI and EG with `invalid param` (`netlist_models.rs`, `BjtModel::new`), and has no `.temp` or `.options` command (`netlist_types.rs`, `CommandType`). It must accept:
-- **On `.model … NPN|PNP`:** `XTB`, `XTI`, `EG`, `TNOM` (in °C, stored in K), lowered into §5.2's fields.
-- **`.temp <value>`:** one value, `{…}` expressions allowed (as in `.temp {k0}`), lowered into `Conditions.temp`. A list of temperatures is an error ("one value").
-- **`.options`:** with `tnom` (→ `Conditions.tnom`, and the default for a model without its own TNOM), and `reltol`, `vntol`, `abstol` (→ a `SolverOptions` value in the lowered output next to the analyses, not in `Circuit` or `Params`). Any other key is an error that lists the accepted ones, as for model parameters today, so nothing is dropped silently.
+**Done (2026-09-30).** It accepts:
+- **On model cards:** `XTB`, `XTI`, `EG`, `TNOM` on `NPN`/`PNP`; `EG`, `XTI`, `TNOM` on `D`; `TNOM` on `R`, `C`, `L`. TNOM is in °C, stored in K. BJT instances also take `temp` and `dtemp`.
+- **`.temp <value>`:** one value, `{…}` expressions allowed (as in `.temp {k0}`), lowered into `Params.temp`. A list of temperatures is an error ("one value"); ngspice warns and runs at 27 °C instead (`inp.c:1242-1269`).
+- **`.options`** (or `.option`): `tnom` (the TNOM of every model whose card gives none), and `reltol`, `vntol`, `abstol` (→ `Lowered.options`, not in `Circuit` or `Params`). Any other key is an error that lists the accepted ones, as for model parameters, so nothing is dropped silently.
+- As in ngspice, `.temp` and `.options` apply wherever they sit in the deck, and a later line overrides an earlier one.
 
 ### 5.4 M1e and M1f, and the round trip
 
-- **M1e** lowers a bare `Npn` to `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: Some(298.15) }` (decision D-A), sets `Conditions.temp` from the `temp` knob, and builds the default bench.
-- **M1f, numeric export** (a knob point): writes `.temp`, `.options tnom=…`, and full model cards. *Done when:* export → `spicy_parser` → lower gives the same `Circuit` + `Params` + `Conditions` (roadmap M1f, extended by `Conditions`).
+- **M1e** lowers a bare `Npn` to `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: 298.15 }` (decision D-A), sets `Params.temp` from the `temp` knob, and builds the default bench.
+- **M1f, numeric export** (a knob point): writes `.temp`, `.options tnom=…`, and full model cards. *Done when:* export → `spicy_parser` → lower gives the same `Circuit` + `Params` + options (roadmap M1f, extended by the options).
 - **M1f, engine deck** (§5.1). *Done when:* the deck at its nominal `.param` values, parsed by `spicy_parser` (which already evaluates `.param` and `{…}`), lowers to the same result as the numeric export at nominal; ngspice's read-back of every knob at nominal and at one corner equals the requested values.
-- **Dependencies for the other session:** §5.2 and §5.3 come before M1f's done-when can hold. They are data-only (no temperature physics), so they don't pull M2c forward.
+- **Dependencies:** §5.2 and §5.3 are done. They were data only (no temperature physics), so they didn't pull M2c forward.
 
 ---
 
@@ -872,8 +877,8 @@ Each step ends in a review (🔍), as roadmap §8 describes. M3a–M3e run on th
 
 ```
  language track (another session)                       engine track (this plan)
- §5.2 spicy_circuit: BjtModel xtb/xti/eg/tnom, Conditions  M3a design note + EngineDeck type
- §5.3 spicy_parser: those params, .temp, .options                 │
+ §5.2 spicy_circuit: xtb/xti/eg/tnom, temp (done)          M3a design note + EngineDeck type
+ §5.3 spicy_parser: those params, .temp, .options (done)          │
  M1d elaborate: FlatDesign, KnobTable, FlatContract        M3b backend ─► M3c worst_case ─► M3d sigma(3)
  M1e lower: default bench, DEFAULT Npn MODEL ◄─ D-A                                     ─► M3e output
  M1f export: numeric + engine deck (§5.4)                         │
@@ -965,7 +970,7 @@ The full record of 20 resolved conflicts, with who said what, is in Appendix C. 
 | `roadmap.md` | M3 replaced by §9.1 (M3a without an `affine` module); M4 becomes "our simulator as a second backend"; §3 (ngspice) moves into M3 with the worker; M1e names decision D-A; M1f gains §5; §2.2's diagram gains `spicy_backends → spicy_engine`; decision rows for D-A to D-F |
 | `language.md` | §8.4: a measure is evaluated per run (same no-double-counting property), and `Beyond` for a crossing below the band (C9); §10: verdict deltas carry the verdict words and `simulated`/`stale` |
 | `specs.md` | §9 verdict list; §11 "when it runs" (no per-edit estimate) |
-| `pipeline.md` | §3 `Conditions` becomes concrete (§5.2); §6(b) per-run measures, no affine form; §6(c) the ngspice path uses the engine deck (`.param` per knob), not a netlist per point; §11 points to this plan |
+| `pipeline.md` | §3 `Conditions` became `Params.temp`, a `tnom` per model and `SolverOptions` (§5.2); §6(b) per-run measures, no affine form; §6(c) the ngspice path uses the engine deck (`.param` per knob), not a netlist per point; §11 points to this plan |
 
 ---
 

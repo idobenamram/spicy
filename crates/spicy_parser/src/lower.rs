@@ -13,11 +13,11 @@ use std::hash::Hash;
 
 use spicy_circuit::{
     AcSpacing, AcSweep, Analysis, Bjt, BjtModel, BjtModelId, BjtParams, Capacitor, CapacitorModel,
-    CapacitorModelId, CapacitorParams, Circuit, CircuitNames, DcSweep, DeviceTemperature, Diode,
-    DiodeModel, DiodeModelId, DiodeParams, Inductor, InductorModel, InductorModelId,
-    InductorParams, IsourceId, Lowered, NodeId, Params, Phasor, Polarity, Resistor, ResistorModel,
-    ResistorModelId, ResistorParams, SolverOptions, SourceParams, SourceRef, Transient,
-    TwoTerminal, VsourceId, Waveform,
+    CapacitorModelId, CapacitorParams, Circuit, CircuitNames, DEFAULT_TEMPERATURE, DcSweep,
+    DeviceTemperature, Diode, DiodeModel, DiodeModelId, DiodeParams, Inductor, InductorModel,
+    InductorModelId, InductorParams, IsourceId, Lowered, NodeId, Params, Phasor, Polarity,
+    Resistor, ResistorModel, ResistorModelId, ResistorParams, SolverOptions, SourceParams,
+    SourceRef, Transient, TwoTerminal, VsourceId, Waveform,
 };
 
 use crate::BjtPolarity;
@@ -39,11 +39,15 @@ const CELSIUS_TO_KELVIN: f64 = 273.15;
 
 pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     let devices = &deck.devices;
+    let settings = run_settings(&deck.commands);
     let mut circuit = Circuit {
         node_count: deck.node_mapping.nodes_len() + 1,
         ..Circuit::default()
     };
-    let mut params = Params::default();
+    let mut params = Params {
+        temp: settings.temp,
+        ..Params::default()
+    };
     let mut names = CircuitNames {
         title: deck.title.clone(),
         nodes: node_names(deck),
@@ -52,7 +56,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
 
     let mut resistor_models = ModelTable::default();
     for r in &devices.resistors {
-        let model = resistor_model(r);
+        let model = resistor_model(r, settings.tnom);
         let model = ResistorModelId::new(resistor_models.insert(resistor_model_key(&model), model));
         circuit.resistors.push(Resistor {
             positive: node(r.positive),
@@ -66,7 +70,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
 
     let mut capacitor_models = ModelTable::default();
     for c in &devices.capacitors {
-        let model = capacitor_model(c);
+        let model = capacitor_model(c, settings.tnom);
         let model = CapacitorModelId::new(
             capacitor_models.insert(tc_model_key(model.tc1, model.tc2, model.tnom), model),
         );
@@ -82,7 +86,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
 
     let mut inductor_models = ModelTable::default();
     for l in &devices.inductors {
-        let model = inductor_model(l);
+        let model = inductor_model(l, settings.tnom);
         let model = InductorModelId::new(
             inductor_models.insert(tc_model_key(model.tc1, model.tc2, model.tnom), model),
         );
@@ -98,7 +102,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
 
     let mut diode_models = ModelTable::default();
     for d in &devices.diodes {
-        let model = diode_model(d);
+        let model = diode_model(d, settings.tnom);
         let model = DiodeModelId::new(diode_models.insert(d.model_name.clone(), model));
         circuit.diodes.push(Diode {
             positive: node(d.positive),
@@ -113,7 +117,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
 
     let mut bjt_models = ModelTable::default();
     for q in &devices.bjts {
-        let model = bjt_model(q);
+        let model = bjt_model(q, settings.tnom);
         let model = BjtModelId::new(bjt_models.insert(q.model_name.clone(), model));
         circuit.bjts.push(Bjt {
             collector: node(q.collector),
@@ -162,6 +166,8 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
                 stop: tran.tstop.get_value(),
                 uic: tran.uic,
             }),
+            // Settings, read by `run_settings`.
+            Command::Temp(_) | Command::Options(_) => continue,
             Command::End => break,
         });
     }
@@ -171,8 +177,46 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
         params,
         names,
         analyses,
-        options: SolverOptions::default(),
+        options: settings.solver,
     })
+}
+
+/// What `.temp` and `.options` set. ngspice applies them before any analysis
+/// runs, wherever they sit in the deck, and a later line overrides an earlier
+/// one (`inp.c`, `inpdoopt.c`).
+struct RunSettings {
+    /// The circuit temperature, in kelvin.
+    temp: f64,
+    /// The TNOM of a model whose card gives none, in kelvin.
+    tnom: f64,
+    solver: SolverOptions,
+}
+
+fn run_settings(commands: &[Command]) -> RunSettings {
+    let mut settings = RunSettings {
+        temp: DEFAULT_TEMPERATURE,
+        tnom: DEFAULT_TEMPERATURE,
+        solver: SolverOptions::default(),
+    };
+    for command in commands {
+        match command {
+            Command::Temp(temp) => settings.temp = temp.celsius.get_value() + CELSIUS_TO_KELVIN,
+            Command::Options(options) => {
+                settings.tnom = tnom(options.tnom.as_ref(), settings.tnom);
+                let solver = &mut settings.solver;
+                solver.reltol = value(&options.reltol).or(solver.reltol);
+                solver.vntol = value(&options.vntol).or(solver.vntol);
+                solver.abstol = value(&options.abstol).or(solver.abstol);
+            }
+            _ => {}
+        }
+    }
+    settings
+}
+
+/// A TNOM in kelvin: the one given (°C), else `default` (kelvin).
+fn tnom(celsius: Option<&Value>, default: f64) -> f64 {
+    celsius.map_or(default, |t| t.get_value() + CELSIUS_TO_KELVIN)
 }
 
 /// Stores each model once, under a key. Diode and BJT models are keyed by
@@ -267,7 +311,7 @@ fn value_or(value: &Option<Value>, default: f64) -> f64 {
 
 /// A resistor's model. Temperature coefficients set on the instance override
 /// the card's, which gives the instance a model of its own.
-fn resistor_model(spec: &ResistorSpec) -> ResistorModel {
+fn resistor_model(spec: &ResistorSpec, default_tnom: f64) -> ResistorModel {
     let model = spec.model.as_ref();
     let defaults = ResistorModel::default();
     ResistorModel {
@@ -279,7 +323,7 @@ fn resistor_model(spec: &ResistorSpec) -> ResistorModel {
         default_length: model
             .and_then(|m| value(&m.l))
             .unwrap_or(defaults.default_length),
-        tnom: defaults.tnom,
+        tnom: tnom(model.and_then(|m| m.tnom.as_ref()), default_tnom),
     }
 }
 
@@ -297,13 +341,13 @@ fn resistor_params(spec: &ResistorSpec) -> ResistorParams {
     }
 }
 
-fn capacitor_model(spec: &CapacitorSpec) -> CapacitorModel {
+fn capacitor_model(spec: &CapacitorSpec, default_tnom: f64) -> CapacitorModel {
     let model = spec.model.as_ref();
     let defaults = CapacitorModel::default();
     CapacitorModel {
         tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(defaults.tc1),
         tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(defaults.tc2),
-        tnom: defaults.tnom,
+        tnom: tnom(model.and_then(|m| m.tnom.as_ref()), default_tnom),
     }
 }
 
@@ -318,13 +362,13 @@ fn capacitor_params(spec: &CapacitorSpec) -> CapacitorParams {
     }
 }
 
-fn inductor_model(spec: &InductorSpec) -> InductorModel {
+fn inductor_model(spec: &InductorSpec, default_tnom: f64) -> InductorModel {
     let model = spec.model.as_ref();
     let defaults = InductorModel::default();
     InductorModel {
         tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(defaults.tc1),
         tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(defaults.tc2),
-        tnom: defaults.tnom,
+        tnom: tnom(model.and_then(|m| m.tnom.as_ref()), default_tnom),
     }
 }
 
@@ -341,15 +385,16 @@ fn inductor_params(spec: &InductorSpec) -> InductorParams {
     }
 }
 
-fn diode_model(spec: &DiodeSpec) -> DiodeModel {
+fn diode_model(spec: &DiodeSpec, default_tnom: f64) -> DiodeModel {
+    let model = &spec.model;
     let defaults = DiodeModel::default();
     DiodeModel {
-        is: value_or(&spec.model.is, defaults.is),
-        n: value_or(&spec.model.n, defaults.n),
-        rs: value_or(&spec.model.rs, defaults.rs),
-        eg: defaults.eg,
-        xti: defaults.xti,
-        tnom: defaults.tnom,
+        is: value_or(&model.is, defaults.is),
+        n: value_or(&model.n, defaults.n),
+        rs: value_or(&model.rs, defaults.rs),
+        eg: value_or(&model.eg, defaults.eg),
+        xti: value_or(&model.xti, defaults.xti),
+        tnom: tnom(model.tnom.as_ref(), default_tnom),
     }
 }
 
@@ -377,11 +422,11 @@ fn bjt_params(spec: &BjtSpec) -> BjtParams {
         off: spec.off.unwrap_or(defaults.off),
         ic_vbe: value_or(&spec.ic_vbe, defaults.ic_vbe),
         ic_vce: value_or(&spec.ic_vce, defaults.ic_vce),
-        temperature: defaults.temperature,
+        temperature: device_temperature(&spec.temp, &spec.dtemp),
     }
 }
 
-fn bjt_model(spec: &BjtSpec) -> BjtModel {
+fn bjt_model(spec: &BjtSpec, default_tnom: f64) -> BjtModel {
     let model = &spec.model;
     let defaults = BjtModel::default();
     BjtModel {
@@ -394,10 +439,10 @@ fn bjt_model(spec: &BjtSpec) -> BjtModel {
         br: value_or(&model.br, defaults.br),
         nf: value_or(&model.nf, defaults.nf),
         nr: value_or(&model.nr, defaults.nr),
-        xtb: defaults.xtb,
-        xti: defaults.xti,
-        eg: defaults.eg,
-        tnom: defaults.tnom,
+        xtb: value_or(&model.xtb, defaults.xtb),
+        xti: value_or(&model.xti, defaults.xti),
+        eg: value_or(&model.eg, defaults.eg),
+        tnom: tnom(model.tnom.as_ref(), default_tnom),
     }
 }
 
@@ -498,6 +543,110 @@ mod tests {
     /// Lower a netlist body (the lines between the title and `.end`).
     fn lower_body(body: &str) -> Lowered {
         lower(&parse_netlist(&format!("test\n{body}\n.end\n"))).expect("lower")
+    }
+
+    /// The error a netlist body fails with, from parsing or from lowering.
+    fn body_error(body: &str) -> SpicyError {
+        let netlist = format!("test\n{body}\n.end\n");
+        let mut options = crate::ParseOptions::new_with_source("inline.spicy", netlist);
+        match crate::parse(&mut options) {
+            Err(error) => error,
+            Ok(deck) => lower(&deck).expect_err("the body should be rejected"),
+        }
+    }
+
+    #[test]
+    fn temp_sets_the_circuit_temperature() {
+        assert_eq!(lower_body("R1 a 0 1k").params.temp, DEFAULT_TEMPERATURE);
+        let hot = lower_body(".temp 60\nR1 a 0 1k");
+        assert_eq!(hot.params.temp, 60.0 + CELSIUS_TO_KELVIN);
+        let from_param = lower_body(".param t=25\n.temp {t}\nR1 a 0 1k");
+        assert_eq!(from_param.params.temp, 25.0 + CELSIUS_TO_KELVIN);
+    }
+
+    /// ngspice runs a list of temperatures as several runs; a lowered circuit is one run.
+    #[test]
+    fn temp_takes_one_value() {
+        let error = body_error(".temp 25 60\nR1 a 0 1k");
+        assert!(error.to_string().contains("one value"), "{error}");
+    }
+
+    #[test]
+    fn options_set_tnom_and_solver_tolerances() {
+        let lowered = lower_body(
+            ".options tnom=25 reltol=1e-6\n.option vntol=1e-9 abstol=1e-15\n\
+             .model QA NPN bf=200\n.model QB NPN tnom=50\nQ1 c b 0 QA\nQ2 c b 0 QB\nR1 a 0 1k",
+        );
+        let asked = SolverOptions {
+            reltol: Some(1e-6),
+            vntol: Some(1e-9),
+            abstol: Some(1e-15),
+        };
+        assert_eq!(lowered.options, asked);
+        let tnom: Vec<f64> = lowered.params.bjt_models.iter().map(|m| m.tnom).collect();
+        assert_eq!(
+            tnom,
+            [25.0 + CELSIUS_TO_KELVIN, 50.0 + CELSIUS_TO_KELVIN],
+            "`.options tnom` fills a card without one; a card's own TNOM wins"
+        );
+        assert_eq!(
+            lowered.params.resistor_models[0].tnom,
+            25.0 + CELSIUS_TO_KELVIN
+        );
+    }
+
+    #[test]
+    fn an_unknown_option_lists_the_accepted_ones() {
+        let error = body_error(".options gmin=1e-12\nR1 a 0 1k");
+        let message = error.to_string();
+        assert!(
+            message.contains("gmin") && message.contains("tnom, reltol, vntol, abstol"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn model_cards_carry_temperature_parameters() {
+        let lowered = lower_body(
+            ".model Q NPN xtb=1.5 xti=3.5 eg=1.2 tnom=25\nQ1 c b 0 Q\n\
+             .model DX D eg=0.69 xti=2 tnom=30\nD1 a 0 DX\n\
+             .model RM R tnom=50\nR1 a 0 1k RM\n\
+             .model CM C tnom=40\nC1 a 0 1u CM\n\
+             .model LM L tnom=35\nL1 a 0 1m LM",
+        );
+        let q = lowered.params.bjt_models[0];
+        assert_eq!(
+            (q.xtb, q.xti, q.eg, q.tnom),
+            (1.5, 3.5, 1.2, 25.0 + CELSIUS_TO_KELVIN)
+        );
+        let d = lowered.params.diode_models[0];
+        assert_eq!((d.eg, d.xti, d.tnom), (0.69, 2.0, 30.0 + CELSIUS_TO_KELVIN));
+        assert_eq!(
+            lowered.params.resistor_models[0].tnom,
+            50.0 + CELSIUS_TO_KELVIN
+        );
+        assert_eq!(
+            lowered.params.capacitor_models[0].tnom,
+            40.0 + CELSIUS_TO_KELVIN
+        );
+        assert_eq!(
+            lowered.params.inductor_models[0].tnom,
+            35.0 + CELSIUS_TO_KELVIN
+        );
+    }
+
+    #[test]
+    fn bjt_instances_take_temp_and_dtemp() {
+        let lowered = lower_body(".model Q NPN\nQ1 c b 0 Q temp=85\nQ2 c b 0 Q dtemp=5");
+        let temperature: Vec<DeviceTemperature> =
+            lowered.params.bjts.iter().map(|q| q.temperature).collect();
+        assert_eq!(
+            temperature,
+            [
+                DeviceTemperature::Fixed(85.0 + CELSIUS_TO_KELVIN),
+                DeviceTemperature::Offset(5.0)
+            ]
+        );
     }
 
     #[test]

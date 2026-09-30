@@ -24,7 +24,7 @@ A check of a clean checkout of `master` (2026-09-25):
 | **CI** | Triggered on pushes to `main`, but the branch is `master`. **Fixed in M0** |
 | **Formatting** | `cargo fmt --check` failed in 19 existing files. **Formatted in M0** |
 | **Clippy** | The current clippy (1.98) reports ~90 warnings in existing code, mostly the KLU solver and the TUI. CI treats them as warnings |
-| **Parser** (`spicy_parser`) | SPICE netlists: R, C, L, D, Q, V, I, subcircuits, `.model`, `.param`, `{}` expressions; `.op .dc .ac .tran`. No `.temp` |
+| **Parser** (`spicy_parser`) | SPICE netlists: R, C, L, D, Q, V, I, subcircuits, `.model`, `.param`, `{}` expressions; `.op .dc .ac .tran`, `.temp`, `.options` (TNOM and solver tolerances) |
 | **Simulator** (`spicy_simulate`) | DC op and sweep, transient (fixed step), AC; KLU sparse solver |
 | | BJT: Ebers–Moll (IS, BF, BR, NF, NR). **No temperature dependence.** No Early effect, no junction capacitances |
 | | AC: dense; **stamps only R/C/L and sources**, so transistors are ignored |
@@ -405,7 +405,7 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
   - The default bench (language §8.5): a DC source on each `Power<In>` port at its assumed nominal, and an AC source on `Analog<In>`.
   - Two decisions, in the step's design note:
     - what "nominal" means for a range knob (the midpoint gives β = 200, as in the walkthrough);
-    - the default model for a bare `Npn`: **decided (D-A, 2026-09-27)**, `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: 25 °C }`, always written out in exports and reports (`engine_plan.md` §5.4). It needs the new `BjtModel` fields and `Conditions` of `engine_plan.md` §5.2.
+    - the default model for a bare `Npn`: **decided (D-A, 2026-09-27)**, `BjtModel { is: 1e-14, bf: ← q1.beta, xtb: 1.5, xti: 3.0, eg: 1.11, tnom: 25 °C }`, always written out in exports and reports (`engine_plan.md` §5.4). It needs the new `BjtModel` fields of `engine_plan.md` §5.2 (done).
   - **Done when:**
     - a snapshot of the lowered circuit;
     - simulated natively, the operating point gives VC ≈ 5.52 V;
@@ -414,9 +414,9 @@ Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours 
   - `Circuit` + `Params` + analyses → SPICE text, plus a name map (`amp.r1` ↔ `R_amp_r1`).
   - `spicy export`.
   - **Two export modes** (`engine_plan.md` §5, the engine's contract): the **numeric** export at one knob point, and the **engine deck** (`EngineDeck`: a `.param` per knob, `.temp {…}`, `.options` as an input, one `.model QM_<path>` per BJT named apart from its instance `Q_<path>`, no analyses, plus the knob and probe maps).
-  - **Needs first** (data only, no temperature physics): `BjtModel` gains `xtb`, `xti`, `eg`, `tnom`, and `Conditions { temp, tnom }` becomes real (`engine_plan.md` §5.2); `spicy_parser` accepts those model parameters, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
+  - **Needs first, done 2026-09-30** (data only, no temperature physics): `Params.temp`, a `tnom` on every model, `BjtModel` `xtb`, `xti`, `eg`, `DiodeModel` `eg`, `xti`, and the solver options the source asked for (`engine_plan.md` §5.2); `spicy_parser` accepts those model parameters, BJT `temp`/`dtemp`, `.temp <value>` and `.options` (`tnom`, `reltol`, `vntol`, `abstol`, anything else an error) (§5.3).
   - **Done when:**
-    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params` + `Conditions`;
+    - round trip: `ce_amp.spl` → export → `spicy_parser` → lower gives the same `Circuit` + `Params` + options;
     - the engine deck at nominal lowers to the same result as the numeric export, and ngspice reads back every knob's requested value at nominal and at one corner;
     - the same round trip for every `circuits/*.spicy` (SPICE → `Circuit` → export → SPICE → `Circuit`);
     - the exported amplifier simulates to the same VC. 🔍

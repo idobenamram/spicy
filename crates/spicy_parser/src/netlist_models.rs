@@ -9,7 +9,7 @@ use crate::{
     expr::ScopeRef,
     lexer::TokenKind,
     netlist_types::{Name, NoCase, keyword},
-    parser_utils::{Ident, parse_expr_into_value, parse_ident},
+    parser_utils::{Ident, parse_assignments, parse_ident},
     statement_phase::{Statement, StmtCursor},
 };
 
@@ -146,23 +146,14 @@ fn model_statement_to_device_model(
 
     let mut cursor = model_statement.statement.as_cursor();
     cursor.skip_ws();
-    let params_cursors = if cursor.consume(TokenKind::LeftParen).is_some() {
+    let params = if cursor.consume(TokenKind::LeftParen).is_some() {
         let in_parentheses = cursor.split_on(TokenKind::RightParen)?;
-        let params = in_parentheses.split_on_whitespace();
+        let params = parse_assignments(&in_parentheses, input, scope)?;
         cursor.expect(TokenKind::RightParen)?;
         params
     } else {
-        cursor.split_on_whitespace()
+        parse_assignments(&cursor, input, scope)?
     };
-
-    let mut params = Vec::new();
-    for mut param in params_cursors {
-        let ident = parse_ident(&mut param, input)?;
-        param.expect(TokenKind::Equal)?;
-        let value = parse_expr_into_value(&mut param, input, scope)?;
-
-        params.push((ident, value));
-    }
 
     Ok(match model_statement.model_type {
         DeviceModelType::Resistor => DeviceModel::Resistor(ResistorModel::new(params)?),
@@ -180,6 +171,7 @@ pub struct ResistorModel {
     pub tc2: Option<Value>,
     pub w: Option<Value>,
     pub l: Option<Value>,
+    pub tnom: Option<Value>,
 }
 
 impl ResistorModel {
@@ -193,6 +185,7 @@ impl ResistorModel {
                 "tc2" => model.tc2 = Some(value),
                 "w" => model.w = Some(value),
                 "l" => model.l = Some(value),
+                "tnom" => model.tnom = Some(value),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.text.to_string(),
@@ -211,6 +204,7 @@ pub struct CapacitorModel {
     pub cap: Option<Value>,
     pub tc1: Option<Value>,
     pub tc2: Option<Value>,
+    pub tnom: Option<Value>,
 }
 
 impl CapacitorModel {
@@ -222,6 +216,7 @@ impl CapacitorModel {
                 "cap" => model.cap = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
+                "tnom" => model.tnom = Some(value),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.text.to_string(),
@@ -240,6 +235,7 @@ pub struct InductorModel {
     pub inductance: Option<Value>,
     pub tc1: Option<Value>,
     pub tc2: Option<Value>,
+    pub tnom: Option<Value>,
 }
 
 impl InductorModel {
@@ -251,6 +247,7 @@ impl InductorModel {
                 "ind" => model.inductance = Some(value),
                 "tc1" => model.tc1 = Some(value),
                 "tc2" => model.tc2 = Some(value),
+                "tnom" => model.tnom = Some(value),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.text.to_string(),
@@ -269,6 +266,9 @@ pub struct DiodeModel {
     pub is: Option<Value>,
     pub n: Option<Value>,
     pub rs: Option<Value>,
+    pub eg: Option<Value>,
+    pub xti: Option<Value>,
+    pub tnom: Option<Value>,
 }
 
 impl DiodeModel {
@@ -280,6 +280,9 @@ impl DiodeModel {
                 "is" => model.is = Some(value),
                 "n" => model.n = Some(value),
                 "rs" => model.rs = Some(value),
+                "eg" => model.eg = Some(value),
+                "xti" => model.xti = Some(value),
+                "tnom" => model.tnom = Some(value),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.text.to_string(),
@@ -301,6 +304,10 @@ pub struct BjtModel {
     pub br: Option<Value>,
     pub nf: Option<Value>,
     pub nr: Option<Value>,
+    pub xtb: Option<Value>,
+    pub xti: Option<Value>,
+    pub eg: Option<Value>,
+    pub tnom: Option<Value>,
 }
 
 impl BjtModel {
@@ -320,6 +327,10 @@ impl BjtModel {
                 "br" => model.br = Some(value),
                 "nf" => model.nf = Some(value),
                 "nr" => model.nr = Some(value),
+                "xtb" => model.xtb = Some(value),
+                "xti" => model.xti = Some(value),
+                "eg" => model.eg = Some(value),
+                "tnom" => model.tnom = Some(value),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.text.to_string(),

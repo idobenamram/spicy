@@ -8,11 +8,11 @@ use crate::lexer::{Token, TokenKind, token_text};
 use crate::netlist_models::DeviceModel;
 use crate::netlist_types::{
     AcCommand, AcSweepType, Command, CommandType, DcCommand, DeviceType, NodeName, OpCommand,
-    Phasor, TranCommand, keyword,
+    OptionsCommand, Phasor, TempCommand, TranCommand, keyword,
 };
 use crate::netlist_waveform::WaveForm;
 use crate::parser_utils::{
-    parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize,
+    parse_assignments, parse_bool, parse_expr_into_value, parse_ident, parse_node, parse_usize,
 };
 use crate::statement_phase::StmtCursor;
 use crate::subcircuit_phase::{ExpandedDeck, ScopedStmt};
@@ -818,7 +818,7 @@ impl<'s> InstanceParser<'s> {
     }
 
     // QXXXXXXX nc nb ne mname <area=val>
-    // + <m=val> <off> <ic=vbe,vce>
+    // + <m=val> <off> <ic=vbe,vce> <temp=val> <dtemp=val>
     fn parse_bjt(
         &self,
         name: String,
@@ -868,6 +868,8 @@ impl<'s> InstanceParser<'s> {
             ParamSlot::other("m"),
             ParamSlot::flag("off"),
             ParamSlot::other("ic"),
+            ParamSlot::other("temp"),
+            ParamSlot::other("dtemp"),
         ];
         let params = ParamParser::new(input, params_order, cursor);
         for item in params {
@@ -888,6 +890,8 @@ impl<'s> InstanceParser<'s> {
                     };
                     bjt.set_ic(vbe, vce);
                 }
+                "temp" => bjt.set_temp(self.parse_value(&mut cursor, scope)?),
+                "dtemp" => bjt.set_dtemp(self.parse_value(&mut cursor, scope)?),
                 _ => {
                     return Err(ParserError::InvalidParam {
                         param: ident.to_string(),
@@ -1136,6 +1140,54 @@ impl<'s> InstanceParser<'s> {
         })
     }
 
+    // .temp t
+    fn parse_temp_command(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: ScopeRef,
+    ) -> Result<TempCommand, SpicyError> {
+        let celsius = self.parse_value(cursor, scope)?;
+        if let Some(extra) = cursor.peek_non_whitespace() {
+            return Err(ParserError::TemperatureList { span: extra.span }.into());
+        }
+        Ok(TempCommand {
+            span: cursor.span,
+            celsius,
+        })
+    }
+
+    // .options name=value ...
+    fn parse_options_command(
+        &self,
+        cursor: &mut StmtCursor,
+        scope: ScopeRef,
+    ) -> Result<OptionsCommand, SpicyError> {
+        let input = self.source_map.get_content(cursor.span.source_index);
+        let mut options = OptionsCommand {
+            span: cursor.span,
+            tnom: None,
+            reltol: None,
+            vntol: None,
+            abstol: None,
+        };
+        for (ident, value) in parse_assignments(cursor, input, scope)? {
+            match keyword(ident.text).as_str() {
+                "tnom" => options.tnom = Some(value),
+                "reltol" => options.reltol = Some(value),
+                "vntol" => options.vntol = Some(value),
+                "abstol" => options.abstol = Some(value),
+                _ => {
+                    return Err(ParserError::UnknownOption {
+                        option: ident.text.to_string(),
+                        span: ident.span,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(options)
+    }
+
     fn parse_command(&self, statement: &ScopedStmt) -> Result<Command, SpicyError> {
         let mut cursor = statement.stmt.as_cursor();
         cursor.expect(TokenKind::Dot)?;
@@ -1157,6 +1209,10 @@ impl<'s> InstanceParser<'s> {
             CommandType::Op => Command::Op(OpCommand { span: cursor.span }),
             CommandType::AC => Command::Ac(self.parse_ac_command(&mut cursor, scope)?),
             CommandType::Tran => Command::Tran(self.parse_trans_command(&mut cursor, scope)?),
+            CommandType::Temp => Command::Temp(self.parse_temp_command(&mut cursor, scope)?),
+            CommandType::Options => {
+                Command::Options(self.parse_options_command(&mut cursor, scope)?)
+            }
             CommandType::End => Command::End,
             _ => {
                 return Err(ParserError::UnexpectedCommandType {

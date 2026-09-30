@@ -180,6 +180,8 @@ pub enum CommandType {
     DC,
     Op,
     Tran,
+    Temp,
+    Options,
     Lib,
     Endl,
     Include,
@@ -197,6 +199,8 @@ impl fmt::Display for CommandType {
             CommandType::DC => "DC",
             CommandType::Op => "OP",
             CommandType::Tran => "TRAN",
+            CommandType::Temp => "TEMP",
+            CommandType::Options => "OPTIONS",
             CommandType::Lib => "LIB",
             CommandType::Endl => "ENDL",
             CommandType::Include => "INCLUDE",
@@ -219,6 +223,8 @@ impl FromStr for CommandType {
             "dc" => Ok(CommandType::DC),
             "op" => Ok(CommandType::Op),
             "tran" => Ok(CommandType::Tran),
+            "temp" => Ok(CommandType::Temp),
+            "options" | "option" => Ok(CommandType::Options),
             "lib" => Ok(CommandType::Lib),
             "endl" => Ok(CommandType::Endl),
             "include" => Ok(CommandType::Include),
@@ -273,12 +279,32 @@ pub struct TranCommand {
     pub uic: bool,
 }
 
+/// `.temp t`: the circuit temperature, in °C.
+#[derive(Debug, Clone)]
+pub struct TempCommand {
+    pub span: Span,
+    pub celsius: Value,
+}
+
+/// `.options name=value ...`, limited to the options that change a
+/// circuit's results: the default model TNOM (°C) and the solver tolerances.
+#[derive(Debug, Clone)]
+pub struct OptionsCommand {
+    pub span: Span,
+    pub tnom: Option<Value>,
+    pub reltol: Option<Value>,
+    pub vntol: Option<Value>,
+    pub abstol: Option<Value>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Command {
     Op(OpCommand),
     Dc(DcCommand),
     Ac(AcCommand),
     Tran(TranCommand),
+    Temp(TempCommand),
+    Options(OptionsCommand),
     End,
 }
 

@@ -51,7 +51,7 @@ Two more rules from the same sources:
 SPICE ──spicy_parser──► Deck ──lower (SPICE rules)──► ┌── spicy_circuit ──────────────────┐
                                                       │ Circuit    wiring (+ names table)  │ once per design
                                                       │ Params     model + instance values │ nominal + one per run
-                                                      │ Conditions, Analysis               │ per run / per request
+                                                      │ Analysis, SolverOptions            │ per request
                                                       └────────────────┬───────────────────┘
                                                                        ▼
                                    ┌──────────────── spicy_simulate ─────────────────┐
@@ -81,11 +81,11 @@ Read it top to bottom:
 | `Circuit` | `spicy_circuit` | lowering (either front-end), once per design | shared (`Arc`) by every run | The simulator's vocabulary: nodes, per-kind device wiring, each instance's model id. **Wiring only, no numbers.** Names and origins go in a `CircuitNames` side table the simulator never reads (`circuit.md` §4.9) |
 | `CircuitNames` | `spicy_circuit` | lowering, beside the `Circuit` | as long as results are shown | Node names, device paths (`X1.R1`, `amp.r1`) and origins (spans). Only the edges read it: CLI, raw writer, engine, error messages |
 | `Params` | `spicy_circuit` | lowering (nominal); backends (per run) | one run, reusable buffer | Resolved device numbers. Per kind, a model table shared by instances and an instance table (`circuit.md` §4.2): plain `Copy` structs, SI units, no strings, `Option` only for defaults that depend on another value. The unit a knob changes, and the level ngspice export works at |
-| `Conditions` | `spicy_circuit` | lowering (nominal); backends / CLI, per run | one run | `temp` and `tnom` (K), later other global conditions. Doesn't exist in code yet: the engine plan makes it concrete, carried and "Not simulated yet" until temperature support (`engine_plan.md` §5.2) |
+| `SolverOptions` | `spicy_circuit` | lowering, beside the analyses | per request | The `reltol`, `vntol`, `abstol` the source asked for, each optional. They say how to solve, not what the circuit is, so whoever runs it decides. The temperatures first planned here as `Conditions` are `Params.temp` and each model's `tnom` (`engine_plan.md` §5.2) |
 | `Analysis` | `spicy_circuit` | SPICE lowering or the engine, per request | per request | "Run op / DC sweep / AC / tran". Lives here so an exporter doesn't import the simulator |
 | `Binding` | `spicy_backends` | lowering, once per design | the engine job | Knob `amp.r1.value` → `Params.resistors[2].r`. Keeps knobs out of the circuit and the simulator |
 | `Plan` | `spicy_simulate` | from the `Circuit`, once per design × solver | shared (`Arc`) by threads | Where each device writes (stamp arrays parallel to the device arrays), the sparsity patterns, and KLU's symbolic analysis. It allocates internal nodes and branch rows, and records the structure key it was built for (`circuit.md` §4.3). Replaces the `stamp` fields `setup_pattern` writes into devices today |
-| `Derived` | `spicy_simulate` | from `Params` + `Conditions`, per run | one run | Temperature-adjusted values (like ngspice's temperature routine), computed once per run instead of in every Newton iteration. **Added only with temperature**; before that it would just copy `Params` |
+| `Derived` | `spicy_simulate` | from `Params` (its `temp` included), per run | one run | Temperature-adjusted values (like ngspice's temperature routine), computed once per run instead of in every Newton iteration. **Added only with temperature**; before that it would just copy `Params` |
 | `Workspace` | `spicy_simulate` | per thread | reused across runs | Matrix values, right-hand side, KLU numeric factorization, solution buffers |
 | `TranState` | `spicy_simulate` | per transient | one analysis | Integration history, indexed by device. Today it's a `HashMap` keyed by capacitor name |
 | `Solution` → named results | `spicy_simulate` → backends / CLI | per analysis | caller | Results by index (fast); names attached only at the edge, for the raw writer, TUI and engine |
@@ -107,7 +107,7 @@ Params      resistors[2] = { r: 47k, tc1: 0, tc2: 0 }                         no
 Binding     Knob#2 → Params.resistors[2].r                                     built once
 Plan        resistor_stamps[2] = { pp: 3, nn: 7, pn: 4, np: 6 }              built once, shared
 ─── run 17 (any thread) ───
-Params      resistors[2].r = 47.47k        Conditions.temp = 60 °C
+Params      resistors[2].r = 47.47k        temp = 333.15 K (60 °C)
 Derived     resistors[2].g = 21.07 µS                                          (once temperature exists)
 Workspace   values[3] += g; values[7] += g; values[4] -= g; values[6] -= g
 Solution    I(resistors[2]) → origin #5 → "amp.r1" → ce_amp.spl:17
@@ -177,7 +177,7 @@ In the MVP (on ngspice) the same shape runs through the engine deck, as in (c). 
 Two export modes (`engine_plan.md` §5):
 
 ```
-numeric:  Circuit + Params(point) + Conditions + [Analysis] ─export─► SPICE text + name map
+numeric:  Circuit + Params(point) + SolverOptions + [Analysis] ─export─► SPICE text + name map
                ngspice -b ─► raw file ─read─► same ids ─► same measures
 
 engine:   FlatDesign + KnobTable ─export once─► EngineDeck { deck with a .param per knob, knob map, probe map }
@@ -237,7 +237,7 @@ We go one step at a time and review each.
 |---|---|---|
 | **1. Cleanup** | Fix the subcircuit bug (§11), apply `m`/`scale`, align defaults with ngspice, and move CLI concerns (the `simulate()` dispatcher, raw-file config, AC printing) out of `spicy_simulate`, with tests guarding the behavior. Each fix starts from a failing test | ✅ Done, committed |
 | 2. Stamp locations out of devices | Stamp indices move into parallel arrays owned by a `Plan`; transient history becomes indexed. No snapshot changes | Deferred: a speed-up that matters once the engine runs many simulations |
-| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Conditions`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | ✅ Done (design: `circuit.md`): 3a `spicy_circuit` + lowering; 3b the simulator reads it (results bit-identical on every test netlist); 3c the parser no longer allocates branch rows |
+| 3. `spicy_circuit` | The crate with `Circuit`, `Params`, `Analysis`; `spicy_parser::lower(&Deck)`; the simulator reads `&Circuit` and drops its parser dependency. No snapshot changes | ✅ Done (design: `circuit.md`): 3a `spicy_circuit` + lowering; 3b the simulator reads it (results bit-identical on every test netlist); 3c the parser no longer allocates branch rows |
 | 4. One `Plan` + `Workspace` per circuit | Shared by all analyses of a circuit; reused across runs | Deferred, with step 2 |
 | 5. Temperature | Adds `Derived`. The first deliberate result changes: thermal voltage becomes kT/q | To discuss |
 

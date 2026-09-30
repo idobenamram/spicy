@@ -229,6 +229,23 @@ pub(crate) fn parse_expr_into_value(
     parse_value(cursor, src)
 }
 
+/// Reads `name=value` groups, one per whitespace-separated group, as on a
+/// `.model` card or an `.options` line.
+pub(crate) fn parse_assignments<'a>(
+    cursor: &StmtCursor,
+    src: &'a str,
+    scope: ScopeRef,
+) -> Result<Vec<(Ident<'a>, Value)>, SpicyError> {
+    let mut assignments = Vec::new();
+    for mut group in cursor.split_on_whitespace() {
+        let ident = parse_ident(&mut group, src)?;
+        group.expect(TokenKind::Equal)?;
+        let value = parse_expr_into_value(&mut group, src, scope)?;
+        assignments.push((ident, value));
+    }
+    Ok(assignments)
+}
+
 pub(crate) fn parse_value_or_placeholder(
     cursor: &mut StmtCursor,
     src: &str,

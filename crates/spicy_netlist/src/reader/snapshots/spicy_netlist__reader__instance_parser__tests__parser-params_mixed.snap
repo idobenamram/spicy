@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_netlist/src/reader/instance_parser.rs
-assertion_line: 1325
+assertion_line: 1334
 expression: deck
 ---
 Deck {
@@ -350,7 +350,14 @@ Deck {
                 negative: NodeIndex(
                     2,
                 ),
-                resistance: None,
+                resistance: Some(
+                    Value {
+                        value: 1.0,
+                        exponent: None,
+                        suffix: None,
+                        scaled: 1.0,
+                    },
+                ),
                 model: Some(
                     ResistorModel {
                         resistance: None,
@@ -370,20 +377,13 @@ Deck {
                 ),
                 ac: Some(
                     Value {
-                        value: 1.0,
-                        exponent: None,
-                        suffix: None,
-                        scaled: 1.0,
-                    },
-                ),
-                m: Some(
-                    Value {
                         value: 5.0,
                         exponent: None,
                         suffix: None,
                         scaled: 5.0,
                     },
                 ),
+                m: None,
                 scale: None,
                 temp: None,
                 dtemp: None,

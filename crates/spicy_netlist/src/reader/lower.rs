@@ -20,6 +20,7 @@ use spicy_circuit::{
     SourceRef, Transient, TwoTerminal, VsourceId, Waveform,
 };
 
+use crate::CELSIUS_TO_KELVIN;
 use crate::reader::BjtPolarity;
 use crate::reader::devices::{
     BjtSpec, CapacitorSpec, DiodeSpec, IndependentSourceSpec, InductorSpec, ResistorSpec,
@@ -30,12 +31,10 @@ use crate::reader::instance_parser::Deck;
 use crate::reader::netlist_types::{AcSweepType, Command, DcCommand, NodeIndex, NodeName};
 use crate::reader::netlist_waveform::WaveForm;
 
-/// ngspice's resistance when neither the instance nor its model gives one
-/// (`restemp.c`).
+/// ngspice's resistance for a line whose model card gives no value
+/// (`restemp.c:61-74`). ngspice drops a line with neither a value nor a model,
+/// with a warning; this reader still gives it this value.
 const DEFAULT_RESISTANCE: f64 = 1e-3;
-
-/// SPICE gives temperatures in °C; `spicy_circuit` uses kelvin.
-const CELSIUS_TO_KELVIN: f64 = 273.15;
 
 pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     let devices = &deck.devices;
@@ -803,6 +802,47 @@ mod tests {
         assert_eq!(c, [1e-9, 2e-9, 3e-9, 4e-9, 5e-9]);
         let l: Vec<f64> = params.inductors.iter().map(|l| l.l).collect();
         assert_eq!(l, [1e-6, 2e-6, 3e-6]);
+    }
+
+    /// A flag like `off` counts wherever it stands, as in ngspice, including
+    /// right after the model name, before any value.
+    #[test]
+    fn flags_count_anywhere_on_the_line() {
+        let lowered = lower_body(
+            ".model DM D\n.model QM NPN\nD1 a 0 DM off\nD2 a 0 DM 2 off\nD3 a 0 DM\nQ1 c b 0 QM off",
+        );
+        let diodes = &lowered.params.diodes;
+        let off: Vec<bool> = diodes.iter().map(|d| d.off).collect();
+        let area: Vec<f64> = diodes.iter().map(|d| d.area).collect();
+        assert_eq!(off, [true, true, false]);
+        assert_eq!(area, [1.0, 2.0, 1.0]);
+        assert!(lowered.params.bjts[0].off);
+    }
+
+    /// The model name may come before the value; for capacitors and inductors
+    /// it's the only order ngspice-42 reads (`C1 a 0 1n CM` is an error there).
+    #[test]
+    fn the_model_may_come_before_the_value() {
+        let lowered = lower_body(
+            ".model RM R tc1=1m\n.model CM C tc1=2m\n.model LM L tc1=3m\n\
+             R1 a 0 RM 1k\nC1 a 0 CM 1n\nL1 a 0 LM 1u m=2",
+        );
+        let params = &lowered.params;
+        assert_eq!(
+            (
+                params.resistors[0].r,
+                params.capacitors[0].c,
+                params.inductors[0].l
+            ),
+            (1e3, 1e-9, 1e-6)
+        );
+        assert_eq!(params.inductors[0].m, 2.0);
+        let tc1 = (
+            params.resistor_models[0].tc1,
+            params.capacitor_models[0].tc1,
+            params.inductor_models[0].tc1,
+        );
+        assert_eq!(tc1, (1e-3, 2e-3, 3e-3));
     }
 
     /// `res` names the value only on a card; ngspice rejects it on an instance.

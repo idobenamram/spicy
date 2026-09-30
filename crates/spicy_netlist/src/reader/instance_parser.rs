@@ -84,7 +84,8 @@ pub(crate) struct ParamParser<'s> {
     params_order: Vec<ParamSlot<'s>>,
     param_cursors: Vec<StmtCursor<'s>>,
     current_cursor: usize,
-    current_param: usize,
+    /// The slots positional arguments have filled.
+    filled: Vec<bool>,
     named_mode: bool,
 }
 
@@ -96,12 +97,55 @@ impl<'s> ParamParser<'s> {
     ) -> Self {
         ParamParser {
             input,
+            filled: vec![false; params_order.len()],
             params_order,
             param_cursors: cursor.split_on_whitespace(),
             named_mode: false,
-            current_param: 0,
             current_cursor: 0,
         }
+    }
+
+    /// A positional argument. A word naming a flag (`off`) sets it wherever it
+    /// stands, as in ngspice; any other argument fills the first free slot of
+    /// its kind: a word a word slot (a model name), a value a value slot. So a
+    /// value lands in the value slot whether it comes before or after the
+    /// model name.
+    fn parse_positional_param(
+        &mut self,
+        cursor: StmtCursor<'s>,
+    ) -> Result<ParsedParam<'s>, SpicyError> {
+        let word = cursor
+            .peek_non_whitespace()
+            .filter(|t| t.kind == TokenKind::Ident)
+            .map(|t| keyword(token_text(self.input, t)));
+        if let Some(word) = &word
+            && let Some(flag) = self
+                .params_order
+                .iter()
+                .find(|p| p.is_flag && p.is_named(word.as_str()))
+        {
+            return Ok(ParsedParam {
+                name: flag.canonical,
+                cursor,
+            });
+        }
+        let free = self
+            .params_order
+            .iter()
+            .zip(&self.filled)
+            .position(|(p, &filled)| !filled && !p.is_flag && p.is_ident == word.is_some());
+        let Some(slot) = free else {
+            return Err(ParserError::TooManyParameters {
+                index: self.current_cursor,
+                span: cursor.span,
+            }
+            .into());
+        };
+        self.filled[slot] = true;
+        Ok(ParsedParam {
+            name: self.params_order[slot].canonical,
+            cursor,
+        })
     }
 
     fn parse_named_param(
@@ -163,57 +207,14 @@ impl<'s> Iterator for ParamParser<'s> {
         } else {
             let cursor = self.param_cursors[self.current_cursor].clone();
 
-            let item = if !self.named_mode {
-                if cursor.contains(TokenKind::Equal) {
-                    self.named_mode = true;
-                    match self.parse_named_param(cursor) {
-                        Ok(param) => Some(Ok(param)),
-                        Err(e) => Some(Err(e)),
-                    }
-                } else {
-                    let is_ident = cursor
-                        .peek_non_whitespace()
-                        .map(|t| t.kind == TokenKind::Ident)
-                        .unwrap_or(false);
-
-                    match self.params_order.get(self.current_param) {
-                        Some(p) => {
-                            if is_ident != p.is_ident {
-                                self.current_param += 1;
-                                match self.params_order.get(self.current_param) {
-                                    Some(p) => Some(Ok(ParsedParam {
-                                        name: p.canonical,
-                                        cursor,
-                                    })),
-                                    None => Some(Err(ParserError::TooManyParameters {
-                                        index: self.current_param,
-                                        span: cursor.span,
-                                    }
-                                    .into())),
-                                }
-                            } else {
-                                Some(Ok(ParsedParam {
-                                    name: p.canonical,
-                                    cursor,
-                                }))
-                            }
-                        }
-                        None => Some(Err(ParserError::TooManyParameters {
-                            index: self.current_param,
-                            span: cursor.span,
-                        }
-                        .into())),
-                    }
-                }
+            let item = if !self.named_mode && !cursor.contains(TokenKind::Equal) {
+                self.parse_positional_param(cursor)
             } else {
-                match self.parse_named_param(cursor) {
-                    Ok(param) => Some(Ok(param)),
-                    Err(e) => Some(Err(e)),
-                }
+                self.named_mode = true;
+                self.parse_named_param(cursor)
             };
-            self.current_param += 1;
             self.current_cursor += 1;
-            item
+            Some(item)
         }
     }
 }

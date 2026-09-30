@@ -1,0 +1,74 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 549
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/unsupported.spl
+---
+block A 170..171
+  port p: Pin 183..184
+  port n: Pin 200..201
+  r = Resistor 216..217
+    a → p
+    b → n
+    value = 1000 Ω
+  s = Resistor 271..272
+    a → p
+    b → <unbound>
+    value = 1000 Ω
+  t = Resistor 396..397
+    a → p
+    b → n
+    value = <invalid>
+  u = Resistor 447..448
+    a → p
+    b → n
+    value = <invalid>
+  v = Resistor 497..498
+    a → <unbound>
+    b → n
+    value = 1000 Ω
+
+--- errors ---
+E-unsupported Unsupported 229..234 "N = 2"
+E-binding Missing 275..283 "Resistor"
+E-unsupported Unsupported 292..298 "1 -> 2"
+E-value NotAValue 430..435 "..=1k"
+E-value NotAValue 481..485 "\"1k\""
+E-binding NotANet 515..519 "p[0]"
+
+--- rendered ---
+error[E-unsupported]: not supported yet: generic arguments
+  --> unsupported.spl:6:22
+  |
+6 |     let r = Resistor<N = 2> { a: p, b: n, value: 1k };
+  |                      ^^^^^ not supported yet
+
+error[E-binding]: `Resistor` is missing `b`
+  --> unsupported.spl:7:13
+  |
+7 |     let s = Resistor { a: p, 1 -> 2, value: 1k };
+  |             ^^^^^^^^ needs `b`
+
+error[E-unsupported]: not supported yet: a transition in a placement
+  --> unsupported.spl:7:30
+  |
+7 |     let s = Resistor { a: p, 1 -> 2, value: 1k };
+  |                              ^^^^^^ not supported yet
+
+error[E-value]: expected a number
+  --> unsupported.spl:9:43
+  |
+9 |     let t = Resistor { a: p, b: n, value: ..=1k };
+  |                                           ^^^^^ not a number
+
+error[E-value]: expected a number
+   --> unsupported.spl:10:43
+   |
+10 |     let u = Resistor { a: p, b: n, value: "1k" };
+   |                                           ^^^^ not a number
+
+error[E-binding]: pin `a` must be bound to a net or port
+   --> unsupported.spl:11:27
+   |
+11 |     let v = Resistor { a: p[0], b: n, value: 1k };
+   |                           ^^^^ this is a value

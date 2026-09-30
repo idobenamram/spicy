@@ -1,13 +1,16 @@
 //! Expressions: a Pratt loop over the precedence table of grammar.md §4.1, plus the
 //! shape rules of §4.2–4.3 (the `±` operand rule, no chaining, no spread in a range
-//! endpoint or a comparison).
+//! endpoint or a comparison). Ranges may leave out an end (`..=b`, `a..`), and fields
+//! and arguments may be transitions (`5mA -> 30mA`), which are parsed only there.
 //!
 //! Every node is built by [`Parser::node`], which checks its height against
 //! `MAX_TREE_DEPTH` (ast.md A11). The height is counted bottom-up, one more than the
 //! tallest child, because trees also grow *above* what's already parsed: in
 //! `a + (…) + a + … + a` each later `+` pushes `(…)` one level further down.
 
-use super::ast::{BinOp, Expr, ExprKind, Field, RelOp};
+use super::ast::{
+    Arg, BinOp, Expr, ExprKind, Field, GenericArg, NamedField, Path, RelOp, StructLit, Transition,
+};
 use super::{MAX_TREE_DEPTH, PResult, ParseError, ParseErrorKind, Parser};
 use spicy_span::Span;
 
@@ -24,12 +27,13 @@ const PRODUCT: u8 = 5;
 fn infix(kind: TokenKind) -> Option<(BinOp, u8)> {
     use TokenKind::*;
     Some(match kind {
-        KwIn => (BinOp::Rel(RelOp::In), COMPARE),
+        KwWithin => (BinOp::Rel(RelOp::Within), COMPARE),
         Lt => (BinOp::Rel(RelOp::Lt), COMPARE),
         Le => (BinOp::Rel(RelOp::Le), COMPARE),
         Gt => (BinOp::Rel(RelOp::Gt), COMPARE),
         Ge => (BinOp::Rel(RelOp::Ge), COMPARE),
-        // `..` is reported and read as `..=` (grammar.md §7 #8).
+        // `a..b` is reported and read as `..=` (grammar.md §7 #8); `a..` with nothing
+        // after it is a range with no upper end.
         DotDotEq | DotDot => (BinOp::Range, RANGE),
         PlusMinus => (BinOp::Tol, TOL),
         Plus => (BinOp::Add, SUM),
@@ -48,7 +52,7 @@ fn chains(level: u8) -> bool {
 
 /// A parsed expression and its height: the levels in its tree, itself included (`a` is
 /// 1, `-a + b` is 3). The height rides beside the tree rather than in it, so `Expr`
-/// stays 64 bytes.
+/// stays 48 bytes.
 struct Tree<'src> {
     expr: Expr<'src>,
     height: u32,
@@ -62,28 +66,40 @@ impl<'src> Parser<'_, 'src> {
     /// An operand, then the operators that bind tighter than `min`: the Pratt loop (as
     /// rust-analyzer's `expr_bp` and Zig's `parseExprPrecedence`). One nesting level.
     fn expr_bp(&mut self, min: u8) -> PResult<Tree<'src>> {
+        use TokenKind::{DotDot, DotDotEq};
         self.nested(|p| {
-            let mut lhs = p.unary()?;
-            let mut prev_level = None;
+            // Where a range may start, `..=b` is one with no lower end (rustc's
+            // `parse_expr_prefix_range`).
+            let (mut lhs, mut prev_level) = match p.peek() {
+                DotDotEq | DotDot if min < RANGE => (p.range_to()?, Some(RANGE)),
+                _ => (p.unary()?, None),
+            };
             while let Some((op, level)) = infix(p.peek()) {
                 if level <= min {
                     break;
                 }
-                let half_open = p.peek() == TokenKind::DotDot;
+                let dots = p.peek() == DotDot;
                 let op_span = p.bump();
                 // The last right side took every operator tighter than its own, so one
                 // of the same level right after it is a chain: `a < b < c`.
                 if !chains(level) && prev_level == Some(level) {
                     p.error(ParseErrorKind::Chained { op }, op_span);
                 }
+                prev_level = Some(level);
+                // `a..` with nothing after it that could be an upper end (rustc's
+                // `is_at_start_of_range_notation_rhs`).
+                if dots && !starts_operand(p.peek()) {
+                    p.check_endpoint(&lhs.expr);
+                    let span = Span::new(lhs.expr.span.start, op_span.end);
+                    let kind = ExprKind::RangeFrom(Box::new(lhs.expr));
+                    lhs = p.node(kind, span, lhs.height)?;
+                    continue;
+                }
                 let rhs = p.expr_bp(level)?;
-                // After the right side parsed, so `x in 1..;` doesn't get a fix to
-                // `1..=;`.
-                if half_open {
-                    p.errors.push(
-                        ParseError::new(ParseErrorKind::HalfOpenRange, op_span)
-                            .with_fix(op_span, "..="),
-                    );
+                // After the right side parsed, so a `..` before a broken upper end gets
+                // no fix.
+                if dots {
+                    p.half_open(op_span);
                 }
                 p.check_shape(op, &lhs.expr, &rhs.expr);
                 let span = Span::new(lhs.expr.span.start, rhs.expr.span.end);
@@ -94,10 +110,30 @@ impl<'src> Parser<'_, 'src> {
                     rhs: Box::new(rhs.expr),
                 };
                 lhs = p.node(kind, span, children)?;
-                prev_level = Some(level);
             }
             Ok(lhs)
         })
+    }
+
+    /// `..=b`: a range with no lower end. `..b` is reported and read as `..=b`, as
+    /// `a..b` is.
+    fn range_to(&mut self) -> PResult<Tree<'src>> {
+        let dots = self.peek() == TokenKind::DotDot;
+        let op_span = self.bump();
+        let end = self.expr_bp(RANGE)?;
+        if dots {
+            self.half_open(op_span);
+        }
+        self.check_endpoint(&end.expr);
+        let span = Span::new(op_span.start, end.expr.span.end);
+        let kind = ExprKind::RangeTo(Box::new(end.expr));
+        self.node(kind, span, end.height)
+    }
+
+    /// `a..b` or `..b` (grammar.md §7 #8), with the fix `..=`.
+    fn half_open(&mut self, dots: Span) {
+        let error = ParseError::new(ParseErrorKind::HalfOpenRange, dots);
+        self.errors.push(error.with_fix(dots, "..="));
     }
 
     /// grammar.md §4.2 and §4.3. These are soft errors: the node is still built.
@@ -105,11 +141,8 @@ impl<'src> Parser<'_, 'src> {
         match op {
             BinOp::Tol => self.check_tolerance_operands(lhs, rhs),
             BinOp::Range => {
-                for end in [lhs, rhs] {
-                    if matches!(end.kind, ExprKind::Binary { op: BinOp::Tol, .. }) {
-                        self.error(ParseErrorKind::ToleranceInRange, end.span);
-                    }
-                }
+                self.check_endpoint(lhs);
+                self.check_endpoint(rhs);
             }
             BinOp::Rel(RelOp::Lt | RelOp::Le | RelOp::Gt | RelOp::Ge) => {
                 for side in [lhs, rhs] {
@@ -118,11 +151,19 @@ impl<'src> Parser<'_, 'src> {
                     }
                 }
             }
-            // `x in 1..=2` is the point of `in`; `1..=2 in x` has it backwards.
-            BinOp::Rel(RelOp::In) if is_spread(lhs) => {
+            // `x within 1..=2` is the point of `within`; `1..=2 within x` has it
+            // backwards.
+            BinOp::Rel(RelOp::Within) if is_spread(lhs) => {
                 self.error(ParseErrorKind::RangeInComparison, lhs.span);
             }
             _ => {}
+        }
+    }
+
+    /// A range endpoint can't carry a tolerance: `1V ± 1%..=2V`, `..=2V ± 1%`.
+    fn check_endpoint(&mut self, end: &Expr) {
+        if matches!(end.kind, ExprKind::Binary { op: BinOp::Tol, .. }) {
+            self.error(ParseErrorKind::ToleranceInRange, end.span);
         }
     }
 
@@ -163,7 +204,7 @@ impl<'src> Parser<'_, 'src> {
         self.node(kind, span, operand.height)
     }
 
-    /// A primary followed by any number of `.field` and `(args)`.
+    /// A primary followed by any number of `.field`, `(args)` and `[index]`.
     fn postfix(&mut self) -> PResult<Tree<'src>> {
         let mut e = self.primary()?;
         let start = e.expr.span.start;
@@ -177,9 +218,19 @@ impl<'src> Parser<'_, 'src> {
                 }
                 TokenKind::LParen => {
                     let open = self.bump();
-                    let (args, tallest) = self.exprs(open, TokenKind::RParen)?;
+                    let (args, tallest) = self.tallest_list(open, TokenKind::RParen, Self::arg)?;
                     let callee = Box::new(e.expr);
                     (ExprKind::Call { callee, args }, e.height.max(tallest))
+                }
+                // After an operand, `[` can only be an index: a statement ends in `;`,
+                // so `[a, b]` never follows a value.
+                TokenKind::LBracket => {
+                    let open = self.bump();
+                    let index = self.expr_bp(0)?;
+                    self.close(open, TokenKind::RBracket)?;
+                    let children = e.height.max(index.height);
+                    let (base, index) = (Box::new(e.expr), Box::new(index.expr));
+                    (ExprKind::Index { base, index }, children)
                 }
                 _ => return Ok(e),
             };
@@ -202,15 +253,25 @@ impl<'src> Parser<'_, 'src> {
                     }
                 }
             }
+            TokenKind::Str => {
+                let text = self.text();
+                self.bump();
+                (ExprKind::Str(&text[1..text.len() - 1]), 0)
+            }
+            // The lexer reported it.
+            TokenKind::UnterminatedStr => {
+                self.bump();
+                let reported = self
+                    .lexed
+                    .expect("the lexer reports an unterminated string");
+                (ExprKind::Error(reported), 0)
+            }
             TokenKind::Ident => {
                 let path = self.path()?;
-                match self.eat(TokenKind::LBrace) {
-                    Some(open) => {
-                        let (fields, tallest) =
-                            self.tallest_list(open, TokenKind::RBrace, Self::field)?;
-                        (ExprKind::StructLit { path, fields }, tallest)
-                    }
-                    None => (ExprKind::Path(path), 0),
+                match self.peek() {
+                    TokenKind::LBrace => self.struct_lit(path)?,
+                    TokenKind::Lt if self.at_generics() => self.struct_lit(path)?,
+                    _ => (ExprKind::Path(path), 0),
                 }
             }
             TokenKind::LParen => {
@@ -224,25 +285,69 @@ impl<'src> Parser<'_, 'src> {
                 let (items, tallest) = self.exprs(open, TokenKind::RBracket)?;
                 (ExprKind::Array(items), tallest)
             }
-            TokenKind::KwReserved => return Err(self.reserved()),
+            kind if super::is_reserved(kind) => return Err(self.reserved()),
             _ => return Err(self.expected("an expression")),
         };
         self.node(kind, Span::new(start, self.prev_end()), children)
     }
 
-    /// `a: vcc`, the shorthand `gnd`, or `a = vcc` (reported, then read as `:`); with the
-    /// value's height (0 for the shorthand).
+    /// Whether generic arguments start here: `< A =`, which a comparison never is, since
+    /// `=` is no operator (`research/contract_v4_review_implementation.md` G4). Any token
+    /// may stand for the name, so `G<let = 1>` gets "`let` is a keyword".
+    fn at_generics(&self) -> bool {
+        self.peek() == TokenKind::Lt && self.nth(2) == TokenKind::Eq
+    }
+
+    /// `Kind<generics> { fields }` after its path: placing a part or a block.
+    fn struct_lit(&mut self, path: Path<'src>) -> PResult<(ExprKind<'src>, u32)> {
+        let (generics, tallest_generic) = match self.eat(TokenKind::Lt) {
+            Some(open) => self.tallest_list(open, TokenKind::Gt, Self::generic_arg)?,
+            None => (Vec::new(), 0),
+        };
+        let open = self.expect(TokenKind::LBrace, "`{`")?;
+        let (fields, tallest_field) = self.tallest_list(open, TokenKind::RBrace, Self::field)?;
+        let lit = StructLit {
+            path,
+            generics,
+            fields,
+        };
+        let kind = ExprKind::StructLit(Box::new(lit));
+        Ok((kind, tallest_generic.max(tallest_field)))
+    }
+
+    /// `A = Mcp6001`. The value is read above the comparisons, so a `>` ends it: a
+    /// comparison in it needs parentheses.
+    fn generic_arg(&mut self) -> PResult<(GenericArg<'src>, u32)> {
+        let name = self.name()?;
+        self.expect(TokenKind::Eq, "`=`")?;
+        let value = self.expr_bp(COMPARE)?;
+        let arg = GenericArg {
+            name,
+            value: value.expr,
+        };
+        Ok((arg, value.height))
+    }
+
+    /// `a: vcc`, the shorthand `gnd`, `a = vcc` (reported, then read as `:`), or a
+    /// transition `5mA -> 30mA`; with the height of its tallest value (0 for the
+    /// shorthand). A name followed by `:`, `=`, `,` or `}` starts a named field;
+    /// anything else, a transition.
     fn field(&mut self) -> PResult<(Field<'src>, u32)> {
+        use TokenKind::{Colon, Comma, Eq, RBrace};
+        if !matches!(self.nth(1), Colon | Eq | Comma | RBrace) {
+            let (transition, height) = self.transition()?;
+            return Ok((Field::Transition(Box::new(transition)), height));
+        }
         let name = self.name()?;
         let value = match self.peek() {
-            TokenKind::Colon => {
+            Colon => {
                 self.bump();
                 Some(self.expr_bp(0)?)
             }
-            TokenKind::Eq => {
+            Eq => {
                 let eq = self.bump();
-                self.errors
-                    .push(ParseError::new(ParseErrorKind::FieldEquals, eq).with_fix(eq, ":"));
+                let error = ParseError::new(ParseErrorKind::FieldEquals, eq);
+                self.errors.push(error.with_fix(eq, ":"));
                 Some(self.expr_bp(0)?)
             }
             _ => None,
@@ -250,7 +355,43 @@ impl<'src> Parser<'_, 'src> {
         let span = Span::new(name.span.start, self.prev_end());
         let height = value.as_ref().map_or(0, |v| v.height);
         let value = value.map(|v| v.expr);
-        Ok((Field { name, value, span }, height))
+        Ok((Field::Named(NamedField { name, value, span }), height))
+    }
+
+    /// `ref: dc`, a transition `4.5V -> 3.0V`, or a plain value; with its height.
+    fn arg(&mut self) -> PResult<(Arg<'src>, u32)> {
+        if self.nth(1) == TokenKind::Colon {
+            let name = self.name()?;
+            self.bump(); // `:`
+            let value = self.expr_bp(0)?;
+            let arg = Arg::Named {
+                name,
+                value: value.expr,
+            };
+            return Ok((arg, value.height));
+        }
+        let from = self.expr_bp(0)?;
+        if self.peek() != TokenKind::Arrow {
+            return Ok((Arg::Positional(from.expr), from.height));
+        }
+        let (transition, height) = self.transition_from(from)?;
+        Ok((Arg::Transition(Box::new(transition)), height))
+    }
+
+    /// `from -> to`, with the taller side's height.
+    fn transition(&mut self) -> PResult<(Transition<'src>, u32)> {
+        let from = self.expr_bp(0)?;
+        self.transition_from(from)
+    }
+
+    /// `-> to`, after `from`.
+    fn transition_from(&mut self, from: Tree<'src>) -> PResult<(Transition<'src>, u32)> {
+        self.expect(TokenKind::Arrow, "`->`")?;
+        let to = self.expr_bp(0)?;
+        let span = Span::new(from.expr.span.start, to.expr.span.end);
+        let height = from.height.max(to.height);
+        let (from, to) = (from.expr, to.expr);
+        Ok((Transition { from, to, span }, height))
     }
 
     /// A comma-separated list of expressions after `open`, and the tallest one's height
@@ -309,14 +450,25 @@ fn is_arithmetic(e: &Expr) -> bool {
     arithmetic(e).is_some()
 }
 
-/// A range or a tolerance.
+/// A range (closed or open) or a tolerance.
 fn is_spread(e: &Expr) -> bool {
     matches!(
         e.kind,
         ExprKind::Binary {
             op: BinOp::Range | BinOp::Tol,
             ..
-        }
+        } | ExprKind::RangeTo(_)
+            | ExprKind::RangeFrom(_)
+    )
+}
+
+/// Tokens an operand can start with (`unary` and `primary`): what may follow `..` as a
+/// range's upper end.
+fn starts_operand(kind: TokenKind) -> bool {
+    use TokenKind::*;
+    matches!(
+        kind,
+        Minus | Quantity | Str | UnterminatedStr | Ident | LParen | LBracket
     )
 }
 

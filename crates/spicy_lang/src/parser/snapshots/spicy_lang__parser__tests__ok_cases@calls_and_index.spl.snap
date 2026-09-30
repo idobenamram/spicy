@@ -1,0 +1,69 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 957
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/calls_and_index.spl
+---
+File 0..390
+  Contract C 0..389
+    Let a 71..103
+      Call 79..102
+        Field .f_high 79..87
+          Path h 79..80 "h"
+        Neg 88..92
+          Quantity 3e0 dB 89..92 "3dB"
+        Arg ref 94..101
+          Path dc 99..101 "dc"
+    Let b 108..136
+      Call 116..135
+        Path Sweep 116..121 "Sweep"
+        Transition 122..134
+          Quantity 4.5e0 V 122..126 "4.5V"
+          Quantity 3e0 V 130..134 "3.0V"
+    Let c 141..169
+      Call 149..168
+        Path f 149..150 "f"
+        Arg x 151..155
+          Quantity 1e0 154..155 "1"
+        Transition 157..163
+          Quantity 2e0 157..158 "2"
+          Quantity 3e0 162..163 "3"
+        Path y 165..166 "y"
+    Let d 251..288
+      Call 259..287
+        Field .mag 259..285
+          Call 259..281
+            Field .at 259..275
+              Index 259..272
+                Call 259..268
+                  Path ac 259..261 "ac"
+                  Field .v 262..267
+                    Path out 262..265 "out"
+                Path dm 269..271 "dm"
+            Quantity 6e1 Hz 276..280 "60Hz"
+    Let e 293..343
+      Binary Div 301..342
+        Paren 301..334
+          Binary Sub 302..333
+            Index 302..316
+              Field .code 302..310
+                Path mcu 302..305 "mcu"
+              Path full 311..315 "full"
+            Index 319..333
+              Field .code 319..327
+                Path mcu 319..322 "mcu"
+              Path zero 328..332 "zero"
+        Quantity 1e-1 V 337..342 "100mV"
+    Let g 348..368
+      Index 356..367
+        Index 356..360
+          Path a 356..357 "a"
+          Path b 358..359 "b"
+        Binary Add 361..366
+          Path c 361..362 "c"
+          Quantity 1e0 365..366 "1"
+    Let k 373..387
+      Neg 381..386
+        Index 382..386
+          Path m 382..383 "m"
+          Path s 384..385 "s"

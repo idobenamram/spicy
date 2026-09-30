@@ -1,27 +1,30 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/lexer_cascade.spl
 ---
-File 0..97
-  Block A 0..96
+File 0..138
+  Block A 0..137
     Let a 14..30
       Binary Sub 22..29
         Path b 22..23 "b"
         Path c 28..29 "c"
-    Let d 35..46
+    Let d 35..45
       Path e 43..44 "e"
-    Let f 51..66
-      ExprError 59..65 "10 kΩ"
-    Let g 71..82
-      ExprError 79..81 ".5"
-    Net ok 87..94
+    Let f 50..65
+      ExprError 58..64 "10 kΩ"
+    Let g 70..81
+      ExprError 78..80 ".5"
+    Let h 86..123
+      ExprError 94..123 "Note { text: \"never closed };"
+    Net ok 128..135
 
 --- errors ---
 E-lookalike Lookalike 24..27 "−" fix 24..27 "-"
-E-lookalike Lookalike 44..46 ";" fix 44..46 ";"
-E-unit-space UnitSpace 59..65 "10 kΩ" fix 59..65 "10kΩ"
-E-number LeadingDecimalPoint 79..81 ".5" fix 79..81 "0.5"
+E-unit-space UnitSpace 58..64 "10 kΩ" fix 58..64 "10kΩ"
+E-number LeadingDecimalPoint 78..80 ".5" fix 78..80 "0.5"
+E-unterminated-string UnterminatedString 107..108 "\""
 
 --- rendered ---
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
@@ -31,14 +34,6 @@ error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
   |               ^ looks like `-`
   |
   = help: replace it with `-`
-
-error[E-lookalike]: `;` (U+037E GREEK QUESTION MARK) is not ASCII
-  --> lexer_cascade.spl:3:14
-  |
-3 |     let d = e;
-  |              ^ looks like `;`
-  |
-  = help: replace it with `;`
 
 error[E-unit-space]: a unit must touch its number
   --> lexer_cascade.spl:4:13
@@ -55,3 +50,11 @@ error[E-number]: a number can't start with `.`
   |             ^^ add a leading zero
   |
   = help: write `0.5`
+
+error[E-unterminated-string]: unterminated string
+  --> lexer_cascade.spl:6:26
+  |
+6 |     let h = Note { text: "never closed };
+  |                          ^ this string is never closed
+  |
+  = help: add `"` before the end of the line (a string is one line)

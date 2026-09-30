@@ -1,10 +1,11 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/chained_across_levels.spl
 ---
-File 0..99
-  Contract A 0..98
+File 0..103
+  Contract A 0..102
     Spec a Lt 17..39
       Binary Rel(Lt) 25..34
         Path x 25..26 "x"
@@ -12,27 +13,27 @@ File 0..99
           Path y 29..30 "y"
           Path z 33..34 "z"
       Path w 37..38 "w"
-    Spec b In 44..73
+    Spec b Within 44..77
       Path x 52..53 "x"
-      Binary Tol 57..72
-        Binary Tol 57..67
-          Path a 57..58 "a"
-          Binary Add 62..67
-            Path b 62..63 "b"
-            Path c 66..67 "c"
-        Path d 71..72 "d"
-    Spec c Lt 78..96
-      Binary Range 86..91
-        Path x 86..87 "x"
-        Path y 90..91 "y"
-      Path z 94..95 "z"
+      Binary Tol 61..76
+        Binary Tol 61..71
+          Path a 61..62 "a"
+          Binary Add 66..71
+            Path b 66..67 "b"
+            Path c 70..71 "c"
+        Path d 75..76 "d"
+    Spec c Lt 82..100
+      Binary Range 90..95
+        Path x 90..91 "x"
+        Path y 94..95 "y"
+      Path z 98..99 "z"
 
 --- errors ---
 E-spread RangeInComparison 29..34 "y..=z"
 E-chained Chained 35..36 "<"
-E-ambiguous-tolerance AmbiguousTolerance 62..67 "b + c"
-E-chained Chained 68..70 "±"
-E-spread RangeInComparison 86..91 "x..=y"
+E-ambiguous-tolerance AmbiguousTolerance 66..71 "b + c"
+E-chained Chained 72..74 "±"
+E-spread RangeInComparison 90..95 "x..=y"
 
 --- rendered ---
 error[E-spread]: compare with a single value
@@ -41,7 +42,7 @@ error[E-spread]: compare with a single value
 2 |     spec a: x < y..=z < w;
   |                 ^^^^^ a range or tolerance here
   |
-  = help: to require a value inside a range, use `in`
+  = help: to require a value inside a range, use `within`
 
 error[E-chained]: comparisons can't be chained
   --> chained_across_levels.spl:2:23
@@ -49,22 +50,22 @@ error[E-chained]: comparisons can't be chained
 2 |     spec a: x < y..=z < w;
   |                       ^ second operator here
   |
-  = help: for a range, write `b in a..=c`
+  = help: for a range, write `b within a..=c`
 
 error[E-ambiguous-tolerance]: ambiguous tolerance
-  --> chained_across_levels.spl:3:22
+  --> chained_across_levels.spl:3:26
   |
-3 |     spec b: x in a ± b + c ± d;
-  |                      ^^^^^ does `±` apply to this whole expression?
+3 |     spec b: x within a ± b + c ± d;
+  |                          ^^^^^ does `±` apply to this whole expression?
   |
   = help: `a ± (b + c)` for a spread on the result
   = help: `(a ± b) + c` for a spread on one term
 
 error[E-chained]: tolerances can't be chained
-  --> chained_across_levels.spl:3:28
+  --> chained_across_levels.spl:3:32
   |
-3 |     spec b: x in a ± b + c ± d;
-  |                            ^ second operator here
+3 |     spec b: x within a ± b + c ± d;
+  |                                ^ second operator here
 
 error[E-spread]: compare with a single value
   --> chained_across_levels.spl:4:13
@@ -72,4 +73,4 @@ error[E-spread]: compare with a single value
 4 |     spec c: x..=y < z;
   |             ^^^^^ a range or tolerance here
   |
-  = help: to require a value inside a range, use `in`
+  = help: to require a value inside a range, use `within`

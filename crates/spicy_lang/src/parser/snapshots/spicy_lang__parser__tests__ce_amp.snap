@@ -1,8 +1,9 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1480
 expression: "dump_parse(\"ce_amp.spl\", src)"
 ---
-File 0..1020
+File 0..1036
   Block CeAmp 0..635
     Doc 0..49 "/// Common-emitter audio stage (walkthrough §1)."
     Port vcc 68..88
@@ -81,52 +82,52 @@ File 0..1020
           Binary Range 621..630
             Quantity 1e2 621..624 "100"
             Quantity 3e2 627..630 "300"
-  Contract CeAmp 637..1019
-    Assume In 658..688
+  Contract CeAmp 637..1035
+    Assume Within 658..692
       Path temp 665..669 "temp"
-      Binary Range 673..687
-        Neg 673..679
-          Quantity 1e1 °C 674..679 "10°C"
-        Quantity 6e1 °C 682..687 "60°C"
-    Assume In 693..719
-      Field .v 700..705
-        Path vcc 700..703 "vcc"
-      Binary Tol 709..718
-        Quantity 1.2e1 V 709..712 "12V"
-        Quantity 5e0 % 716..718 "5%"
-    Let h 725..756
-      Call 733..755
-        Path ac 733..735 "ac"
-        Binary Div 736..754
-          Field .v 736..744
-            Path output 736..742 "output"
-          Field .v 747..754
-            Path input 747..752 "input"
-    Spec bias In 762..862
-      Doc 762..818 "/// Room for the output to swing ±1 V without clipping."
-      Call 834..846
-        Path dc 834..836 "dc"
-        Field .v 837..845
-          Path output 837..843 "output"
-      Binary Range 850..861
-        Quantity 4.5e0 V 850..854 "4.5V"
-        Quantity 6.5e0 V 857..861 "6.5V"
-    Spec gain In 867..951
-      Doc 867..905 "/// The next stage expects this level."
-      Call 921..937
-        Field .mag 921..935
-          Call 921..931
-            Field .at 921..925
-              Path h 921..922 "h"
-            Quantity 1e3 Hz 926..930 "1kHz"
-      Binary Tol 941..950
-        Quantity 4.6e0 941..944 "4.6"
-        Quantity 5e0 % 948..950 "5%"
-    Spec bass Le 956..1017
-      Doc 956..979 "/// Don't cut the bass."
-      Call 995..1008
-        Field .f_low 995..1002
-          Path h 995..996 "h"
-        Neg 1003..1007
-          Quantity 3e0 dB 1004..1007 "3dB"
-      Quantity 3e1 Hz 1012..1016 "30Hz"
+      Binary Range 677..691
+        Neg 677..683
+          Quantity 1e1 °C 678..683 "10°C"
+        Quantity 6e1 °C 686..691 "60°C"
+    Assume Within 697..727
+      Field .v 704..709
+        Path vcc 704..707 "vcc"
+      Binary Tol 717..726
+        Quantity 1.2e1 V 717..720 "12V"
+        Quantity 5e0 % 724..726 "5%"
+    Let h 733..764
+      Call 741..763
+        Path ac 741..743 "ac"
+        Binary Div 744..762
+          Field .v 744..752
+            Path output 744..750 "output"
+          Field .v 755..762
+            Path input 755..760 "input"
+    Spec bias Within 770..874
+      Doc 770..826 "/// Room for the output to swing ±1 V without clipping."
+      Call 842..854
+        Path dc 842..844 "dc"
+        Field .v 845..853
+          Path output 845..851 "output"
+      Binary Range 862..873
+        Quantity 4.5e0 V 862..866 "4.5V"
+        Quantity 6.5e0 V 869..873 "6.5V"
+    Spec gain Within 879..967
+      Doc 879..917 "/// The next stage expects this level."
+      Call 933..949
+        Field .mag 933..947
+          Call 933..943
+            Field .at 933..937
+              Path h 933..934 "h"
+            Quantity 1e3 Hz 938..942 "1kHz"
+      Binary Tol 957..966
+        Quantity 4.6e0 957..960 "4.6"
+        Quantity 5e0 % 964..966 "5%"
+    Spec bass Le 972..1033
+      Doc 972..995 "/// Don't cut the bass."
+      Call 1011..1024
+        Field .f_low 1011..1018
+          Path h 1011..1012 "h"
+        Neg 1019..1023
+          Quantity 3e0 dB 1020..1023 "3dB"
+      Quantity 3e1 Hz 1028..1032 "30Hz"

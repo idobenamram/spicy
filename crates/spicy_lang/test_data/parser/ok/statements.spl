@@ -15,6 +15,6 @@ contract All {
     let h = ac(output.v / input.v);
     #[confidence(sigma(3))]
     #[warn]
-    spec bias: dc(output.v) in 4.5V..=6.5V;
-    spec calls: f() in g(a, b,)..=h(1);
+    spec bias: dc(output.v) within 4.5V..=6.5V;
+    spec calls: f() within g(a, b,)..=h(1);
 }

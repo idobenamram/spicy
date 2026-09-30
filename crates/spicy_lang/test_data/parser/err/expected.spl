@@ -5,4 +5,11 @@ block A {
     net ok;
     let y = (1 + 2;
     let z = 1 2;
+    // A field that isn't named must be a transition.
+    let t = Step { 5mA 30mA };
+    let u = Step { 5mA };
+    // Generic arguments are named, and a placement follows them.
+    let v = G<A = X, B> {};
+    let w = G<A = X>;
+    let i = m[s;
 }

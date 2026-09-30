@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/follow_on.spl
 ---
@@ -14,7 +15,7 @@ File 0..177
       Binary Tol 78..98
         Binary Div 78..91
           Path capacity 78..86 "capacity"
-          ExprError 89..91 "2h"
+          ExprError 89..91 "2q"
         Quantity 1e1 % 95..98 "10%"
     Let c 104..115
       ExprError 112..114 "1."
@@ -30,8 +31,8 @@ E-syntax MissingSemi 25..29 "1Meg" fix 29..29 ";"
 E-unit-suffix Meg 26..29 "Meg" fix 26..29 "M"
 E-relation NotARelation 57..64 "x − 1"
 E-lookalike Lookalike 59..62 "−" fix 59..62 "-"
-E-ambiguous-tolerance AmbiguousTolerance 78..91 "capacity / 2h"
-E-unit-suffix UnknownSuffix 90..91 "h" fix 90..91 "H"
+E-ambiguous-tolerance AmbiguousTolerance 78..91 "capacity / 2q"
+E-unit-suffix UnknownSuffix 90..91 "q"
 E-number TrailingDecimalPoint 112..114 "1." fix 112..114 "1.0"
 E-percent LonePercent 130..131 "%"
 E-unexpected-char UnexpectedChar 149..150 "!"
@@ -60,7 +61,7 @@ error[E-relation]: expected a relation
 4 |     spec g: x − 1;
   |             ^^^^^ not a relation
   |
-  = help: write it like `x in a..=b` or `x <= b`
+  = help: write it like `x within a..=b` or `x <= b`
 
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
   --> follow_on.spl:4:15
@@ -73,20 +74,19 @@ error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
 error[E-ambiguous-tolerance]: ambiguous tolerance
   --> follow_on.spl:5:13
   |
-5 |     let i = capacity / 2h ± 10%;
+5 |     let i = capacity / 2q ± 10%;
   |             ^^^^^^^^^^^^^ does `±` apply to this whole expression?
   |
-  = help: `(capacity / 2h) ± 10%` for a spread on the result
-  = help: `capacity / (2h ± 10%)` for a spread on one term
+  = help: `(capacity / 2q) ± 10%` for a spread on the result
+  = help: `capacity / (2q ± 10%)` for a spread on one term
 
-error[E-unit-suffix]: unknown unit `h`
+error[E-unit-suffix]: unknown unit `q`
   --> follow_on.spl:5:25
   |
-5 |     let i = capacity / 2h ± 10%;
+5 |     let i = capacity / 2q ± 10%;
   |                         ^ not a unit or prefix
   |
-  = help: did you mean `H`?
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-number]: a number can't end with `.`
   --> follow_on.spl:6:13

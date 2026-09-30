@@ -1,6 +1,6 @@
 contract A {
-    spec in: x in 1..=2;
-    spec fn: x in 1..=2;
-    spec g x in 1..=2;
-    spec ok: x in 1..=2;
+    spec in: x within 1..=2;
+    spec fn: x within 1..=2;
+    spec g x within 1..=2;
+    spec ok: x within 1..=2;
 }

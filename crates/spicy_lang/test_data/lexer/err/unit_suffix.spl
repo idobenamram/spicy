@@ -8,3 +8,6 @@ let g = 10ºC;
 let h = 4k7k;
 let i = 1e3k7;
 let j = 2kdB;
+let k = 10mh;
+let l = 3ky;
+let m = 10µh;

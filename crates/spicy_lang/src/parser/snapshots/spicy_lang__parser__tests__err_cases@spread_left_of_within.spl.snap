@@ -1,0 +1,65 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/spread_left_of_within.spl
+---
+File 0..179
+  Contract A 0..178
+    Spec a Within 17..40
+      Binary Range 25..30
+        Quantity 1e0 25..26 "1"
+        Quantity 2e0 29..30 "2"
+      Path x 38..39 "x"
+    Spec b Within 45..70
+      Binary Tol 53..60
+        Path x 53..54 "x"
+        Quantity 1e0 % 58..60 "1%"
+      Path y 68..69 "y"
+    Spec c Within 128..150
+      RangeTo 136..140
+        Quantity 2e0 139..140 "2"
+      Path x 148..149 "x"
+    Spec d Within 155..176
+      RangeFrom 163..166
+        Quantity 1e0 163..164 "1"
+      Path x 174..175 "x"
+
+--- errors ---
+E-spread RangeInComparison 25..30 "1..=2"
+E-spread RangeInComparison 53..60 "x ± 1%"
+E-spread RangeInComparison 136..140 "..=2"
+E-spread RangeInComparison 163..166 "1.."
+
+--- rendered ---
+error[E-spread]: compare with a single value
+  --> spread_left_of_within.spl:2:13
+  |
+2 |     spec a: 1..=2 within x;
+  |             ^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: compare with a single value
+  --> spread_left_of_within.spl:3:13
+  |
+3 |     spec b: x ± 1% within y;
+  |             ^^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: compare with a single value
+  --> spread_left_of_within.spl:5:13
+  |
+5 |     spec c: ..=2 within x;
+  |             ^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: compare with a single value
+  --> spread_left_of_within.spl:6:13
+  |
+6 |     spec d: 1.. within x;
+  |             ^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`

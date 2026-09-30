@@ -1,0 +1,11 @@
+// Strings, on one line, with `\"` and `\\` as their only escapes (lexer.md §5).
+"reason"
+""
+"a \"quoted\" word"
+"a back\\slash"
+"ends in a backslash\\"
+"Ω µ °C"
+"a""b"
+// A string is one token: nothing inside it is a comment, a number or a look-alike.
+"// not a comment /* nor this"
+"10 kΩ, .5, 1., +-, −, →"

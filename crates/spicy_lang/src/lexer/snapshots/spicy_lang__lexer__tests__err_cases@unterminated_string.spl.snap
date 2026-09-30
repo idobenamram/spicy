@@ -1,0 +1,39 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unterminated_string.spl
+---
+LineComment "// A string is one line: without its closing `\"`, it runs to the end of the line."
+Whitespace "\n"
+Pound "#"
+LBracket "["
+Ident "outside"
+LParen "("
+Ident "reason"
+Whitespace " "
+Eq "="
+Whitespace " "
+UnterminatedStr "\"not closed)]"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "a"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "b"
+Semi ";"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-unterminated-string UnterminatedString 101..102 "\""
+
+--- rendered ---
+error[E-unterminated-string]: unterminated string
+  --> unterminated_string.spl:2:20
+  |
+2 | #[outside(reason = "not closed)]
+  |                    ^ this string is never closed
+  |
+  = help: add `"` before the end of the line (a string is one line)

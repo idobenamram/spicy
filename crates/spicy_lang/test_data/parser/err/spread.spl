@@ -1,5 +1,10 @@
 contract A {
-    spec a: x in 1V ± 1%..=2V;
+    spec a: x within 1V ± 1%..=2V;
     spec b: x <= 1V..=2V;
     spec c: x > 1 ± 1%;
+    // Open ranges are spreads too, and their one endpoint can't carry a tolerance.
+    spec d: x <= ..=2V;
+    spec e: 10k.. > x;
+    spec f: x within ..=2V ± 1%;
+    spec g: x within 1V ± 1%..;
 }

@@ -21,18 +21,31 @@ pub enum TokenKind {
     IdentNonAscii,
 
     KwBlock,
+    KwCircuit,
+    KwSetup,
     KwContract,
+    KwEnv,
+    KwConst,
+    KwPub,
     KwPort,
     KwNet,
     KwLet,
     KwAssume,
     KwSpec,
+    KwRated,
+    KwEnsure,
+    KwWithin,
+    KwFor,
     KwIn,
-    /// Any word reserved for later (`fn`, `for`, `signal`, …); the text says which.
+    /// Any word reserved for later (`fn`, `trait`, `signal`, …); the text says which.
     KwReserved,
 
     /// A number with an optional glued suffix: `47k`, `4k7`, `1uF`, `-10°C` (without the `-`).
     Quantity,
+    /// `"…"` on one line, with `\"` and `\\` as its only escapes.
+    Str,
+    /// A `"` with no closing `"` before the end of its line. Rejected by `check`.
+    UnterminatedStr,
 
     LBrace,
     RBrace,
@@ -54,6 +67,8 @@ pub enum TokenKind {
     Eq,
     Plus,
     Minus,
+    /// `->`, the two characters touching: a transition (`5mA -> 30mA`).
+    Arrow,
     Star,
     Slash,
     /// `±` or `+/-`.

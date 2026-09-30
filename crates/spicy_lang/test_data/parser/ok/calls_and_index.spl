@@ -1,0 +1,11 @@
+contract C {
+    // Named arguments, and transitions as arguments.
+    let a = h.f_high(-3dB, ref: dc);
+    let b = Sweep(4.5V -> 3.0V);
+    let c = f(x: 1, 2 -> 3, y,);
+    // `m[s]` is measure `m` in setup `s`: a postfix, like `.f` and `(…)`.
+    let d = ac(out.v)[dm].at(60Hz).mag();
+    let e = (mcu.code[full] - mcu.code[zero]) / 100mV;
+    let g = a[b][c + 1];
+    let k = -m[s];
+}

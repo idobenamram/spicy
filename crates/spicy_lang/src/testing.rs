@@ -10,7 +10,8 @@ use spicy_errors::{Diag, DiagKind, Render, render_plain};
 
 use crate::lexer::{LexError, TokenKind, check, scan};
 use crate::parser::ast::{
-    Attribute, Expr, ExprKind, File, Item, ItemKind, Path, Relation, Stmt, StmtKind, Type, TypeKind,
+    Arg, Attribute, Expr, ExprKind, Field, File, Item, ItemKind, Path, Relation, Stmt, StmtKind,
+    Transition, Type, TypeKind,
 };
 use crate::parser::parse;
 
@@ -452,21 +453,33 @@ impl<'a> Printer<'a> {
                 self.leaf(&format!("Path {}", path_text(path)), e.span);
                 self.check_path(path, e.span);
             }
+            ExprKind::Str(_) => self.leaf("Str", e.span),
             ExprKind::Error(_) => self.leaf("ExprError", e.span),
-            ExprKind::StructLit { path, fields } => {
-                self.line(&format!("StructLit {}", path_text(path)), e.span);
-                self.check_path(path, e.span);
+            ExprKind::StructLit(lit) => {
+                self.line(&format!("StructLit {}", path_text(&lit.path)), e.span);
+                self.check_path(&lit.path, e.span);
                 self.nested(|p| {
-                    for f in fields {
-                        let shorthand = if f.value.is_none() {
-                            " (shorthand)"
-                        } else {
-                            ""
-                        };
-                        p.line(&format!("Field {}{shorthand}", f.name.text), f.span);
-                        p.check(f.name.span, f.span);
-                        if let Some(v) = &f.value {
-                            p.nested(|p| p.expr(v));
+                    for g in &lit.generics {
+                        let span = Span::new(g.name.span.start, g.value.span.end);
+                        p.line(&format!("Generic {}", g.name.text), span);
+                        p.check(g.name.span, span);
+                        p.nested(|p| p.expr(&g.value));
+                    }
+                    for f in &lit.fields {
+                        match f {
+                            Field::Named(f) => {
+                                let shorthand = if f.value.is_none() {
+                                    " (shorthand)"
+                                } else {
+                                    ""
+                                };
+                                p.line(&format!("Field {}{shorthand}", f.name.text), f.span);
+                                p.check(f.name.span, f.span);
+                                if let Some(v) = &f.value {
+                                    p.nested(|p| p.expr(v));
+                                }
+                            }
+                            Field::Transition(t) => p.transition(t),
                         }
                     }
                 });
@@ -497,8 +510,24 @@ impl<'a> Printer<'a> {
                 self.nested(|p| {
                     p.expr(callee);
                     for a in args {
-                        p.expr(a);
+                        match a {
+                            Arg::Positional(v) => p.expr(v),
+                            Arg::Named { name, value } => {
+                                let span = Span::new(name.span.start, value.span.end);
+                                p.line(&format!("Arg {}", name.text), span);
+                                p.check(name.span, span);
+                                p.nested(|p| p.expr(value));
+                            }
+                            Arg::Transition(t) => p.transition(t),
+                        }
                     }
+                });
+            }
+            ExprKind::Index { base, index } => {
+                self.line("Index", e.span);
+                self.nested(|p| {
+                    p.expr(base);
+                    p.expr(index);
                 });
             }
             ExprKind::Binary { op, lhs, rhs } => {
@@ -508,7 +537,23 @@ impl<'a> Printer<'a> {
                     p.expr(rhs);
                 });
             }
+            ExprKind::RangeTo(end) => {
+                self.line("RangeTo", e.span);
+                self.nested(|p| p.expr(end));
+            }
+            ExprKind::RangeFrom(start) => {
+                self.line("RangeFrom", e.span);
+                self.nested(|p| p.expr(start));
+            }
         }
+    }
+
+    fn transition(&mut self, t: &Transition) {
+        self.line("Transition", t.span);
+        self.nested(|p| {
+            p.expr(&t.from);
+            p.expr(&t.to);
+        });
     }
 }
 

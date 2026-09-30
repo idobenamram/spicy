@@ -2,7 +2,7 @@
 //! renders to (as `parser/error.rs` and `resolve/error.rs` for their stages).
 
 use super::lookalike;
-use super::quantity::{QuantityErrorKind, SUFFIX_NOTE, suffix_suggestions};
+use super::quantity::{QuantityErrorKind, SUFFIX_NOTE, other_case, suffix_suggestions};
 use spicy_errors::{Diag, DiagKind, Fix, Text};
 
 /// One lexer problem (lexer.md L10).
@@ -27,6 +27,13 @@ pub enum LexErrorKind {
     /// `%` not glued to a number.
     LonePercent,
     UnterminatedBlockComment,
+    /// A `"` with no closing `"` on its line.
+    UnterminatedString,
+    /// `\n` in a string: only `\"` and `\\` are escapes. `escape` is the character after
+    /// the backslash.
+    UnknownEscape {
+        escape: char,
+    },
     /// `−` (U+2212) instead of `-`, and the rest of the look-alike table, which holds
     /// its name and what to write instead (also the fix).
     Lookalike {
@@ -62,6 +69,8 @@ impl LexErrorKind {
         "DoubleMinus",
         "LonePercent",
         "UnterminatedBlockComment",
+        "UnterminatedString",
+        "UnknownEscape",
         "Lookalike",
         "UnexpectedChar",
         "NonAsciiIdent",
@@ -92,6 +101,8 @@ impl DiagKind for LexErrorKind {
             LexErrorKind::DoubleMinus => "DoubleMinus",
             LexErrorKind::LonePercent => "LonePercent",
             LexErrorKind::UnterminatedBlockComment => "UnterminatedBlockComment",
+            LexErrorKind::UnterminatedString => "UnterminatedString",
+            LexErrorKind::UnknownEscape { .. } => "UnknownEscape",
             LexErrorKind::Lookalike { .. } => "Lookalike",
             LexErrorKind::UnexpectedChar(_) => "UnexpectedChar",
             LexErrorKind::NonAsciiIdent { .. } => "NonAsciiIdent",
@@ -113,6 +124,8 @@ impl DiagKind for LexErrorKind {
             LexErrorKind::DoubleMinus => "E-double-minus",
             LexErrorKind::LonePercent => "E-percent",
             LexErrorKind::UnterminatedBlockComment => "E-unterminated-comment",
+            LexErrorKind::UnterminatedString => "E-unterminated-string",
+            LexErrorKind::UnknownEscape { .. } => "E-escape",
             LexErrorKind::Lookalike { .. } => "E-lookalike",
             LexErrorKind::UnexpectedChar(_) => "E-unexpected-char",
             LexErrorKind::NonAsciiIdent { .. } => "E-ascii-ident",
@@ -157,6 +170,18 @@ impl DiagKind for LexErrorKind {
                 "unterminated block comment".to_string(),
                 "this comment is never closed".to_string(),
                 vec!["help: add `*/` (block comments nest, so each `/*` needs one)".to_string()],
+            ),
+            LexErrorKind::UnterminatedString => (
+                "unterminated string".to_string(),
+                "this string is never closed".to_string(),
+                vec![
+                    "help: add `\"` before the end of the line (a string is one line)".to_string(),
+                ],
+            ),
+            LexErrorKind::UnknownEscape { escape } => (
+                format!("unknown escape `\\{}`", escape.escape_debug()),
+                "not an escape".to_string(),
+                vec!["note: a string's only escapes are `\\\"` and `\\\\`".to_string()],
             ),
             LexErrorKind::Lookalike { found } => {
                 let row = lookalike::lookup(*found).expect("only table characters are Lookalike");
@@ -224,25 +249,23 @@ fn quantity_text(q: &QuantityErrorKind) -> Text {
         QuantityErrorKind::PrefixNotAllowed {
             prefix,
             unit,
-            infix: false,
-        } => (
-            format!("`{}` takes no prefix", unit.symbol()),
-            format!("remove `{prefix}`"),
-            vec![],
-        ),
-        QuantityErrorKind::PrefixNotAllowed {
-            prefix,
-            unit,
-            infix: true,
-        } => (
-            format!("`{}` takes no prefix", unit.symbol()),
-            format!("`{prefix}` can't be a prefix here"),
-            vec![format!(
-                "help: in this form `{prefix}` marks the decimal point, but `{}` takes \
-                 no prefix: write `.` instead",
-                unit.symbol()
-            )],
-        ),
+            infix,
+        } => {
+            let symbol = unit.symbol();
+            let (label, mut notes) = if *infix {
+                let help = format!(
+                    "help: in this form `{prefix}` marks the decimal point, but `{symbol}` \
+                     takes no prefix: write `.` instead"
+                );
+                (format!("`{prefix}` can't be a prefix here"), vec![help])
+            } else {
+                (format!("remove `{prefix}`"), vec![])
+            };
+            // The other reading, if there is one (`mh` as `mH`).
+            let other = other_case(*prefix, *unit);
+            notes.extend(other.map(|s| format!("help: or did you mean `{s}`?")));
+            (format!("`{symbol}` takes no prefix"), label, notes)
+        }
         QuantityErrorKind::SecondPrefix { prefix } => (
             "a number takes one prefix".to_string(),
             format!("second prefix `{prefix}`"),

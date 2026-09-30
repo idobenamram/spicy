@@ -3,13 +3,13 @@ source: crates/spicy_lang/src/lexer/mod.rs
 expression: "dump(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/lexer/err/signs.spl
 ---
-KwAssume "assume"
+KwRated "rated"
 Whitespace " "
 Ident "vcc"
 Dot "."
 Ident "v"
 Whitespace " "
-KwIn "in"
+KwWithin "within"
 Whitespace " "
 Quantity "12V"
 Whitespace " "
@@ -33,15 +33,15 @@ Whitespace "\n"
 Eof ""
 
 --- errors ---
-E-plus-minus PlusMinusTypo 20..22 "+-" fix 20..22 "±"
-E-double-minus DoubleMinus 35..37 "--"
+E-plus-minus PlusMinusTypo 23..25 "+-" fix 23..25 "±"
+E-double-minus DoubleMinus 38..40 "--"
 
 --- rendered ---
 error[E-plus-minus]: `+-` means `+ (-…)` in Rust
-  --> signs.spl:1:21
+  --> signs.spl:1:24
   |
-1 | assume vcc.v in 12V +- 5%;
-  |                     ^^ not a tolerance
+1 | rated vcc.v within 12V +- 5%;
+  |                        ^^ not a tolerance
   |
   = help: for a tolerance write `±` or `+/-`
 

@@ -1,0 +1,14 @@
+contract R {
+    // A range may leave out one end: `..=b` has no lower end, `a..` no upper end.
+    spec a: x within ..=0.5Ω;
+    spec b: x within 10kΩ..;
+    // `a..` is open only where no upper end follows: before `,` `}` `)` `]` or `;`.
+    let c = Supply { z: ..=0.5Ω, r: 10kΩ.., };
+    let d = Load { r: 10kΩ.. };
+    let e = f(1V.., ..=2V);
+    let g = [1.., ..=2];
+    // `..=` binds looser than `±` and arithmetic, on either side.
+    spec h: x within ..=v + 1V;
+    spec i: x within v - 1V..;
+    let j = w { window: ..=(drop.end + 1s) };
+}

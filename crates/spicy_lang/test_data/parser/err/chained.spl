@@ -1,5 +1,5 @@
 contract A {
     spec a: x < y < z;
-    spec b: x in 1 ± 2% ± 1%;
-    spec c: x in 1..=2..=3;
+    spec b: x within 1 ± 2% ± 1%;
+    spec c: x within 1..=2..=3;
 }

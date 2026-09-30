@@ -1,0 +1,3 @@
+// Only `\"` and `\\` are escapes.
+#[outside(reason = "a\nb")]
+#[outside(reason = "tab\tthen")]

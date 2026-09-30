@@ -1,3 +1,7 @@
 block A {
     let q = Npn { beta: 100..300 };
+    // With no lower end too: `..300` is `..=300`.
+    let p = Npn { beta: ..300 };
+    // A `..` before an upper end that doesn't parse gets no fix.
+    let s = Npn { beta: 100..(1 };
 }

@@ -1,4 +1,6 @@
 block A {
     let net = 1;
     net in;
+    let r = f(net: 1);
+    let s = G<let = 1> {};
 }

@@ -3,8 +3,11 @@
 use spicy_span::Span;
 
 use super::error::{LexError, LexErrorKind};
+use super::is_escape;
 use super::lookalike;
-use super::quantity::{QuantityErrorKind, decode_quantity, suffix_len, suffix_suggestions};
+use super::quantity::{
+    QuantityErrorKind, decode_quantity, other_case, suffix_len, suffix_suggestions,
+};
 use super::token::{TokenIdx, TokenKind, Tokens};
 
 /// Pass 2: every lexer problem in `tokens`, in source order.
@@ -31,7 +34,10 @@ pub fn check(tokens: &Tokens) -> Vec<LexError> {
             TokenKind::Plus => out.push(plus_minus_typo(tokens, i)),
             TokenKind::Minus => out.push(double_minus(tokens, i)),
             TokenKind::Unknown => out.push(Some(unknown_char(tokens, i))),
-            TokenKind::UnterminatedBlockComment => out.push(Some(unterminated_comment(tokens, i))),
+            TokenKind::UnterminatedBlockComment | TokenKind::UnterminatedStr => {
+                out.push(Some(unterminated(tokens, i)))
+            }
+            TokenKind::Str => out.push(unknown_escape(tokens, i)),
             TokenKind::IdentNonAscii => out.push(Some(non_ascii_ident(tokens, i))),
             _ => {}
         }
@@ -116,6 +122,12 @@ fn decode_error(tokens: &Tokens, i: TokenIdx) -> Option<LexError> {
 fn quantity_fix(kind: &QuantityErrorKind) -> Option<String> {
     match kind {
         QuantityErrorKind::Meg => Some("M".to_string()),
+        // `10mh` and `4u7h` may be `10mH` and `4u7H`: with another reading, no fix.
+        QuantityErrorKind::PrefixNotAllowed { prefix, unit, .. }
+            if other_case(*prefix, *unit).is_some() =>
+        {
+            None
+        }
         // `4k7%` → `4.7%`: the letter stood for the decimal point.
         QuantityErrorKind::PrefixNotAllowed { infix: true, .. } => Some(".".to_string()),
         QuantityErrorKind::PrefixNotAllowed { .. } | QuantityErrorKind::SecondPrefix { .. } => {
@@ -168,13 +180,14 @@ fn is_name(kind: TokenKind) -> bool {
 }
 
 /// Tokens that can end an operand. A `.` right after one is a field access, not a
-/// decimal point (`x.5`, `f().5`), and `0.5` would be no fix.
+/// decimal point (`x.5`, `f().5`, `"a".5`), and `0.5` would be no fix.
 fn ends_operand(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Ident
             | TokenKind::IdentNonAscii
             | TokenKind::Quantity
+            | TokenKind::Str
             | TokenKind::RParen
             | TokenKind::RBracket
             | TokenKind::RBrace
@@ -217,13 +230,37 @@ fn unknown_char(tokens: &Tokens, i: TokenIdx) -> LexError {
     }
 }
 
-/// Points at the `/*` that is never closed.
-fn unterminated_comment(tokens: &Tokens, i: TokenIdx) -> LexError {
+/// A comment or string that is never closed, reported at its opener (`/*`, `"`).
+fn unterminated(tokens: &Tokens, i: TokenIdx) -> LexError {
+    let (kind, opener) = match tokens.kind(i) {
+        TokenKind::UnterminatedBlockComment => (LexErrorKind::UnterminatedBlockComment, "/*"),
+        TokenKind::UnterminatedStr => (LexErrorKind::UnterminatedString, "\""),
+        other => unreachable!("{other:?} is closed"),
+    };
     let start = tokens.span(i).start;
-    LexError::new(
-        LexErrorKind::UnterminatedBlockComment,
-        Span::new(start, start + 2),
-    )
+    LexError::new(kind, Span::new(start, start + opener.len() as u32))
+}
+
+/// The first `\` in a string that isn't `\"` or `\\` ([`is_escape`]), over the two
+/// characters.
+fn unknown_escape(tokens: &Tokens, i: TokenIdx) -> Option<LexError> {
+    let text = tokens.text(i);
+    let mut chars = text.char_indices().skip(1);
+    while let Some((at, c)) = chars.next() {
+        if c != '\\' {
+            continue;
+        }
+        let (_, escape) = chars.next()?;
+        if !is_escape(escape) {
+            let start = tokens.span(i).start + at as u32;
+            let end = start + 1 + escape.len_utf8() as u32;
+            return Some(LexError::new(
+                LexErrorKind::UnknownEscape { escape },
+                Span::new(start, end),
+            ));
+        }
+    }
+    None
 }
 
 fn non_ascii_ident(tokens: &Tokens, i: TokenIdx) -> LexError {
@@ -387,6 +424,40 @@ mod tests {
                 assert!(one_quantity(&fix), "{src:?}: {fix:?}");
             }
         }
+    }
+
+    /// A prefix on `h` may be meant for `H` (`10mh`, `10µh`, `4u7h`), so neither
+    /// removing it nor a `.` is the fix there. With no other reading, it is.
+    #[test]
+    fn prefix_fix_only_without_another_reading() {
+        for src in ["10mh", "10µh", "10μh", "10Mh", "4u7h"] {
+            assert_eq!(errors(src)[0].2, None, "{src}");
+        }
+        assert_eq!(
+            errors("3ky"),
+            [("PrefixNotAllowed", "k", Some(String::new()))]
+        );
+        assert_eq!(
+            errors("4k7%"),
+            [("PrefixNotAllowed", "k", Some(".".into()))]
+        );
+    }
+
+    /// A string gets one error: its first unknown escape (the whole character after the
+    /// `\`), or the unclosed `"` alone.
+    #[test]
+    fn one_error_per_string() {
+        assert_eq!(errors("\"\\n\\t\""), [("UnknownEscape", "\\n", None)]);
+        assert_eq!(errors("\"\\é\""), [("UnknownEscape", "\\é", None)]);
+        assert_eq!(names("\"a\\n"), ["UnterminatedString"]);
+    }
+
+    /// `->` is not a minus: `-->` is `-` then `->`, with no double-minus error, and
+    /// `--->` has one, for its `--`.
+    #[test]
+    fn arrow_next_to_minus() {
+        assert_eq!(names("x-->y"), Vec::<&str>::new());
+        assert_eq!(errors("x--->y"), [("DoubleMinus", "--", None)]);
     }
 
     /// A too-large integer ending in `.` gets one error, the number's own.

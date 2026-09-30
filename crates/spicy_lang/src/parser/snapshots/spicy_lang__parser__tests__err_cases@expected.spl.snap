@@ -1,10 +1,11 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/expected.spl
 ---
-File 0..136
-  Block A 0..135
+File 0..380
+  Block A 0..379
     StmtError 14..29 "port vcc Power;"
     Let r 34..70
       ExprError 42..69 "Resistor { a: vcc b: base }"
@@ -15,6 +16,16 @@ File 0..136
       ExprError 109..116 "(1 + 2;"
     Let z 121..133
       ExprError 129..132 "1 2"
+    Let t 192..218
+      ExprError 200..217 "Step { 5mA 30mA }"
+    Let u 223..244
+      ExprError 231..243 "Step { 5mA }"
+    Let v 315..338
+      ExprError 323..337 "G<A = X, B> {}"
+    Let w 343..360
+      ExprError 351..359 "G<A = X>"
+    Let i 365..377
+      ExprError 373..377 "m[s;"
 
 --- errors ---
 E-syntax Expected 23..28 "Power"
@@ -22,6 +33,11 @@ E-syntax Expected 60..61 "b"
 E-syntax Expected 83..84 ";"
 E-syntax Expected 115..116 ";"
 E-syntax Expected 131..132 "2"
+E-syntax Expected 211..215 "30mA"
+E-syntax Expected 238..241 "5mA"
+E-syntax Expected 333..334 ">"
+E-syntax Expected 359..360 ";"
+E-syntax Expected 376..377 ";"
 
 --- rendered ---
 error[E-syntax]: expected `:`, found `Power`
@@ -53,3 +69,33 @@ error[E-syntax]: expected `;`, found `2`
   |
 7 |     let z = 1 2;
   |               ^ expected `;`
+
+error[E-syntax]: expected `->`, found `30mA`
+  --> expected.spl:9:24
+  |
+9 |     let t = Step { 5mA 30mA };
+  |                        ^^^^ expected `->`
+
+error[E-syntax]: expected a name, found `5mA`
+   --> expected.spl:10:20
+   |
+10 |     let u = Step { 5mA };
+   |                    ^^^ expected a name
+
+error[E-syntax]: expected `=`, found `>`
+   --> expected.spl:12:23
+   |
+12 |     let v = G<A = X, B> {};
+   |                       ^ expected `=`
+
+error[E-syntax]: expected `{`, found `;`
+   --> expected.spl:13:21
+   |
+13 |     let w = G<A = X>;
+   |                     ^ expected `{`
+
+error[E-syntax]: expected `]`, found `;`
+   --> expected.spl:14:16
+   |
+14 |     let i = m[s;
+   |                ^ expected `]`

@@ -1,4 +1,11 @@
-block contract port net let assume spec in
-use mod pub fn const enum type for if else match where as true false self super crate
-signal interface family env param bench
-part from on In Out input _private r1_2
+// Keywords.
+block circuit setup contract env const pub net let spec rated ensure within for in
+// v0.1's keywords, until the parser stops reading them (syntax_v5_plan.md steps 3 and 4).
+port assume
+// Reserved.
+use mod fn enum type trait impl if else match where as true false self super crate
+signal interface family
+// Names: contextual words, a keyword's other case, words that start like one, words
+// no longer reserved (v5 writes a test bench as a `setup`, a parameter as a generic).
+part from on In Out input _private r1_2 bench param
+mode event observe emits with window at temp

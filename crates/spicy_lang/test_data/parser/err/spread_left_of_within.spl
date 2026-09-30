@@ -1,0 +1,7 @@
+contract A {
+    spec a: 1..=2 within x;
+    spec b: x ± 1% within y;
+    // An open range is a spread too, on either end.
+    spec c: ..=2 within x;
+    spec d: 1.. within x;
+}

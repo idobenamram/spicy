@@ -120,6 +120,9 @@ pub enum ResolveErrorKind {
     NegativeTolerance,
     /// `1k / 0`.
     DivisionByZero,
+    /// Syntax the parser reads but resolve doesn't handle yet: generic arguments, a
+    /// transition in a placement. `what` names it.
+    Unsupported { what: &'static str },
 }
 
 /// The variant names, for the test that every error kind has a case file. Only tests
@@ -148,6 +151,7 @@ impl ResolveErrorKind {
         "RangeReversed",
         "NegativeTolerance",
         "DivisionByZero",
+        "Unsupported",
     ];
 }
 
@@ -174,6 +178,7 @@ impl DiagKind for ResolveErrorKind {
             RangeReversed => "RangeReversed",
             NegativeTolerance => "NegativeTolerance",
             DivisionByZero => "DivisionByZero",
+            Unsupported { .. } => "Unsupported",
         }
     }
 
@@ -193,6 +198,7 @@ impl DiagKind for ResolveErrorKind {
             | RangeReversed
             | NegativeTolerance
             | DivisionByZero => "E-value",
+            Unsupported { .. } => "E-unsupported",
         }
     }
 
@@ -367,6 +373,11 @@ impl DiagKind for ResolveErrorKind {
             DivisionByZero => (
                 "division by zero".to_string(),
                 "the divisor is zero".to_string(),
+                vec![],
+            ),
+            Unsupported { what } => (
+                format!("not supported yet: {what}"),
+                "not supported yet".to_string(),
                 vec![],
             ),
         }

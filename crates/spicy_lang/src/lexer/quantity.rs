@@ -33,6 +33,8 @@ const UNITS: &[(&str, Unit)] = &[
     ("H", Unit::Henry),
     ("Hz", Unit::Hertz),
     ("s", Unit::Second),
+    ("h", Unit::Hour),
+    ("y", Unit::Year),
     ("W", Unit::Watt),
     ("K", Unit::Kelvin),
     ("°C", Unit::Celsius),
@@ -503,8 +505,20 @@ pub fn suffix_suggestions(s: &str, after_infix: bool) -> Vec<String> {
 
 /// The note under an unknown suffix: every unit and prefix, one spelling each. A test
 /// checks it against [`UNITS`] and [`PREFIXES`].
-pub(super) const SUFFIX_NOTE: &str = "note: units are V A Ω F H Hz s W K °C % dB, optionally after a \
-                                      prefix f p n u µ m k M G T (case matters)";
+pub(super) const SUFFIX_NOTE: &str = "note: units are V A Ω F H Hz s h y W K °C % dB, optionally \
+                                      after a prefix f p n u µ m k M G T (case matters)";
+
+/// The other reading of a prefix on a unit that takes none, when the unit in another
+/// case takes it: `mH` for `10mh`, `uH` for `4u7h`, `µH` for `10µh` (the prefix as
+/// written). With it, neither removing the prefix (ten hours) nor a `.` (4.7 hours) is
+/// the only fix.
+pub(super) fn other_case(prefix: char, unit: Unit) -> Option<String> {
+    let symbol = unit.symbol();
+    let (other, _) = UNITS
+        .iter()
+        .find(|&&(s, u)| s != symbol && s.eq_ignore_ascii_case(&symbol) && u.accepts_prefix())?;
+    Some(format!("{prefix}{other}"))
+}
 
 /// Every valid suffix, spelled canonically (`u` for micro, U+03A9 for ohm). Built once.
 fn candidates() -> &'static [String] {
@@ -595,6 +609,8 @@ mod tests {
         assert_eq!(ok("3dB"), (3.0, Some(Decibel)));
         assert_eq!(ok("2ms"), (2e-3, Some(Second)));
         assert_eq!(ok("2.2mH"), (2.2e-3, Some(Henry)));
+        assert_eq!(ok("0.5h"), (0.5, Some(Hour)));
+        assert_eq!(ok("10y"), (10.0, Some(Year)));
     }
 
     #[test]
@@ -639,6 +655,13 @@ mod tests {
             fails("2k5°C"),
             QuantityErrorKind::PrefixNotAllowed { .. }
         ));
+        // Hours and years take no prefix: `10mh` is likely `10mH`, not 36 seconds.
+        for text in ["10mh", "4u7h", "1ky"] {
+            assert!(
+                matches!(fails(text), QuantityErrorKind::PrefixNotAllowed { .. }),
+                "{text}"
+            );
+        }
     }
 
     #[test]
@@ -802,7 +825,7 @@ mod tests {
             assert!(prefixes.contains(&p.to_string().as_str()), "{p}");
         }
         assert!(prefixes.contains(&"\u{B5}"));
-        assert_eq!(units.len(), 12);
+        assert_eq!(units.len(), 14);
         assert_eq!(prefixes.len(), PREFIXES.len() - 1);
     }
 

@@ -1,4 +1,4 @@
 contract A {
-    spec dc(out.v) in 1V..=2V;
-    spec ok: x in 1..=2;
+    spec dc(out.v) within 1V..=2V;
+    spec ok: x within 1..=2;
 }

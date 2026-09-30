@@ -29,11 +29,11 @@ pub enum ParseErrorKind {
     KeywordAsName { keyword: String },
     /// #20: `assume` in a `block`, `port` in a `contract`.
     WrongBody { stmt: &'static str, body: BodyKind },
-    /// #17: `spec dc(out.v) in …;`
+    /// #17: `spec dc(out.v) within …;`
     SpecNeedsName,
     /// #16: `Resistor { a = vcc }`
     FieldEquals,
-    /// An `assume` or `spec` whose top level isn't `in`, `<`, `<=`, `>` or `>=`.
+    /// An `assume` or `spec` whose top level isn't `within`, `<`, `<=`, `>` or `>=`.
     NotARelation,
     /// #4: `capacity / 2h ± 10%`. Both readings, written out:
     /// `(capacity / 2h) ± 10%` and `capacity / (2h ± 10%)`.
@@ -44,7 +44,7 @@ pub enum ParseErrorKind {
     ToleranceInRange,
     /// #7: `x <= 1V..=2V`
     RangeInComparison,
-    /// #8: `100..300` as a value.
+    /// #8: `100..300` or `..300` as a value.
     HalfOpenRange,
     /// #25: a `///` with nothing after it.
     UnattachedDoc,
@@ -193,7 +193,7 @@ impl DiagKind for ParseErrorKind {
             ParseErrorKind::SpecNeedsName => (
                 "a spec needs a name".to_string(),
                 "expected a name before the measure".to_string(),
-                vec!["help: write `spec name: measure in bound;`".to_string()],
+                vec!["help: write `spec name: measure within bound;`".to_string()],
             ),
             ParseErrorKind::FieldEquals => (
                 "fields use `:`, not `=`".to_string(),
@@ -203,7 +203,7 @@ impl DiagKind for ParseErrorKind {
             ParseErrorKind::NotARelation => (
                 "expected a relation".to_string(),
                 "not a relation".to_string(),
-                vec!["help: write it like `x in a..=b` or `x <= b`".to_string()],
+                vec!["help: write it like `x within a..=b` or `x <= b`".to_string()],
             ),
             ParseErrorKind::AmbiguousTolerance { whole, part } => (
                 "ambiguous tolerance".to_string(),
@@ -219,7 +219,7 @@ impl DiagKind for ParseErrorKind {
                     BinOp::Tol => ("tolerances", vec![]),
                     _ => (
                         "comparisons",
-                        vec!["help: for a range, write `b in a..=c`".to_string()],
+                        vec!["help: for a range, write `b within a..=c`".to_string()],
                     ),
                 };
                 (
@@ -236,12 +236,12 @@ impl DiagKind for ParseErrorKind {
             ParseErrorKind::RangeInComparison => (
                 "compare with a single value".to_string(),
                 "a range or tolerance here".to_string(),
-                vec!["help: to require a value inside a range, use `in`".to_string()],
+                vec!["help: to require a value inside a range, use `within`".to_string()],
             ),
             ParseErrorKind::HalfOpenRange => (
-                "a value range is closed".to_string(),
+                "a range's end is written after `..=`".to_string(),
                 "write `..=`".to_string(),
-                vec!["note: `..` is reserved for integer ranges in loops".to_string()],
+                vec!["note: `a..` with nothing after it is a range with no upper end".to_string()],
             ),
             ParseErrorKind::TooDeep => (
                 "expression nested too deeply".to_string(),

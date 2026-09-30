@@ -98,6 +98,10 @@ pub enum Unit {
     Henry,
     Hertz,
     Second,
+    /// 3600 s.
+    Hour,
+    /// A Julian year, 365.25 days.
+    Year,
     Watt,
     Kelvin,
     /// A temperature point, offset from kelvin.
@@ -123,6 +127,10 @@ impl Unit {
             Unit::Henry => Dimension::HENRY,
             Unit::Hertz => Dimension::HERTZ,
             Unit::Second => Dimension::SECOND,
+            Unit::Hour => return Quantity::new(value * 3600.0, Dimension::SECOND),
+            // One rounding: `0.9y` is exactly 28 401 840 s, which `value * 365.25 * 86400.0`
+            // misses by a bit.
+            Unit::Year => return Quantity::new(value * (365.25 * 86400.0), Dimension::SECOND),
             Unit::Watt => Dimension::WATT,
             Unit::Kelvin => Dimension::KELVIN,
         };
@@ -136,13 +144,19 @@ impl Unit {
             Unit::Celsius => "°C".to_string(),
             Unit::Percent => "%".to_string(),
             Unit::Decibel => "dB".to_string(),
+            Unit::Hour => "h".to_string(),
+            Unit::Year => "y".to_string(),
             _ => self.quantity(1.0).dim.symbol(),
         }
     }
 
-    /// `k°C`, `m%` and `kdB` make no sense, so these units take no prefix.
+    /// `k°C`, `m%`, `kdB`, `mh` and `ky` make no sense, so these units take no prefix
+    /// (and `10mh`, likely `10mH`, is an error rather than 36 seconds).
     pub fn accepts_prefix(self) -> bool {
-        !matches!(self, Unit::Celsius | Unit::Percent | Unit::Decibel)
+        !matches!(
+            self,
+            Unit::Celsius | Unit::Percent | Unit::Decibel | Unit::Hour | Unit::Year
+        )
     }
 }
 
@@ -363,17 +377,23 @@ mod tests {
         );
         assert_eq!(Unit::Percent.quantity(5.0), Quantity::ratio(0.05));
         assert_eq!(Unit::Celsius.quantity(0.0), Quantity::celsius(0.0));
+        let seconds = |si| Quantity::new(si, Dimension::SECOND);
+        assert_eq!(Unit::Hour.quantity(0.5), seconds(1800.0));
+        assert_eq!(Unit::Year.quantity(10.0), seconds(315_576_000.0));
+        assert_eq!(Unit::Year.quantity(0.9), seconds(28_401_840.0));
         let symbols = [
             Unit::Volt,
             Unit::Ohm,
             Unit::Hertz,
+            Unit::Hour,
+            Unit::Year,
             Unit::Kelvin,
             Unit::Celsius,
             Unit::Percent,
             Unit::Decibel,
         ]
         .map(Unit::symbol);
-        assert_eq!(symbols, ["V", "Ω", "Hz", "K", "°C", "%", "dB"]);
+        assert_eq!(symbols, ["V", "Ω", "Hz", "h", "y", "K", "°C", "%", "dB"]);
     }
 
     #[test]

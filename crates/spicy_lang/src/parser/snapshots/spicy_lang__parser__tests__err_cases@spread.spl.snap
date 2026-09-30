@@ -1,39 +1,64 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/spread.spl
 ---
-File 0..98
-  Contract A 0..97
-    Spec a In 17..44
+File 0..300
+  Contract A 0..299
+    Spec a Within 17..48
       Path x 25..26 "x"
-      Binary Range 30..43
-        Binary Tol 30..38
-          Quantity 1e0 V 30..32 "1V"
-          Quantity 1e0 % 36..38 "1%"
-        Quantity 2e0 V 41..43 "2V"
-    Spec b Le 49..70
-      Path x 57..58 "x"
-      Binary Range 62..69
-        Quantity 1e0 V 62..64 "1V"
-        Quantity 2e0 V 67..69 "2V"
-    Spec c Gt 75..95
-      Path x 83..84 "x"
-      Binary Tol 87..94
-        Quantity 1e0 87..88 "1"
-        Quantity 1e0 % 92..94 "1%"
+      Binary Range 34..47
+        Binary Tol 34..42
+          Quantity 1e0 V 34..36 "1V"
+          Quantity 1e0 % 40..42 "1%"
+        Quantity 2e0 V 45..47 "2V"
+    Spec b Le 53..74
+      Path x 61..62 "x"
+      Binary Range 66..73
+        Quantity 1e0 V 66..68 "1V"
+        Quantity 2e0 V 71..73 "2V"
+    Spec c Gt 79..99
+      Path x 87..88 "x"
+      Binary Tol 91..98
+        Quantity 1e0 91..92 "1"
+        Quantity 1e0 % 96..98 "1%"
+    Spec d Le 188..207
+      Path x 196..197 "x"
+      RangeTo 201..206
+        Quantity 2e0 V 204..206 "2V"
+    Spec e Gt 212..230
+      RangeFrom 220..225
+        Quantity 1e4 220..223 "10k"
+      Path x 228..229 "x"
+    Spec f Within 235..264
+      Path x 243..244 "x"
+      RangeTo 252..263
+        Binary Tol 255..263
+          Quantity 2e0 V 255..257 "2V"
+          Quantity 1e0 % 261..263 "1%"
+    Spec g Within 269..297
+      Path x 277..278 "x"
+      RangeFrom 286..296
+        Binary Tol 286..294
+          Quantity 1e0 V 286..288 "1V"
+          Quantity 1e0 % 292..294 "1%"
 
 --- errors ---
-E-spread ToleranceInRange 30..38 "1V ± 1%"
-E-spread RangeInComparison 62..69 "1V..=2V"
-E-spread RangeInComparison 87..94 "1 ± 1%"
+E-spread ToleranceInRange 34..42 "1V ± 1%"
+E-spread RangeInComparison 66..73 "1V..=2V"
+E-spread RangeInComparison 91..98 "1 ± 1%"
+E-spread RangeInComparison 201..206 "..=2V"
+E-spread RangeInComparison 220..225 "10k.."
+E-spread ToleranceInRange 255..263 "2V ± 1%"
+E-spread ToleranceInRange 286..294 "1V ± 1%"
 
 --- rendered ---
 error[E-spread]: a range endpoint can't carry a tolerance
-  --> spread.spl:2:18
+  --> spread.spl:2:22
   |
-2 |     spec a: x in 1V ± 1%..=2V;
-  |                  ^^^^^^^ this endpoint has a tolerance
+2 |     spec a: x within 1V ± 1%..=2V;
+  |                      ^^^^^^^ this endpoint has a tolerance
   |
   = help: use either a range `a..=b` or a tolerance `x ± t`
 
@@ -43,7 +68,7 @@ error[E-spread]: compare with a single value
 3 |     spec b: x <= 1V..=2V;
   |                  ^^^^^^^ a range or tolerance here
   |
-  = help: to require a value inside a range, use `in`
+  = help: to require a value inside a range, use `within`
 
 error[E-spread]: compare with a single value
   --> spread.spl:4:17
@@ -51,4 +76,36 @@ error[E-spread]: compare with a single value
 4 |     spec c: x > 1 ± 1%;
   |                 ^^^^^^ a range or tolerance here
   |
-  = help: to require a value inside a range, use `in`
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: compare with a single value
+  --> spread.spl:6:18
+  |
+6 |     spec d: x <= ..=2V;
+  |                  ^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: compare with a single value
+  --> spread.spl:7:13
+  |
+7 |     spec e: 10k.. > x;
+  |             ^^^^^ a range or tolerance here
+  |
+  = help: to require a value inside a range, use `within`
+
+error[E-spread]: a range endpoint can't carry a tolerance
+  --> spread.spl:8:25
+  |
+8 |     spec f: x within ..=2V ± 1%;
+  |                         ^^^^^^^ this endpoint has a tolerance
+  |
+  = help: use either a range `a..=b` or a tolerance `x ± t`
+
+error[E-spread]: a range endpoint can't carry a tolerance
+  --> spread.spl:9:22
+  |
+9 |     spec g: x within 1V ± 1%..;
+  |                      ^^^^^^^ this endpoint has a tolerance
+  |
+  = help: use either a range `a..=b` or a tolerance `x ± t`

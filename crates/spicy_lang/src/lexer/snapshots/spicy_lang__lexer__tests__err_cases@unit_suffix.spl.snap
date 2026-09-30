@@ -93,6 +93,33 @@ Whitespace " "
 Quantity "2kdB"
 Semi ";"
 Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "k"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10mh"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "l"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "3ky"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "m"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "10µh"
+Semi ";"
+Whitespace "\n"
 Eof ""
 
 --- errors ---
@@ -106,6 +133,9 @@ E-unit-suffix UnknownSuffix 94..97 "ºC" fix 94..97 "°C"
 E-unit-suffix SecondPrefix 110..111 "k" fix 110..111 ""
 E-unit-suffix DecimalAndInfix 121..126 "1e3k7"
 E-unit-suffix PrefixNotAllowed 137..138 "k" fix 137..138 ""
+E-unit-suffix PrefixNotAllowed 152..153 "m"
+E-unit-suffix PrefixNotAllowed 165..166 "k" fix 165..166 ""
+E-unit-suffix PrefixNotAllowed 179..181 "µ"
 
 --- rendered ---
 error[E-unit-suffix]: unknown unit `q`
@@ -114,7 +144,7 @@ error[E-unit-suffix]: unknown unit `q`
 1 | let a = 47q;
   |           ^ not a unit or prefix
   |
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-unit-suffix]: `Meg` is SPICE's spelling of mega
   --> unit_suffix.spl:2:10
@@ -151,7 +181,7 @@ error[E-unit-suffix]: unknown unit `KHz`
   |          ^^^ not a unit or prefix
   |
   = help: did you mean `kHz`?
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-unit-suffix]: unknown unit `ºC`
   --> unit_suffix.spl:7:11
@@ -160,7 +190,7 @@ error[E-unit-suffix]: unknown unit `ºC`
   |           ^^ not a unit or prefix
   |
   = help: did you mean `°C`?
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-unit-suffix]: a number takes one prefix
   --> unit_suffix.spl:8:12
@@ -183,3 +213,25 @@ error[E-unit-suffix]: `dB` takes no prefix
    |
 10 | let j = 2kdB;
    |          ^ remove `k`
+
+error[E-unit-suffix]: `h` takes no prefix
+   --> unit_suffix.spl:11:11
+   |
+11 | let k = 10mh;
+   |           ^ remove `m`
+   |
+   = help: or did you mean `mH`?
+
+error[E-unit-suffix]: `y` takes no prefix
+   --> unit_suffix.spl:12:10
+   |
+12 | let l = 3ky;
+   |          ^ remove `k`
+
+error[E-unit-suffix]: `h` takes no prefix
+   --> unit_suffix.spl:13:11
+   |
+13 | let m = 10µh;
+   |           ^ remove `µ`
+   |
+   = help: or did you mean `µH`?

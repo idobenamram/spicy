@@ -1,0 +1,14 @@
+block S {
+    // A field may be a transition, anywhere among the named ones.
+    let a = Step { 5mA -> 30mA, edge: 1us, at: 50us };
+    let b = Step { on: vdd.i, 5mA -> 30mA, edge: 1us };
+    let c = Step { lo.v -> -hi.v };
+    // Named generic arguments: `< IDENT =` starts them, so `<` is less-than anywhere
+    // else. Each value ends at `>`, so a comparison in one needs parentheses.
+    let d = GainStage<A = Mcp6001> { vin: sensor, gnd };
+    let e = GainStage<A = Mcp6001, GAIN = 2 * 10,> {};
+    let f = G<N = (a > b)> {};
+    let g = x < y;
+    // A string is a value; its escapes are kept as written.
+    let h = Note { text: "a \"quoted\" \\ word", empty: "" };
+}

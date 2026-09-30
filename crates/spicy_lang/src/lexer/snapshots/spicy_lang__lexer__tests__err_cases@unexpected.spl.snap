@@ -22,9 +22,11 @@ Ident "a"
 Whitespace " "
 Eq "="
 Whitespace " "
-Unknown "\""
-Ident "text"
-Unknown "\""
+Ident "b"
+Whitespace " "
+Unknown "$"
+Whitespace " "
+Ident "c"
 Semi ";"
 Whitespace "\n"
 KwLet "let"
@@ -64,11 +66,10 @@ Eof ""
 
 --- errors ---
 E-unexpected-char UnexpectedChar 10..12 "§"
-E-unexpected-char UnexpectedChar 24..25 "\""
-E-unexpected-char UnexpectedChar 29..30 "\""
-E-unexpected-char UnexpectedChar 42..43 "@"
-E-unexpected-char UnexpectedChar 55..56 "!"
-E-unexpected-char UnexpectedChar 68..69 "\u{1}"
+E-unexpected-char UnexpectedChar 26..27 "$"
+E-unexpected-char UnexpectedChar 41..42 "@"
+E-unexpected-char UnexpectedChar 54..55 "!"
+E-unexpected-char UnexpectedChar 67..68 "\u{1}"
 
 --- rendered ---
 error[E-unexpected-char]: unexpected character `§` (U+00A7)
@@ -77,17 +78,11 @@ error[E-unexpected-char]: unexpected character `§` (U+00A7)
 1 | let a = b § c;
   |           ^ not part of the language
 
-error[E-unexpected-char]: unexpected character `\"` (U+0022)
-  --> unexpected.spl:2:9
+error[E-unexpected-char]: unexpected character `$` (U+0024)
+  --> unexpected.spl:2:11
   |
-2 | let a = "text";
-  |         ^ not part of the language
-
-error[E-unexpected-char]: unexpected character `\"` (U+0022)
-  --> unexpected.spl:2:14
-  |
-2 | let a = "text";
-  |              ^ not part of the language
+2 | let a = b $ c;
+  |           ^ not part of the language
 
 error[E-unexpected-char]: unexpected character `@` (U+0040)
   --> unexpected.spl:3:11

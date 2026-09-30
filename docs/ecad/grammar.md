@@ -237,7 +237,7 @@ After lexing, the suffix of each `Quantity` is split into an optional prefix and
 
 ### 5.1 Tables
 
-**Units (MVP):** `V`, `A`, `Ω` (or `ohm`), `F`, `H`, `Hz`, `s`, `W`, `K`, `°C`, `%`, `dB`.
+**Units (MVP):** `V`, `A`, `Ω` (or `ohm`), `F`, `H`, `Hz`, `s`, `h` (hour), `y` (a Julian year, 365.25 days), `W`, `K`, `°C`, `%`, `dB`. `°C`, `%`, `dB`, `h` and `y` take no prefix.
 
 **Prefixes** (case-sensitive): `f` 1e-15 · `p` 1e-12 · `n` 1e-9 · `u` / `µ` 1e-6 · `m` 1e-3 · `k` 1e3 · `M` 1e6 · `G` 1e9 · `T` 1e12.
 

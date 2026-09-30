@@ -2,5 +2,5 @@ block A {
     net a;
 
 contract A {
-    spec s: x in 1..=2;
+    spec s: x within 1..=2;
 }

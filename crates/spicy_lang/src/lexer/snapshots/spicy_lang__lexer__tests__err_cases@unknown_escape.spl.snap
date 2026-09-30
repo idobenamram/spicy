@@ -1,0 +1,53 @@
+---
+source: crates/spicy_lang/src/lexer/mod.rs
+expression: "dump(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/lexer/err/unknown_escape.spl
+---
+LineComment "// Only `\\\"` and `\\\\` are escapes."
+Whitespace "\n"
+Pound "#"
+LBracket "["
+Ident "outside"
+LParen "("
+Ident "reason"
+Whitespace " "
+Eq "="
+Whitespace " "
+Str "\"a\\nb\""
+RParen ")"
+RBracket "]"
+Whitespace "\n"
+Pound "#"
+LBracket "["
+Ident "outside"
+LParen "("
+Ident "reason"
+Whitespace " "
+Eq "="
+Whitespace " "
+Str "\"tab\\tthen\""
+RParen ")"
+RBracket "]"
+Whitespace "\n"
+Eof ""
+
+--- errors ---
+E-escape UnknownEscape 56..58 "\\n"
+E-escape UnknownEscape 86..88 "\\t"
+
+--- rendered ---
+error[E-escape]: unknown escape `\n`
+  --> unknown_escape.spl:2:22
+  |
+2 | #[outside(reason = "a\nb")]
+  |                      ^^ not an escape
+  |
+  = note: a string's only escapes are `\"` and `\\`
+
+error[E-escape]: unknown escape `\t`
+  --> unknown_escape.spl:3:24
+  |
+3 | #[outside(reason = "tab\tthen")]
+  |                        ^^ not an escape
+  |
+  = note: a string's only escapes are `\"` and `\\`

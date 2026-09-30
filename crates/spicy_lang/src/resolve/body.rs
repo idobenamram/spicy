@@ -21,7 +21,9 @@ use super::{
     BlockBuilder, NameKind, Namespace, ResolveError, ResolveErrorKind, Resolver, Scope, Signature,
     suggest, unknown_name,
 };
-use crate::parser::ast::{self, Body, Expr, ExprKind, Field, Ident, Stmt, StmtKind};
+use crate::parser::ast::{
+    self, Body, Expr, ExprKind, Field, Ident, NamedField, Stmt, StmtKind, StructLit,
+};
 
 /// What a name in a block's value namespace is (model.md E5).
 #[derive(Clone, Copy)]
@@ -84,7 +86,7 @@ impl Slots {
 
     /// Whether `field`'s value could go in slot `i`: a pin binds a net (a name), a
     /// field takes a number. A misspelled slot is one whose value fits it.
-    fn fits(self, field: &Field, i: usize) -> bool {
+    fn fits(self, field: &NamedField, i: usize) -> bool {
         let is_name = field
             .value
             .as_ref()
@@ -102,7 +104,7 @@ struct Bindings<'f> {
     /// Each field's value, once given.
     fields: Vec<Option<FieldValue>>,
     /// The fields that name no slot.
-    unknown: Vec<&'f Field<'f>>,
+    unknown: Vec<&'f NamedField<'f>>,
 }
 
 impl Bindings<'_> {
@@ -362,7 +364,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             pins,
             fields,
         };
-        let ExprKind::StructLit { path, fields } = &value.kind else {
+        let ExprKind::StructLit(lit) = &value.kind else {
             let reported = match value.kind {
                 ExprKind::Error(reported) => reported,
                 _ => self.r.report(ResolveErrorKind::LetNotInstance, value.span),
@@ -370,7 +372,17 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             let unresolved = instance(InstanceOf::Error(reported), Vec::new(), Vec::new());
             return (unresolved, spans);
         };
+        let StructLit {
+            path,
+            generics,
+            fields,
+        } = &**lit;
         spans.kind = path.span;
+        if let (Some(first), Some(last)) = (generics.first(), generics.last()) {
+            let at = Span::new(first.name.span.start, last.value.span.end);
+            let what = "generic arguments";
+            self.r.report(ResolveErrorKind::Unsupported { what }, at);
+        }
         let slots = match self.kind_named(path) {
             of @ InstanceOf::Part(kind) => Slots {
                 of,
@@ -439,6 +451,12 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
             unknown: Vec::new(),
         };
         for field in fields {
+            let Field::Named(field) = field else {
+                let at = field.span();
+                let what = "a transition in a placement";
+                self.r.report(ResolveErrorKind::Unsupported { what }, at);
+                continue;
+            };
             let name = field.name.text;
             let Some(i) = self.slot(slots.of, name) else {
                 b.unknown.push(field);

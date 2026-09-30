@@ -1,34 +1,35 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/chained.spl
 ---
-File 0..98
-  Contract A 0..97
+File 0..106
+  Contract A 0..105
     Spec a Lt 17..35
       Binary Rel(Lt) 25..30
         Path x 25..26 "x"
         Path y 29..30 "y"
       Path z 33..34 "z"
-    Spec b In 40..67
+    Spec b Within 40..71
       Path x 48..49 "x"
-      Binary Tol 53..66
-        Binary Tol 53..60
-          Quantity 1e0 53..54 "1"
-          Quantity 2e0 % 58..60 "2%"
-        Quantity 1e0 % 64..66 "1%"
-    Spec c In 72..95
-      Path x 80..81 "x"
-      Binary Range 85..94
-        Binary Range 85..90
-          Quantity 1e0 85..86 "1"
-          Quantity 2e0 89..90 "2"
-        Quantity 3e0 93..94 "3"
+      Binary Tol 57..70
+        Binary Tol 57..64
+          Quantity 1e0 57..58 "1"
+          Quantity 2e0 % 62..64 "2%"
+        Quantity 1e0 % 68..70 "1%"
+    Spec c Within 76..103
+      Path x 84..85 "x"
+      Binary Range 93..102
+        Binary Range 93..98
+          Quantity 1e0 93..94 "1"
+          Quantity 2e0 97..98 "2"
+        Quantity 3e0 101..102 "3"
 
 --- errors ---
 E-chained Chained 31..32 "<"
-E-chained Chained 61..63 "±"
-E-chained Chained 90..93 "..="
+E-chained Chained 65..67 "±"
+E-chained Chained 98..101 "..="
 
 --- rendered ---
 error[E-chained]: comparisons can't be chained
@@ -37,16 +38,16 @@ error[E-chained]: comparisons can't be chained
 2 |     spec a: x < y < z;
   |                   ^ second operator here
   |
-  = help: for a range, write `b in a..=c`
+  = help: for a range, write `b within a..=c`
 
 error[E-chained]: tolerances can't be chained
-  --> chained.spl:3:25
+  --> chained.spl:3:29
   |
-3 |     spec b: x in 1 ± 2% ± 1%;
-  |                         ^ second operator here
+3 |     spec b: x within 1 ± 2% ± 1%;
+  |                             ^ second operator here
 
 error[E-chained]: ranges can't be chained
-  --> chained.spl:4:23
+  --> chained.spl:4:27
   |
-4 |     spec c: x in 1..=2..=3;
-  |                       ^^^ second operator here
+4 |     spec c: x within 1..=2..=3;
+  |                           ^^^ second operator here

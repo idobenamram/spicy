@@ -1,0 +1,67 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 957
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/struct_literals.spl
+---
+File 0..676
+  Block S 0..675
+    Let a 81..131
+      StructLit Step 89..130
+        Transition 96..107
+          Quantity 5e-3 A 96..99 "5mA"
+          Quantity 3e-2 A 103..107 "30mA"
+        Field edge 109..118
+          Quantity 1e-6 s 115..118 "1us"
+        Field at 120..128
+          Quantity 5e-5 s 124..128 "50us"
+    Let b 136..187
+      StructLit Step 144..186
+        Field on 151..160
+          Field .i 155..160
+            Path vdd 155..158 "vdd"
+        Transition 162..173
+          Quantity 5e-3 A 162..165 "5mA"
+          Quantity 3e-2 A 169..173 "30mA"
+        Field edge 175..184
+          Quantity 1e-6 s 181..184 "1us"
+    Let c 192..223
+      StructLit Step 200..222
+        Transition 207..220
+          Field .v 207..211
+            Path lo 207..209 "lo"
+          Neg 215..220
+            Field .v 216..220
+              Path hi 216..218 "hi"
+    Let d 393..445
+      StructLit GainStage 401..444
+        Generic A 411..422
+          Path Mcp6001 415..422 "Mcp6001"
+        Field vin 426..437
+          Path sensor 431..437 "sensor"
+        Field gnd (shorthand) 439..442
+    Let e 450..500
+      StructLit GainStage 458..499
+        Generic A 468..479
+          Path Mcp6001 472..479 "Mcp6001"
+        Generic GAIN 481..494
+          Binary Mul 488..494
+            Quantity 2e0 488..489 "2"
+            Quantity 1e1 492..494 "10"
+    Let f 505..531
+      StructLit G 513..530
+        Generic N 515..526
+          Paren 519..526
+            Binary Rel(Gt) 520..525
+              Path a 520..521 "a"
+              Path b 524..525 "b"
+    Let g 536..550
+      Binary Rel(Lt) 544..549
+        Path x 544..545 "x"
+        Path y 548..549 "y"
+    Let h 616..673
+      StructLit Note 624..672
+        Field text 631..659
+          Str 637..659 "\"a \\\"quoted\\\" \\\\ word\""
+        Field empty 661..670
+          Str 668..670 "\"\""

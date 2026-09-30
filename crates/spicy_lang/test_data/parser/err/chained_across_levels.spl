@@ -1,5 +1,5 @@
 contract A {
     spec a: x < y..=z < w;
-    spec b: x in a ± b + c ± d;
+    spec b: x within a ± b + c ± d;
     spec c: x..=y < z;
 }

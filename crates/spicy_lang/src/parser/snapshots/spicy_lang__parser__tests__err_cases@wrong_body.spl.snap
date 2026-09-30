@@ -1,44 +1,45 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/wrong_body.spl
 ---
-File 0..119
-  Block A 0..66
-    Assume In 14..40
+File 0..127
+  Block A 0..74
+    Assume Within 14..44
       Field .v 21..26
         Path vcc 21..24 "vcc"
-      Binary Tol 30..39
-        Quantity 1.2e1 V 30..33 "12V"
-        Quantity 5e0 % 37..39 "5%"
-    Spec s In 45..64
-      Path x 53..54 "x"
-      Binary Range 58..63
-        Quantity 1e0 58..59 "1"
-        Quantity 2e0 62..63 "2"
-  Contract A 68..118
-    Port vcc 85..105
-      Type Power 95..104 "Power<In>"
-        Type In 101..103 "In"
-    Net n 110..116
+      Binary Tol 34..43
+        Quantity 1.2e1 V 34..37 "12V"
+        Quantity 5e0 % 41..43 "5%"
+    Spec s Within 49..72
+      Path x 57..58 "x"
+      Binary Range 66..71
+        Quantity 1e0 66..67 "1"
+        Quantity 2e0 70..71 "2"
+  Contract A 76..126
+    Port vcc 93..113
+      Type Power 103..112 "Power<In>"
+        Type In 109..111 "In"
+    Net n 118..124
 
 --- errors ---
 E-wrong-body WrongBody 14..20 "assume"
-E-wrong-body WrongBody 45..49 "spec"
-E-wrong-body WrongBody 85..89 "port"
-E-wrong-body WrongBody 110..113 "net"
+E-wrong-body WrongBody 49..53 "spec"
+E-wrong-body WrongBody 93..97 "port"
+E-wrong-body WrongBody 118..121 "net"
 
 --- rendered ---
 error[E-wrong-body]: `assume` doesn't belong in a `block`
   --> wrong_body.spl:2:5
   |
-2 |     assume vcc.v in 12V ± 5%;
+2 |     assume vcc.v within 12V ± 5%;
   |     ^^^^^^ `assume` belongs in the contract
 
 error[E-wrong-body]: `spec` doesn't belong in a `block`
   --> wrong_body.spl:3:5
   |
-3 |     spec s: x in 1..=2;
+3 |     spec s: x within 1..=2;
   |     ^^^^ `spec` belongs in the contract
 
 error[E-wrong-body]: `port` doesn't belong in a `contract`

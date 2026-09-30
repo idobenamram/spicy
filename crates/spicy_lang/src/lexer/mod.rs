@@ -2,8 +2,8 @@
 //!
 //! 1. [`scan`] (this file) cuts the text into tokens. It never fails: every byte lands
 //!    in exactly one token, trivia included, and problems become token kinds
-//!    (`Unknown`, `IdentNonAscii`, `UnterminatedBlockComment`) instead of errors, as
-//!    in rustc_lexer.
+//!    (`Unknown`, `IdentNonAscii`, `UnterminatedBlockComment`, `UnterminatedStr`)
+//!    instead of errors, as in rustc_lexer.
 //! 2. [`check`] (`check.rs`) reads the tokens and reports every problem, with fixes, as
 //!    rustc_parse "cooks" each raw token. The errors are data (`error.rs`).
 //!
@@ -94,11 +94,13 @@ impl Scanner<'_> {
             },
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.ident(),
             b'0'..=b'9' => self.take(quantity_len(self.rest()), Quantity),
+            b'"' => self.string(),
             // Operators of several characters, longest first.
             b'+' if self.at("+/-") => self.take(3, PlusMinus),
             b'.' if self.at("..=") => self.take(3, DotDotEq),
             b'.' if self.at("..") => self.take(2, DotDot),
             b':' if self.at("::") => self.take(2, ColonColon),
+            b'-' if self.at("->") => self.take(2, Arrow),
             b'<' if self.at("<=") => self.take(2, Le),
             b'>' if self.at(">=") => self.take(2, Ge),
             b'{' => self.take(1, LBrace),
@@ -124,7 +126,7 @@ impl Scanner<'_> {
                 c if c.is_alphanumeric() => self.ident(),
                 c => self.take(c.len_utf8(), Unknown),
             },
-            // Any other ASCII character: `%` on its own, `!`, `"`, control characters, …
+            // Any other ASCII character: `%` on its own, `!`, control characters, …
             _ => self.take(1, Unknown),
         }
     }
@@ -167,6 +169,26 @@ impl Scanner<'_> {
         TokenKind::UnterminatedBlockComment
     }
 
+    /// `"…"`, up to its closing `"` on the same line; an escaped `"` ([`is_escape`])
+    /// doesn't close it. Walking byte by byte is safe, as in a block comment: it only
+    /// stops on ASCII. Without a closing `"`, it runs to the end of the line. `check`
+    /// reports that, and any `\` that isn't an escape.
+    fn string(&mut self) -> TokenKind {
+        self.pos += 1;
+        while let Some(b) = self.peek(0) {
+            match b {
+                b'"' => {
+                    self.pos += 1;
+                    return TokenKind::Str;
+                }
+                b'\\' if self.peek(1).is_some_and(|b| is_escape(b.into())) => self.pos += 2,
+                b'\n' | b'\r' => break,
+                _ => self.pos += 1,
+            }
+        }
+        TokenKind::UnterminatedStr
+    }
+
     /// Letters, digits and `_`, non-ASCII letters included (lexer.md L8). A word with
     /// any non-ASCII in it is `IdentNonAscii`, rejected by `check`; the others go through
     /// the keyword lookup.
@@ -177,12 +199,12 @@ impl Scanner<'_> {
         while matches!(self.peek(0), Some(b) if b.is_ascii_alphanumeric() || b == b'_') {
             self.pos += 1;
         }
-        if self.peek(0).is_none_or(|b| b.is_ascii()) {
-            return keyword(&self.src[start..self.pos]).unwrap_or(TokenKind::Ident);
+        let ascii_end = self.pos;
+        // A non-ASCII character next: if it's a letter, the name goes on, a char at a time.
+        if self.peek(0).is_some_and(|b| !b.is_ascii()) {
+            self.take_while(|c| c == '_' || c.is_alphanumeric());
         }
-        // A non-ASCII letter: the rest of the name, a char at a time.
-        self.take_while(|c| c == '_' || c.is_alphanumeric());
-        if self.src[start..self.pos].is_ascii() {
+        if self.pos == ascii_end {
             keyword(&self.src[start..self.pos]).unwrap_or(TokenKind::Ident)
         } else {
             TokenKind::IdentNonAscii
@@ -190,21 +212,39 @@ impl Scanner<'_> {
     }
 }
 
-/// MVP keywords get their own kinds; every reserved word is `KwReserved` (grammar.md §2.3).
+/// Whether `\` followed by `c` is an escape. A string has two, `\"` and `\\`: the scanner
+/// doesn't end a string at an escaped `"`, and `check` reports every other `\`.
+fn is_escape(c: char) -> bool {
+    matches!(c, '"' | '\\')
+}
+
+/// The language's keywords get their own kinds; every reserved word is `KwReserved`
+/// (grammar.md §2.3). `mode`, `event`, `observe`, `emits`, `with` and `on` aren't
+/// here: they're keywords only where the parser expects them, so they stay usable as
+/// names (a part's `mode:` field).
 fn keyword(word: &str) -> Option<TokenKind> {
     use TokenKind::*;
     Some(match word {
         "block" => KwBlock,
+        "circuit" => KwCircuit,
+        "setup" => KwSetup,
         "contract" => KwContract,
+        "env" => KwEnv,
+        "const" => KwConst,
+        "pub" => KwPub,
         "port" => KwPort,
         "net" => KwNet,
         "let" => KwLet,
         "assume" => KwAssume,
         "spec" => KwSpec,
+        "rated" => KwRated,
+        "ensure" => KwEnsure,
+        "within" => KwWithin,
+        "for" => KwFor,
         "in" => KwIn,
-        "use" | "mod" | "pub" | "fn" | "const" | "enum" | "type" | "for" | "if" | "else"
-        | "match" | "where" | "as" | "true" | "false" | "self" | "super" | "crate" | "signal"
-        | "interface" | "family" | "env" | "param" | "bench" => KwReserved,
+        "use" | "mod" | "fn" | "enum" | "type" | "trait" | "impl" | "if" | "else" | "match"
+        | "where" | "as" | "true" | "false" | "self" | "super" | "crate" | "signal"
+        | "interface" | "family" => KwReserved,
         _ => return None,
     })
 }
@@ -315,6 +355,28 @@ mod tests {
         });
     }
 
+    /// A string ends at its closing `"` or where its line does (at EOF, before `\r\n`),
+    /// and an escaped `"` doesn't close it.
+    #[test]
+    fn where_a_string_ends() {
+        use super::TokenKind::{Ident, Str, UnterminatedStr, Whitespace};
+        let tokens = |src| {
+            let t = scan(src);
+            let all = (0..t.len() - 1).map(|i| (t.kind(i), t.text(i)));
+            all.collect::<Vec<_>>()
+        };
+        assert_eq!(tokens("\"a\""), [(Str, "\"a\"")]);
+        assert_eq!(tokens("\"a"), [(UnterminatedStr, "\"a")]);
+        assert_eq!(
+            tokens("\"a\r\nb"),
+            [(UnterminatedStr, "\"a"), (Whitespace, "\r\n"), (Ident, "b")]
+        );
+        assert_eq!(tokens("\"a\\\""), [(UnterminatedStr, "\"a\\\"")]);
+        assert_eq!(tokens("\"a\\\\\""), [(Str, "\"a\\\\\"")]);
+        assert_eq!(tokens("\"a\\"), [(UnterminatedStr, "\"a\\")]);
+        assert_eq!(tokens("\"é\\ü\"x"), [(Str, "\"é\\ü\""), (Ident, "x")]);
+    }
+
     /// Pieces the random inputs are built from, weighted toward what the lexer cares about
     /// (as Zig's tokenizer fuzzing weights its bytes).
     const PIECES: &[&str] = &[
@@ -322,7 +384,8 @@ mod tests {
         ".", "..", "..=", "=", "+", "-", "*", "/", "+/-", "±", "%", "µ", "μ", "Ω", "Ω", "°", "º",
         "(", ")", "{", "}", "[", "]", "<", ">", "<=", ">=", ",", ";", ":", "::", "#", "?", "//",
         "///", "////", "/*", "*/", " ", " ", " ", "\n", "\t", "\r", "let", "in", "net", "fn", "a",
-        "r1", "α", "−", ";", "\u{A0}", "\u{2009}", "\u{FEFF}", "\0", "\"", "§", "Meg",
+        "r1", "α", "−", ";", "\u{A0}", "\u{2009}", "\u{FEFF}", "\0", "\"", "§", "Meg", "->", "→",
+        "\\", "\\\"", "h", "y", "within", "setup", "circuit", "pub",
     ];
 
     #[test]

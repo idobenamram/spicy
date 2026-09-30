@@ -108,12 +108,12 @@ atopile's unit decoding (`decode_symbol` in `Units.py`) is the same idea as ours
 | L1 | **Two passes:** `scan` (total, never fails) and `check` (diagnostics + quantity decoding) | Rust's split. Pass 1 is easy to make fast and to fuzz. Pass 2 can look across tokens (`10 kΩ`, `+-`) |
 | L2 | **Every byte is in exactly one token**, trivia included, and a zero-length `Eof` token closes the list | Byte-for-byte round trip (roadmap §4.4). The parser never needs to check for end of input separately |
 | L3 | **Struct-of-arrays:** `kinds: Vec<TokenKind>` (1 byte each) and `starts: Vec<u32>`. Token `i` covers `starts[i]..starts[i+1]` | Zig and rust-analyzer. 5 bytes per token, no spans stored twice, cache-friendly. `u32` caps a file at 4 GiB, which is checked on load |
-| L4 | **Multi-character operators are formed in pass 1** (`<=`, `..=`, `::`, `+/-`) | No macros, so there's no reason for rustc's single-character layer |
+| L4 | **Multi-character operators are formed in pass 1** (`<=`, `..=`, `::`, `->`, `+/-`) | No macros, so there's no reason for rustc's single-character layer |
 | L5 | **Quantities scan permissively:** a digit starts a `Quantity`, which then takes every letter, digit, `_`, `µ`, `μ`, `Ω`, `Ω`, `°`, `%` (and the `°` look-alikes `º` `˚`) glued to it. Pass 2 decodes it | Zig's approach. `4.7k7` and `47q` are one token each and get one precise error each, instead of confusing follow-on errors |
 | L6 | **The value is correctly rounded, with no allocation:** the digits are read as an integer and a power of ten (`100nF` → 100 × 10^-9), then **Clinger's fast path**: when the digits fit in 53 bits and the power is at most 22, one exact multiply or divide (100 / 1e9). Otherwise std's `str::parse::<f64>` runs the full algorithm. This is what Rust's `dec2flt` (`can_use_fast_path`) and Zig's `parse_float` (`isFastPath`) do internally | Multiplying by an inexact power loses the last bit: `100.0 * 1e-9` is `1.0000000000000001e-07`, but 100 / 1e9 is `1e-07`. Across 14 common values (1 … 680) × 8 prefixes, **26 of 112** such multiplications are off in the last bit. Exact values keep export round trips exact (`100n` prints back as `100n`). A test checks the fast path against std on 200 000 random inputs and on both sides of every limit |
 | L7 | **Unknown characters are one token per character** (`Unknown`), and the rest of the line keeps lexing | Rust's behavior (Zig skips to the end of the line). A look-alike fix applies to one character, and the parser still sees the tokens after it |
 | L8 | **Identifiers continue over non-ASCII letters** (`char::is_alphanumeric`) but get the kind `IdentNonAscii`, which pass 2 rejects | One clear error per identifier (`r1_α`: "identifiers are ASCII"), not a fragment and a stray character. It also lets `10 kΩ` be recognized as a spaced-out unit |
-| L9 | **Keywords by lookup after scanning an identifier.** MVP keywords get their own kinds; all reserved words share `KwReserved` | Zig's approach. The parser reports "`fn` is reserved" from the text |
+| L9 | **Keywords by lookup after scanning an identifier.** The language's keywords get their own kinds; all reserved words share `KwReserved`. `mode`, `event`, `observe`, `emits`, `with` and `on` are contextual: identifiers the parser recognizes only in their position, so they stay usable as names (a part's `mode:` field) | Zig's approach. The parser reports "`fn` is reserved" from the text. Contextual words as Rust's `union` and grammar.md §2.3's `part` |
 | L10 | **The lexer's errors are data** (an enum with spans and optional fixes), rendered through codespan-reporting in one shared module | The editor, the language server and the AI get structured fixes (P8). Snapshot tests see the rendered text |
 | L11 | **No parsing dependencies.** A ~40-line byte cursor, not `unscanny`; no Unicode tables. (codespan-reporting renders the diagnostics, nothing else) | Roadmap §4.4. ASCII fast path; non-ASCII is decoded only where it appears |
 
@@ -142,11 +142,12 @@ pub enum TokenKind {
     // significant
     DocComment,
     Ident, IdentNonAscii,
-    KwBlock, KwContract, KwPort, KwNet, KwLet, KwAssume, KwSpec, KwIn, KwReserved,
-    Quantity,
+    KwBlock, KwCircuit, KwSetup, KwContract, KwEnv, KwConst, KwPub, KwPort, KwNet, KwLet,
+    KwAssume, KwSpec, KwRated, KwEnsure, KwWithin, KwFor, KwIn, KwReserved,
+    Quantity, Str, UnterminatedStr,
     LBrace, RBrace, LParen, RParen, LBracket, RBracket, Lt, Gt, Le, Ge,
     Comma, Semi, Colon, ColonColon, Dot, DotDot, DotDotEq, Eq,
-    Plus, Minus, Star, Slash, PlusMinus, Pound, Question,
+    Plus, Minus, Arrow, Star, Slash, PlusMinus, Pound, Question,
     Unknown,
     Eof,
 }
@@ -181,9 +182,10 @@ At each position, the first matching rule wins:
 | ASCII letter or `_` | `Ident` / `Kw*` | Take `[A-Za-z0-9_]` and any non-ASCII alphanumeric. Any non-ASCII inside makes it `IdentNonAscii`. Then the keyword lookup |
 | non-ASCII alphanumeric (`µ`, `Ω`, `α`) | `IdentNonAscii` | As above |
 | digit | `Quantity` | Mantissa `[0-9][0-9_]*`; then `.` only if a digit follows; then an exponent `[eE][+-]?digit…` only if a digit follows `e` (or the sign); then the suffix, every glued `[A-Za-z0-9_]` / `µ μ Ω Ω ° %`, and the `°` look-alikes `º ˚` (`quantity_len`) |
+| `"` | `Str` | To the closing `"` on the same line; `\"` and `\\` don't close it. Without a closing `"` before the end of the line: `UnterminatedStr`, up to the line end |
 | `+/-` | `PlusMinus` | Only when the three characters touch |
 | `±` | `PlusMinus` | |
-| `..=`, `..`, `::`, `<=`, `>=` | as named | Longest match first |
+| `..=`, `..`, `::`, `->`, `<=`, `>=` | as named | Longest match first; `->` (`Arrow`) only when the two characters touch |
 | one of `{}()[]<>,;:.=+-*/#?` | as named | |
 | anything else (including a lone `%`, `−`, `;`, U+00A0) | `Unknown` | One character |
 | end of input | `Eof` | Zero length |
@@ -200,12 +202,13 @@ Numbers `#…` refer to the error list in `grammar.md` §7.
 
 | Check | Looks at | Example | Diagnostic |
 |---|---|---|---|
-| Quantity decoding | each `Quantity` | `47q`, `1Meg`, `k°C`, `4.7k7`, `4k7k`, `4k7%`, `1e`, `1e400`, `1e-400` | #9 unknown suffix (with close matches; a fix only when there's exactly one, since `1mhz` could be `mHz` or `MHz`), #10 `Meg` → `M`, #11 no prefix on this unit (`4k7%` → `4.7%`), #12 decimal point *or* infix prefix, not both; a second prefix after an infix one; missing exponent digits; value too large or too small |
+| Quantity decoding | each `Quantity` | `47q`, `1Meg`, `k°C`, `4.7k7`, `4k7k`, `4k7%`, `1e`, `1e400`, `1e-400` | #9 unknown suffix (with close matches; a fix only when there's exactly one, since `1mhz` could be `mHz` or `MHz`), #10 `Meg` → `M`, #11 no prefix on this unit (`4k7%` → `4.7%`; `°C`, `%`, `dB`, `h` and `y` take none; `10mh`, `10µh` and `4u7h` get no fix, since `h` may be `H`, and the help offers `mH`, `µH`, `uH`), #12 decimal point *or* infix prefix, not both; a second prefix after an infix one; missing exponent digits; value too large or too small |
 | Space before a unit | `Quantity`, whitespace, then a word that decodes as a suffix and doesn't start with a digit (`1 2` is two numbers) | `10 V`, `10 kΩ` | #13 remove the space |
-| Bare decimal point | `Dot` touching a following `Quantity` (not right after a name or `)`, where it's a field access: `x.5`); a `Quantity` touching a following `Dot` that isn't a field access. Only when the fixed text decodes: `1.5.` and `.4k7` are left to the parser and the number check | `.5`, `1.` | #14 write `0.5` / `1.0` |
+| Bare decimal point | `Dot` touching a following `Quantity` (not right after a name, a string or `)`, where it's a field access: `x.5`); a `Quantity` touching a following `Dot` that isn't a field access. Only when the fixed text decodes: `1.5.` and `.4k7` are left to the parser and the number check | `.5`, `1.` | #14 write `0.5` / `1.0` |
 | `+-`, `--` | `Plus` touching `Minus`; a run of touching `Minus` (one error for the run, checked from its first `-`) | `12V +- 5%`, `----x` | #2 did you mean `±` or `+/-`; #3 |
 | Lone `%` | `Unknown "%"` | `a % 3` | #15 `%` only means percent, glued to a number. After a number (`± 1 %`) the space check wins instead: "remove the space: `1%`" |
-| Unterminated comment | `UnterminatedBlockComment` | `/* …` | #22, with a label on the `/*` |
+| Unterminated comment or string | `UnterminatedBlockComment`, `UnterminatedStr` | `/* …`, `"not closed` | At the opener, `/*` or `"`: #22, and "unterminated string" (a string is one line) |
+| Unknown escape | `Str` | `"a\nb"` | "unknown escape `\n`": the only escapes are `\"` and `\\`. One error per string, at its first |
 | Look-alikes | `Unknown` in the table (§6.3) | `−`, `;`, `≤` | #23 "this is `−` (U+2212 MINUS SIGN), not `-`", with a replacement |
 | Other unknown characters | `Unknown` | `§` | unexpected character, showing its code point |
 | Non-ASCII identifier | `IdentNonAscii` | `r1_α` | #24 identifiers are ASCII |
@@ -231,6 +234,7 @@ rustc has 264 entries. We start with the ones that come from datasheets, PDFs an
 | `−` `–` `—` `‐` | minus sign, en dash, em dash, hyphen | `-` |
 | `;` | Greek question mark | `;` |
 | `≤` `≥` | | `<=` `>=` |
+| `→` | rightwards arrow | `->` |
 | `×` `·` | multiplication sign, middle dot | `*` |
 | `∕` `÷` | division slash, division sign | `/` |
 | `º` `˚` | masculine ordinal, ring above | `°`. `º` is a letter, so it only gets this fix inside a number's suffix (`10ºC` → `10°C`); elsewhere it reads as an identifier character |
@@ -255,6 +259,7 @@ crates/spicy_lang/test_data/lexer/
     quantities.spl        every row of grammar.md §5.2, one per line
     comments.spl          //, ///, ////, nested /* /* */ */
     punctuation.spl       every operator, including ..= next to numbers (0..N, 100..=300, 0.5..=1)
+    strings.spl           escapes, and nothing inside a string is a comment, a number or a look-alike
     …
   err/
     unit_space.spl        10 V, 10 kΩ, 10 °C (with U+2009)

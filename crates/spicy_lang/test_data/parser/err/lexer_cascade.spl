@@ -1,7 +1,8 @@
 block A {
     let a = b − c;
-    let d = e;
+    let d = e;
     let f = 10 kΩ;
     let g = .5;
+    let h = Note { text: "never closed };
     net ok;
 }

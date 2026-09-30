@@ -1,2 +1,2 @@
-assume vcc.v in 12V +- 5%;
+rated vcc.v within 12V +- 5%;
 let x = --y;

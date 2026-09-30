@@ -18,15 +18,15 @@ block CeAmp {
 }
 
 contract CeAmp {
-    assume temp in -10°C..=60°C;
-    assume vcc.v in 12V ± 5%;
+    assume temp within -10°C..=60°C;
+    assume vcc.v within 12V ± 5%;
 
     let h = ac(output.v / input.v);
 
     /// Room for the output to swing ±1 V without clipping.
-    spec bias: dc(output.v) in 4.5V..=6.5V;
+    spec bias: dc(output.v) within 4.5V..=6.5V;
     /// The next stage expects this level.
-    spec gain: h.at(1kHz).mag() in 4.6 ± 5%;
+    spec gain: h.at(1kHz).mag() within 4.6 ± 5%;
     /// Don't cut the bass.
     spec bass: h.f_low(-3dB) <= 30Hz;
 }

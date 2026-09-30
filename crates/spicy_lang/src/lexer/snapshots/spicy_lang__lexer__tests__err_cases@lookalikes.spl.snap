@@ -252,6 +252,25 @@ Semi ";"
 Whitespace "\n"
 KwLet "let"
 Whitespace " "
+Ident "s"
+Whitespace " "
+Eq "="
+Whitespace " "
+Ident "Step"
+Whitespace " "
+LBrace "{"
+Whitespace " "
+Quantity "1V"
+Whitespace " "
+Unknown "→"
+Whitespace " "
+Quantity "2V"
+Whitespace " "
+RBrace "}"
+Semi ";"
+Whitespace "\n"
+KwLet "let"
+Whitespace " "
 Ident "a"
 Whitespace " "
 Eq "="
@@ -297,8 +316,9 @@ E-lookalike Lookalike 295..298 "；" fix 295..298 ";"
 E-lookalike Lookalike 308..311 "（" fix 308..311 "("
 E-lookalike Lookalike 312..315 "）" fix 312..315 ")"
 E-lookalike Lookalike 327..330 "＋" fix 327..330 "+"
-E-lookalike Lookalike 343..346 "\u{2009}" fix 343..346 " "
-E-lookalike Lookalike 358..361 "\u{202f}" fix 358..361 " "
+E-lookalike Lookalike 352..355 "→" fix 352..355 "->"
+E-lookalike Lookalike 371..374 "\u{2009}" fix 371..374 " "
+E-lookalike Lookalike 386..389 "\u{202f}" fix 386..389 " "
 
 --- rendered ---
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
@@ -404,7 +424,7 @@ error[E-unit-suffix]: unknown unit `˚C`
    |           ^^ not a unit or prefix
    |
    = help: did you mean `°C`?
-   = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+   = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-lookalike]: ` ` (U+00A0 NO-BREAK SPACE) is not ASCII
    --> lookalikes.spl:14:10
@@ -478,18 +498,26 @@ error[E-lookalike]: `＋` (U+FF0B FULLWIDTH PLUS SIGN) is not ASCII
    |
    = help: replace it with `+`
 
-error[E-lookalike]: ` ` (U+2009 THIN SPACE) is not ASCII
-   --> lookalikes.spl:22:10
+error[E-lookalike]: `→` (U+2192 RIGHTWARDS ARROW) is not ASCII
+   --> lookalikes.spl:22:19
    |
-22 | let a = b c;
+22 | let s = Step { 1V → 2V };
+   |                   ^ looks like `->`
+   |
+   = help: replace it with `->`
+
+error[E-lookalike]: ` ` (U+2009 THIN SPACE) is not ASCII
+   --> lookalikes.spl:23:10
+   |
+23 | let a = b c;
    |          ^ looks like ` `
    |
    = help: replace it with ` `
 
 error[E-lookalike]: ` ` (U+202F NARROW NO-BREAK SPACE) is not ASCII
-   --> lookalikes.spl:23:10
+   --> lookalikes.spl:24:10
    |
-23 | let a = b c;
+24 | let a = b c;
    |          ^ looks like ` `
    |
    = help: replace it with ` `

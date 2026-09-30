@@ -1,0 +1,3 @@
+// A string is one line: without its closing `"`, it runs to the end of the line.
+#[outside(reason = "not closed)]
+let a = b;

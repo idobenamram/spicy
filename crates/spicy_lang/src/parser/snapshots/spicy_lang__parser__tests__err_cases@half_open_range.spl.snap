@@ -1,25 +1,49 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/half_open_range.spl
 ---
-File 0..48
-  Block A 0..47
+File 0..233
+  Block A 0..232
     Let q 14..45
       StructLit Npn 22..44
         Field beta 28..42
           Binary Range 34..42
             Quantity 1e2 34..37 "100"
             Quantity 3e2 39..42 "300"
+    Let p 101..129
+      StructLit Npn 109..128
+        Field beta 115..126
+          RangeTo 121..126
+            Quantity 3e2 123..126 "300"
+    Let s 200..230
+      ExprError 208..230 "Npn { beta: 100..(1 };"
 
 --- errors ---
 E-range HalfOpenRange 37..39 ".." fix 37..39 "..="
+E-range HalfOpenRange 121..123 ".." fix 121..123 "..="
+E-syntax Expected 228..229 "}"
 
 --- rendered ---
-error[E-range]: a value range is closed
+error[E-range]: a range's end is written after `..=`
   --> half_open_range.spl:2:28
   |
 2 |     let q = Npn { beta: 100..300 };
   |                            ^^ write `..=`
   |
-  = note: `..` is reserved for integer ranges in loops
+  = note: `a..` with nothing after it is a range with no upper end
+
+error[E-range]: a range's end is written after `..=`
+  --> half_open_range.spl:4:25
+  |
+4 |     let p = Npn { beta: ..300 };
+  |                         ^^ write `..=`
+  |
+  = note: `a..` with nothing after it is a range with no upper end
+
+error[E-syntax]: expected `)`, found `}`
+  --> half_open_range.spl:6:33
+  |
+6 |     let s = Npn { beta: 100..(1 };
+  |                                 ^ expected `)`

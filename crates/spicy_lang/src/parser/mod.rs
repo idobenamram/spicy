@@ -213,7 +213,7 @@ impl<'t, 'src> Parser<'t, 'src> {
                 self.unattached(&docs, &attrs, "an item after the attribute")?;
                 return Ok(None);
             }
-            TokenKind::KwReserved => return Err(self.reserved()),
+            kind if is_reserved(kind) => return Err(self.reserved()),
             _ => {
                 let found = self.found();
                 return Err(self.fail(ParseErrorKind::ExpectedItem { found }));
@@ -300,7 +300,7 @@ impl<'t, 'src> Parser<'t, 'src> {
             KwLet => self.let_stmt()?,
             KwAssume => self.assume_stmt()?,
             KwSpec => self.spec_stmt()?,
-            KwReserved => return Err(self.reserved()),
+            kind if is_reserved(kind) => return Err(self.reserved()),
             _ => {
                 return Err(self.expected("a statement (`port`, `net`, `let`, `assume` or `spec`)"));
             }
@@ -384,8 +384,8 @@ impl<'t, 'src> Parser<'t, 'src> {
         use TokenKind::{Colon, Ident};
         self.bump(); // `spec`
         // A keyword before the `:` is a bad name, not a missing one (`name` reports it),
-        // and `spec g x in y` is a missing `:`. Only a measure right after `spec`
-        // (`spec dc(out.v) in …`) lacks the name.
+        // and `spec g x within y` is a missing `:`. Only a measure right after `spec`
+        // (`spec dc(out.v) within …`) lacks the name.
         let named = self.nth(1) == Colon || (self.peek() == Ident && self.nth(1) == Ident);
         if !named {
             return Err(self.fail(ParseErrorKind::SpecNeedsName));
@@ -526,7 +526,7 @@ impl<'t, 'src> Parser<'t, 'src> {
                 let span = self.bump();
                 Ok(Ident { text, span })
             }
-            TokenKind::KwReserved => Err(self.reserved()),
+            kind if is_reserved(kind) => Err(self.reserved()),
             kind if is_keyword(kind) => {
                 let keyword = self.text().to_string();
                 // Consumed, so recovery doesn't read it as the start of a statement.
@@ -860,7 +860,34 @@ fn is_keyword(kind: TokenKind) -> bool {
     use TokenKind::*;
     matches!(
         kind,
-        KwBlock | KwContract | KwPort | KwNet | KwLet | KwAssume | KwSpec | KwIn | KwReserved
+        KwBlock
+            | KwCircuit
+            | KwSetup
+            | KwContract
+            | KwEnv
+            | KwConst
+            | KwPub
+            | KwPort
+            | KwNet
+            | KwLet
+            | KwAssume
+            | KwSpec
+            | KwRated
+            | KwEnsure
+            | KwWithin
+            | KwFor
+            | KwIn
+            | KwReserved
+    )
+}
+
+/// A word the parser doesn't read yet: "`fn` isn't supported yet". The v5 keywords the
+/// parser doesn't handle yet are here too, until their steps.
+pub(super) fn is_reserved(kind: TokenKind) -> bool {
+    use TokenKind::*;
+    matches!(
+        kind,
+        KwReserved | KwCircuit | KwSetup | KwEnv | KwConst | KwPub | KwRated | KwEnsure | KwFor
     )
 }
 
@@ -1407,7 +1434,8 @@ mod tests {
         "block", "contract", "port", "net", "let", "assume", "spec", "in", "fn", " A", " r1",
         " vcc", "Resistor", "{", "}", "(", ")", "[", "]", "<", ">", "<=", ">=", ",", ";", ":",
         "::", ".", "..", "..=", "=", "+", "-", "*", "/", "±", "#", "?", " 47k", " 1%", " 3",
-        " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%", "\"", "α",
+        " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%", "\"", "α", "within", "->",
+        "\"s\"", "<A =",
     ];
 
     #[test]

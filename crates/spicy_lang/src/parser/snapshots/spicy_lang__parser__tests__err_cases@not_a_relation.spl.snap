@@ -1,16 +1,20 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 973
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/not_a_relation.spl
 ---
-File 0..59
-  Contract A 0..58
+File 0..162
+  Contract A 0..161
     StmtError 17..30 "assume vcc.v;"
     StmtError 35..56 "spec s: dc(output.v);"
+    StmtError 127..159 "spec t: dc(output.v) in 1V..=2V;"
 
 --- errors ---
 E-relation NotARelation 24..29 "vcc.v"
 E-relation NotARelation 43..55 "dc(output.v)"
+E-relation NotARelation 135..147 "dc(output.v)"
+E-syntax Expected 148..150 "in"
 
 --- rendered ---
 error[E-relation]: expected a relation
@@ -19,7 +23,7 @@ error[E-relation]: expected a relation
 2 |     assume vcc.v;
   |            ^^^^^ not a relation
   |
-  = help: write it like `x in a..=b` or `x <= b`
+  = help: write it like `x within a..=b` or `x <= b`
 
 error[E-relation]: expected a relation
   --> not_a_relation.spl:3:13
@@ -27,4 +31,18 @@ error[E-relation]: expected a relation
 3 |     spec s: dc(output.v);
   |             ^^^^^^^^^^^^ not a relation
   |
-  = help: write it like `x in a..=b` or `x <= b`
+  = help: write it like `x within a..=b` or `x <= b`
+
+error[E-relation]: expected a relation
+  --> not_a_relation.spl:5:13
+  |
+5 |     spec t: dc(output.v) in 1V..=2V;
+  |             ^^^^^^^^^^^^ not a relation
+  |
+  = help: write it like `x within a..=b` or `x <= b`
+
+error[E-syntax]: expected `;`, found `in`
+  --> not_a_relation.spl:5:26
+  |
+5 |     spec t: dc(output.v) in 1V..=2V;
+  |                          ^^ expected `;`

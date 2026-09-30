@@ -131,9 +131,9 @@ pub enum StmtKind<'src> {
         name: Ident<'src>,
         value: Expr<'src>,
     },
-    /// `assume vcc.v in 12V ± 5%;`: a condition the world may be anywhere in.
+    /// `assume vcc.v within 12V ± 5%;`: a condition the world may be anywhere in.
     Assume { relation: Relation<'src> },
-    /// `spec gain: h.at(1kHz).mag() in 4.6 ± 5%;`: a requirement the design must meet.
+    /// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a requirement the design must meet.
     Spec {
         name: Ident<'src>,
         relation: Relation<'src>,
@@ -143,8 +143,8 @@ pub enum StmtKind<'src> {
 }
 
 /// The top level of an `assume` or `spec`, split out so elaboration gets the measured
-/// side, the relation and the bound directly: in `dc(output.v) in 4.5V..=6.5V`, `lhs` is
-/// `dc(output.v)`, `op` is `In`, and `rhs` is the range. The two sides have spans; the
+/// side, the relation and the bound directly: in `dc(output.v) within 4.5V..=6.5V`, `lhs`
+/// is `dc(output.v)`, `op` is `Within`, and `rhs` is the range. The two sides have spans; the
 /// relation as a whole spans from `lhs` to `rhs`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Relation<'src> {
@@ -156,8 +156,8 @@ pub struct Relation<'src> {
 /// The relations an `assume` or `spec` can use (grammar.md §4.1, level 1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RelOp {
-    /// `x in a..=b` or `x in n ± t`: inside a range or tolerance.
-    In,
+    /// `x within a..=b` or `x within n ± t`: inside a range or tolerance.
+    Within,
     Lt,
     Le,
     Gt,
@@ -192,20 +192,25 @@ pub struct Expr<'src> {
     pub span: Span,
 }
 
+// The most common node, so its size is checked, as rustc checks its own
+// (`static_assert_size!(Expr, 72)`): a larger variant is boxed, as `StructLit` is.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(std::mem::size_of::<Expr>() == 48);
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind<'src> {
     /// `47k`, `1uF`, `3`: already decoded (value with the prefix applied, and the unit
     /// symbol). What the unit means for this field (ohms for a resistor's `value`) is
     /// elaboration's job.
     Quantity(QuantityLit),
+    /// `"datasheet dropout row"`: the text between the quotes, as written (`\"` and `\\`
+    /// are still escaped).
+    Str(&'src str),
     /// A name: `vcc`, `temp`, `a::b`.
     Path(Path<'src>),
-    /// `Resistor { a: vcc, value: 47k }`: placing a part or a block, with its pins and
-    /// fields bound by name.
-    StructLit {
-        path: Path<'src>,
-        fields: Vec<Field<'src>>,
-    },
+    /// `Resistor { a: vcc, value: 47k }`: placing a part or a block. Boxed, as rustc's
+    /// `ExprKind::Struct`, so the rarer, larger node doesn't make every `Expr` larger.
+    StructLit(Box<StructLit<'src>>),
     /// `(a + b)`. Kept rather than dropped, because it matters: `(a + b) ± 1%` is
     /// allowed and `a + b ± 1%` isn't (grammar.md §4.2), and the formatter prints it.
     Paren(Box<Expr<'src>>),
@@ -220,28 +225,38 @@ pub enum ExprKind<'src> {
     /// (`h.at`), so `h.at(1kHz).mag()` is `Call(Field(Call(Field(h, at), [1kHz]), mag))`.
     Call {
         callee: Box<Expr<'src>>,
-        args: Vec<Expr<'src>>,
+        args: Vec<Arg<'src>>,
+    },
+    /// `m[s]`: measure `m` in setup `s`, in a spec that uses several setups.
+    Index {
+        base: Box<Expr<'src>>,
+        index: Box<Expr<'src>>,
     },
     /// `-3dB`, `-x`
     Neg(Box<Expr<'src>>),
-    /// `a + b`, `12V ± 5%`, `4.5V..=6.5V`, `x in r`: every binary operator, including
+    /// `a + b`, `12V ± 5%`, `4.5V..=6.5V`, `x within r`: every binary operator, including
     /// tolerances and ranges (which are values, not special syntax).
     Binary {
         op: BinOp,
         lhs: Box<Expr<'src>>,
         rhs: Box<Expr<'src>>,
     },
+    /// `..=0.5Ω`: a range with no lower end.
+    RangeTo(Box<Expr<'src>>),
+    /// `10kΩ..`: a range with no upper end.
+    RangeFrom(Box<Expr<'src>>),
     /// A value that couldn't be parsed, over the text skipped to the end of its
     /// statement: the statement keeps its name (`net base = [g g];` still declares
-    /// `base`). Or a number the lexer rejected (`47q`), which the lexer reported.
+    /// `base`). Or a number or string the lexer rejected (`47q`), which the lexer
+    /// reported.
     Error(Reported),
 }
 
 /// Binary operators, loosest first (grammar.md §4.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
-    /// A comparison: `in`, `<`, `<=`, `>`, `>=`. Only valid at the top of an `assume` or
-    /// `spec`, which takes it out as a typed [`Relation`].
+    /// A comparison: `within`, `<`, `<=`, `>`, `>=`. Only valid at the top of an `assume`
+    /// or `spec`, which takes it out as a typed [`Relation`].
     Rel(RelOp),
     /// `..=`
     Range,
@@ -253,12 +268,69 @@ pub enum BinOp {
     Div,
 }
 
-/// One field of a struct literal: a pin binding (`a: vcc`), a parameter
-/// (`value: 47k ± 1%`), or the shorthand `gnd` for `gnd: gnd`.
+/// `Kind<generics> { fields }`, the inside of [`ExprKind::StructLit`].
 #[derive(Clone, Debug, PartialEq)]
-pub struct Field<'src> {
+pub struct StructLit<'src> {
+    pub path: Path<'src>,
+    /// `<A = Mcp6001>` in `GainStage<A = Mcp6001> { … }`; empty when there are none.
+    pub generics: Vec<GenericArg<'src>>,
+    pub fields: Vec<Field<'src>>,
+}
+
+/// `A = Mcp6001`: a generic argument at a placement. Always named: `< IDENT =` is what
+/// tells it from a less-than (`research/contract_v4_review_implementation.md` G4).
+#[derive(Clone, Debug, PartialEq)]
+pub struct GenericArg<'src> {
+    pub name: Ident<'src>,
+    pub value: Expr<'src>,
+}
+
+/// One element of a struct literal.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Field<'src> {
+    /// `a: vcc`, `value: 47k ± 1%`, or the shorthand `gnd`.
+    Named(NamedField<'src>),
+    /// `5mA -> 30mA` in `Step { 5mA -> 30mA, edge: 1us }`.
+    Transition(Box<Transition<'src>>),
+}
+
+impl Field<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            Field::Named(field) => field.span,
+            Field::Transition(transition) => transition.span,
+        }
+    }
+}
+
+/// A pin binding (`a: vcc`), a parameter (`value: 47k ± 1%`), or the shorthand `gnd` for
+/// `gnd: gnd`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NamedField<'src> {
     pub name: Ident<'src>,
     /// `None` for the shorthand: the value is the net with the same name.
     pub value: Option<Expr<'src>>,
     pub span: Span,
+}
+
+/// `from -> to`: what a step or a sweep goes between.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Transition<'src> {
+    pub from: Expr<'src>,
+    pub to: Expr<'src>,
+    pub span: Span,
+}
+
+/// One argument of a call.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Arg<'src> {
+    /// `-3dB` in `h.f_high(-3dB, ref: dc)`.
+    Positional(Expr<'src>),
+    /// `ref: dc`
+    Named {
+        name: Ident<'src>,
+        value: Expr<'src>,
+    },
+    /// `4.5V -> 3.0V` in `Sweep(4.5V -> 3.0V)`.
+    Transition(Box<Transition<'src>>),
 }

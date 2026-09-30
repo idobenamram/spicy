@@ -1,6 +1,6 @@
 block A {
-    assume vcc.v in 12V ± 5%;
-    spec s: x in 1..=2;
+    assume vcc.v within 12V ± 5%;
+    spec s: x within 1..=2;
 }
 
 contract A {

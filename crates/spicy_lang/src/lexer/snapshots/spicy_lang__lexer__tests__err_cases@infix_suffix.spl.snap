@@ -48,6 +48,15 @@ Whitespace " "
 Quantity "4k7v"
 Semi ";"
 Whitespace "\n"
+KwLet "let"
+Whitespace " "
+Ident "f"
+Whitespace " "
+Eq "="
+Whitespace " "
+Quantity "4u7h"
+Semi ";"
+Whitespace "\n"
 Eof ""
 
 --- errors ---
@@ -56,6 +65,7 @@ E-unit-suffix PrefixNotAllowed 23..24 "m" fix 23..24 "."
 E-unit-suffix UnknownSuffix 41..43 "in"
 E-unit-suffix UnknownSuffix 54..57 "mhz"
 E-unit-suffix UnknownSuffix 70..71 "v" fix 70..71 "V"
+E-unit-suffix PrefixNotAllowed 82..83 "u"
 
 --- rendered ---
 error[E-unit-suffix]: `%` takes no prefix
@@ -80,7 +90,7 @@ error[E-unit-suffix]: unknown unit `in`
 3 | let c = 4k7in;
   |            ^^ not a unit or prefix
   |
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-unit-suffix]: unknown unit `mhz`
   --> infix_suffix.spl:4:10
@@ -89,7 +99,7 @@ error[E-unit-suffix]: unknown unit `mhz`
   |          ^^^ not a unit or prefix
   |
   = help: did you mean `mHz` or `MHz`?
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
 
 error[E-unit-suffix]: unknown unit `v`
   --> infix_suffix.spl:5:12
@@ -98,4 +108,13 @@ error[E-unit-suffix]: unknown unit `v`
   |            ^ not a unit or prefix
   |
   = help: did you mean `V`?
-  = note: units are V A Ω F H Hz s W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+  = note: units are V A Ω F H Hz s h y W K °C % dB, optionally after a prefix f p n u µ m k M G T (case matters)
+
+error[E-unit-suffix]: `h` takes no prefix
+  --> infix_suffix.spl:6:10
+  |
+6 | let f = 4u7h;
+  |          ^ `u` can't be a prefix here
+  |
+  = help: in this form `u` marks the decimal point, but `h` takes no prefix: write `.` instead
+  = help: or did you mean `uH`?

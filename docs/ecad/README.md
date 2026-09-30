@@ -51,6 +51,11 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [contract_options.md](research/contract_options.md): the three options compared, the common core, a possible hybrid. Start here.
     - Options: [contract_option_a_datasheet.md](research/contract_option_a_datasheet.md), [contract_option_b_testbench.md](research/contract_option_b_testbench.md), [contract_option_c_interface.md](research/contract_option_c_interface.md)
     - Research: [contract_references.md](research/contract_references.md), [contract_ee_practice.md](research/contract_ee_practice.md) (sources, loads and setups for non-specialists; the reference board), [contract_hierarchy.md](research/contract_hierarchy.md) (reusing a child's results), [contract_tool_gaps.md](research/contract_tool_gaps.md) (what today's tools can't do, G1–G19, faults)
+  - Block and contract syntax (round 6):
+    - [contract_syntax_v5.md](research/contract_syntax_v5.md): **final for now** (2026-09-30), the target for the language implementation: rules, full example, MVP subset, migration order. Start here.
+    - [contract_syntax_v4.md](research/contract_syntax_v4.md) and its reviews: [consistency](research/contract_v4_review_consistency.md), [novice](research/contract_v4_review_novice.md), [implementation](research/contract_v4_review_implementation.md)
+    - [contract_syntax_v3.md](research/contract_syntax_v3.md): the previous draft, with what changed from draft 2 and why.
+    - [contract_syntax_v2.md](research/contract_syntax_v2.md) and its reviews: [semantics](research/contract_v2_review_semantics.md), [syntax](research/contract_v2_review_syntax.md), [engine](research/contract_v2_review_engine.md), [usability](research/contract_v2_review_usability.md)
   - Data pipeline:
     - [staged_ir_survey.md](research/staged_ir_survey.md): how compilers and circuit simulators pass data between stages
     - [circuit_redteam.md](research/circuit_redteam.md): our code, red-teamed and measured

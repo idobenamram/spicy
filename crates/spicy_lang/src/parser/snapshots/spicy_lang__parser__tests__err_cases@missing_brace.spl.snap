@@ -1,10 +1,10 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1059
+assertion_line: 1204
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/missing_brace.spl
 ---
-File 0..380
+File 0..500
   Block Child 229..253
     Port a 245..251
       Type Pin 248..251 "Pin"
@@ -23,10 +23,14 @@ File 0..380
     Let c 357..377
       StructLit Child 365..376
         Field a (shorthand) 373..374
+  Setup Operating for Top 461..499
+    Set a.v 489..496
+      Quantity 1e0 V 494..496 "1V"
 
 --- errors ---
 E-syntax MissingBrace 235..240 "Child" fix 240..240 " {"
 E-syntax MissingBrace 263..268 "Child" fix 268..268 " {"
+E-syntax MissingBrace 481..484 "Top" fix 484..484 " {"
 
 --- rendered ---
 error[E-syntax]: expected `{`
@@ -44,3 +48,11 @@ error[E-syntax]: expected `{`
   |         ^^^^^ `{` goes after the name
   |
   = help: add `{` after the name
+
+error[E-syntax]: expected `{`
+   --> missing_brace.spl:18:21
+   |
+18 | setup Operating for Top
+   |                     ^^^ `{` goes after the name
+   |
+   = help: add `{` after the name

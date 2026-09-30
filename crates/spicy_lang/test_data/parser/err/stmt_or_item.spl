@@ -1,0 +1,19 @@
+// In a body, `setup` not before a name and `pub` not before an item keyword start a
+// statement: a mistake in one is that statement's error, and the body goes on.
+contract A {
+    pub let h = dc(out.v);
+    setup: Operating;
+    spec s: h within 1V..=2V;
+    pub
+}
+
+circuit A {
+    pub net n;
+    net m;
+}
+
+// A key named like a keyword is a bad name, and its setup goes on.
+setup S for A {
+    setup: 1V,
+    temp: 25°C,
+}

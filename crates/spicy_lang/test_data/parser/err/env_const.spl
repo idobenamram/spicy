@@ -1,0 +1,6 @@
+// A broken `env` or `const` is an error up to the next item.
+env a Temperature in 1..=2;
+env b: Temperature 1..=2;
+const c: Confidence sigma(3);
+env ok: Temperature in 1..=2;
+const d: Confidence = ;

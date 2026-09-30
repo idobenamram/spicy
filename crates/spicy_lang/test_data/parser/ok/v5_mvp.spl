@@ -1,0 +1,36 @@
+// The MVP subset of v5's example (research/contract_syntax_v5.md §2): conditions of the
+// whole project, a block and its circuit, its setups, and a contract that names its
+// default setup and publishes a spec.
+env ambient: Temperature in -10°C..=60°C;
+env life: Duration in 0y..=10y;
+const confidence: Confidence = sigma(3);
+
+pub block Ldo3v3 { vin: Power<In>, vout: Power<Out>, gnd: Ground }
+
+circuit Ldo3v3 {
+    let u1 = Tlv755p { vin, vout, gnd };
+    let c_in = Capacitor { a: vin, b: gnd, value: 1uF ± 10% };
+    let c_out = Capacitor { a: vout, b: gnd, value: 1uF ± 10% };
+}
+
+/// A key is a port, a field of what's on it, or `temp`.
+setup Operating for Ldo3v3 {
+    vin: Supply { v: 4.3V..=5.5V, z: ..=0.5Ω },
+    vout: Load { c: ..=20uF },
+    vout.i: 5mA..=50mA,
+    temp: -40°C..=125°C,
+}
+
+setup LoadStep for Ldo3v3 {
+    vout.i: Step { from: 5mA, to: 30mA, edge: 1us, at: 50us },
+    window: ..=300us,
+}
+
+contract Ldo3v3 {
+    // `setup =` and `pub spec` are statements here, not the start of the next item.
+    setup = Operating;
+    let out = dc(vout.v);
+    spec output: out within 3.3V ± 2%;
+    /// Parents may rely on it.
+    pub spec quiescent: dc(vin.i + vout.i) <= 50uA;
+}

@@ -4,7 +4,7 @@
 >
 > **Scope:** syntax only. The exporter comes next, then the engine; both are out of this plan. Grammar details follow `research/contract_v4_review_implementation.md` ("[IR]"), §2.
 >
-> **Status:** steps 1, 2 and 3 done. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added.
+> **Status:** steps 1 to 4 done. Steps 3 and 4 cover only the MVP subset (decided 2026-09-30): what steps 1 and 2 already parse stays, and nothing past the MVP is added.
 
 ---
 
@@ -121,9 +121,10 @@ We do them together, one at a time.
   - `setup = S;`
   - `let …;`
   - `[pub] spec name: … within|<=|>= …;`
-  - Not in the MVP, so not parsed: `rated`, the clauses (`with`, `for x in`, `on`, `in M`), the function form `spec name(a: A) { … }` and `ensure`. `rated`, `ensure` and `for` become reserved words, with no token kinds of their own.
+  - Not in the MVP, so not parsed: `rated`, the clauses (`with`, `for x in`, `on`, `in M`), the function form `spec name(a: A) { … }` and `ensure`. `rated` and `ensure` become reserved words, with no token kinds of their own. `for` stays a keyword, read only in `setup S for X`.
 - **`assume` is gone.**
-- **The parser rule this needs** ([IR] §2.3 G1): `setup` and `pub` start both items and statements, so a two-token rule decides.
+- **The parser rule this needs** ([IR] §2.3 G1): `setup` and `pub` start both items and statements, so a two-token rule decides. It says "item" only when the next token is an item's own (decided 2026-09-30, after the step 4 review): `setup` before a name (`setup S for X`), `pub` before an item keyword. Anything else is a statement, whose mistake is reported there, so a typo doesn't end the body. As rustc reads `union` as an item only before a name.
+- **For later, when `..Base` lands:** the `,` before it is required (as in Rust). Without it, `vcc: 1V` then `..Operating` on the next line would read as the range `1V..Operating`.
 - **Resolve** matches each `setup` and `contract` to its block by name, and reports one without a block. What they contain isn't elaborated yet: setups and contracts are resolved in the next phase.
 - **Tests:** v5's MVP subset parses whole, as a parser `ok` case. There's an `err` case for each rule, and every fix is applied by a test.
 

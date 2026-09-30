@@ -1,0 +1,13 @@
+// A broken setup entry is skipped to the next `,`, and the entries after it are read on.
+// One whose value doesn't parse keeps its key.
+setup S for A {
+    vcc Supply {},
+    vin.: 1V,
+    temp: ,
+    ok: 1V,
+}
+
+// Without its `for`, a setup is an error up to the next item.
+setup T A {}
+
+block A { vcc: Pin }

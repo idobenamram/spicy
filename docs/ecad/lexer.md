@@ -143,7 +143,7 @@ pub enum TokenKind {
     DocComment,
     Ident, IdentNonAscii,
     KwBlock, KwCircuit, KwSetup, KwContract, KwEnv, KwConst, KwPub, KwNet, KwLet,
-    KwAssume, KwSpec, KwRated, KwEnsure, KwWithin, KwFor, KwIn, KwReserved,
+    KwSpec, KwWithin, KwFor, KwIn, KwReserved,
     Quantity, Str, UnterminatedStr,
     LBrace, RBrace, LParen, RParen, LBracket, RBracket, Lt, Gt, Le, Ge,
     Comma, Semi, Colon, ColonColon, Dot, DotDot, DotDotEq, Eq,

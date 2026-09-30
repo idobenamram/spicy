@@ -1,134 +1,146 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1693
+assertion_line: 1825
 expression: "dump_parse(\"ce_amp.spl\", src)"
 ---
-File 0..1021
-  pub Block CeAmp 0..137
-    Doc 0..49 "/// Common-emitter audio stage (walkthrough §1)."
-    Port vcc 68..82
-      Type Power 73..82 "Power<In>"
-        Type In 79..81 "In"
-    Port gnd 84..95
-      Type Ground 89..95 "Ground"
-    Port input 97..114
-      Type Analog 104..114 "Analog<In>"
-        Type In 111..113 "In"
-    Port output 116..135
-      Type Analog 124..135 "Analog<Out>"
-        Type Out 131..134 "Out"
-  Circuit CeAmp 139..620
-    Net base 159..168
-    Net emitter 173..185
-    Let r1 191..290
-      Doc 191..229 "/// Divider holds the base near 2.1 V."
-      StructLit Resistor 243..289
-        Field a 254..260
-          Path vcc 257..260 "vcc"
-        Field b 262..269
-          Path base 265..269 "base"
-        Field value 271..287
-          Binary Tol 278..287
-            Quantity 4.7e4 278..281 "47k"
-            Quantity 1e0 % 285..287 "1%"
-    Let r2 295..351
-      StructLit Resistor 304..350
-        Field a 315..322
-          Path base 318..322 "base"
-        Field b 324..330
-          Path gnd 327..330 "gnd"
-        Field value 332..348
-          Binary Tol 339..348
-            Quantity 1e4 339..342 "10k"
-            Quantity 1e0 % 346..348 "1%"
-    Let rc 356..415
-      StructLit Resistor 365..414
-        Field a 376..382
-          Path vcc 379..382 "vcc"
-        Field b 384..393
-          Path output 387..393 "output"
-        Field value 395..412
-          Binary Tol 402..412
-            Quantity 4.7e3 402..406 "4.7k"
-            Quantity 1e0 % 410..412 "1%"
-    Let re 420..478
-      StructLit Resistor 429..477
-        Field a 440..450
-          Path emitter 443..450 "emitter"
-        Field b 452..458
-          Path gnd 455..458 "gnd"
-        Field value 460..475
-          Binary Tol 467..475
-            Quantity 1e3 467..469 "1k"
-            Quantity 1e0 % 473..475 "1%"
-    Let c_in 483..548
-      StructLit Electrolytic 494..547
-        Field p 509..516
-          Path base 512..516 "base"
-        Field n 518..526
-          Path input 521..526 "input"
-        Field value 528..545
-          Binary Tol 535..545
-            Quantity 1e-6 F 535..538 "1uF"
-            Quantity 2e1 % 542..545 "20%"
-    Let q1 553..618
-      StructLit Npn 562..617
-        Field c 568..577
-          Path output 571..577 "output"
-        Field b 579..586
-          Path base 582..586 "base"
-        Field e 588..598
-          Path emitter 591..598 "emitter"
-        Field beta 600..615
-          Range a..=b 606..615
-            Quantity 1e2 606..609 "100"
-            Quantity 3e2 612..615 "300"
-  Contract CeAmp 622..1020
-    Assume Within 643..677
-      Path temp 650..654 "temp"
-      Range a..=b 662..676
-        Neg 662..668
-          Quantity 1e1 °C 663..668 "10°C"
-        Quantity 6e1 °C 671..676 "60°C"
-    Assume Within 682..712
-      Field .v 689..694
-        Path vcc 689..692 "vcc"
-      Binary Tol 702..711
-        Quantity 1.2e1 V 702..705 "12V"
-        Quantity 5e0 % 709..711 "5%"
-    Let h 718..749
-      Call 726..748
-        Path ac 726..728 "ac"
-        Binary Div 729..747
-          Field .v 729..737
-            Path output 729..735 "output"
-          Field .v 740..747
-            Path input 740..745 "input"
-    Spec bias Within 755..859
-      Doc 755..811 "/// Room for the output to swing ±1 V without clipping."
-      Call 827..839
-        Path dc 827..829 "dc"
-        Field .v 830..838
-          Path output 830..836 "output"
-      Range a..=b 847..858
-        Quantity 4.5e0 V 847..851 "4.5V"
-        Quantity 6.5e0 V 854..858 "6.5V"
-    Spec gain Within 864..952
-      Doc 864..902 "/// The next stage expects this level."
-      Call 918..934
-        Field .mag 918..932
-          Call 918..928
-            Field .at 918..922
-              Path h 918..919 "h"
-            Quantity 1e3 Hz 923..927 "1kHz"
-      Binary Tol 942..951
-        Quantity 4.6e0 942..945 "4.6"
-        Quantity 5e0 % 949..951 "5%"
-    Spec bass Le 957..1018
-      Doc 957..980 "/// Don't cut the bass."
-      Call 996..1009
-        Field .f_low 996..1003
-          Path h 996..997 "h"
-        Neg 1004..1008
-          Quantity 3e0 dB 1005..1008 "3dB"
-      Quantity 3e1 Hz 1013..1017 "30Hz"
+File 0..1289
+  Env ambient 0..107
+    Doc 0..63 "/// The temperature the amplifier works in, anywhere it's used."
+    Type Temperature 77..88 "Temperature"
+    Range a..=b 92..106
+      Neg 92..98
+        Quantity 1e1 °C 93..98 "10°C"
+      Quantity 6e1 °C 101..106 "60°C"
+  pub Block CeAmp 109..246
+    Doc 109..158 "/// Common-emitter audio stage (walkthrough §1)."
+    Port vcc 177..191
+      Type Power 182..191 "Power<In>"
+        Type In 188..190 "In"
+    Port gnd 193..204
+      Type Ground 198..204 "Ground"
+    Port input 206..223
+      Type Analog 213..223 "Analog<In>"
+        Type In 220..222 "In"
+    Port output 225..244
+      Type Analog 233..244 "Analog<Out>"
+        Type Out 240..243 "Out"
+  Circuit CeAmp 248..729
+    Net base 268..277
+    Net emitter 282..294
+    Let r1 300..399
+      Doc 300..338 "/// Divider holds the base near 2.1 V."
+      StructLit Resistor 352..398
+        Field a 363..369
+          Path vcc 366..369 "vcc"
+        Field b 371..378
+          Path base 374..378 "base"
+        Field value 380..396
+          Binary Tol 387..396
+            Quantity 4.7e4 387..390 "47k"
+            Quantity 1e0 % 394..396 "1%"
+    Let r2 404..460
+      StructLit Resistor 413..459
+        Field a 424..431
+          Path base 427..431 "base"
+        Field b 433..439
+          Path gnd 436..439 "gnd"
+        Field value 441..457
+          Binary Tol 448..457
+            Quantity 1e4 448..451 "10k"
+            Quantity 1e0 % 455..457 "1%"
+    Let rc 465..524
+      StructLit Resistor 474..523
+        Field a 485..491
+          Path vcc 488..491 "vcc"
+        Field b 493..502
+          Path output 496..502 "output"
+        Field value 504..521
+          Binary Tol 511..521
+            Quantity 4.7e3 511..515 "4.7k"
+            Quantity 1e0 % 519..521 "1%"
+    Let re 529..587
+      StructLit Resistor 538..586
+        Field a 549..559
+          Path emitter 552..559 "emitter"
+        Field b 561..567
+          Path gnd 564..567 "gnd"
+        Field value 569..584
+          Binary Tol 576..584
+            Quantity 1e3 576..578 "1k"
+            Quantity 1e0 % 582..584 "1%"
+    Let c_in 592..657
+      StructLit Electrolytic 603..656
+        Field p 618..625
+          Path base 621..625 "base"
+        Field n 627..635
+          Path input 630..635 "input"
+        Field value 637..654
+          Binary Tol 644..654
+            Quantity 1e-6 F 644..647 "1uF"
+            Quantity 2e1 % 651..654 "20%"
+    Let q1 662..727
+      StructLit Npn 671..726
+        Field c 677..686
+          Path output 680..686 "output"
+        Field b 688..695
+          Path base 691..695 "base"
+        Field e 697..707
+          Path emitter 700..707 "emitter"
+        Field beta 709..724
+          Range a..=b 715..724
+            Quantity 1e2 715..718 "100"
+            Quantity 3e2 721..724 "300"
+  Setup Operating for CeAmp 731..939
+    Doc 731..806 "/// The amplifier as it's used: a 12 V rail, a quiet input, an open output."
+    Set vcc 839..867
+      StructLit Supply 844..867
+        Field v 853..865
+          Binary Tol 856..865
+            Quantity 1.2e1 V 856..859 "12V"
+            Quantity 5e0 % 863..865 "5%"
+    Set input 873..896
+      StructLit Signal 880..896
+        Field v 889..894
+          Quantity 0e0 V 892..894 "0V"
+    Set output 902..917
+      StructLit Load 910..917
+    Set temp 923..936
+      Path ambient 929..936 "ambient"
+  Contract CeAmp 941..1288
+    Setup = Operating 962..980
+    Let h 986..1017
+      Call 994..1016
+        Path ac 994..996 "ac"
+        Binary Div 997..1015
+          Field .v 997..1005
+            Path output 997..1003 "output"
+          Field .v 1008..1015
+            Path input 1008..1013 "input"
+    Spec bias Within 1023..1127
+      Doc 1023..1079 "/// Room for the output to swing ±1 V without clipping."
+      Call 1095..1107
+        Path dc 1095..1097 "dc"
+        Field .v 1098..1106
+          Path output 1098..1104 "output"
+      Range a..=b 1115..1126
+        Quantity 4.5e0 V 1115..1119 "4.5V"
+        Quantity 6.5e0 V 1122..1126 "6.5V"
+    Spec gain Within 1132..1220
+      Doc 1132..1170 "/// The next stage expects this level."
+      Call 1186..1202
+        Field .mag 1186..1200
+          Call 1186..1196
+            Field .at 1186..1190
+              Path h 1186..1187 "h"
+            Quantity 1e3 Hz 1191..1195 "1kHz"
+      Binary Tol 1210..1219
+        Quantity 4.6e0 1210..1213 "4.6"
+        Quantity 5e0 % 1217..1219 "5%"
+    Spec bass Le 1225..1286
+      Doc 1225..1248 "/// Don't cut the bass."
+      Call 1264..1277
+        Field .f_low 1264..1271
+          Path h 1264..1265 "h"
+        Neg 1272..1276
+          Quantity 3e0 dB 1273..1276 "3dB"
+      Quantity 3e1 Hz 1281..1285 "30Hz"

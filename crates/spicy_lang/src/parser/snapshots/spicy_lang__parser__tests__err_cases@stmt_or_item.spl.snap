@@ -1,0 +1,67 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1219
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/stmt_or_item.spl
+---
+File 0..427
+  Contract A 165..266
+    Let h 182..204
+      Call 194..203
+        Path dc 194..196 "dc"
+        Field .v 197..202
+          Path out 197..200 "out"
+    StmtError 209..226 "setup: Operating;"
+    Spec s Within 231..256
+      Path h 239..240 "h"
+      Range a..=b 248..255
+        Quantity 1e0 V 248..250 "1V"
+        Quantity 2e0 V 253..255 "2V"
+    StmtError 261..264 "pub"
+  Circuit A 268..307
+    Net n 284..294
+    Net m 299..305
+  Setup S for A 377..426
+    EntryError 397..406 "setup: 1V"
+    Set temp 412..423
+      Quantity 2.5e1 °C 418..423 "25°C"
+
+--- errors ---
+E-syntax PubNotAllowed 182..185 "pub" fix 182..186 ""
+E-syntax Expected 214..215 ":"
+E-syntax Expected 265..266 "}"
+E-syntax PubNotAllowed 284..287 "pub" fix 284..288 ""
+E-keyword KeywordAsName 397..402 "setup"
+
+--- rendered ---
+error[E-syntax]: only a block or a spec can be `pub`
+  --> stmt_or_item.spl:4:5
+  |
+4 |     pub let h = dc(out.v);
+  |     ^^^ remove `pub`
+
+error[E-syntax]: expected `=`, found `:`
+  --> stmt_or_item.spl:5:10
+  |
+5 |     setup: Operating;
+  |          ^ expected `=`
+
+error[E-syntax]: expected a statement (`net`, `let`, `setup` or `spec`), found `}`
+  --> stmt_or_item.spl:8:1
+  |
+8 | }
+  | ^ expected a statement (`net`, `let`, `setup` or `spec`)
+
+error[E-syntax]: only a block or a spec can be `pub`
+   --> stmt_or_item.spl:11:5
+   |
+11 |     pub net n;
+   |     ^^^ remove `pub`
+
+error[E-keyword]: `setup` is a keyword
+   --> stmt_or_item.spl:17:5
+   |
+17 |     setup: 1V,
+   |     ^^^^^ can't be used as a name
+   |
+   = help: choose another name

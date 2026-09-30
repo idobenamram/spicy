@@ -1,0 +1,6 @@
+// A circuit, a contract or a setup for a block the file doesn't have.
+circuit Nowhere {}
+
+contract Missing {}
+
+setup S for Absent {}

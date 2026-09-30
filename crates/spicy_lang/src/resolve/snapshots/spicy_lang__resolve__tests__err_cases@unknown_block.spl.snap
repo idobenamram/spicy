@@ -1,0 +1,35 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 621
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/unknown_block.spl
+---
+--- errors ---
+E-name UnknownBlock 79..86 "Nowhere"
+E-name UnknownBlock 100..107 "Missing"
+E-name UnknownBlock 124..130 "Absent"
+
+--- rendered ---
+error[E-name]: circuit for an unknown block `Nowhere`
+  --> unknown_block.spl:2:9
+  |
+2 | circuit Nowhere {}
+  |         ^^^^^^^ no block with this name
+  |
+  = note: a circuit is the inside of the block of the same name
+
+error[E-name]: contract for an unknown block `Missing`
+  --> unknown_block.spl:4:10
+  |
+4 | contract Missing {}
+  |          ^^^^^^^ no block with this name
+  |
+  = note: a contract describes the block of the same name
+
+error[E-name]: setup for an unknown block `Absent`
+  --> unknown_block.spl:6:13
+  |
+6 | setup S for Absent {}
+  |             ^^^^^^ no block with this name
+  |
+  = note: a setup is for the block named after `for`

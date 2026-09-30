@@ -1,0 +1,10 @@
+// A `,` missing before the next entry is reported with its insertion, and the entry
+// after it is read on: `b` stays a port, and `vin.v` and `temp` stay in the setup.
+block A { a: Pin b: Pin }
+
+setup S for A {
+    vcc: Supply { v: 12V }
+    vin.v: 1V
+    /// The room.
+    temp: 25°C
+}

@@ -5,8 +5,8 @@
 //! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), read top
 //! to bottom in [`resolve`]:
 //! 1. **The file's names:** every block's name, its circuit and contract (each named
-//!    after it), then every block's [`Signature`] (its ports). A block can be placed
-//!    before its definition.
+//!    after it) and its setups (each naming it after `for`), then every block's
+//!    [`Signature`] (its ports). A block can be placed before its definition.
 //! 2. **The circuits:** each block's circuit, by a [`BodyResolver`](body::BodyResolver)
 //!    of its own, which has two passes of its own: every name the circuit declares, then
 //!    every statement, so statement order never matters.
@@ -18,8 +18,8 @@
 //! once. A second definition of a name (a block, a circuit, a port, a `net` or `let`) is
 //! checked for its own mistakes, then dropped: it never enters the design.
 //!
-//! Contracts are only matched to their blocks here; their contents are resolved in the
-//! next step (roadmap M1d-5).
+//! Contracts and setups are only matched to their blocks here; their contents, and the
+//! file's `env`s and `const`s, are resolved in the next step (roadmap M1d-5).
 
 mod body;
 mod error;
@@ -64,12 +64,13 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         suggestions_left: SUGGESTION_BUDGET,
     };
 
-    // Pass 1, the file's names: every block's name, its circuit and contract, then
-    // every block's ports. A block can be placed, and a port typed, before its
+    // Pass 1, the file's names: every block's name, its circuit, contract and setups,
+    // then every block's ports. A block can be placed, and a port typed, before its
     // definition.
     let (decls, block_spans, second_decls) = r.declare_blocks();
     let (circuits, second_circuits) = r.match_to_blocks(NameKind::Circuit, decls.len());
     let (contracts, _) = r.match_to_blocks(NameKind::Contract, decls.len());
+    r.check_setups(decls.len());
     let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) = decls
         .iter()
         .zip(&circuits)
@@ -418,8 +419,8 @@ impl<'p, 'src> Resolver<'p, 'src> {
                 (Some(block), Ok(())) => first[block.index()] = Some((body, item.span)),
                 (Some(block), Err(_)) => second.push((body, block)),
                 (None, Ok(())) => {
-                    let kind = ResolveErrorKind::WithoutBlock {
-                        what,
+                    let kind = ResolveErrorKind::UnknownBlock {
+                        item: what,
                         name: body.name.text.to_string(),
                     };
                     self.report(kind, body.name.span);
@@ -428,6 +429,32 @@ impl<'p, 'src> Resolver<'p, 'src> {
             }
         }
         (first, second)
+    }
+
+    /// The block after each setup's `for` is one of the `blocks` blocks, and each block's
+    /// setups have different names. Setups are named per block, so every block can have
+    /// its own `Operating` (research/contract_v4_review_implementation.md §3.2).
+    fn check_setups(&mut self, blocks: usize) {
+        let mut seen: Vec<Scope<()>> = vec![Scope::default(); blocks];
+        for item in &self.parsed.file.items {
+            let ItemKind::Setup(setup) = &item.kind else {
+                continue;
+            };
+            let name = self.path_text(&setup.block);
+            match self.blocks.get(name) {
+                Some(block) => {
+                    let setups = &mut seen[block.index()];
+                    let _ = setups.declare(&setup.name, (), NameKind::Setup, &mut self.errors);
+                }
+                None => {
+                    let kind = ResolveErrorKind::UnknownBlock {
+                        item: NameKind::Setup,
+                        name: name.to_string(),
+                    };
+                    self.report(kind, setup.block.span);
+                }
+            }
+        }
     }
 
     /// A block's signature, and the start of the block itself: its name, and its ports

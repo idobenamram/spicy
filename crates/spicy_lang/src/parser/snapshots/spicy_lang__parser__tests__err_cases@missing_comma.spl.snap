@@ -1,0 +1,52 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1215
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/missing_comma.spl
+---
+File 0..289
+  Block A 169..194
+    Port a 179..185
+      Type Pin 182..185 "Pin"
+    Port b 186..192
+      Type Pin 189..192 "Pin"
+  Setup S for A 196..288
+    Set vcc 216..238
+      StructLit Supply 221..238
+        Field v 230..236
+          Quantity 1.2e1 V 233..236 "12V"
+    Set vin.v 243..252
+      Quantity 1e0 V 250..252 "1V"
+    Set temp 257..286
+      Doc 257..270 "/// The room."
+      Quantity 2.5e1 °C 281..286 "25°C"
+
+--- errors ---
+E-syntax MissingComma 182..185 "Pin" fix 185..185 ","
+E-syntax MissingComma 237..238 "}" fix 238..238 ","
+E-syntax MissingComma 250..252 "1V" fix 252..252 ","
+
+--- rendered ---
+error[E-syntax]: expected `,`
+  --> missing_comma.spl:3:14
+  |
+3 | block A { a: Pin b: Pin }
+  |              ^^^ entries are separated by `,`
+  |
+  = help: add `,` after this entry
+
+error[E-syntax]: expected `,`
+  --> missing_comma.spl:6:26
+  |
+6 |     vcc: Supply { v: 12V }
+  |                          ^ entries are separated by `,`
+  |
+  = help: add `,` after this entry
+
+error[E-syntax]: expected `,`
+  --> missing_comma.spl:7:12
+  |
+7 |     vin.v: 1V
+  |            ^^ entries are separated by `,`
+  |
+  = help: add `,` after this entry

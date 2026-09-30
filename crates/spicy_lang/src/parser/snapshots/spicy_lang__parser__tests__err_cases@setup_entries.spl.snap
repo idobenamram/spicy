@@ -1,0 +1,49 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1201
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/setup_entries.spl
+---
+File 0..312
+  Setup S for A 138..212
+    EntryError 158..171 "vcc Supply {}"
+    EntryError 177..185 "vin.: 1V"
+    Set temp 191..196
+      ExprError 196..196 ""
+    Set ok 203..209
+      Quantity 1e0 V 207..209 "1V"
+  ItemError 277..289 "setup T A {}"
+  Block A 291..311
+    Port vcc 301..309
+      Type Pin 306..309 "Pin"
+
+--- errors ---
+E-syntax Expected 162..168 "Supply"
+E-syntax Expected 181..182 ":"
+E-syntax Expected 197..198 ","
+E-syntax Expected 285..286 "A"
+
+--- rendered ---
+error[E-syntax]: expected `:`, found `Supply`
+  --> setup_entries.spl:4:9
+  |
+4 |     vcc Supply {},
+  |         ^^^^^^ expected `:`
+
+error[E-syntax]: expected a name, found `:`
+  --> setup_entries.spl:5:9
+  |
+5 |     vin.: 1V,
+  |         ^ expected a name
+
+error[E-syntax]: expected an expression, found `,`
+  --> setup_entries.spl:6:11
+  |
+6 |     temp: ,
+  |           ^ expected an expression
+
+error[E-syntax]: expected `for`, found `A`
+   --> setup_entries.spl:11:9
+   |
+11 | setup T A {}
+   |         ^ expected `for`

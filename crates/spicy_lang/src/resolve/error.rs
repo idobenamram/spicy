@@ -22,6 +22,7 @@ pub enum NameKind {
     Binding,
     Circuit,
     Contract,
+    Setup,
     Value,
 }
 
@@ -38,6 +39,7 @@ impl NameKind {
             NameKind::Binding => "a pin or field",
             NameKind::Circuit => "a circuit",
             NameKind::Contract => "a contract",
+            NameKind::Setup => "a setup",
             NameKind::Value => "a value",
         }
     }
@@ -72,10 +74,11 @@ pub enum ResolveErrorKind {
         expected: &'static str,
     },
     /// Two of a name where one is allowed: two blocks, two ports, a net and an instance
-    /// named alike, two circuits or contracts for one block, a pin bound twice.
+    /// named alike, two circuits or contracts for one block, two setups of one name for
+    /// one block, a pin bound twice.
     Duplicate { name: String, what: NameKind },
-    /// A `circuit` or `contract` (`what`) for a block that doesn't exist.
-    WithoutBlock { what: NameKind, name: String },
+    /// The block a `circuit`, `contract` or `setup` (`item`) is for doesn't exist.
+    UnknownBlock { item: NameKind, name: String },
     /// A placed block that has no `circuit`: there's nothing inside it to place.
     NoCircuit { block: String },
     /// A port type that isn't a signal type (`Bus`), or with the wrong arguments.
@@ -139,7 +142,7 @@ impl ResolveErrorKind {
         "UnknownName",
         "WrongNamespace",
         "Duplicate",
-        "WithoutBlock",
+        "UnknownBlock",
         "NoCircuit",
         "BadSignalType",
         "LetNotInstance",
@@ -167,7 +170,7 @@ impl DiagKind for ResolveErrorKind {
             UnknownName { .. } => "UnknownName",
             WrongNamespace { .. } => "WrongNamespace",
             Duplicate { .. } => "Duplicate",
-            WithoutBlock { .. } => "WithoutBlock",
+            UnknownBlock { .. } => "UnknownBlock",
             NoCircuit { .. } => "NoCircuit",
             BadSignalType { .. } => "BadSignalType",
             LetNotInstance => "LetNotInstance",
@@ -191,13 +194,9 @@ impl DiagKind for ResolveErrorKind {
     fn code(&self) -> &'static str {
         use ResolveErrorKind::*;
         match self {
-            UnknownName { .. } | WrongNamespace { .. } => "E-name",
+            UnknownName { .. } | WrongNamespace { .. } | UnknownBlock { .. } => "E-name",
             Duplicate { .. } => "E-duplicate",
-            WithoutBlock {
-                what: NameKind::Contract,
-                ..
-            } => "E-contract",
-            WithoutBlock { .. } | NoCircuit { .. } => "E-circuit",
+            NoCircuit { .. } => "E-circuit",
             BadSignalType { .. } => "E-type",
             LetNotInstance => "E-let",
             UnknownField { .. } | Missing { .. } | NotANet { .. } | BadMerge => "E-binding",
@@ -263,7 +262,7 @@ impl DiagKind for ResolveErrorKind {
                     "second time".to_string(),
                     vec![],
                 ),
-                NameKind::Block | NameKind::Port => (
+                NameKind::Block | NameKind::Port | NameKind::Setup => (
                     format!("{} `{name}` is defined twice", what.noun()),
                     "second definition".to_string(),
                     vec![],
@@ -275,13 +274,14 @@ impl DiagKind for ResolveErrorKind {
                     vec![],
                 ),
             },
-            WithoutBlock { what, name } => {
-                let note = match what {
+            UnknownBlock { item, name } => {
+                let note = match item {
                     NameKind::Contract => "note: a contract describes the block of the same name",
+                    NameKind::Setup => "note: a setup is for the block named after `for`",
                     _ => "note: a circuit is the inside of the block of the same name",
                 };
                 (
-                    format!("{} for an unknown block `{name}`", what.noun()),
+                    format!("{} for an unknown block `{name}`", item.noun()),
                     "no block with this name".to_string(),
                     vec![note.to_string()],
                 )

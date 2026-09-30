@@ -1,10 +1,10 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1088
+assertion_line: 1201
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/unclosed_block.spl
 ---
-File 0..154
+File 0..308
   Block A 68..85
     Port a 78..84
       Type Pin 81..84 "Pin"
@@ -16,10 +16,19 @@ File 0..154
       Range a..=b 145..150
         Quantity 1e0 145..146 "1"
         Quantity 2e0 149..150 "2"
+  Contract B 230..289
+    Setup = S 247..257
+    pub Spec s Within 262..289
+      Path x 274..275 "x"
+      Range a..=b 283..288
+        Quantity 1e0 283..284 "1"
+        Quantity 2e0 287..288 "2"
+  Setup S for B 291..307
 
 --- errors ---
 E-syntax Unclosed 87..94 "circuit" related 76..77
 E-syntax Unclosed 111..119 "contract" related 97..98
+E-syntax Unclosed 291..296 "setup" related 241..242
 
 --- rendered ---
 error[E-syntax]: expected `}`
@@ -39,3 +48,12 @@ error[E-syntax]: expected `}`
   .
 7 | contract A {
   | ^^^^^^^^ expected `}` here
+
+error[E-syntax]: expected `}`
+   --> unclosed_block.spl:16:1
+   |
+12 | contract B {
+   |            - …to close this
+   .
+16 | setup S for B {}
+   | ^^^^^ expected `}` here

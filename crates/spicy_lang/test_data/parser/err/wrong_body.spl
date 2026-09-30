@@ -1,5 +1,5 @@
 circuit A {
-    assume vcc.v within 12V ± 5%;
+    setup = Operating;
     spec s: x within 1..=2;
 }
 

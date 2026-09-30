@@ -191,8 +191,8 @@ pub enum KnobSource {
 pub enum KnobKind {
     /// A part's spread: a random variation across the parts built.
     Statistical,
-    /// An operating condition the design must meet everywhere in (an `assume`, the
-    /// environment's temperature). From contracts, M1d-5.
+    /// An operating condition the design must meet everywhere in (a setup's range, an
+    /// `env` such as the ambient temperature). From setups, M1d-5.
     Range,
 }
 

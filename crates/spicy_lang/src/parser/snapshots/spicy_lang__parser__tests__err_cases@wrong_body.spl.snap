@@ -1,36 +1,31 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1088
+assertion_line: 1197
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/wrong_body.spl
 ---
-File 0..104
-  Circuit A 0..76
-    Assume Within 16..46
-      Field .v 23..28
-        Path vcc 23..26 "vcc"
-      Binary Tol 36..45
-        Quantity 1.2e1 V 36..39 "12V"
-        Quantity 5e0 % 43..45 "5%"
-    Spec s Within 51..74
-      Path x 59..60 "x"
-      Range a..=b 68..73
-        Quantity 1e0 68..69 "1"
-        Quantity 2e0 72..73 "2"
-  Contract A 78..103
-    Net n 95..101
+File 0..92
+  Circuit A 0..64
+    Setup = Operating 16..34
+    Spec s Within 39..62
+      Path x 47..48 "x"
+      Range a..=b 56..61
+        Quantity 1e0 56..57 "1"
+        Quantity 2e0 60..61 "2"
+  Contract A 66..91
+    Net n 83..89
 
 --- errors ---
-E-wrong-body WrongBody 16..22 "assume"
-E-wrong-body WrongBody 51..55 "spec"
-E-wrong-body WrongBody 95..98 "net"
+E-wrong-body WrongBody 16..21 "setup"
+E-wrong-body WrongBody 39..43 "spec"
+E-wrong-body WrongBody 83..86 "net"
 
 --- rendered ---
-error[E-wrong-body]: `assume` doesn't belong in a `circuit`
+error[E-wrong-body]: `setup` doesn't belong in a `circuit`
   --> wrong_body.spl:2:5
   |
-2 |     assume vcc.v within 12V ± 5%;
-  |     ^^^^^^ `assume` belongs in the contract
+2 |     setup = Operating;
+  |     ^^^^^ `setup` belongs in the contract
 
 error[E-wrong-body]: `spec` doesn't belong in a `circuit`
   --> wrong_body.spl:3:5

@@ -1,18 +1,26 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1059
+assertion_line: 1201
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/reserved.spl
 ---
-File 0..63
+File 0..145
   ItemError 0..14 "fn helper() {}"
   Circuit A 16..62
     StmtError 32..48 "for i in 0..N {}"
     Net ok 53..60
+  Contract A 64..144
+    StmtError 81..113 "rated vin.v within -0.3V..=6.5V;"
+    Spec ok Within 118..142
+      Path x 127..128 "x"
+      Range a..=b 136..141
+        Quantity 1e0 136..137 "1"
+        Quantity 2e0 140..141 "2"
 
 --- errors ---
 E-reserved Reserved 0..2 "fn"
 E-reserved Reserved 32..35 "for"
+E-reserved Reserved 81..86 "rated"
 
 --- rendered ---
 error[E-reserved]: `fn` isn't supported yet
@@ -26,3 +34,9 @@ error[E-reserved]: `for` isn't supported yet
   |
 4 |     for i in 0..N {}
   |     ^^^ reserved for a later version of the language
+
+error[E-reserved]: `rated` isn't supported yet
+  --> reserved.spl:9:5
+  |
+9 |     rated vin.v within -0.3V..=6.5V;
+  |     ^^^^^ reserved for a later version of the language

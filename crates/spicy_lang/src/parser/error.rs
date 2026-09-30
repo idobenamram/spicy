@@ -18,25 +18,32 @@ pub enum ParseErrorKind {
     },
     /// #1: a statement that isn't closed by `;`.
     MissingSemi,
+    /// `block A { a: Pin b: Pin }`: an entry of a comma list in braces with no `,` before
+    /// the next one.
+    MissingComma,
     /// `circuit Child net a; }`: an item's contents without the `{` before them.
     MissingBrace,
     /// #21: `(`, `[` or `{` never closed; the opener is the error's `related` span.
     Unclosed { closer: &'static str },
     /// Top-level text that isn't an item.
     ExpectedItem { found: String },
-    /// `pub circuit A { … }`: only a block can be `pub`.
+    /// `pub circuit A { … }`: only a block or a spec can be `pub`.
     PubNotAllowed,
     /// #19: `fn`, `for`, … are reserved for later.
     Reserved { word: String },
     /// #18: `let net = …`
     KeywordAsName { keyword: String },
-    /// #20: `assume` in a `circuit`, `net` in a `contract`.
-    WrongBody { stmt: &'static str, body: BodyKind },
+    /// #20: `spec` in a `circuit`, `net` in a `contract`. `home` is where it belongs.
+    WrongBody {
+        stmt: &'static str,
+        body: BodyKind,
+        home: BodyKind,
+    },
     /// #17: `spec dc(out.v) within …;`
     SpecNeedsName,
     /// #16: `Resistor { a = vcc }`
     FieldEquals,
-    /// An `assume` or `spec` whose top level isn't `within`, `<`, `<=`, `>` or `>=`.
+    /// A `spec` whose top level isn't `within`, `<`, `<=`, `>` or `>=`.
     NotARelation,
     /// #4: `capacity / 2h ± 10%`. Both readings, written out:
     /// `(capacity / 2h) ± 10%` and `capacity / (2h ± 10%)`.
@@ -65,6 +72,7 @@ impl ParseErrorKind {
     pub const ALL_NAMES: &'static [&'static str] = &[
         "Expected",
         "MissingSemi",
+        "MissingComma",
         "MissingBrace",
         "Unclosed",
         "ExpectedItem",
@@ -90,6 +98,7 @@ impl DiagKind for ParseErrorKind {
         match self {
             ParseErrorKind::Expected { .. } => "Expected",
             ParseErrorKind::MissingSemi => "MissingSemi",
+            ParseErrorKind::MissingComma => "MissingComma",
             ParseErrorKind::MissingBrace => "MissingBrace",
             ParseErrorKind::Unclosed { .. } => "Unclosed",
             ParseErrorKind::ExpectedItem { .. } => "ExpectedItem",
@@ -122,6 +131,7 @@ impl DiagKind for ParseErrorKind {
         match self {
             ParseErrorKind::Expected { .. }
             | ParseErrorKind::MissingSemi
+            | ParseErrorKind::MissingComma
             | ParseErrorKind::MissingBrace
             | ParseErrorKind::Unclosed { .. }
             | ParseErrorKind::ExpectedItem { .. }
@@ -160,6 +170,11 @@ impl DiagKind for ParseErrorKind {
                 "statements end with `;`".to_string(),
                 vec!["help: add `;` at the end of this statement".to_string()],
             ),
+            ParseErrorKind::MissingComma => (
+                "expected `,`".to_string(),
+                "entries are separated by `,`".to_string(),
+                vec!["help: add `,` after this entry".to_string()],
+            ),
             ParseErrorKind::MissingBrace => (
                 "expected `{`".to_string(),
                 "`{` goes after the name".to_string(),
@@ -173,10 +188,14 @@ impl DiagKind for ParseErrorKind {
             ParseErrorKind::ExpectedItem { found } => (
                 format!("expected an item, found {found}"),
                 "not an item".to_string(),
-                vec!["note: a file holds `block`, `circuit` and `contract` items".to_string()],
+                vec![
+                    "note: a file holds `block`, `circuit`, `setup`, `contract`, `env` and \
+                     `const` items"
+                        .to_string(),
+                ],
             ),
             ParseErrorKind::PubNotAllowed => (
-                "only a block can be `pub`".to_string(),
+                "only a block or a spec can be `pub`".to_string(),
                 "remove `pub`".to_string(),
                 vec![],
             ),
@@ -190,17 +209,11 @@ impl DiagKind for ParseErrorKind {
                 "can't be used as a name".to_string(),
                 vec!["help: choose another name".to_string()],
             ),
-            ParseErrorKind::WrongBody { stmt, body } => {
-                let (body, belongs) = match body {
-                    BodyKind::Circuit => ("circuit", "the contract"),
-                    BodyKind::Contract => ("contract", "the circuit"),
-                };
-                (
-                    format!("`{stmt}` doesn't belong in a `{body}`"),
-                    format!("`{stmt}` belongs in {belongs}"),
-                    vec![],
-                )
-            }
+            ParseErrorKind::WrongBody { stmt, body, home } => (
+                format!("`{stmt}` doesn't belong in a `{}`", body.keyword()),
+                format!("`{stmt}` belongs in the {}", home.keyword()),
+                vec![],
+            ),
             ParseErrorKind::SpecNeedsName => (
                 "a spec needs a name".to_string(),
                 "expected a name before the measure".to_string(),

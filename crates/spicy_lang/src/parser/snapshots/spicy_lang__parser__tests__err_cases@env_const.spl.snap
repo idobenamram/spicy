@@ -1,0 +1,49 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1201
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/err/env_const.spl
+---
+File 0..200
+  ItemError 62..89 "env a Temperature in 1..=2;"
+  ItemError 90..115 "env b: Temperature 1..=2;"
+  ItemError 116..145 "const c: Confidence sigma(3);"
+  Env ok 146..175
+    Type Temperature 154..165 "Temperature"
+    Range a..=b 169..174
+      Quantity 1e0 169..170 "1"
+      Quantity 2e0 173..174 "2"
+  Const d 176..199
+    Type Confidence 185..195 "Confidence"
+    ExprError 197..197 ""
+
+--- errors ---
+E-syntax Expected 68..79 "Temperature"
+E-syntax Expected 109..110 "1"
+E-syntax Expected 136..141 "sigma"
+E-syntax Expected 198..199 ";"
+
+--- rendered ---
+error[E-syntax]: expected `:`, found `Temperature`
+  --> env_const.spl:2:7
+  |
+2 | env a Temperature in 1..=2;
+  |       ^^^^^^^^^^^ expected `:`
+
+error[E-syntax]: expected `in`, found `1`
+  --> env_const.spl:3:20
+  |
+3 | env b: Temperature 1..=2;
+  |                    ^ expected `in`
+
+error[E-syntax]: expected `=`, found `sigma`
+  --> env_const.spl:4:21
+  |
+4 | const c: Confidence sigma(3);
+  |                     ^^^^^ expected `=`
+
+error[E-syntax]: expected an expression, found `;`
+  --> env_const.spl:6:23
+  |
+6 | const d: Confidence = ;
+  |                       ^ expected an expression

@@ -39,8 +39,8 @@ pub struct Design {
     pub contracts: Vec<Option<Contract>>,
 }
 
-/// A block's contract. Its contents (assumptions, measures, specs) are resolved in the
-/// next step (model.md E24, roadmap M1d-5).
+/// A block's contract. Its contents (its default setup, measures, specs) are resolved
+/// in the next step (model.md E24, roadmap M1d-5).
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Contract {}
 

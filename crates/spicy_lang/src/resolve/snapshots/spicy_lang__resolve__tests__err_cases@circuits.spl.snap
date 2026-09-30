@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 621
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/circuits.spl
 ---
@@ -22,7 +22,7 @@ block Unused 318..324
 
 --- errors ---
 E-circuit NoCircuit 211..220 "Interface"
-E-circuit WithoutBlock 402..409 "Nowhere"
+E-name UnknownBlock 402..409 "Nowhere"
 E-duplicate Duplicate 434..437 "Top" related 193..196
 
 --- rendered ---
@@ -34,7 +34,7 @@ error[E-circuit]: block `Interface` has no circuit
   |
   = help: write `circuit Interface { … }` with its nets and parts
 
-error[E-circuit]: circuit for an unknown block `Nowhere`
+error[E-name]: circuit for an unknown block `Nowhere`
    --> circuits.spl:15:9
    |
 15 | circuit Nowhere {

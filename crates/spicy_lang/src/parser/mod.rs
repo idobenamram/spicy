@@ -3,8 +3,9 @@
 //! becomes `Error` nodes that keep their spans, and every problem is collected.
 //!
 //! One function per rule of grammar.md §3, in this file's order: `file` → `item` →
-//! `block_decl` → `port`, or `body` → `stmts` → `stmt` → `net_stmt` … `spec_stmt`, then
-//! `expr` (`expr.rs`: `expr_bp` → `unary` → `postfix` → `primary`).
+//! `block_decl`, `setup_decl` (each through `entries` → `with_docs`), `value_decl`
+//! (`env`, `const`), or `body` → `stmts` → `with_docs` → `stmt` → `net_stmt` …
+//! `spec_stmt`, then `expr` (`expr.rs`: `expr_bp` → `unary` → `postfix` → `primary`).
 //!
 //! How an error travels (decision A8):
 //! - **Fatal:** a rule that can't go on records its error and returns `Err(Reported)`. `?`
@@ -31,7 +32,8 @@ use spicy_span::Span;
 use crate::lexer::{LexError, TokenIdx, TokenKind, Tokens, check, lookalike, scan};
 use ast::{
     Attribute, BinOp, BlockDecl, BlockEntry, Body, BodyKind, Expr, ExprKind, File, Ident, Item,
-    ItemKind, Node, Path, Relation, Stmt, StmtKind, Type, TypeKind,
+    ItemKind, Key, Node, Path, Relation, SetupDecl, SetupEntry, Stmt, StmtKind, Type, TypeKind,
+    ValueDecl,
 };
 use spicy_errors::Render;
 
@@ -196,34 +198,51 @@ impl<'t, 'src> Parser<'t, 'src> {
         }
     }
 
-    /// `item = { DOC } { attribute } [ "pub" ] ( block | circuit | contract )`, or `None`
-    /// when only doc comments or attributes are left before the end of the file. `pub`
-    /// on anything but a block is reported, and the item is read on.
+    /// `item = { DOC } { attribute } [ "pub" ] ( block | circuit | setup | contract |
+    /// env | const )`, or `None` when only doc comments, attributes or `pub` are left
+    /// before the end of the file. `pub` on an item that can't be `pub` is reported, and
+    /// the item is read on.
     fn item(&mut self) -> PResult<Option<Item<'src>>> {
+        use TokenKind::*;
         let start = self.span().start;
         let (docs, attrs) = self.docs_and_attrs()?;
-        let public = self.eat(TokenKind::KwPub);
+        let public = self.eat(KwPub);
+        // Only a block can be `pub`: before another item, or the end of the file, it's
+        // reported. Before text that isn't an item, that text's own error says enough.
         if let Some(public) = public
-            && self.peek() != TokenKind::KwBlock
+            && matches!(
+                self.peek(),
+                KwCircuit | KwSetup | KwContract | KwEnv | KwConst | Eof
+            )
         {
-            let removal = Span::new(public.start, self.span().start);
-            let error = ParseError::new(ParseErrorKind::PubNotAllowed, public);
-            self.errors.push(error.with_fix(removal, ""));
+            self.pub_not_allowed(public);
         }
         let kind = match self.peek() {
-            TokenKind::KwBlock => {
+            KwBlock => {
                 self.bump();
                 ItemKind::Block(self.block_decl(public)?)
             }
-            TokenKind::KwCircuit => {
+            KwCircuit => {
                 self.bump();
                 ItemKind::Circuit(self.body(BodyKind::Circuit)?)
             }
-            TokenKind::KwContract => {
+            KwSetup => {
+                self.bump();
+                ItemKind::Setup(self.setup_decl()?)
+            }
+            KwContract => {
                 self.bump();
                 ItemKind::Contract(self.body(BodyKind::Contract)?)
             }
-            TokenKind::Eof => {
+            KwEnv => {
+                self.bump();
+                ItemKind::Env(self.value_decl(KwIn, "`in`")?)
+            }
+            KwConst => {
+                self.bump();
+                ItemKind::Const(self.value_decl(Eq, "`=`")?)
+            }
+            Eof => {
                 self.unattached(&docs, &attrs, "an item after the attribute")?;
                 return Ok(None);
             }
@@ -241,30 +260,18 @@ impl<'t, 'src> Parser<'t, 'src> {
         }))
     }
 
-    /// `Name { ports }`, after `block`. Each port is `name: Type`, separated by `,`; a
-    /// broken one becomes a `BlockEntry::Error` over the text skipped to the next `,`,
-    /// and the others are kept. The `{` and `}` are handled as a body's are.
+    /// `Name { ports }`, after `block`. Each port is `name: Type`; a type that doesn't
+    /// parse becomes a `TypeKind::Error`, and the port keeps its name.
     fn block_decl(&mut self, public: Option<Span>) -> PResult<BlockDecl<'src>> {
-        use TokenKind::{Colon, Comma, DocComment, Ident, Pound};
         let reported = self.errors.len();
         let name = self.name()?;
-        let starts_port = |p: &Self| {
-            matches!(p.peek(), DocComment | Pound) || (p.peek() == Ident && p.nth(1) == Colon)
-        };
-        let open = self.open_brace(&name, starts_port)?;
-        let mut ports = Vec::new();
-        while !ends_body(self.peek()) {
-            let start = self.pos;
-            match self.port() {
-                Ok(Some(port)) => ports.push(port),
-                Ok(None) => break,
-                Err(reported) => {
-                    let span = self.recover(start, Level::Entry);
-                    ports.push(error_node(BlockEntry::Error(reported), span));
-                }
-            }
-            self.eat(Comma);
-        }
+        let open = self.open_brace(name.span, Self::at_entry_start)?;
+        let ports = self.entries("a port after the attribute", BlockEntry::Error, |p| {
+            let name = p.name()?;
+            p.expect(TokenKind::Colon, "`:`")?;
+            let ty = p.rhs(Level::Entry, Self::ty, error_type);
+            Ok(BlockEntry::Port { name, ty })
+        });
         self.close_body(open);
         let broken = Reported::among(&self.errors[reported..]);
         Ok(BlockDecl {
@@ -275,35 +282,107 @@ impl<'t, 'src> Parser<'t, 'src> {
         })
     }
 
-    /// `{ DOC } { attribute } name: Type`, up to the `,` or `}` after it, or `None` when
-    /// only doc comments or attributes are left before the `}`. A type that doesn't
-    /// parse becomes a `TypeKind::Error`, and the port keeps its name.
-    fn port(&mut self) -> PResult<Option<Node<'src, BlockEntry<'src>>>> {
+    /// `Name for Block { entries }`, after `setup`. Each entry is `key: value`; a value
+    /// that doesn't parse becomes an `ExprKind::Error`, and the entry keeps its key.
+    fn setup_decl(&mut self) -> PResult<SetupDecl<'src>> {
+        use TokenKind::{Colon, KwFor};
+        let reported = self.errors.len();
+        let name = self.name()?;
+        self.expect(KwFor, "`for`")?;
+        let block = self.path()?;
+        let open = self.open_brace(block.span, Self::at_entry_start)?;
+        let entries = self.entries("an entry after the attribute", SetupEntry::Error, |p| {
+            let key = p.key()?;
+            p.expect(Colon, "`:`")?;
+            let value = p.rhs(Level::Entry, Self::expr, error_expr);
+            Ok(SetupEntry::Set { key, value })
+        });
+        self.close_body(open);
+        let broken = Reported::among(&self.errors[reported..]);
+        Ok(SetupDecl {
+            name,
+            block,
+            entries,
+            broken,
+        })
+    }
+
+    /// A setup entry's key: `vcc`, `vin.v`, `temp`.
+    fn key(&mut self) -> PResult<Key<'src>> {
+        let mut segments = vec![self.name()?];
+        while self.eat(TokenKind::Dot).is_some() {
+            segments.push(self.name()?);
+        }
+        let span = Span::new(segments[0].span.start, self.prev_end());
+        Ok(Key { segments, span })
+    }
+
+    /// The entries of a comma list in braces (a block's ports, a setup's entries), up to
+    /// its `}`, each read by `with_docs` with `kind`. A broken one becomes
+    /// `error(reported)` over the text skipped to the next `,` (`Level::Entry`), and the
+    /// others are kept.
+    fn entries<K>(
+        &mut self,
+        what: &'static str,
+        error: fn(Reported) -> K,
+        mut kind: impl FnMut(&mut Self) -> PResult<K>,
+    ) -> Vec<Node<'src, K>> {
+        let mut entries = Vec::new();
+        while !self.at_body_end() {
+            let start = self.pos;
+            match self.with_docs(what, &mut kind) {
+                Ok(Some(entry)) => entries.push(entry),
+                Ok(None) => break,
+                Err(reported) => {
+                    let span = self.recover(start, Level::Entry);
+                    entries.push(error_node(error(reported), span));
+                }
+            }
+            self.eat(TokenKind::Comma);
+        }
+        entries
+    }
+
+    /// `{ DOC } { attribute }`, then what `kind` reads: one entry or statement, as a node
+    /// with its doc comments, attributes and span. `None` when only doc comments or
+    /// attributes are left before the end of the body; `what` is expected after the
+    /// attributes.
+    fn with_docs<K>(
+        &mut self,
+        what: &'static str,
+        kind: impl FnOnce(&mut Self) -> PResult<K>,
+    ) -> PResult<Option<Node<'src, K>>> {
         let start = self.span().start;
         let (docs, attrs) = self.docs_and_attrs()?;
-        if ends_body(self.peek()) {
-            self.unattached(&docs, &attrs, "a port after the attribute")?;
+        if self.at_body_end() {
+            self.unattached(&docs, &attrs, what)?;
             return Ok(None);
         }
-        let name = self.name()?;
-        self.expect(TokenKind::Colon, "`:`")?;
-        let ty = self.rhs(Level::Entry, Self::ty, |reported, span| Type {
-            kind: TypeKind::Error(reported),
-            span,
-        });
+        let kind = kind(self)?;
         Ok(Some(Node {
             docs,
             attrs,
-            kind: BlockEntry::Port { name, ty },
+            kind,
             span: Span::new(start, self.prev_end()),
         }))
+    }
+
+    /// `name: Type in range;` after `env`, or `name: Type = value;` after `const`: `sep`
+    /// is the `in` or the `=`, and `what` says it in errors (as `expect`'s).
+    fn value_decl(&mut self, sep: TokenKind, what: &'static str) -> PResult<ValueDecl<'src>> {
+        let name = self.name()?;
+        self.expect(TokenKind::Colon, "`:`")?;
+        let ty = self.ty()?;
+        self.expect(sep, what)?;
+        let value = self.rhs(Level::Value, Self::expr, error_expr);
+        Ok(ValueDecl { name, ty, value })
     }
 
     /// `Name { statements }`, after `circuit` or `contract`.
     fn body(&mut self, which: BodyKind) -> PResult<Body<'src>> {
         let reported = self.errors.len();
         let name = self.name()?;
-        let open = self.open_brace(&name, |p| starts_stmt(p.peek()))?;
+        let open = self.open_brace(name.span, Self::at_stmt_start)?;
         let stmts = self.stmts(which);
         self.close_body(open);
         let broken = Reported::among(&self.errors[reported..]);
@@ -314,24 +393,18 @@ impl<'t, 'src> Parser<'t, 'src> {
         })
     }
 
-    /// The `{` after an item's name. A missing one, when what follows starts the item's
-    /// contents (`starts_contents`) or is its `}`, is reported with the insertion and
-    /// the item is read on, so it keeps its name (a soft error, like a missing `;`).
-    fn open_brace(
-        &mut self,
-        name: &Ident,
-        starts_contents: impl Fn(&Self) -> bool,
-    ) -> PResult<Span> {
+    /// The `{` after an item's head, which ends at `head`. A missing one, when what
+    /// follows starts the item's contents (`starts_contents`) or is its `}`, is reported
+    /// at `head` with the insertion, and the item is read on, so it keeps its name (a
+    /// soft error, like a missing `;`).
+    fn open_brace(&mut self, head: Span, starts_contents: impl Fn(&Self) -> bool) -> PResult<Span> {
         if let Some(open) = self.eat(TokenKind::LBrace) {
             return Ok(open);
         }
         if !starts_contents(self) && self.peek() != TokenKind::RBrace {
             return Err(self.expected("`{`"));
         }
-        let at = Span::new(name.span.end, name.span.end);
-        let error = ParseError::new(ParseErrorKind::MissingBrace, name.span);
-        self.errors.push(error.with_fix(at, " {"));
-        Ok(at)
+        Ok(self.error_inserting(ParseErrorKind::MissingBrace, head, " {"))
     }
 
     /// The `}` that closes an item opened at `open`. A missing one at the end of the
@@ -348,9 +421,9 @@ impl<'t, 'src> Parser<'t, 'src> {
     /// broken statement becomes a `StmtKind::Error` over the text skipped to recover.
     fn stmts(&mut self, body: BodyKind) -> Vec<Stmt<'src>> {
         let mut stmts = Vec::new();
-        while !ends_body(self.peek()) {
+        while !self.at_body_end() {
             let start = self.pos;
-            match self.stmt(body) {
+            match self.with_docs("a statement after the attribute", |p| p.stmt(body)) {
                 Ok(Some(stmt)) => stmts.push(stmt),
                 Ok(None) => break,
                 Err(reported) => {
@@ -362,40 +435,36 @@ impl<'t, 'src> Parser<'t, 'src> {
         stmts
     }
 
-    /// `{ DOC } { attribute } ( net | let | assume | spec )`, or `None` when only doc
-    /// comments or attributes are left before the end of the body.
-    fn stmt(&mut self, body: BodyKind) -> PResult<Option<Stmt<'src>>> {
+    /// `net | let | setup = … | [ pub ] spec`, after the statement's doc comments and
+    /// attributes (`with_docs`).
+    fn stmt(&mut self, body: BodyKind) -> PResult<StmtKind<'src>> {
         use TokenKind::*;
-        let start = self.span().start;
-        let (docs, attrs) = self.docs_and_attrs()?;
+        let public = self.eat(KwPub);
         let keyword = self.peek();
-        if ends_body(keyword) {
-            self.unattached(&docs, &attrs, "a statement after the attribute")?;
-            return Ok(None);
+        // Only a spec can be `pub`: before another statement it's reported, and the
+        // statement is read on. Before text that isn't a statement, that text's own error
+        // says enough.
+        if let Some(public) = public
+            && keyword != KwSpec
+            && self.at_stmt_keyword()
+        {
+            self.pub_not_allowed(public);
         }
         // A statement in the wrong body is reported, and still parsed.
         if let Some((stmt, home)) = home_body(keyword)
             && home != body
         {
-            self.error_here(ParseErrorKind::WrongBody { stmt, body });
+            self.error_here(ParseErrorKind::WrongBody { stmt, body, home });
         }
         // Each reads through its `;`.
-        let kind = match keyword {
-            KwNet => self.net_stmt()?,
-            KwLet => self.let_stmt()?,
-            KwAssume => self.assume_stmt()?,
-            KwSpec => self.spec_stmt()?,
-            kind if is_reserved(kind) => return Err(self.reserved()),
-            _ => {
-                return Err(self.expected("a statement (`net`, `let`, `assume` or `spec`)"));
-            }
-        };
-        Ok(Some(Stmt {
-            docs,
-            attrs,
-            kind,
-            span: Span::new(start, self.prev_end()),
-        }))
+        match keyword {
+            KwNet => self.net_stmt(),
+            KwLet => self.let_stmt(),
+            KwSetup => self.default_setup_stmt(),
+            KwSpec => self.spec_stmt(public),
+            kind if is_reserved(kind) => Err(self.reserved()),
+            _ => Err(self.expected("a statement (`net`, `let`, `setup` or `spec`)")),
+        }
     }
 
     /// `net name;` or `net name = merge;`
@@ -421,12 +490,13 @@ impl<'t, 'src> Parser<'t, 'src> {
         Ok(StmtKind::Let { name, value })
     }
 
-    /// A right-hand side, then what ends it: a statement's value and its `;`
-    /// (`Level::Value`), or a port's type and the `,` or `}` after it (`Level::Entry`).
-    /// When the value doesn't parse, or something else follows it (`let z = 1 2;`), it
-    /// becomes an `Error` node over the text up to the end, and its statement or port
-    /// keeps its name: `net base = [g g];` still declares `base`, so its uses aren't
-    /// reported again (rustc: "we still want a field even if its expr didn't parse").
+    /// A right-hand side, then what ends it: the value of a statement, an `env` or a
+    /// `const`, and its `;` (`Level::Value`), or an entry's type or value and the `,` or
+    /// `}` after it (`Level::Entry`). When the value doesn't parse, or something else
+    /// follows it (`let z = 1 2;`), it becomes an `Error` node over the text up to the
+    /// end, and what it belongs to keeps its name: `net base = [g g];` still declares
+    /// `base`, so its uses aren't reported again (rustc: "we still want a field even if
+    /// its expr didn't parse").
     fn rhs<T>(
         &mut self,
         level: Level,
@@ -451,24 +521,21 @@ impl<'t, 'src> Parser<'t, 'src> {
     fn end_of(&mut self, level: Level) -> PResult<()> {
         match level {
             Level::Value => self.semi(),
-            _ if self.peek() == TokenKind::Comma || ends_body(self.peek()) => Ok(()),
-            _ => Err(self.expected("`,` or `}`")),
+            _ => self.comma(),
         }
     }
 
-    /// `assume relation;`
-    fn assume_stmt(&mut self) -> PResult<StmtKind<'src>> {
-        self.bump(); // `assume`
-        let kind = match self.relation()? {
-            Ok(relation) => StmtKind::Assume { relation },
-            Err(reported) => StmtKind::Error(reported),
-        };
+    /// `setup = Name;`: the contract's default setup.
+    fn default_setup_stmt(&mut self) -> PResult<StmtKind<'src>> {
+        self.bump(); // `setup`
+        self.expect(TokenKind::Eq, "`=`")?; // `setup:` or `setup;` reaches here too
+        let setup = self.path()?;
         self.semi()?;
-        Ok(kind)
+        Ok(StmtKind::DefaultSetup { setup })
     }
 
-    /// `spec name: relation`
-    fn spec_stmt(&mut self) -> PResult<StmtKind<'src>> {
+    /// `[ pub ] spec name: relation`, after the `pub` if there is one.
+    fn spec_stmt(&mut self, public: Option<Span>) -> PResult<StmtKind<'src>> {
         use TokenKind::{Colon, Ident};
         self.bump(); // `spec`
         // A keyword before the `:` is a bad name, not a missing one (`name` reports it),
@@ -481,15 +548,19 @@ impl<'t, 'src> Parser<'t, 'src> {
         let name = self.name()?;
         self.expect(Colon, "`:`")?;
         let kind = match self.relation()? {
-            Ok(relation) => StmtKind::Spec { name, relation },
+            Ok(relation) => StmtKind::Spec {
+                public,
+                name,
+                relation,
+            },
             Err(reported) => StmtKind::Error(reported),
         };
         self.semi()?;
         Ok(kind)
     }
 
-    /// The expression of an `assume` or `spec`, split at its top-level relation. `None`
-    /// when the top isn't one: reported, but a soft error, so the statement becomes
+    /// The expression of a `spec`, split at its top-level relation. The inner `Err` when
+    /// the top isn't one: reported, but a soft error, so the statement becomes
     /// `StmtKind::Error` and its `;` is still read.
     fn relation(&mut self) -> PResult<Result<Relation<'src>, Reported>> {
         let expr = self.expr()?;
@@ -517,13 +588,27 @@ impl<'t, 'src> Parser<'t, 'src> {
         if self.eat(TokenKind::Semi).is_some() {
             return Ok(());
         }
-        let next = self.peek();
-        if starts_stmt(next) || ends_body(next) {
+        if self.at_stmt_start() || self.at_body_end() {
             let last = self.span_at(self.pos - 1);
             self.error_inserting(ParseErrorKind::MissingSemi, last, ";");
             return Ok(());
         }
         Err(self.expected("`;`"))
+    }
+
+    /// The `,` or `}` after an entry, left to its list. If the next token starts an
+    /// entry, a missing `,` is reported with an insertion fix and parsing goes on (a soft
+    /// error, as `semi`'s; rustc's "try adding a comma"), so the next entry is kept.
+    fn comma(&mut self) -> PResult<()> {
+        if self.peek() == TokenKind::Comma || self.at_body_end() {
+            return Ok(());
+        }
+        if self.at_entry_start() {
+            let last = self.span_at(self.pos - 1);
+            self.error_inserting(ParseErrorKind::MissingComma, last, ",");
+            return Ok(());
+        }
+        Err(self.expected("`,` or `}`"))
     }
 
     // --- Recovery ----------------------------------------------------------------
@@ -562,7 +647,7 @@ impl<'t, 'src> Parser<'t, 'src> {
                 // braces opened after it. Not at a statement's or item's own first token,
                 // so that is always consumed; a value or an entry may be empty (`let r =`
                 // before the next statement).
-                _ if level.resumes_at(kind)
+                _ if level.resumes_at(self)
                     && at >= failed_at
                     && braces_after == 0
                     && (at > start || matches!(level, Level::Value | Level::Entry)) =>
@@ -770,6 +855,14 @@ impl<'t, 'src> Parser<'t, 'src> {
         self.errors.push(error.with_fix(span, text));
     }
 
+    /// `pub` where it means nothing (`pub circuit`): reported, with its removal (and the
+    /// space after it) as the fix.
+    fn pub_not_allowed(&mut self, public: Span) {
+        let removal = Span::new(public.start, self.span().start);
+        let error = ParseError::new(ParseErrorKind::PubNotAllowed, public);
+        self.errors.push(error.with_fix(removal, ""));
+    }
+
     /// Records a soft error at the current token.
     fn error_here(&mut self, kind: ParseErrorKind) {
         let span = self.span();
@@ -905,6 +998,14 @@ fn error_node<'src, K>(kind: K, span: Span) -> Node<'src, K> {
     }
 }
 
+/// A type that didn't parse, over the text skipped (see `rhs`).
+fn error_type<'src>(reported: Reported, span: Span) -> Type<'src> {
+    Type {
+        kind: TypeKind::Error(reported),
+        span,
+    }
+}
+
 /// A value that didn't parse, over the text skipped (see `rhs`).
 fn error_expr<'src>(reported: Reported, span: Span) -> Expr<'src> {
     Expr {
@@ -920,20 +1021,20 @@ enum Level {
     Item,
     /// A whole statement, through its `;` or up to the next statement or item.
     Stmt,
-    /// A statement's right-hand side: the rest of the statement, up to its `;`, which is
-    /// left to the statement. Unlike a statement, it may be empty.
+    /// A statement's right-hand side (or an `env`'s or a `const`'s): the rest of it, up
+    /// to its `;`, which is left to the statement. Unlike a statement, it may be empty.
     Value,
-    /// An entry of a comma list in braces (a block's port), or the rest of it after its
-    /// name: up to the next `,` or the `}`.
+    /// An entry of a comma list in braces (a block's port, a setup's entry), or the rest
+    /// of it after its name: up to the next `,` or the `}`.
     Entry,
 }
 
 impl Level {
-    /// Whether `kind` starts what comes next at this level.
-    fn resumes_at(self, kind: TokenKind) -> bool {
+    /// Whether what comes next at this level starts at `p`'s current token.
+    fn resumes_at(self, p: &Parser) -> bool {
         match self {
-            Level::Item | Level::Entry => starts_item(kind),
-            Level::Stmt | Level::Value => starts_item(kind) || is_stmt_keyword(kind),
+            Level::Item | Level::Entry => p.at_item_start(),
+            Level::Stmt | Level::Value => p.at_item_start() || p.at_stmt_keyword(),
         }
     }
 
@@ -993,10 +1094,7 @@ fn is_keyword(kind: TokenKind) -> bool {
             | KwPub
             | KwNet
             | KwLet
-            | KwAssume
             | KwSpec
-            | KwRated
-            | KwEnsure
             | KwWithin
             | KwFor
             | KwIn
@@ -1004,45 +1102,78 @@ fn is_keyword(kind: TokenKind) -> bool {
     )
 }
 
-/// A word the parser doesn't read yet: "`fn` isn't supported yet". The v5 keywords the
-/// parser doesn't handle yet are here too, until their steps.
+/// A word the parser doesn't read: "`fn` isn't supported yet". `for` is read only in
+/// `setup S for X`, so anywhere else it's reserved too.
 pub(super) fn is_reserved(kind: TokenKind) -> bool {
+    matches!(kind, TokenKind::KwReserved | TokenKind::KwFor)
+}
+
+/// The keywords that start an item. `setup` and `pub` start one only when the next token
+/// says so (`Parser::at_item_start`).
+fn is_item_keyword(kind: TokenKind) -> bool {
     use TokenKind::*;
     matches!(
         kind,
-        KwReserved | KwSetup | KwEnv | KwConst | KwRated | KwEnsure | KwFor
+        KwBlock | KwCircuit | KwSetup | KwContract | KwEnv | KwConst
     )
-}
-
-fn starts_item(kind: TokenKind) -> bool {
-    use TokenKind::*;
-    matches!(kind, KwPub | KwBlock | KwCircuit | KwContract)
-}
-
-fn is_stmt_keyword(kind: TokenKind) -> bool {
-    use TokenKind::*;
-    matches!(kind, KwNet | KwLet | KwAssume | KwSpec)
 }
 
 /// Which body a statement belongs in (`let` goes in both, so it has none).
 fn home_body(keyword: TokenKind) -> Option<(&'static str, BodyKind)> {
     match keyword {
         TokenKind::KwNet => Some(("net", BodyKind::Circuit)),
-        TokenKind::KwAssume => Some(("assume", BodyKind::Contract)),
+        TokenKind::KwSetup => Some(("setup", BodyKind::Contract)),
         TokenKind::KwSpec => Some(("spec", BodyKind::Contract)),
         _ => None,
     }
 }
 
-/// Tokens that can start a statement, including its doc comments and attributes.
-fn starts_stmt(kind: TokenKind) -> bool {
-    is_stmt_keyword(kind) || matches!(kind, TokenKind::DocComment | TokenKind::Pound)
-}
+/// What the next tokens start: an item, a statement, the end of a body. `setup` and `pub`
+/// start both items and statements (`setup = S;`, `pub spec …`), so the token after them
+/// decides (`research/contract_v4_review_implementation.md` G1). It says "item" only for
+/// an item's own next token, a name after `setup` and an item keyword after `pub`, as
+/// rustc reads `union` as an item only before a name: here an item ends the body, so a
+/// wrong "item" would lose the rest of it.
+impl Parser<'_, '_> {
+    fn at_item_start(&self) -> bool {
+        use TokenKind::*;
+        match self.peek() {
+            // `setup S for X`: any other `setup` is a contract's `setup = S;`.
+            KwSetup => self.nth(1) == Ident,
+            // `pub block X`: any other `pub` is a statement's, reported there unless it's
+            // before `spec`.
+            KwPub => is_item_keyword(self.nth(1)),
+            kind => is_item_keyword(kind),
+        }
+    }
 
-/// Tokens that end a body's statements: its `}`, the end of the file, or the next item
-/// (a body left unclosed).
-fn ends_body(kind: TokenKind) -> bool {
-    matches!(kind, TokenKind::RBrace | TokenKind::Eof) || starts_item(kind)
+    fn at_stmt_keyword(&self) -> bool {
+        use TokenKind::*;
+        match self.peek() {
+            KwNet | KwLet | KwSpec => true,
+            KwSetup | KwPub => !self.at_item_start(),
+            _ => false,
+        }
+    }
+
+    /// A statement, including its doc comments and attributes.
+    fn at_stmt_start(&self) -> bool {
+        self.at_stmt_keyword() || matches!(self.peek(), TokenKind::DocComment | TokenKind::Pound)
+    }
+
+    /// An entry of a comma list in braces: its doc comments and attributes, or a name
+    /// followed by `:` or `.` (a port's `vcc:`, a setup's `vin.v`).
+    fn at_entry_start(&self) -> bool {
+        use TokenKind::*;
+        matches!(self.peek(), DocComment | Pound)
+            || (self.peek() == Ident && matches!(self.nth(1), Colon | Dot))
+    }
+
+    /// The end of a body's contents: its `}`, the end of the file, or the next item (a
+    /// body left unclosed).
+    fn at_body_end(&self) -> bool {
+        matches!(self.peek(), TokenKind::RBrace | TokenKind::Eof) || self.at_item_start()
+    }
 }
 
 /// The case-file suite and property tests (ast.md §5).
@@ -1305,6 +1436,19 @@ mod tests {
                     }
                     continue;
                 }
+                ItemKind::Setup(decl) => {
+                    nodes.push(format!("setup {}", decl.name.text));
+                    for entry in &decl.entries {
+                        let kind = match entry.kind {
+                            SetupEntry::Set { .. } => "entry",
+                            SetupEntry::Error(_) => "entry-error",
+                        };
+                        nodes.push(format!("  {kind} {:?}", text(entry.span)));
+                    }
+                    continue;
+                }
+                ItemKind::Env(_) => ("env", None),
+                ItemKind::Const(_) => ("const", None),
                 ItemKind::Circuit(b) => ("circuit", Some(b)),
                 ItemKind::Contract(b) => ("contract", Some(b)),
                 ItemKind::Error(_) => ("item-error", None),
@@ -1317,7 +1461,7 @@ mod tests {
                 let kind = match stmt.kind {
                     StmtKind::Net { .. } => "net",
                     StmtKind::Let { .. } => "let",
-                    StmtKind::Assume { .. } => "assume",
+                    StmtKind::DefaultSetup { .. } => "setup",
                     StmtKind::Spec { .. } => "spec",
                     StmtKind::Error(_) => "error",
                 };
@@ -1497,7 +1641,7 @@ mod tests {
             (
                 "circuit A { ; net ok; }",
                 &["circuit A", "  error \";\"", "  net \"net ok;\""],
-                &["Expected a statement (`net`, `let`, `assume` or `spec`) \";\""],
+                &["Expected a statement (`net`, `let`, `setup` or `spec`) \";\""],
             ),
             // A `{` opened before the error is assumed broken: the next keyword ends
             // the statement inside it, and the body's `}` still closes the body.
@@ -1605,11 +1749,11 @@ mod tests {
     }
 
     /// Review: what port recovery skips and where it stops, one rule per case. A broken
-    /// port ends at the next `,` or the `}` (a `;` is skipped), and a port whose type
-    /// doesn't parse keeps its name.
+    /// port ends at the next `,` or the `}` (a `;` is skipped), a port whose type
+    /// doesn't parse keeps its name, and a missing `,` doesn't lose the next port.
     #[test]
     fn port_recovery() {
-        let cases: [(&str, &[&str], &[&str]); 5] = [
+        let cases: [(&str, &[&str], &[&str]); 6] = [
             (
                 "block A { a Pin, b: Pin }",
                 &["block A", "  port-error \"a Pin\"", "  port \"b: Pin\""],
@@ -1632,6 +1776,13 @@ mod tests {
                 &["block A", "  port \"a: Pin; b: Pin\""],
                 &["Expected `,` or `}` \";\""],
             ),
+            // A `,` missing before the next port is inserted (the red team found the
+            // next port was lost, and its uses in the circuit reported as unknown).
+            (
+                "block A { a: Pin b: Pin }",
+                &["block A", "  port \"a: Pin\"", "  port \"b: Pin\""],
+                &["MissingComma \"Pin\""],
+            ),
             // A header left open ends at the next item.
             (
                 "block A { a: Pin, circuit A {}",
@@ -1650,11 +1801,11 @@ mod tests {
     /// Pieces for random input: mostly the language's own tokens, so the parser gets
     /// deep into its rules, plus some noise.
     const PIECES: &[&str] = &[
-        "block", "circuit", "contract", "pub", "net", "let", "assume", "spec", "in", "fn", " A",
-        " r1", " vcc", "Resistor", "{", "}", "(", ")", "[", "]", "<", ">", "<=", ">=", ",", ";",
-        ":", "::", ".", "..", "..=", "=", "+", "-", "*", "/", "±", "#", "?", " 47k", " 1%", " 3",
-        " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%", "\"", "α", "within", "\"s\"",
-        "<A =",
+        "block", "circuit", "setup", "contract", "env", "const", "pub", "for", "net", "let",
+        "spec", "in", "fn", " A", " r1", " vcc", "Resistor", "{", "}", "(", ")", "[", "]", "<",
+        ">", "<=", ">=", ",", ";", ":", "::", ".", "..", "..=", "=", "+", "-", "*", "/", "±", "#",
+        "?", " 47k", " 1%", " 3", " 4k7", " 1e", "///doc\n", "//c\n", " ", "\n", "−", ";", "%",
+        "\"", "α", "within", "\"s\"", "<A =",
     ];
 
     #[test]
@@ -1683,13 +1834,23 @@ mod tests {
             .items
             .iter()
             .map(|item| match &item.kind {
+                ItemKind::Env(_) => ("env", 1),
+                ItemKind::Const(_) => ("const", 1),
                 ItemKind::Block(decl) => ("block", decl.ports.len()),
                 ItemKind::Circuit(b) => ("circuit", b.stmts.len()),
+                ItemKind::Setup(decl) => ("setup", decl.entries.len()),
                 ItemKind::Contract(b) => ("contract", b.stmts.len()),
                 ItemKind::Error(_) => ("error", 0),
             })
             .collect();
-        assert_eq!(counts, [("block", 4), ("circuit", 8), ("contract", 6)]);
+        let items = [
+            ("env", 1),
+            ("block", 4),
+            ("circuit", 8),
+            ("setup", 4),
+            ("contract", 5),
+        ];
+        assert_eq!(counts, items);
         insta::assert_snapshot!(dump_parse("ce_amp.spl", src));
     }
 

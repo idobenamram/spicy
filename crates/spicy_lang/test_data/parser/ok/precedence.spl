@@ -1,7 +1,7 @@
 contract P {
     // grammar.md §4.1: `within` loosest, then `..=`, then `±`, then arithmetic.
-    assume x within 12V ± 5%;
-    assume x within v - 0.5V..=v + 0.5V;
+    spec tol: x within 12V ± 5%;
+    spec range: x within v - 0.5V..=v + 0.5V;
     spec a: y within (capacity / t) ± 10%;
     spec b: y within capacity / (t ± 10%);
     spec c: -3V + 1V <= 1V;

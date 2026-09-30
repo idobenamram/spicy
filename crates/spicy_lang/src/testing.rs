@@ -10,8 +10,8 @@ use spicy_errors::{Diag, DiagKind, Render, render_plain};
 
 use crate::lexer::{LexError, TokenKind, check, scan};
 use crate::parser::ast::{
-    Arg, Attribute, BlockDecl, BlockEntry, Expr, ExprKind, File, Item, ItemKind, Path, Relation,
-    Stmt, StmtKind, Type, TypeKind,
+    Arg, Attribute, BlockDecl, BlockEntry, Expr, ExprKind, File, Ident, Item, ItemKind, Path,
+    Relation, SetupDecl, SetupEntry, Stmt, StmtKind, Type, TypeKind, ValueDecl,
 };
 use crate::parser::parse;
 
@@ -325,10 +325,16 @@ impl<'a> Printer<'a> {
 
     /// A path and its segments, as the next child.
     fn path(&mut self, path: &Path) {
-        self.check(path.span);
-        self.inside(path.span, |p| {
-            for seg in &path.segments {
-                p.check(seg.span);
+        self.segments(path.span, &path.segments);
+    }
+
+    /// A dotted or `::` name (a setup's key, a path) over `span`, and its segments inside
+    /// it, as the next child.
+    fn segments(&mut self, span: Span, segments: &[Ident]) {
+        self.check(span);
+        self.inside(span, |p| {
+            for segment in segments {
+                p.check(segment.span);
             }
         });
     }
@@ -393,6 +399,9 @@ impl<'a> Printer<'a> {
     fn item(&mut self, item: &Item) {
         let (label, body) = match &item.kind {
             ItemKind::Block(decl) => return self.block_decl(item, decl),
+            ItemKind::Setup(decl) => return self.setup_decl(item, decl),
+            ItemKind::Env(decl) => return self.value_decl(item, "Env", decl),
+            ItemKind::Const(decl) => return self.value_decl(item, "Const", decl),
             ItemKind::Circuit(b) => ("Circuit", b),
             ItemKind::Contract(b) => ("Contract", b),
             ItemKind::Error(_) => {
@@ -410,8 +419,7 @@ impl<'a> Printer<'a> {
     }
 
     fn block_decl(&mut self, item: &Item, decl: &BlockDecl) {
-        let public = if decl.public.is_some() { "pub " } else { "" };
-        let label = format!("{public}Block {}", decl.name.text);
+        let label = format!("{}Block {}", pub_prefix(decl.public), decl.name.text);
         self.node(&label, item.span, |p| {
             p.docs_attrs(&item.docs, &item.attrs);
             if let Some(public) = decl.public {
@@ -432,13 +440,56 @@ impl<'a> Printer<'a> {
         });
     }
 
+    fn setup_decl(&mut self, item: &Item, decl: &SetupDecl) {
+        let label = format!("Setup {} for {}", decl.name.text, path_text(&decl.block));
+        self.node(&label, item.span, |p| {
+            p.docs_attrs(&item.docs, &item.attrs);
+            p.check(decl.name.span);
+            p.path(&decl.block);
+            for entry in &decl.entries {
+                let SetupEntry::Set { key, value } = &entry.kind else {
+                    p.leaf("EntryError", entry.span);
+                    continue;
+                };
+                let names: Vec<&str> = key.segments.iter().map(|s| s.text).collect();
+                p.node(&format!("Set {}", names.join(".")), entry.span, |p| {
+                    p.docs_attrs(&entry.docs, &entry.attrs);
+                    p.segments(key.span, &key.segments);
+                    p.expr(value);
+                });
+            }
+        });
+    }
+
+    /// An `env` or `const`: a name, a type and a value.
+    fn value_decl(&mut self, item: &Item, label: &str, decl: &ValueDecl) {
+        self.node(&format!("{label} {}", decl.name.text), item.span, |p| {
+            p.docs_attrs(&item.docs, &item.attrs);
+            p.check(decl.name.span);
+            p.ty(&decl.ty);
+            p.expr(&decl.value);
+        });
+    }
+
     fn stmt(&mut self, stmt: &Stmt) {
-        let (label, name) = match &stmt.kind {
-            StmtKind::Net { name, .. } => (format!("Net {}", name.text), Some(name)),
-            StmtKind::Let { name, .. } => (format!("Let {}", name.text), Some(name)),
-            StmtKind::Assume { relation } => (format!("Assume {:?}", relation.op), None),
-            StmtKind::Spec { name, relation } => {
-                (format!("Spec {} {:?}", name.text, relation.op), Some(name))
+        let (label, public, name) = match &stmt.kind {
+            StmtKind::Net { name, .. } => (format!("Net {}", name.text), None, Some(name)),
+            StmtKind::Let { name, .. } => (format!("Let {}", name.text), None, Some(name)),
+            StmtKind::DefaultSetup { setup } => {
+                (format!("Setup = {}", path_text(setup)), None, None)
+            }
+            StmtKind::Spec {
+                public,
+                name,
+                relation,
+            } => {
+                let label = format!(
+                    "{}Spec {} {:?}",
+                    pub_prefix(*public),
+                    name.text,
+                    relation.op
+                );
+                (label, *public, Some(name))
             }
             StmtKind::Error(_) => {
                 self.leaf("StmtError", stmt.span);
@@ -447,6 +498,9 @@ impl<'a> Printer<'a> {
         };
         self.node(&label, stmt.span, |p| {
             p.docs_attrs(&stmt.docs, &stmt.attrs);
+            if let Some(public) = public {
+                p.check(public);
+            }
             if let Some(name) = name {
                 p.check(name.span);
             }
@@ -457,9 +511,8 @@ impl<'a> Printer<'a> {
                     }
                 }
                 StmtKind::Let { value, .. } => p.expr(value),
-                StmtKind::Assume { relation } | StmtKind::Spec { relation, .. } => {
-                    p.relation(relation);
-                }
+                StmtKind::DefaultSetup { setup } => p.path(setup),
+                StmtKind::Spec { relation, .. } => p.relation(relation),
                 StmtKind::Error(_) => {}
             }
         });
@@ -578,6 +631,11 @@ impl<'a> Printer<'a> {
             }
         }
     }
+}
+
+/// `"pub "` before a label, for what's written `pub`.
+fn pub_prefix(public: Option<Span>) -> &'static str {
+    if public.is_some() { "pub " } else { "" }
 }
 
 fn path_text(path: &Path) -> String {

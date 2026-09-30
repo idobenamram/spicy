@@ -7,3 +7,10 @@ circuit A {
 contract A {
     spec s: x within 1..=2;
 }
+
+// `setup =` and `pub spec` don't end a contract, but a `setup` item does.
+contract B {
+    setup = S;
+    pub spec s: x within 1..=2;
+
+setup S for B {}

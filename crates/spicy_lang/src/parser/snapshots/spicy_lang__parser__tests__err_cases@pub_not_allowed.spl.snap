@@ -1,30 +1,66 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1059
+assertion_line: 1198
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/pub_not_allowed.spl
 ---
-File 0..184
-  pub Block A 112..134
-    Port p 126..132
-      Type Pin 129..132 "Pin"
-  Circuit A 136..164
-    Net n 156..162
-  Contract A 166..183
+File 0..364
+  pub Block A 122..144
+    Port p 136..142
+      Type Pin 139..142 "Pin"
+  Circuit A 146..174
+    Net n 166..172
+  Contract A 176..193
+  Setup S for A 195..215
+  Env e 217..249
+    Type Temperature 228..239 "Temperature"
+    Range a..=b 243..248
+      Quantity 1e0 243..244 "1"
+      Quantity 2e0 247..248 "2"
 
 --- errors ---
-E-syntax PubNotAllowed 136..139 "pub" fix 136..140 ""
-E-syntax PubNotAllowed 166..169 "pub" fix 166..170 ""
+E-syntax PubNotAllowed 146..149 "pub" fix 146..150 ""
+E-syntax PubNotAllowed 176..179 "pub" fix 176..180 ""
+E-syntax PubNotAllowed 195..198 "pub" fix 195..199 ""
+E-syntax PubNotAllowed 217..220 "pub" fix 217..221 ""
+W-doc UnattachedDoc 342..359 "/// The last one."
+E-syntax PubNotAllowed 360..363 "pub" fix 360..364 ""
 
 --- rendered ---
-error[E-syntax]: only a block can be `pub`
+error[E-syntax]: only a block or a spec can be `pub`
   --> pub_not_allowed.spl:5:1
   |
 5 | pub circuit A {
   | ^^^ remove `pub`
 
-error[E-syntax]: only a block can be `pub`
+error[E-syntax]: only a block or a spec can be `pub`
   --> pub_not_allowed.spl:9:1
   |
 9 | pub contract A {}
   | ^^^ remove `pub`
+
+error[E-syntax]: only a block or a spec can be `pub`
+   --> pub_not_allowed.spl:11:1
+   |
+11 | pub setup S for A {}
+   | ^^^ remove `pub`
+
+error[E-syntax]: only a block or a spec can be `pub`
+   --> pub_not_allowed.spl:13:1
+   |
+13 | pub env e: Temperature in 1..=2;
+   | ^^^ remove `pub`
+
+warning[W-doc]: doc comment isn't attached to anything
+   --> pub_not_allowed.spl:16:1
+   |
+16 | /// The last one.
+   | ^^^^^^^^^^^^^^^^^ nothing follows this doc comment
+   |
+   = help: move it before an item or a statement, or use `//`
+
+error[E-syntax]: only a block or a spec can be `pub`
+   --> pub_not_allowed.spl:17:1
+   |
+17 | pub
+   | ^^^ remove `pub`

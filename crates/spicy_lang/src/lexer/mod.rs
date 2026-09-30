@@ -233,16 +233,13 @@ fn keyword(word: &str) -> Option<TokenKind> {
         "pub" => KwPub,
         "net" => KwNet,
         "let" => KwLet,
-        "assume" => KwAssume,
         "spec" => KwSpec,
-        "rated" => KwRated,
-        "ensure" => KwEnsure,
         "within" => KwWithin,
         "for" => KwFor,
         "in" => KwIn,
         "use" | "mod" | "fn" | "enum" | "type" | "trait" | "impl" | "if" | "else" | "match"
         | "where" | "as" | "true" | "false" | "self" | "super" | "crate" | "signal"
-        | "interface" | "family" => KwReserved,
+        | "interface" | "family" | "rated" | "ensure" => KwReserved,
         _ => return None,
     })
 }

@@ -1,0 +1,119 @@
+---
+source: crates/spicy_lang/src/parser/mod.rs
+assertion_line: 1185
+expression: "dump_parse(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/parser/ok/v5_mvp.spl
+---
+File 0..1205
+  Env ambient 214..257
+    Type Temperature 227..238 "Temperature"
+    Range a..=b 242..256
+      Neg 242..248
+        Quantity 1e1 °C 243..248 "10°C"
+      Quantity 6e1 °C 251..256 "60°C"
+  Env life 258..289
+    Type Duration 268..276 "Duration"
+    Range a..=b 280..288
+      Quantity 0e0 y 280..282 "0y"
+      Quantity 1e1 y 285..288 "10y"
+  Const confidence 290..330
+    Type Confidence 308..318 "Confidence"
+    Call 321..329
+      Path sigma 321..326 "sigma"
+      Quantity 3e0 327..328 "3"
+  pub Block Ldo3v3 332..398
+    Port vin 351..365
+      Type Power 356..365 "Power<In>"
+        Type In 362..364 "In"
+    Port vout 367..383
+      Type Power 373..383 "Power<Out>"
+        Type Out 379..382 "Out"
+    Port gnd 385..396
+      Type Ground 390..396 "Ground"
+  Circuit Ldo3v3 400..589
+    Let u1 421..457
+      StructLit Tlv755p 430..456
+        Field vin (shorthand) 440..443
+        Field vout (shorthand) 445..449
+        Field gnd (shorthand) 451..454
+    Let c_in 462..521
+      StructLit Capacitor 473..520
+        Field a 485..491
+          Path vin 488..491 "vin"
+        Field b 493..499
+          Path gnd 496..499 "gnd"
+        Field value 501..518
+          Binary Tol 508..518
+            Quantity 1e-6 F 508..511 "1uF"
+            Quantity 1e1 % 515..518 "10%"
+    Let c_out 526..587
+      StructLit Capacitor 538..586
+        Field a 550..557
+          Path vout 553..557 "vout"
+        Field b 559..565
+          Path gnd 562..565 "gnd"
+        Field value 567..584
+          Binary Tol 574..584
+            Quantity 1e-6 F 574..577 "1uF"
+            Quantity 1e1 % 581..584 "10%"
+  Setup Operating for Ldo3v3 591..809
+    Doc 591..647 "/// A key is a port, a field of what's on it, or `temp`."
+    Set vin 681..724
+      StructLit Supply 686..724
+        Field v 695..709
+          Range a..=b 698..709
+            Quantity 4.3e0 V 698..702 "4.3V"
+            Quantity 5.5e0 V 705..709 "5.5V"
+        Field z 711..722
+          Range ..=b 714..722
+            Quantity 5e-1 Ω 717..722 "0.5Ω"
+    Set vout 730..755
+      StructLit Load 736..755
+        Field c 743..753
+          Range ..=b 746..753
+            Quantity 2e-5 F 749..753 "20uF"
+    Set vout.i 761..779
+      Range a..=b 769..779
+        Quantity 5e-3 A 769..772 "5mA"
+        Quantity 5e-2 A 775..779 "50mA"
+    Set temp 785..806
+      Range a..=b 791..806
+        Neg 791..797
+          Quantity 4e1 °C 792..797 "40°C"
+        Quantity 1.25e2 °C 800..806 "125°C"
+  Setup LoadStep for Ldo3v3 811..925
+    Set vout.i 843..900
+      StructLit Step 851..900
+        Field from 858..867
+          Quantity 5e-3 A 864..867 "5mA"
+        Field to 869..877
+          Quantity 3e-2 A 873..877 "30mA"
+        Field edge 879..888
+          Quantity 1e-6 s 885..888 "1us"
+        Field at 890..898
+          Quantity 5e-5 s 894..898 "50us"
+    Set window 906..922
+      Range ..=b 914..922
+        Quantity 3e-4 s 917..922 "300us"
+  Contract Ldo3v3 927..1204
+    Setup = Operating 1034..1052
+    Let out 1057..1078
+      Call 1067..1077
+        Path dc 1067..1069 "dc"
+        Field .v 1070..1076
+          Path vout 1070..1074 "vout"
+    Spec output Within 1083..1118
+      Path out 1096..1099 "out"
+      Binary Tol 1107..1117
+        Quantity 3.3e0 V 1107..1111 "3.3V"
+        Quantity 2e0 % 1115..1117 "2%"
+    pub Spec quiescent Le 1123..1202
+      Doc 1123..1150 "/// Parents may rely on it."
+      Call 1175..1193
+        Path dc 1175..1177 "dc"
+        Binary Add 1178..1192
+          Field .i 1178..1183
+            Path vin 1178..1181 "vin"
+          Field .i 1186..1192
+            Path vout 1186..1190 "vout"
+      Quantity 5e-5 A 1197..1201 "50uA"

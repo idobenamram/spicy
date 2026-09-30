@@ -1,5 +1,5 @@
 contract A {
-    assume vcc.v;
+    pub spec p: vcc.v;
     spec s: dc(output.v);
     // `in` is no longer an operator: the measure ends before it.
     spec t: dc(output.v) in 1V..=2V;

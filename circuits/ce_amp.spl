@@ -1,3 +1,6 @@
+/// The temperature the amplifier works in, anywhere it's used.
+env ambient: Temperature in -10°C..=60°C;
+
 /// Common-emitter audio stage (walkthrough §1).
 pub block CeAmp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
 
@@ -14,9 +17,16 @@ circuit CeAmp {
     let q1 = Npn { c: output, b: base, e: emitter, beta: 100..=300 };
 }
 
+/// The amplifier as it's used: a 12 V rail, a quiet input, an open output.
+setup Operating for CeAmp {
+    vcc: Supply { v: 12V ± 5% },
+    input: Signal { v: 0V },
+    output: Load {},
+    temp: ambient,
+}
+
 contract CeAmp {
-    assume temp within -10°C..=60°C;
-    assume vcc.v within 12V ± 5%;
+    setup = Operating;
 
     let h = ac(output.v / input.v);
 

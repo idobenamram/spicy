@@ -141,8 +141,8 @@ impl Resolver<'_, '_> {
     /// (model.md E13); anything else is absolute, in the nominal's unit (`47k ± 500`,
     /// `5V ± 0.1V`). A ratio without `%`, like `± (1V / 1V)`, is absolute too: `±` reads
     /// as relative only where it's written so.
-    /// (Temperature spreads, which are differences in K, arrive with contract
-    /// assumptions in M1d-5.)
+    /// (Temperature spreads, which are differences in K, arrive with setups and `env`s
+    /// in M1d-5.)
     fn tolerance(&mut self, e: &Expr, expected: FieldType) -> Result<Spread, Reported> {
         let t = self.term(e)?;
         let relative = t.q.is_ratio() && has_percent(e);

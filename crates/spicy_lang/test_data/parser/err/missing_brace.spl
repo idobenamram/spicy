@@ -13,3 +13,8 @@ block Top { a: Pin }
 circuit Top {
     let c = Child { a };
 }
+
+// A setup's `{` goes after its block's name, and its first key may be a field.
+setup Operating for Top
+    a.v: 1V,
+}

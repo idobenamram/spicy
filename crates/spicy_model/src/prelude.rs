@@ -123,7 +123,7 @@ impl FieldType {
         }
     }
 
-    /// An absolute temperature with a spread (`assume temp in -10°C..=60°C`).
+    /// An absolute temperature with a spread (`env ambient: Temperature in -10°C..=60°C;`).
     pub const fn temperature() -> Self {
         Self {
             dim: Dimension::KELVIN,

@@ -4,3 +4,8 @@ circuit A {
     for i in 0..N {}
     net ok;
 }
+
+contract A {
+    rated vin.v within -0.3V..=6.5V;
+    spec ok: x within 1..=2;
+}

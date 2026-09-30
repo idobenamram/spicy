@@ -1,2 +1,2 @@
-rated vcc.v within 12V +- 5%;
+spec s: vcc.v within 12V +- 5%;
 let x = --y;

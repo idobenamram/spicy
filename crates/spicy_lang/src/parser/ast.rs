@@ -30,8 +30,9 @@ pub struct Ident<'src> {
 }
 
 /// A name that may be qualified: `vcc`, `std::prelude`, `onsemi::MMBT3904`. Used for
-/// part kinds and block names in struct literals, for names in expressions, in types
-/// and in attributes. Most paths have one segment.
+/// part kinds and block names in struct literals, for names in expressions, in types,
+/// in attributes, and for the setups and blocks that setups and contracts name. Most
+/// paths have one segment.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Path<'src> {
     pub segments: Vec<Ident<'src>>,
@@ -58,7 +59,7 @@ pub struct Node<'src, K> {
     pub span: Span,
 }
 
-/// One top-level item: a `block`, a `circuit` or a `contract`.
+/// One top-level item: a `block`, `circuit`, `setup`, `contract`, `env` or `const`.
 pub type Item<'src> = Node<'src, ItemKind<'src>>;
 
 /// What an item is. A block is its interface; its `circuit` and its `contract`, each
@@ -70,8 +71,17 @@ pub enum ItemKind<'src> {
     Block(BlockDecl<'src>),
     /// `circuit CeAmp { … }`: the nets and the parts inside the block.
     Circuit(Body<'src>),
-    /// `contract CeAmp { … }`: the block's assumptions, measures and specs (language §8).
+    /// `setup Operating for CeAmp { vcc: Supply { v: 12V ± 5% }, … }`: the world around
+    /// the block, what its specs are checked in.
+    Setup(SetupDecl<'src>),
+    /// `contract CeAmp { … }`: the block's default setup, measures and specs (language
+    /// §8).
     Contract(Body<'src>),
+    /// `env ambient: Temperature in -10°C..=60°C;`: a condition of the whole project,
+    /// which setups name (`temp: ambient`).
+    Env(ValueDecl<'src>),
+    /// `const confidence: Confidence = sigma(3);`
+    Const(ValueDecl<'src>),
     /// Text at the top level that couldn't be parsed as an item; the item's span covers
     /// all of it, up to the next item.
     Error(Reported),
@@ -97,6 +107,37 @@ pub enum BlockEntry<'src> {
     Error(Reported),
 }
 
+/// `setup Name for Block { entries }`, after `setup`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SetupDecl<'src> {
+    pub name: Ident<'src>,
+    /// The block it's a setup for.
+    pub block: Path<'src>,
+    pub entries: Vec<Node<'src, SetupEntry<'src>>>,
+    /// The proof, if parsing it reported an error, as [`Body::broken`].
+    pub broken: Option<Reported>,
+}
+
+/// One entry of a setup.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SetupEntry<'src> {
+    /// `vcc: Supply { v: 12V ± 5% }`, `vin.v: 4.5V`, `temp: ambient`: what the port, a
+    /// field of what's on it, or the temperature is.
+    Set { key: Key<'src>, value: Expr<'src> },
+    /// An entry that couldn't be parsed; its span covers the skipped text.
+    Error(Reported),
+}
+
+/// What a setup entry sets: a port (`vcc`), a field of what's on one (`vin.v`), `temp`
+/// or `window`. A dotted name, not an expression: nothing is computed. Not a [`Path`]
+/// either: a path's `::` segments name one thing in a namespace, a key's `.` segments
+/// walk from a port into the fields of what's on it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Key<'src> {
+    pub segments: Vec<Ident<'src>>,
+    pub span: Span,
+}
+
 /// Which kind of body, without the body: the tag of `ItemKind::Circuit` and
 /// `ItemKind::Contract`, for code that needs to know which one it's in (the parser's
 /// `WrongBody` check) but not to hold it. Kept apart rather than folded into `ItemKind`
@@ -106,6 +147,16 @@ pub enum BlockEntry<'src> {
 pub enum BodyKind {
     Circuit,
     Contract,
+}
+
+impl BodyKind {
+    /// The keyword that starts it.
+    pub fn keyword(self) -> &'static str {
+        match self {
+            BodyKind::Circuit => "circuit",
+            BodyKind::Contract => "contract",
+        }
+    }
 }
 
 /// `Name { statements }`: the part of a `circuit` or `contract` after its keyword.
@@ -119,6 +170,16 @@ pub struct Body<'src> {
     /// body's, as rustc taints the body whose checking reported one, not the place the
     /// error points at.
     pub broken: Option<Reported>,
+}
+
+/// `name: Type in range` or `name: Type = value`: the part of an `env` or `const` after
+/// its keyword, as [`Body`] is of a `circuit` or `contract`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValueDecl<'src> {
+    pub name: Ident<'src>,
+    pub ty: Type<'src>,
+    /// An `env`'s range (`-10°C..=60°C`), or a `const`'s value.
+    pub value: Expr<'src>,
 }
 
 /// An attribute on an item or statement: `#[warn]`, `#[confidence(sigma(3))]`.
@@ -151,10 +212,12 @@ pub enum StmtKind<'src> {
         name: Ident<'src>,
         value: Expr<'src>,
     },
-    /// `assume vcc.v within 12V ± 5%;`: a condition the world may be anywhere in.
-    Assume { relation: Relation<'src> },
-    /// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a requirement the design must meet.
+    /// `setup = Operating;`: the setup a contract's specs are checked in.
+    DefaultSetup { setup: Path<'src> },
+    /// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a requirement the design must
+    /// meet. A `pub` one is part of what the block promises to whoever places it.
     Spec {
+        public: Option<Span>,
         name: Ident<'src>,
         relation: Relation<'src>,
     },
@@ -162,10 +225,10 @@ pub enum StmtKind<'src> {
     Error(Reported),
 }
 
-/// The top level of an `assume` or `spec`, split out so elaboration gets the measured
-/// side, the relation and the bound directly: in `dc(output.v) within 4.5V..=6.5V`, `lhs`
-/// is `dc(output.v)`, `op` is `Within`, and `rhs` is the range. The two sides have spans; the
-/// relation as a whole spans from `lhs` to `rhs`.
+/// The top level of a `spec`, split out so elaboration gets the measured side, the
+/// relation and the bound directly: in `dc(output.v) within 4.5V..=6.5V`, `lhs` is
+/// `dc(output.v)`, `op` is `Within`, and `rhs` is the range. The two sides have spans;
+/// the relation as a whole spans from `lhs` to `rhs`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Relation<'src> {
     pub lhs: Expr<'src>,
@@ -173,7 +236,7 @@ pub struct Relation<'src> {
     pub rhs: Expr<'src>,
 }
 
-/// The relations an `assume` or `spec` can use (grammar.md §4.1, level 1).
+/// The relations a `spec` can use (grammar.md §4.1, level 1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RelOp {
     /// `x within a..=b` or `x within n ± t`: inside a range or tolerance.
@@ -184,7 +247,8 @@ pub enum RelOp {
     Ge,
 }
 
-/// A port's type, with its span: `Power<In>`, `Ground`, `Analog<Out>`.
+/// A type, with its span: a port's (`Power<In>`, `Ground`), an `env`'s or a `const`'s
+/// (`Temperature`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Type<'src> {
     pub kind: TypeKind<'src>,
@@ -213,7 +277,7 @@ pub struct Expr<'src> {
 }
 
 // The most common node, so its size is checked, as rustc checks its own
-// (`static_assert_size!(Expr, 72)`): a larger variant is boxed, as `StructLit` is.
+// (`static_assert_size!(Expr, 64)`): a larger variant is boxed, as `StructLit` is.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(std::mem::size_of::<Expr>() == 48);
 
@@ -280,8 +344,8 @@ pub enum ExprKind<'src> {
 /// builds an [`ExprKind::Range`] instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
-    /// A comparison: `within`, `<`, `<=`, `>`, `>=`. Only valid at the top of an `assume`
-    /// or `spec`, which takes it out as a typed [`Relation`].
+    /// A comparison: `within`, `<`, `<=`, `>`, `>=`. Only valid at the top of a `spec`,
+    /// which takes it out as a typed [`Relation`].
     Rel(RelOp),
     /// `±`, `+/-`
     Tol,

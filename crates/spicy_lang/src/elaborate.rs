@@ -167,9 +167,17 @@ mod tests {
         let mut items: Vec<String> = Vec::new();
         let mut item: Option<String> = None;
         for line in src.lines() {
-            let starts = ["block ", "pub block ", "circuit ", "contract "]
-                .iter()
-                .any(|keyword| line.starts_with(keyword));
+            let starts = [
+                "block ",
+                "pub block ",
+                "circuit ",
+                "setup ",
+                "contract ",
+                "env ",
+                "const ",
+            ]
+            .iter()
+            .any(|keyword| line.starts_with(keyword));
             if starts {
                 item = Some(String::new());
             }
@@ -177,8 +185,8 @@ mod tests {
                 text.push_str(line);
                 text.push('\n');
                 // A `}` alone ends an item, and so does one on its first line
-                // (`block A { p: Pin }`).
-                if line == "}" || (starts && line.ends_with('}')) {
+                // (`block A { p: Pin }`), or its `;` (`env a: T in r;`).
+                if line == "}" || (starts && (line.ends_with('}') || line.ends_with(';'))) {
                     items.extend(item.take());
                 }
             }

@@ -16,11 +16,11 @@
 mod analysis;
 mod params;
 
-pub use analysis::{AcSpacing, AcSweep, Analysis, DcSweep, SourceRef, Transient};
+pub use analysis::{AcSpacing, AcSweep, Analysis, DcSweep, SolverOptions, SourceRef, Transient};
 pub use params::{
-    BjtModel, BjtParams, CapacitorModel, CapacitorParams, DeviceTemperature, DiodeModel,
-    DiodeParams, InductorModel, InductorParams, Params, Phasor, Polarity, ResistorModel,
-    ResistorParams, SourceParams, Waveform,
+    BjtModel, BjtParams, CapacitorModel, CapacitorParams, DEFAULT_TEMPERATURE, DeviceTemperature,
+    DiodeModel, DiodeParams, InductorModel, InductorParams, Params, Phasor, Polarity,
+    ResistorModel, ResistorParams, SourceParams, Waveform,
 };
 
 use spicy_index::id;
@@ -77,6 +77,8 @@ pub struct Lowered {
     pub params: Params,
     pub names: CircuitNames,
     pub analyses: Vec<Analysis>,
+    /// The solver tolerances the source asked for, if any.
+    pub options: SolverOptions,
 }
 
 /// The circuit's structure. Device `i` of a kind is described by entry `i`

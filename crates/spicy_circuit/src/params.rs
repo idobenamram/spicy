@@ -8,9 +8,17 @@
 //! Every parameter the SPICE front-end accepts is carried here, including
 //! ones the simulator doesn't use yet. Those say "Not simulated yet".
 
+/// SPICE's default temperature, 27 °C in kelvin: of a circuit, and of the model
+/// parameters when a model doesn't say (ngspice `cktntask.c`).
+pub const DEFAULT_TEMPERATURE: f64 = 300.15;
+
 /// All device numbers of a circuit, indexed like [`crate::Circuit`].
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Params {
+    /// The circuit's temperature (K). A per-run number like the rest: the engine's
+    /// temperature knob sets it. Not simulated yet: every device runs at the thermal
+    /// voltage of 27 °C until temperature support.
+    pub temp: f64,
     pub resistor_models: Vec<ResistorModel>,
     pub resistors: Vec<ResistorParams>,
     pub capacitor_models: Vec<CapacitorModel>,
@@ -23,6 +31,26 @@ pub struct Params {
     pub bjts: Vec<BjtParams>,
     pub vsources: Vec<SourceParams>,
     pub isources: Vec<SourceParams>,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            temp: DEFAULT_TEMPERATURE,
+            resistor_models: Vec::new(),
+            resistors: Vec::new(),
+            capacitor_models: Vec::new(),
+            capacitors: Vec::new(),
+            inductor_models: Vec::new(),
+            inductors: Vec::new(),
+            diode_models: Vec::new(),
+            diodes: Vec::new(),
+            bjt_models: Vec::new(),
+            bjts: Vec::new(),
+            vsources: Vec::new(),
+            isources: Vec::new(),
+        }
+    }
 }
 
 /// A device's temperature relative to the run's. Not simulated yet: every
@@ -53,6 +81,9 @@ pub struct ResistorModel {
     pub default_width: f64,
     /// Default length (m) of a geometric resistor. Not simulated yet.
     pub default_length: f64,
+    /// Temperature (K) the parameters were measured at, filled in when the source is
+    /// lowered: the model's own TNOM, else the circuit's. Not simulated yet.
+    pub tnom: f64,
 }
 
 impl Default for ResistorModel {
@@ -63,6 +94,7 @@ impl Default for ResistorModel {
             tc2: 0.0,
             default_width: 10e-6,
             default_length: 10e-6,
+            tnom: DEFAULT_TEMPERATURE,
         }
     }
 }
@@ -81,12 +113,25 @@ pub struct ResistorParams {
     pub noisy: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CapacitorModel {
     /// First-order temperature coefficient (1/K). Not simulated yet.
     pub tc1: f64,
     /// Second-order temperature coefficient (1/K²). Not simulated yet.
     pub tc2: f64,
+    /// Temperature (K) the parameters were measured at, filled in when the source is
+    /// lowered: the model's own TNOM, else the circuit's. Not simulated yet.
+    pub tnom: f64,
+}
+
+impl Default for CapacitorModel {
+    fn default() -> Self {
+        Self {
+            tc1: 0.0,
+            tc2: 0.0,
+            tnom: DEFAULT_TEMPERATURE,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -100,12 +145,25 @@ pub struct CapacitorParams {
     pub temperature: DeviceTemperature,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InductorModel {
     /// First-order temperature coefficient (1/K). Not simulated yet.
     pub tc1: f64,
     /// Second-order temperature coefficient (1/K²). Not simulated yet.
     pub tc2: f64,
+    /// Temperature (K) the parameters were measured at, filled in when the source is
+    /// lowered: the model's own TNOM, else the circuit's. Not simulated yet.
+    pub tnom: f64,
+}
+
+impl Default for InductorModel {
+    fn default() -> Self {
+        Self {
+            tc1: 0.0,
+            tc2: 0.0,
+            tnom: DEFAULT_TEMPERATURE,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -132,6 +190,13 @@ pub struct DiodeModel {
     /// Series resistance (Ω); 0 means none. Not simulated yet: a nonzero
     /// value adds an internal node (docs/ecad/circuit.md §4.3).
     pub rs: f64,
+    /// Energy gap (eV), in the saturation current's temperature law. Not simulated yet.
+    pub eg: f64,
+    /// Saturation current temperature exponent. Not simulated yet.
+    pub xti: f64,
+    /// Temperature (K) the parameters were measured at, filled in when the source is
+    /// lowered: the model's own TNOM, else the circuit's. Not simulated yet.
+    pub tnom: f64,
 }
 
 impl Default for DiodeModel {
@@ -141,6 +206,9 @@ impl Default for DiodeModel {
             is: 1e-14,
             n: 1.0,
             rs: 0.0,
+            eg: 1.11,
+            xti: 3.0,
+            tnom: DEFAULT_TEMPERATURE,
         }
     }
 }
@@ -206,6 +274,15 @@ pub struct BjtModel {
     pub nf: f64,
     /// Reverse emission coefficient.
     pub nr: f64,
+    /// Forward and reverse β temperature exponent. Not simulated yet.
+    pub xtb: f64,
+    /// Saturation current temperature exponent. Not simulated yet.
+    pub xti: f64,
+    /// Energy gap (eV), in the saturation current's temperature law. Not simulated yet.
+    pub eg: f64,
+    /// Temperature (K) the parameters were measured at, filled in when the source is
+    /// lowered: the model's own TNOM, else the circuit's. Not simulated yet.
+    pub tnom: f64,
 }
 
 impl Default for BjtModel {
@@ -218,6 +295,10 @@ impl Default for BjtModel {
             br: 1.0,
             nf: 1.0,
             nr: 1.0,
+            xtb: 0.0,
+            xti: 3.0,
+            eg: 1.11,
+            tnom: DEFAULT_TEMPERATURE,
         }
     }
 }
@@ -235,6 +316,7 @@ pub struct BjtParams {
     pub ic_vbe: f64,
     /// Initial collector-emitter voltage (V), as `ic_vbe`. Not simulated yet.
     pub ic_vce: f64,
+    pub temperature: DeviceTemperature,
 }
 
 impl Default for BjtParams {
@@ -245,6 +327,7 @@ impl Default for BjtParams {
             off: false,
             ic_vbe: 0.0,
             ic_vce: 0.0,
+            temperature: DeviceTemperature::default(),
         }
     }
 }
@@ -311,4 +394,46 @@ pub struct Phasor {
     pub magnitude: f64,
     /// Radians.
     pub phase: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SolverOptions;
+
+    /// ngspice's defaults: 27 °C for the circuit and every model's TNOM
+    /// (`cktntask.c`), XTB 0, XTI 3 and EG 1.11 eV for the BJT (`bjtsetup.c`),
+    /// XTI 3 and EG 1.11 eV for the diode (`diosetup.c`).
+    #[test]
+    fn temperature_defaults_match_ngspice() {
+        assert_eq!(DEFAULT_TEMPERATURE, 300.15);
+        assert_eq!(Params::default().temp, DEFAULT_TEMPERATURE);
+        let bjt = BjtModel::default();
+        assert_eq!(
+            (bjt.xtb, bjt.xti, bjt.eg, bjt.tnom),
+            (0.0, 3.0, 1.11, DEFAULT_TEMPERATURE)
+        );
+        let diode = DiodeModel::default();
+        assert_eq!(
+            (diode.xti, diode.eg, diode.tnom),
+            (3.0, 1.11, DEFAULT_TEMPERATURE)
+        );
+        assert_eq!(ResistorModel::default().tnom, DEFAULT_TEMPERATURE);
+        assert_eq!(CapacitorModel::default().tnom, DEFAULT_TEMPERATURE);
+        assert_eq!(InductorModel::default().tnom, DEFAULT_TEMPERATURE);
+        assert_eq!(
+            BjtParams::default().temperature,
+            DeviceTemperature::Offset(0.0)
+        );
+    }
+
+    /// Solver options record what a source file asked for; nothing asked, nothing set.
+    #[test]
+    fn solver_options_start_unset() {
+        let options = SolverOptions::default();
+        assert_eq!(
+            (options.reltol, options.vntol, options.abstol),
+            (None, None, None)
+        );
+    }
 }

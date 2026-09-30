@@ -16,8 +16,8 @@ use spicy_circuit::{
     CapacitorModelId, CapacitorParams, Circuit, CircuitNames, DcSweep, DeviceTemperature, Diode,
     DiodeModel, DiodeModelId, DiodeParams, Inductor, InductorModel, InductorModelId,
     InductorParams, IsourceId, Lowered, NodeId, Params, Phasor, Polarity, Resistor, ResistorModel,
-    ResistorModelId, ResistorParams, SourceParams, SourceRef, Transient, TwoTerminal, VsourceId,
-    Waveform,
+    ResistorModelId, ResistorParams, SolverOptions, SourceParams, SourceRef, Transient,
+    TwoTerminal, VsourceId, Waveform,
 };
 
 use crate::BjtPolarity;
@@ -68,7 +68,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     for c in &devices.capacitors {
         let model = capacitor_model(c);
         let model = CapacitorModelId::new(
-            capacitor_models.insert(tc_model_key(model.tc1, model.tc2), model),
+            capacitor_models.insert(tc_model_key(model.tc1, model.tc2, model.tnom), model),
         );
         circuit.capacitors.push(Capacitor {
             positive: node(c.positive),
@@ -83,8 +83,9 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
     let mut inductor_models = ModelTable::default();
     for l in &devices.inductors {
         let model = inductor_model(l);
-        let model =
-            InductorModelId::new(inductor_models.insert(tc_model_key(model.tc1, model.tc2), model));
+        let model = InductorModelId::new(
+            inductor_models.insert(tc_model_key(model.tc1, model.tc2, model.tnom), model),
+        );
         circuit.inductors.push(Inductor {
             positive: node(l.positive),
             negative: node(l.negative),
@@ -170,6 +171,7 @@ pub fn lower(deck: &Deck) -> Result<Lowered, SpicyError> {
         params,
         names,
         analyses,
+        options: SolverOptions::default(),
     })
 }
 
@@ -209,18 +211,19 @@ impl<K: Hash + Eq + Clone, M> ModelTable<K, M> {
     }
 }
 
-fn resistor_model_key(model: &ResistorModel) -> [u64; 4] {
+fn resistor_model_key(model: &ResistorModel) -> [u64; 5] {
     [
         model.tc1,
         model.tc2,
         model.default_width,
         model.default_length,
+        model.tnom,
     ]
     .map(f64::to_bits)
 }
 
-fn tc_model_key(tc1: f64, tc2: f64) -> [u64; 2] {
-    [tc1.to_bits(), tc2.to_bits()]
+fn tc_model_key(tc1: f64, tc2: f64, tnom: f64) -> [u64; 3] {
+    [tc1, tc2, tnom].map(f64::to_bits)
 }
 
 fn node_names(deck: &Deck) -> Vec<String> {
@@ -276,6 +279,7 @@ fn resistor_model(spec: &ResistorSpec) -> ResistorModel {
         default_length: model
             .and_then(|m| value(&m.l))
             .unwrap_or(defaults.default_length),
+        tnom: defaults.tnom,
     }
 }
 
@@ -295,9 +299,11 @@ fn resistor_params(spec: &ResistorSpec) -> ResistorParams {
 
 fn capacitor_model(spec: &CapacitorSpec) -> CapacitorModel {
     let model = spec.model.as_ref();
+    let defaults = CapacitorModel::default();
     CapacitorModel {
-        tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(0.0),
-        tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(0.0),
+        tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(defaults.tc1),
+        tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(defaults.tc2),
+        tnom: defaults.tnom,
     }
 }
 
@@ -314,9 +320,11 @@ fn capacitor_params(spec: &CapacitorSpec) -> CapacitorParams {
 
 fn inductor_model(spec: &InductorSpec) -> InductorModel {
     let model = spec.model.as_ref();
+    let defaults = InductorModel::default();
     InductorModel {
-        tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(0.0),
-        tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(0.0),
+        tc1: instance_or_model(&spec.tc1, model.map(|m| &m.tc1)).unwrap_or(defaults.tc1),
+        tc2: instance_or_model(&spec.tc2, model.map(|m| &m.tc2)).unwrap_or(defaults.tc2),
+        tnom: defaults.tnom,
     }
 }
 
@@ -339,6 +347,9 @@ fn diode_model(spec: &DiodeSpec) -> DiodeModel {
         is: value_or(&spec.model.is, defaults.is),
         n: value_or(&spec.model.n, defaults.n),
         rs: value_or(&spec.model.rs, defaults.rs),
+        eg: defaults.eg,
+        xti: defaults.xti,
+        tnom: defaults.tnom,
     }
 }
 
@@ -366,6 +377,7 @@ fn bjt_params(spec: &BjtSpec) -> BjtParams {
         off: spec.off.unwrap_or(defaults.off),
         ic_vbe: value_or(&spec.ic_vbe, defaults.ic_vbe),
         ic_vce: value_or(&spec.ic_vce, defaults.ic_vce),
+        temperature: defaults.temperature,
     }
 }
 
@@ -382,6 +394,10 @@ fn bjt_model(spec: &BjtSpec) -> BjtModel {
         br: value_or(&model.br, defaults.br),
         nf: value_or(&model.nf, defaults.nf),
         nr: value_or(&model.nr, defaults.nr),
+        xtb: defaults.xtb,
+        xti: defaults.xti,
+        eg: defaults.eg,
+        tnom: defaults.tnom,
     }
 }
 

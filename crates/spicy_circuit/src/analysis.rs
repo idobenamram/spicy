@@ -2,6 +2,20 @@
 
 use crate::{IsourceId, VsourceId};
 
+/// Solver tolerances a source asked for (SPICE `.options`). `None` means the
+/// file didn't say. They describe how precisely to solve, not what the circuit
+/// is, so they don't belong to it: the one running the circuit (the CLI, the
+/// engine's tolerance profiles) decides, and may start from these.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct SolverOptions {
+    /// Relative tolerance.
+    pub reltol: Option<f64>,
+    /// Absolute voltage tolerance (V).
+    pub vntol: Option<f64>,
+    /// Absolute current tolerance (A).
+    pub abstol: Option<f64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Analysis {
     /// DC operating point.

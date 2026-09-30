@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/lower.rs
-assertion_line: 746
+assertion_line: 762
 expression: lowered
 ---
 Lowered {
@@ -122,30 +122,35 @@ Lowered {
         isources: [],
     },
     params: Params {
+        temp: 300.15,
         resistor_models: [
             ResistorModel {
                 tc1: 0.1,
                 tc2: 0.01,
                 default_width: 1e-5,
                 default_length: 1e-5,
+                tnom: 300.15,
             },
             ResistorModel {
                 tc1: 0.02,
                 tc2: 0.0,
                 default_width: 1e-5,
                 default_length: 1e-5,
+                tnom: 300.15,
             },
             ResistorModel {
                 tc1: 0.0,
                 tc2: 0.0,
                 default_width: 1e-5,
                 default_length: 1e-5,
+                tnom: 300.15,
             },
             ResistorModel {
                 tc1: 345.0,
                 tc2: 0.0,
                 default_width: 1e-5,
                 default_length: 1e-5,
+                tnom: 300.15,
             },
         ],
         resistors: [
@@ -209,14 +214,17 @@ Lowered {
             CapacitorModel {
                 tc1: 0.1,
                 tc2: 0.01,
+                tnom: 300.15,
             },
             CapacitorModel {
                 tc1: 0.2,
                 tc2: 0.02,
+                tnom: 300.15,
             },
             CapacitorModel {
                 tc1: 0.0,
                 tc2: 0.0,
+                tnom: 300.15,
             },
         ],
         capacitors: [
@@ -309,4 +317,9 @@ Lowered {
     analyses: [
         Op,
     ],
+    options: SolverOptions {
+        reltol: None,
+        vntol: None,
+        abstol: None,
+    },
 }

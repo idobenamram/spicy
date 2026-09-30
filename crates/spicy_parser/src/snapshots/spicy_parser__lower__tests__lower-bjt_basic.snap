@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_parser/src/lower.rs
-assertion_line: 746
+assertion_line: 762
 expression: lowered
 ---
 Lowered {
@@ -30,6 +30,7 @@ Lowered {
         isources: [],
     },
     params: Params {
+        temp: 300.15,
         resistor_models: [],
         resistors: [],
         capacitor_models: [],
@@ -46,6 +47,10 @@ Lowered {
                 br: 1.0,
                 nf: 1.0,
                 nr: 1.0,
+                xtb: 0.0,
+                xti: 3.0,
+                eg: 1.11,
+                tnom: 300.15,
             },
         ],
         bjts: [
@@ -55,6 +60,9 @@ Lowered {
                 off: true,
                 ic_vbe: 0.7,
                 ic_vce: 1.2,
+                temperature: Offset(
+                    0.0,
+                ),
             },
         ],
         vsources: [],
@@ -83,4 +91,9 @@ Lowered {
         ],
     },
     analyses: [],
+    options: SolverOptions {
+        reltol: None,
+        vntol: None,
+        abstol: None,
+    },
 }

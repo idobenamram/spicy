@@ -1,5 +1,5 @@
-//! The standard part kinds, signal types and value types (model.md E8; language.md §3,
-//! §5.1, §6.1).
+//! The standard part kinds, setup shapes, signal types and value types (model.md E8;
+//! language.md §3, §5.1, §6.1, §8.2).
 //!
 //! Written in Rust for the MVP (roadmap §2.5): the language can't define parts or
 //! signals yet. A part kind is a *schema*: its pins and its fields with the unit each
@@ -74,15 +74,84 @@ impl PartKind {
     }
 
     pub fn field(self, name: &str) -> Option<(usize, &'static FieldSchema)> {
-        self.fields()
-            .iter()
-            .enumerate()
-            .find(|(_, f)| f.name == name)
+        field_named(self.fields(), name)
     }
 }
 
-/// A field of a part kind: its name, the value it expects, and whether it must be
-/// given.
+/// What a setup puts on a port (language.md §8.2): a source that drives one of the
+/// block's inputs, or a load on one of its outputs. A schema like a part kind's: its
+/// fields, with the unit each expects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Shape {
+    /// A supply rail into a `Power<In>`: its voltage `v` and source impedance `z`.
+    Supply,
+    /// A signal source into an `Analog<In>`: its voltage `v` and source impedance `z`.
+    Signal,
+    /// What an output drives, each to ground: a resistance `r`, a capacitance `c` and a
+    /// current `i`.
+    Load,
+}
+
+impl Shape {
+    pub const ALL: [Shape; 3] = [Shape::Supply, Shape::Signal, Shape::Load];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Shape::Supply => "Supply",
+            Shape::Signal => "Signal",
+            Shape::Load => "Load",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Shape> {
+        Self::ALL.into_iter().find(|s| s.name() == name)
+    }
+
+    /// Its fields, in order. A source's voltage has no ideal default, so `v` must be
+    /// given (v5 rule 1.3.1); an impedance or a load left out is ideal: a 0 Ω source,
+    /// nothing on the output.
+    pub fn fields(self) -> &'static [FieldSchema] {
+        const SOURCE: &[FieldSchema] = &[
+            FieldSchema::new("v", FieldType::tol(Dimension::VOLT), true),
+            FieldSchema::new("z", FieldType::tol(Dimension::OHM), false),
+        ];
+        const LOAD: &[FieldSchema] = &[
+            FieldSchema::new("r", FieldType::tol(Dimension::OHM), false),
+            FieldSchema::new("c", FieldType::tol(Dimension::FARAD), false),
+            FieldSchema::new("i", FieldType::tol(Dimension::AMPERE), false),
+        ];
+        match self {
+            Shape::Supply | Shape::Signal => SOURCE,
+            Shape::Load => LOAD,
+        }
+    }
+
+    pub fn field(self, name: &str) -> Option<(usize, &'static FieldSchema)> {
+        field_named(self.fields(), name)
+    }
+
+    /// The shape a port of type `signal` takes: an input's source, an output's load. A
+    /// `Ground` is the reference and takes nothing; a `Pin` has no role.
+    pub fn for_role(signal: SignalType) -> Option<Shape> {
+        match signal {
+            SignalType::Power(Role::In) => Some(Shape::Supply),
+            SignalType::Analog(Role::In) => Some(Shape::Signal),
+            SignalType::Power(Role::Out) | SignalType::Analog(Role::Out) => Some(Shape::Load),
+            SignalType::Ground | SignalType::Pin => None,
+        }
+    }
+}
+
+/// The field named `name` among `fields`, with its position.
+fn field_named(
+    fields: &'static [FieldSchema],
+    name: &str,
+) -> Option<(usize, &'static FieldSchema)> {
+    fields.iter().enumerate().find(|(_, f)| f.name == name)
+}
+
+/// A field of a part kind or a setup's shape: its name, the value it expects, and
+/// whether it must be given.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FieldSchema {
     pub name: &'static str,
@@ -301,6 +370,30 @@ mod tests {
         let (_, beta) = PartKind::Npn.field("beta").unwrap();
         assert!(beta.ty.dim.is_none() && !beta.required);
         assert!(PartKind::Resistor.field("beta").is_none());
+    }
+
+    #[test]
+    fn shapes_fit_roles() {
+        for shape in Shape::ALL {
+            assert_eq!(Shape::from_name(shape.name()), Some(shape));
+        }
+        let supply = Shape::for_role(SignalType::Power(Role::In));
+        assert_eq!(supply, Some(Shape::Supply));
+        assert_eq!(
+            Shape::for_role(SignalType::Analog(Role::In)),
+            Some(Shape::Signal)
+        );
+        assert_eq!(
+            Shape::for_role(SignalType::Power(Role::Out)),
+            Some(Shape::Load)
+        );
+        assert_eq!(Shape::for_role(SignalType::Ground), None);
+        assert_eq!(Shape::for_role(SignalType::Pin), None);
+        // A source's voltage must be written; everything else is ideal when left out.
+        let (_, v) = Shape::Supply.field("v").unwrap();
+        assert!(v.required && v.ty.dim == Dimension::VOLT);
+        assert!(Shape::Load.fields().iter().all(|f| !f.required));
+        assert!(Shape::Load.field("v").is_none());
     }
 
     #[test]

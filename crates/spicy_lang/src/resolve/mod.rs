@@ -5,35 +5,40 @@
 //! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), then a
 //! third that marks what's broken, read top to bottom in [`resolve`]:
 //! 1. **The file's names:** every block's name, its circuit and contract (each named
-//!    after it) and its setups (each naming it after `for`), then every block's
-//!    [`Signature`] (its ports). A block can be placed before its definition. And the
-//!    file's values (`resolve/env.rs`): every `env` and `const`, typed against its
-//!    declared type, the consts first, since an env's or a part's value may name one.
+//!    after it), then every block's [`Signature`] (its ports). A block can be placed
+//!    before its definition. Then the file's values (`resolve/env.rs`): every `env` and
+//!    `const`, typed against its declared type, the consts first, since an env's, a
+//!    part's or a setup's value may name one. Then the setups (`resolve/setup.rs`), each
+//!    against the ports of the block it names after `for`.
 //! 2. **The circuits:** each block's circuit, by a [`BodyResolver`](body::BodyResolver)
 //!    of its own, which has two passes of its own: every name the circuit declares, then
 //!    every statement, so statement order never matters.
-//! 3. **What's broken:** every block with an error inside it, or a read of a broken
-//!    const, is tainted ([`Block::tainted`]), so flatten doesn't check a circuit with a
-//!    part missing.
+//! 3. **What's broken:** every block or setup with an error inside it, or a read of a
+//!    broken const, is tainted ([`Block::tainted`]), so flatten doesn't check a circuit
+//!    with a part missing.
 //!
 //! Errors never stop the stage (E7): a name that doesn't resolve becomes a placeholder
 //! holding the proof it was reported (an `InstanceOf::Error`, an `Err` binding), reported
-//! once. A second definition of a name (a block, a circuit, a port, a `net` or `let`, an
-//! `env` or `const`) is checked for its own mistakes, then dropped: it never enters the
-//! design. Which one was meant isn't known, so the first of a block, an env or a const
-//! defined twice is broken too: the block is tainted, the value is `Err`.
+//! once. A second definition of a name (a block, a circuit, a setup, a port, a `net` or
+//! `let`, an `env` or `const`) is checked for its own mistakes, then dropped: it never
+//! enters the design. Which one was meant isn't known, so the first is broken too: a
+//! block with two definitions or two circuits, or a setup, is tainted; an env's or
+//! const's value is `Err`.
 //!
-//! Contracts and setups are only matched to their blocks here; their contents are
-//! resolved in the next steps (contracts_plan.md steps 2–4).
+//! Contracts are only matched to their blocks here; their contents are resolved in the
+//! next steps (contracts_plan.md steps 3–4).
 
 mod body;
 mod env;
 mod error;
+mod fields;
+mod setup;
 mod value;
 
 pub use error::{NameKind, Namespace, ResolveError, ResolveErrorKind};
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use spicy_errors::{Diag, DiagKind, Reported};
 use spicy_model::design::{
@@ -73,13 +78,12 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         suggestions_left: SUGGESTION_BUDGET,
     };
 
-    // Pass 1, the file's names: every block's name, its circuit, contract and setups,
-    // then every block's ports. A block can be placed, and a port typed, before its
+    // Pass 1, the file's names: every block's name, its circuit and contract, then
+    // every block's ports. A block can be placed, and a port typed, before its
     // definition.
     let (decls, block_spans, second_decls) = r.declare_blocks();
     let (circuits, second_circuits) = r.match_to_blocks(NameKind::Circuit, decls.len());
     let (contracts, _) = r.match_to_blocks(NameKind::Contract, decls.len());
-    r.check_setups(decls.len());
     let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) = decls
         .iter()
         .zip(&circuits)
@@ -93,11 +97,14 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     let (consts, const_spans) = r.const_values(&value_decls);
     r.consts = Some(consts.iter().map(|c| c.value).collect());
     let (envs, env_spans) = r.env_values(&value_decls);
+    // …and the setups, each against its block's ports: its values may name a const, and
+    // its `temp` an env.
+    let (mut setups, second_setups) = r.setups(&signatures, &starts, &circuits, &envs);
 
     // A second circuit of a block is checked against the block's ports (see below).
     let second_starts: Vec<BlockBuilder> = second_circuits
         .iter()
-        .map(|&(_, block)| starts[block.index()].clone())
+        .map(|(_, second)| starts[second.first.index()].clone())
         .collect();
 
     // Pass 2, the circuits: each block's nets, instances and merges.
@@ -124,8 +131,8 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     for &(decl, _) in &second_decls {
         r.signature(decl, false);
     }
-    for (&(body, block), start) in second_circuits.iter().zip(second_starts) {
-        let signature = &signatures[block.index()];
+    for (&(body, second), start) in second_circuits.iter().zip(second_starts) {
+        let signature = &signatures[second.first.index()];
         BodyResolver::new(&mut r, &signatures, signature, start, &body.stmts).resolve(&body.stmts);
     }
 
@@ -155,11 +162,23 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
             .or_else(|| inside.inside(span))
             .or_else(|| circuit_span.and_then(|s| inside.inside(s)));
     }
-    // A block defined twice: which definition was meant isn't known, so the first,
-    // the one the design keeps, is broken too.
-    for (_, Redefined { first, reported }) in second_decls {
+    // A block defined twice, or with two circuits: which one was meant isn't known, so
+    // the first, the one the design keeps, is broken too.
+    let seconds = second_decls.iter().map(|&(_, second)| second);
+    let seconds = seconds.chain(second_circuits.iter().map(|&(_, second)| second));
+    for Redefined { first, reported } in seconds {
         design.blocks[first.index()].tainted.get_or_insert(reported);
     }
+    // The same for a setup: one with an error in it, or the first of two of one name for
+    // one block.
+    for s in &mut setups {
+        let inside = s.broken.or_else(|| inside.inside(s.item));
+        s.setup.tainted = s.setup.tainted.or(inside);
+    }
+    for Redefined { first, reported } in second_setups {
+        setups[first.index()].setup.tainted.get_or_insert(reported);
+    }
+    (design.setups, source_map.setups) = setups.into_iter().map(|s| (s.setup, s.spans)).unzip();
 
     Resolved {
         design,
@@ -224,6 +243,10 @@ enum FileValue {
 
 /// Each block's circuit or contract, if it has one, with the span of its item.
 type PerBlock<'p, 'src> = Vec<Option<(&'p Body<'src>, Span)>>;
+
+/// The second circuits or contracts of a block, each with its block, whose first one
+/// it redefines.
+type SecondBodies<'p, 'src> = Vec<(&'p Body<'src>, Redefined<BlockId>)>;
 
 /// The second definitions of a block name, each with the first it redefines.
 type SecondBlocks<'p, 'src> = Vec<(&'p BlockDecl<'src>, Redefined<BlockId>)>;
@@ -297,7 +320,7 @@ impl BlockBuilder {
     }
 }
 
-/// The names declared in one scope (the file's blocks, a block's ports, a block's nets
+/// The names declared in one scope (the file's blocks, a block's ports, setups, nets
 /// and instances), each with where it was first declared. The one place a name given
 /// twice is caught; a second declaration is reported and isn't entered (rustc's
 /// `try_plant_decl_into_local_module`, Spade's `ensure_is_unique`).
@@ -325,18 +348,22 @@ impl<'src, T: Copy> Scope<'src, T> {
         what: NameKind,
         errors: &mut Vec<ResolveError>,
     ) -> Result<(), Redefined<T>> {
-        if let Some(&(first, at)) = self.declared.get(name.text) {
-            let kind = ResolveErrorKind::Duplicate {
-                name: name.text.to_string(),
-                what,
-            };
-            let reported = ResolveError::new(kind, name.span)
-                .with_related(at)
-                .report(errors);
-            return Err(Redefined { first, reported });
-        }
-        self.declared.insert(name.text, (value, name.span));
-        Ok(())
+        // One lookup: the name is entered where it isn't found.
+        let (first, at) = match self.declared.entry(name.text) {
+            Entry::Occupied(declared) => *declared.get(),
+            Entry::Vacant(slot) => {
+                slot.insert((value, name.span));
+                return Ok(());
+            }
+        };
+        let kind = ResolveErrorKind::Duplicate {
+            name: name.text.to_string(),
+            what,
+        };
+        let reported = ResolveError::new(kind, name.span)
+            .with_related(at)
+            .report(errors);
+        Err(Redefined { first, reported })
     }
 
     fn get(&self, name: &str) -> Option<T> {
@@ -359,8 +386,8 @@ impl<'src, T: Copy> Scope<'src, T> {
 
 /// The first declaration of a name declared again, and the proof the second was
 /// reported. Which one was meant isn't known, so the first is broken too where it can
-/// be: a block defined twice is tainted (pass 3), an env's or const's value is `Err`
-/// (`resolve/env.rs`).
+/// be: a block or a setup defined twice is tainted (pass 3), an env's or const's value
+/// is `Err` (`resolve/env.rs`).
 #[derive(Clone, Copy)]
 struct Redefined<T> {
     first: T,
@@ -420,6 +447,19 @@ impl<'p, 'src> Resolver<'p, 'src> {
         ResolveError::new(kind, at).report(&mut self.errors)
     }
 
+    /// What `name` is in the kind namespace, for an error that says so ("`Resistor` is a
+    /// part kind, not a shape"): the file's blocks first, then the prelude's part kinds
+    /// and signal types, the order a kind is looked up in (model.md E5).
+    fn kind_of(&self, name: &str) -> Option<NameKind> {
+        if self.blocks.get(name).is_some() {
+            Some(NameKind::Block)
+        } else if PartKind::from_name(name).is_some() {
+            Some(NameKind::PartKind)
+        } else {
+            SignalType::is_name(name).then_some(NameKind::SignalType)
+        }
+    }
+
     // --- Pass 1: the file's names ---------------------------------------------------
 
     /// Every block's name, in `blocks`. Returns the blocks of the design, in source
@@ -453,7 +493,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         &mut self,
         what: NameKind,
         blocks: usize,
-    ) -> (PerBlock<'p, 'src>, Vec<(&'p Body<'src>, BlockId)>) {
+    ) -> (PerBlock<'p, 'src>, SecondBodies<'p, 'src>) {
         let (mut first, mut second) = (vec![None; blocks], Vec::new());
         let mut seen = Scope::default();
         for item in &self.parsed.file.items {
@@ -465,7 +505,9 @@ impl<'p, 'src> Resolver<'p, 'src> {
             let declared = seen.declare(&body.name, (), what, &mut self.errors);
             match (self.blocks.get(body.name.text), declared) {
                 (Some(block), Ok(())) => first[block.index()] = Some((body, item.span)),
-                (Some(block), Err(_)) => second.push((body, block)),
+                (Some(first), Err(Redefined { reported, .. })) => {
+                    second.push((body, Redefined { first, reported }));
+                }
                 (None, Ok(())) => {
                     let kind = ResolveErrorKind::UnknownBlock {
                         item: what,
@@ -479,32 +521,6 @@ impl<'p, 'src> Resolver<'p, 'src> {
         (first, second)
     }
 
-    /// The block after each setup's `for` is one of the `blocks` blocks, and each block's
-    /// setups have different names. Setups are named per block, so every block can have
-    /// its own `Operating` (research/contract_v4_review_implementation.md §3.2).
-    fn check_setups(&mut self, blocks: usize) {
-        let mut seen: Vec<Scope<()>> = vec![Scope::default(); blocks];
-        for item in &self.parsed.file.items {
-            let ItemKind::Setup(setup) = &item.kind else {
-                continue;
-            };
-            let name = self.path_text(&setup.block);
-            match self.blocks.get(name) {
-                Some(block) => {
-                    let setups = &mut seen[block.index()];
-                    let _ = setups.declare(&setup.name, (), NameKind::Setup, &mut self.errors);
-                }
-                None => {
-                    let kind = ResolveErrorKind::UnknownBlock {
-                        item: NameKind::Setup,
-                        name: name.to_string(),
-                    };
-                    self.report(kind, setup.block.span);
-                }
-            }
-        }
-    }
-
     /// A block's signature, and the start of the block itself: its name, and its ports
     /// with their types and nets.
     fn signature(
@@ -513,6 +529,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         has_circuit: bool,
     ) -> (Signature<'src>, BlockBuilder) {
         let mut block = BlockBuilder::new(&decl.name);
+        block.block.has_circuit = has_circuit;
         let mut ports = Scope::default();
         for port in &decl.ports {
             let BlockEntry::Port { name, ty } = &port.kind else {
@@ -557,12 +574,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         let name = self.path_text(path);
         if !SignalType::is_name(name) {
             // `v: Resistor` as a port: say what it is instead of "isn't a port type".
-            let is = if self.blocks.get(name).is_some() {
-                Some(NameKind::Block)
-            } else {
-                PartKind::from_name(name).map(|_| NameKind::PartKind)
-            };
-            let kind = match is {
+            let kind = match self.kind_of(name) {
                 Some(is) => ResolveErrorKind::WrongNamespace {
                     name: name.to_string(),
                     is,
@@ -890,6 +902,26 @@ mod tests {
             errors,
             ["Duplicate", "Duplicate", "BadSignalType", "UnknownName"]
         );
+    }
+
+    /// A block with no circuit differs from one with an empty `circuit A {}`
+    /// (contracts_plan.md §3.1), and placing it is `NoCircuit`: the model's
+    /// `Block::has_circuit` and the signature's, which a placement reads, agree.
+    #[test]
+    fn a_block_knows_whether_it_has_a_circuit() {
+        let src = "block A { p: Pin }\n\nblock B { p: Pin }\n\ncircuit B {}\n\n\
+                   block Top { x: Pin }\n\ncircuit Top {\n    let a = A { p: x };\n    \
+                   let b = B { p: x };\n}\n";
+        let resolved = resolve(&parse(src));
+        let has: Vec<bool> = resolved
+            .design
+            .blocks
+            .iter()
+            .map(|b| b.has_circuit)
+            .collect();
+        assert_eq!(has, [false, true, true]);
+        let errors: Vec<_> = resolved.errors.iter().map(|e| e.kind.name()).collect();
+        assert_eq!(errors, ["NoCircuit"]);
     }
 
     /// `C { a }` where `a` is an instance: the shorthand names pin `a`, so the error

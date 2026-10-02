@@ -1,0 +1,53 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 667
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_fields.spl
+---
+block Amp 127..130
+  port vcc: Power<In> 133..136
+  port gnd: Ground 149..152
+  port input: Analog<In> 162..167
+  port output: Analog<Out> 181..187
+env ambient 80..87 = 298.15 K (25 °C) (263.15 K..=333.15 K)
+setup Fields 226..232 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = <invalid>
+  output: Load r = <invalid>
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-duplicate Duplicate 275..285 "vcc.v: 11V" related 261..267
+E-unsupported Unsupported 310..314 "Step"
+E-unsupported Unsupported 381..388 "ambient"
+E-binding UnknownField 390..392 "cc" fix 390..392 "c"
+
+--- rendered ---
+error[E-duplicate]: `v` is given twice
+   --> setup_fields.spl:10:5
+   |
+ 9 |     vcc: Supply { v: 12V },
+   |                   ------ first given here
+10 |     vcc.v: 11V,
+   |     ^^^^^^^^^^ second time
+
+error[E-unsupported]: not supported yet: `Step` and `Sweep`
+   --> setup_fields.spl:11:24
+   |
+11 |     input: Signal { v: Step { from: 0V, to: 1V, edge: 1us, at: 1ms } },
+   |                        ^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: an env's name anywhere but a setup's `temp:`
+   --> setup_fields.spl:12:23
+   |
+12 |     output: Load { r: ambient, cc: 1nF },
+   |                       ^^^^^^^ not supported yet
+
+error[E-binding]: `Load` has no field `cc`
+   --> setup_fields.spl:12:32
+   |
+12 |     output: Load { r: ambient, cc: 1nF },
+   |                                ^^ unknown
+   |
+   = help: did you mean `c`?
+   = note: `Load` has `r`, `c` and `i`

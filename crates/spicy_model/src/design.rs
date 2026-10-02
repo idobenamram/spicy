@@ -8,7 +8,7 @@
 
 use spicy_index::id;
 
-use crate::prelude::{PartKind, SignalType};
+use crate::prelude::{PartKind, Shape, SignalType};
 use crate::units::{Quantity, Value};
 use spicy_errors::Reported;
 use spicy_span::Span;
@@ -38,6 +38,10 @@ id!(
     /// A `const`, by its position in [`Design::consts`] (source order).
     ConstId
 );
+id!(
+    /// A `setup`, by its position in [`Design::setups`] (source order).
+    SetupId
+);
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Design {
@@ -47,6 +51,7 @@ pub struct Design {
     pub contracts: Vec<Option<Contract>>,
     pub envs: Vec<Env>,
     pub consts: Vec<Const>,
+    pub setups: Vec<Setup>,
 }
 
 /// `env ambient: Temperature in -10°C..=60°C;`: a condition of the whole project, a
@@ -68,6 +73,42 @@ pub struct Const {
     pub name: String,
     /// `Err` when the type or the value was wrong, or the name is defined twice.
     pub value: Result<Quantity, Reported>,
+}
+
+/// `setup Operating for CeAmp { … }`: the world around a block, what its specs are
+/// checked in (language.md §8.2). Named per block: every block can have its own
+/// `Operating`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Setup {
+    pub name: String,
+    pub block: BlockId,
+    /// What's on each of the block's ports, by `PortId`. `None` for a port that takes
+    /// nothing (a `Ground`, a `Pin`, a port whose type is wrong) and for one the setup
+    /// leaves out, which is reported: every port with a role must be written.
+    pub ports: Vec<Option<PortSetup>>,
+    /// The temperature. `Err` when it's wrong or not written.
+    pub temp: Result<Temp, Reported>,
+    /// As [`Block::tainted`]: whether an error was reported inside the setup, or a value
+    /// it reads is broken, or it's the first of two setups of one name for one block.
+    pub tainted: Option<Reported>,
+}
+
+/// What's on one port: its shape, and each of the shape's fields in the order of
+/// [`Shape::fields`]. An optional field left out is `Unset`: ideal, so it gets no knob
+/// (a 0 Ω source, nothing on the output).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PortSetup {
+    pub shape: Shape,
+    pub fields: Vec<FieldValue>,
+}
+
+/// A setup's temperature.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Temp {
+    /// `temp: ambient`: the env's range, one knob for every setup of a root that names it.
+    Env(EnvId),
+    /// `temp: 25°C`, `temp: -40°C..=125°C`, or a const's value.
+    Value(Value),
 }
 
 /// A block's contract. Its contents (its default setup, measures, specs) are resolved
@@ -93,6 +134,9 @@ pub struct Block {
     /// `net x = [a, b];`: `x` and the listed nets are one net. Applied by flatten's
     /// union-find, with every name kept as an alias (model.md E15).
     pub merges: Vec<Merge>,
+    /// Whether the block has a `circuit`, so a block with none differs from one with an
+    /// empty `circuit A {}` (contracts_plan.md §3.1).
+    pub has_circuit: bool,
     /// Whether an error was reported inside the block (by the lexer, the parser or
     /// resolve), or a value it reads is broken (a part's value naming a const whose own
     /// value is wrong), with the proof (rustc's `tainted_by_errors`). Every placeholder
@@ -189,6 +233,16 @@ pub enum InstanceOf {
     Error(Reported),
 }
 
+/// A value as a field holds it: `Err` is a value that was wrong, reported.
+impl From<Result<Value, Reported>> for FieldValue {
+    fn from(value: Result<Value, Reported>) -> Self {
+        match value {
+            Ok(value) => FieldValue::Given(value),
+            Err(reported) => FieldValue::Invalid(reported),
+        }
+    }
+}
+
 /// Where every part of the `Design` was written, indexed like the design itself.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct DesignSourceMap {
@@ -196,6 +250,27 @@ pub struct DesignSourceMap {
     /// Each env's and const's name, indexed like [`Design::envs`] and [`Design::consts`].
     pub envs: Vec<Span>,
     pub consts: Vec<Span>,
+    pub setups: Vec<SetupSpans>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct SetupSpans {
+    /// The setup's name in `setup Name for Block`.
+    pub name: Span,
+    /// Each port's entries, indexed like [`Setup::ports`].
+    pub ports: Vec<Option<PortSetupSpans>>,
+    /// The `temp: …` entry, if it's written.
+    pub temp: Option<Span>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct PortSetupSpans {
+    /// The `vcc: Supply { … }` entry; `None` when the shape is implied by the port's
+    /// role (`vout.i: 5mA` alone).
+    pub shape: Option<Span>,
+    /// Where each field was given, in the shape (`v: 12V`) or by a path (`vcc.v: 12V`),
+    /// in the order of [`PortSetup::fields`].
+    pub fields: Vec<Option<Span>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

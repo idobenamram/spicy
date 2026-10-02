@@ -1,0 +1,21 @@
+// A key is one of the block's ports, a field of what's on one, or `temp`; attributes
+// aren't read on setups yet (plan §2.9 c).
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out>, aux: Pin }
+
+circuit Amp {
+    net base;
+}
+
+#[confidence(worst_case)]
+setup Keys for Amp {
+    vcc: Supply { v: 12V },
+    input: Signal { v: 0V },
+    output: Load {},
+    temp: 25°C,
+    base: Supply { v: 1V },
+    vcc.v.dc: 12V,
+    window: ..=1ms,
+    aux: Load {},
+    #[hint]
+    output.c: 1nF,
+}

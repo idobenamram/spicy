@@ -1,0 +1,34 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 652
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/setups.spl
+---
+block Ldo 264..267
+  port vin: Power<In> 270..273
+  port vout: Power<Out> 286..290
+  port gnd: Ground 304..307
+  port en: Analog<In> 317..319
+env ambient 159..166 = 298.15 K (25 °C) (263.15 K..=333.15 K)
+const T_LAB 205..210 = 298.15 K (25 °C)
+const R_MIN 239..244 = 10000 Ω
+setup Operating 522..531 for Ldo
+  vin: Supply v = 4.9 V (4.3 V..=5.5 V) z = 0.25 Ω (0 Ω..=0.5 Ω)
+  vout: Load c = 0.00001 F (0 F..=0.00002 F) i = 0.0275 A (0.005 A..=0.05 A)
+  en: Signal v = 3.3 V
+  temp = ambient
+setup Bench 791..796 for Ldo
+  vin: Supply v = 5 V ± 1%
+  vout: Load r = 10000 Ω
+  en: Signal v = 0 V
+  temp = 298.15 K (25 °C)
+setup Hot 870..873 for Ldo
+  vin: Supply v = 5 V
+  vout: Load
+  en: Signal v = 0 V
+  temp = 358.15 K (85 °C)
+setup Wide 941..945 for Ldo
+  vin: Supply v = 5 V
+  vout: Load
+  en: Signal v = 0 V
+  temp = 315.65 K (42.5 °C) (233.14999999999998 K..=398.15 K)

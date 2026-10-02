@@ -1,17 +1,17 @@
 // A setup's name is given once per block, and the block after `for` is one of the file's.
-block A { p: Pin }
+block A { p: Power<In> }
 
 circuit A {}
 
-block B { p: Pin }
+block B { p: Power<In> }
 
 circuit B {}
 
-setup S for A { p: Supply {} }
+setup S for A { p: Supply { v: 1V }, temp: 25°C }
 
-setup S for A { p: Supply {} }
+setup S for A { p: Supply { v: 2V }, temp: 25°C }
 
 // Each block names its own setups: this `S` is `B`'s, not a second `A`'s.
-setup S for B { p: Supply {} }
+setup S for B { p: Supply { v: 1V }, temp: 25°C }
 
 setup T for Nowhere {}

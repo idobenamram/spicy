@@ -1,0 +1,14 @@
+// A shape's fields: each given once, in the shape or by a path, and typed.
+env ambient: Temperature in -10°C..=60°C;
+
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {}
+
+setup Fields for Amp {
+    vcc: Supply { v: 12V },
+    vcc.v: 11V,
+    input: Signal { v: Step { from: 0V, to: 1V, edge: 1us, at: 1ms } },
+    output: Load { r: ambient, cc: 1nF },
+    temp: 25°C,
+}

@@ -1,0 +1,63 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 667
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_keys.spl
+---
+block Amp 137..140
+  port vcc: Power<In> 143..146
+  port gnd: Ground 159..162
+  port input: Analog<In> 172..177
+  port output: Analog<Out> 191..197
+  port aux: Pin 212..215
+  net base 246..250
+setup Keys 287..291 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load c = 0.000000001 F
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-unsupported Unsupported 255..280 "#[confidence(worst_case)]"
+E-name WrongNamespace 401..405 "base"
+E-unsupported Unsupported 429..437 "vcc.v.dc"
+E-unsupported Unsupported 448..454 "window"
+E-unsupported Unsupported 468..471 "aux"
+E-unsupported Unsupported 486..493 "#[hint]"
+
+--- rendered ---
+error[E-unsupported]: not supported yet: attributes on a setup
+  --> setup_keys.spl:9:1
+  |
+9 | #[confidence(worst_case)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ not supported yet
+
+error[E-name]: `base` is a net, not a port
+   --> setup_keys.spl:15:5
+   |
+15 |     base: Supply { v: 1V },
+   |     ^^^^ expected a port
+
+error[E-unsupported]: not supported yet: a key deeper than `port.field`
+   --> setup_keys.spl:16:5
+   |
+16 |     vcc.v.dc: 12V,
+   |     ^^^^^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: `window`
+   --> setup_keys.spl:17:5
+   |
+17 |     window: ..=1ms,
+   |     ^^^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: a setup entry on a `Pin` port, which has no role
+   --> setup_keys.spl:18:5
+   |
+18 |     aux: Load {},
+   |     ^^^ not supported yet
+
+error[E-unsupported]: not supported yet: attributes on a setup
+   --> setup_keys.spl:19:5
+   |
+19 |     #[hint]
+   |     ^^^^^^^ not supported yet

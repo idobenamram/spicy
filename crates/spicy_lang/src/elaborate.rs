@@ -342,6 +342,27 @@ mod tests {
         assert_eq!(flatten_errors(src), vec![], "{src}");
     }
 
+    /// A block with two circuits is broken the same way: which circuit was meant isn't
+    /// known, so the one the design keeps isn't checked as a whole either (contracts_plan
+    /// §3: the second-definition rule).
+    #[test]
+    fn a_block_with_two_circuits_is_broken() {
+        let src = "block A { g: Ground }\n\ncircuit A {\n    net x;\n    \
+                   let r = Resistor { a: x, b: x, value: 1k };\n}\n\n\
+                   circuit A {}\n\n\
+                   block T { g: Ground }\n\ncircuit T {\n    let a = A { g };\n}\n";
+        let elaborated = elaborate(&parse(src));
+        let kinds: Vec<_> = elaborated
+            .resolved
+            .errors
+            .iter()
+            .map(|e| e.kind.name())
+            .collect();
+        assert_eq!(kinds, ["Duplicate"]);
+        assert!(elaborated.resolved.design.blocks[0].tainted.is_some());
+        assert_eq!(flatten_errors(src), vec![], "{src}");
+    }
+
     /// A spread of nothing varies nothing: `± 0%` and `200..=200` are exact values, not
     /// knobs (ngspice's `agauss` returns the nominal for one; Xyce still samples it, which
     /// shifts every later draw).

@@ -1,0 +1,18 @@
+// A port takes a shape, the one its role takes, written by name.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {}
+
+setup Shapes for Amp {
+    vcc: 12V,
+    input: Signl { v: 0V },
+    output: Resistor { value: 1k },
+    temp: 25°C,
+}
+
+setup Stimulus for Amp {
+    vcc: Supply { v: 12V },
+    input: Step { from: 0V, to: 1V, edge: 1us, at: 1ms },
+    output: Load {},
+    temp: 25°C,
+}

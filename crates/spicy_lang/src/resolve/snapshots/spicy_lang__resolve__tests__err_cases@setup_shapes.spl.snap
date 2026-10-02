@@ -1,0 +1,56 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 667
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_shapes.spl
+---
+block Amp 72..75
+  port vcc: Power<In> 78..81
+  port gnd: Ground 94..97
+  port input: Analog<In> 107..112
+  port output: Analog<Out> 126..132
+setup Shapes 171..177 for Amp
+  vcc: Supply v = <invalid>
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+setup Stimulus 292..300 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = <invalid>
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-setup NotAShape 197..200 "12V"
+E-name UnknownName 213..218 "Signl" fix 213..218 "Signal"
+E-name WrongNamespace 242..250 "Resistor"
+E-unsupported Unsupported 350..354 "Step"
+
+--- rendered ---
+error[E-setup]: `vcc` takes a shape, not a value
+  --> setup_shapes.spl:7:10
+  |
+7 |     vcc: 12V,
+  |          ^^^ a value
+  |
+  = help: give it the whole shape, `vcc: Supply { v: … }`, or one field, `vcc.v: …`
+
+error[E-name]: unknown shape `Signl`
+  --> setup_shapes.spl:8:12
+  |
+8 |     input: Signl { v: 0V },
+  |            ^^^^^ not defined
+  |
+  = help: did you mean `Signal`?
+
+error[E-name]: `Resistor` is a part kind, not a shape
+  --> setup_shapes.spl:9:13
+  |
+9 |     output: Resistor { value: 1k },
+  |             ^^^^^^^^ expected a shape
+
+error[E-unsupported]: not supported yet: `Step` and `Sweep`
+   --> setup_shapes.spl:15:12
+   |
+15 |     input: Step { from: 0V, to: 1V, edge: 1us, at: 1ms },
+   |            ^^^^ not supported yet

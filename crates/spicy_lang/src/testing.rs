@@ -645,13 +645,13 @@ fn path_text(path: &Path) -> String {
 
 // --- Resolve -----------------------------------------------------------------------
 
-use spicy_model::design::{Design, DesignSourceMap, FieldValue, InstanceOf};
+use spicy_model::design::{Design, DesignSourceMap, FieldValue, InstanceOf, PortId, Temp};
 
 use spicy_model::flat::{
     Flat, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
 };
 use spicy_model::flatten::{FlattenError, FlattenProblem, check_simulation};
-use spicy_model::prelude::SignalType;
+use spicy_model::prelude::{Shape, SignalType};
 
 use crate::elaborate::{Elaborated, elaborate};
 use crate::resolve::{ResolveError, resolve};
@@ -846,6 +846,44 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
         let value = c.value.map_or_else(invalid, |q| q.to_string());
         let _ = writeln!(out, "const {} {} = {value}", c.name, at(*span));
     }
+    for (setup, spans) in design.setups.iter().zip(&map.setups) {
+        let block = design.block(setup.block);
+        let _ = writeln!(
+            out,
+            "setup {} {} for {}",
+            setup.name,
+            at(spans.name),
+            block.name
+        );
+        for (p, port) in setup.ports.iter().enumerate() {
+            let Some(port) = port else {
+                continue;
+            };
+            let mut line = format!(
+                "  {}: {}",
+                block.port_name(PortId::new(p)),
+                port.shape.name()
+            );
+            for (field, value) in port.shape.fields().iter().zip(&port.fields) {
+                match value {
+                    FieldValue::Unset => {}
+                    FieldValue::Given(v) => {
+                        let _ = write!(line, " {} = {v}", field.name);
+                    }
+                    FieldValue::Invalid(_) => {
+                        let _ = write!(line, " {} = <invalid>", field.name);
+                    }
+                }
+            }
+            let _ = writeln!(out, "{line}");
+        }
+        let temp = match setup.temp {
+            Ok(Temp::Env(env)) => design.envs[env.index()].name.clone(),
+            Ok(Temp::Value(v)) => v.to_string(),
+            Err(_) => "<invalid>".to_string(),
+        };
+        let _ = writeln!(out, "  temp = {temp}");
+    }
     out
 }
 
@@ -883,6 +921,86 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
             "an env's or const's span is its name"
         );
         assert!(names.insert(name), "`{name}` is defined once in the design");
+    }
+    // The setups: each at its own name, once per block, a slot per port and per field
+    // of its shape, with spans alike, and every placeholder taints its setup.
+    assert_eq!(
+        design.setups.len(),
+        map.setups.len(),
+        "a span table per setup"
+    );
+    let mut setups = std::collections::HashSet::new();
+    for (setup, spans) in design.setups.iter().zip(&map.setups) {
+        in_src(spans.name, "setup name");
+        assert_eq!(
+            &src[spans.name.range()],
+            setup.name,
+            "a setup's span is its name"
+        );
+        let once = setups.insert((setup.block, &setup.name));
+        assert!(once, "setup `{}` is defined once per block", setup.name);
+        let block = design.block(setup.block);
+        assert_eq!(setup.ports.len(), block.ports.len(), "a slot per port");
+        assert_eq!(spans.ports.len(), setup.ports.len(), "a span slot per port");
+        for (port, port_spans) in setup.ports.iter().zip(&spans.ports) {
+            let (Some(port), Some(port_spans)) = (port, port_spans) else {
+                assert!(
+                    port.is_none() && port_spans.is_none(),
+                    "a port's spans match it"
+                );
+                continue;
+            };
+            assert_eq!(
+                port.fields.len(),
+                port.shape.fields().len(),
+                "a slot per field"
+            );
+            assert_eq!(
+                port_spans.fields.len(),
+                port.fields.len(),
+                "a span per field"
+            );
+            port_spans
+                .shape
+                .iter()
+                .for_each(|&s| in_src(s, "setup shape"));
+            for (value, s) in port.fields.iter().zip(&port_spans.fields) {
+                s.iter().for_each(|&s| in_src(s, "setup field"));
+                match value {
+                    FieldValue::Unset => assert!(s.is_none(), "an unset field wasn't written"),
+                    FieldValue::Given(_) => assert!(s.is_some(), "a given field was written"),
+                    FieldValue::Invalid(_) => {}
+                }
+            }
+        }
+        spans.temp.iter().for_each(|&s| in_src(s, "setup temp"));
+        assert!(
+            spans.temp.is_some() || setup.temp.is_err(),
+            "an unwritten `temp` is an error"
+        );
+        if let Ok(Temp::Env(env)) = setup.temp {
+            assert!(
+                design.envs[env.index()].value.is_ok(),
+                "`temp` names a sound env"
+            );
+        }
+        let fields = setup.ports.iter().flatten().flat_map(|p| &p.fields);
+        // A port with a role that nothing sets was left out, which is reported.
+        let left_out = setup.ports.iter().zip(&block.ports).any(|(set, port)| {
+            let role = port.signal.ok().and_then(Shape::for_role);
+            set.is_none() && role.is_some()
+        });
+        let placeholder = setup.temp.is_err()
+            || left_out
+            || fields
+                .into_iter()
+                .any(|f| matches!(f, FieldValue::Invalid(_)));
+        if placeholder {
+            assert!(
+                setup.tainted.is_some(),
+                "a setup with a placeholder is tainted"
+            );
+        }
     }
     let inside = |s: Span, outer: Span, what: &str| {
         assert!(

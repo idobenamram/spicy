@@ -321,6 +321,21 @@ impl Value {
         }
     }
 
+    /// `lo..=hi`, whose nominal is the midpoint (model.md E16): `100..=300` is 200. The
+    /// caller checks that `lo` isn't above `hi`.
+    pub fn range(lo: Quantity, hi: Quantity) -> Self {
+        Self {
+            nominal: Quantity {
+                si: (lo.si + hi.si) / 2.0,
+                ..lo
+            },
+            spread: Spread::Range {
+                lo: lo.si,
+                hi: hi.si,
+            },
+        }
+    }
+
     /// `self` times `k`: the nominal and an absolute spread scale, a relative one
     /// doesn't. A negative `k` flips a range, so `lo` stays the lower bound.
     pub fn scaled(self, k: f64) -> Self {

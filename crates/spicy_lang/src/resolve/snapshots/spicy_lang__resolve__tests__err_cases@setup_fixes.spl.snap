@@ -1,0 +1,145 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 684
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_fixes.spl
+---
+block Amp 269..272
+  port vcc: Power<In> 275..278
+  port gnd: Ground 291..294
+  port input: Analog<In> 304..309
+  port output: Analog<Out> 323..329
+  port aux: Pin 344..347
+setup NoVoltage 469..478 for Amp
+  vcc: Supply v = <invalid> z = 1 Ω
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+setup WrongUnit 563..572 for Amp
+  vcc: Supply v = <invalid>
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+setup Bare 725..729 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = <invalid>
+setup NotTemp 888..895 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = <invalid>
+setup NotTempEither 970..983 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = <invalid>
+setup NotAux 1066..1072 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-setup IncompleteSetup 469..478 "NoVoltage"
+E-binding UnknownField 489..491 "vc" fix 489..491 "vcc"
+E-binding UnknownField 583..585 "vc" fix 583..585 "vcc"
+E-unit UnitMismatch 599..602 "12A"
+E-binding UnknownField 782..785 "tmp" fix 782..785 "temp"
+E-unit TemperaturePoint 787..789 "25" fix 787..789 "25°C"
+E-setup IncompleteSetup 888..895 "NotTemp"
+E-binding UnknownField 948..951 "tmp"
+E-setup IncompleteSetup 970..983 "NotTempEither"
+E-binding UnknownField 1036..1038 "vc"
+E-binding UnknownField 1138..1140 "ax"
+
+--- rendered ---
+error[E-setup]: setup `NoVoltage` leaves out `vcc.v`
+  --> setup_fixes.spl:9:7
+  |
+9 | setup NoVoltage for Amp { vc: Supply { z: 1Ω }, input.v: 0V, output: Load {}, temp: 25°C }
+  |       ^^^^^^^^^ incomplete
+  |
+  = note: every port with a role is set, a source's voltage has no ideal default, and `temp` isn't assumed (language.md §8.2)
+
+error[E-binding]: `Amp` has no port `vc`
+  --> setup_fixes.spl:9:27
+  |
+9 | setup NoVoltage for Amp { vc: Supply { z: 1Ω }, input.v: 0V, output: Load {}, temp: 25°C }
+  |                           ^^ unknown
+  |
+  = help: did you mean `vcc`?
+  = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`
+
+error[E-binding]: `Amp` has no port `vc`
+   --> setup_fixes.spl:11:27
+   |
+11 | setup WrongUnit for Amp { vc: Supply { v: 12A }, input.v: 0V, output: Load {}, temp: 25°C }
+   |                           ^^ unknown
+   |
+   = help: did you mean `vcc`?
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`
+
+error[E-unit]: expected `V` (a voltage), found `A` (a current)
+   --> setup_fixes.spl:11:43
+   |
+11 | setup WrongUnit for Amp { vc: Supply { v: 12A }, input.v: 0V, output: Load {}, temp: 25°C }
+   |                                           ^^^ this is `A` (a current)
+
+error[E-binding]: `Amp` has no port `tmp`
+   --> setup_fixes.spl:14:64
+   |
+14 | setup Bare for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp: 25 }
+   |                                                                ^^^ unknown
+   |
+   = help: did you mean `temp`?
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`
+
+error[E-unit]: a temperature is written in `°C`
+   --> setup_fixes.spl:14:69
+   |
+14 | setup Bare for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp: 25 }
+   |                                                                     ^^ a plain number
+   |
+   = help: write `25°C`
+
+error[E-setup]: setup `NotTemp` leaves out `temp`
+   --> setup_fixes.spl:17:7
+   |
+17 | setup NotTemp for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp.v: 25°C }
+   |       ^^^^^^^ incomplete
+   |
+   = note: every port with a role is set, a source's voltage has no ideal default, and `temp` isn't assumed (language.md §8.2)
+
+error[E-binding]: `Amp` has no port `tmp`
+   --> setup_fixes.spl:17:67
+   |
+17 | setup NotTemp for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp.v: 25°C }
+   |                                                                   ^^^ unknown
+   |
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`
+
+error[E-setup]: setup `NotTempEither` leaves out `temp`
+   --> setup_fixes.spl:19:7
+   |
+19 | setup NotTempEither for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, vc: Supply { v: 1V } }
+   |       ^^^^^^^^^^^^^ incomplete
+   |
+   = note: every port with a role is set, a source's voltage has no ideal default, and `temp` isn't assumed (language.md §8.2)
+
+error[E-binding]: `Amp` has no port `vc`
+   --> setup_fixes.spl:19:73
+   |
+19 | setup NotTempEither for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, vc: Supply { v: 1V } }
+   |                                                                         ^^ unknown
+   |
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`
+
+error[E-binding]: `Amp` has no port `ax`
+   --> setup_fixes.spl:21:78
+   |
+21 | setup NotAux for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, temp: 25°C, ax: Load {} }
+   |                                                                              ^^ unknown
+   |
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output`, `aux` and `temp`

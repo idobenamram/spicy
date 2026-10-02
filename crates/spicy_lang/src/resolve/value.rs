@@ -127,15 +127,7 @@ impl Resolver<'_, '_> {
         if lo.si > hi.si {
             return Err(self.report(ResolveErrorKind::RangeReversed, at));
         }
-        let nominal = Quantity {
-            si: (lo.si + hi.si) / 2.0,
-            ..lo
-        };
-        let spread = Spread::Range {
-            lo: lo.si,
-            hi: hi.si,
-        };
-        Ok(Value { nominal, spread })
+        Ok(Value::range(lo, hi))
     }
 
     /// `Ok` if a spread of type `expected` may be scaled; `at` is the scaled spread. A
@@ -501,7 +493,7 @@ fn is_spread(e: &Expr) -> bool {
     )
 }
 
-fn unparen<'e, 'src>(mut e: &'e Expr<'src>) -> &'e Expr<'src> {
+pub(super) fn unparen<'e, 'src>(mut e: &'e Expr<'src>) -> &'e Expr<'src> {
     while let ExprKind::Paren(inner) = &e.kind {
         e = inner;
     }

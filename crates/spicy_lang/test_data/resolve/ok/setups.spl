@@ -1,0 +1,26 @@
+// Setups: each port's shape, written whole or implied by a path into it, and `temp` as
+// an env, a const, a point or a range (contracts_plan.md step 2).
+env ambient: Temperature in -10°C..=60°C;
+const T_LAB: Temperature = 25°C;
+const R_MIN: Ohm = 10k;
+
+block Ldo { vin: Power<In>, vout: Power<Out>, gnd: Ground, en: Analog<In> }
+
+circuit Ldo {}
+
+// A whole shape, and a path merged into one: `vout` is a `Load` with `c` and `i`. A
+// field that can't be negative starts at 0 when only its upper end is written.
+setup Operating for Ldo {
+    vin: Supply { v: 4.3V..=5.5V, z: ..=0.5Ω },
+    vout: Load { c: ..=20uF },
+    vout.i: 5mA..=50mA,
+    en: Signal { v: 3.3V },
+    temp: ambient,
+}
+
+// Implied shapes: `vin.v` alone makes `vin` a `Supply`, `vout.r` makes `vout` a `Load`.
+setup Bench for Ldo { vin.v: 5V ± 1%, vout.r: R_MIN, en.v: 0V, temp: T_LAB }
+
+setup Hot for Ldo { vin.v: 5V, vout: Load {}, en.v: 0V, temp: 85°C }
+
+setup Wide for Ldo { vin.v: 5V, vout: Load {}, en.v: 0V, temp: -40°C..=125°C }

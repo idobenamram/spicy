@@ -1,0 +1,13 @@
+// A setup sets what the world does to the block: a source on an input, a load on an
+// output, nothing on ground (language.md §8.2).
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {}
+
+setup Wrong for Amp {
+    vcc: Load { v: 12V },
+    gnd: Supply { v: 0V },
+    input: Signal { v: 0V },
+    output.v: 4.5V..=6.5V,
+    temp: 25°C,
+}

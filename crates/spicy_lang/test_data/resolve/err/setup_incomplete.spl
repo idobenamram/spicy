@@ -1,0 +1,19 @@
+// Every port with a role is set, with its source's voltage, and so is `temp` (v5 rule
+// 1.3.1): one error lists everything left out.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {}
+
+setup Operating for Amp {
+    vcc: Supply { z: 1Ω },
+    output: Load {},
+}
+
+// A misspelled key or field is one mistake, not also something left out: renamed, it
+// sets what was missing.
+setup Typos for Amp {
+    vc: Supply { v: 12V },
+    input: Signal { vv: 0V },
+    output: Load {},
+    temp: 25°C,
+}

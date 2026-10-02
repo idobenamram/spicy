@@ -1,0 +1,52 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 684
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_incomplete.spl
+---
+block Amp 141..144
+  port vcc: Power<In> 147..150
+  port gnd: Ground 163..166
+  port input: Analog<In> 176..181
+  port output: Analog<Out> 195..201
+setup Operating 240..249 for Amp
+  vcc: Supply v = <invalid> z = 1 Ω
+  output: Load
+  temp = <invalid>
+setup Typos 430..435 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = <invalid>
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-setup IncompleteSetup 240..249 "Operating"
+E-binding UnknownField 450..452 "vc" fix 450..452 "vcc"
+E-binding UnknownField 493..495 "vv" fix 493..495 "v"
+
+--- rendered ---
+error[E-setup]: setup `Operating` leaves out `vcc.v`, `input` and `temp`
+  --> setup_incomplete.spl:7:7
+  |
+7 | setup Operating for Amp {
+  |       ^^^^^^^^^ incomplete
+  |
+  = note: every port with a role is set, a source's voltage has no ideal default, and `temp` isn't assumed (language.md §8.2)
+
+error[E-binding]: `Amp` has no port `vc`
+   --> setup_incomplete.spl:15:5
+   |
+15 |     vc: Supply { v: 12V },
+   |     ^^ unknown
+   |
+   = help: did you mean `vcc`?
+   = note: `Amp` has `vcc`, `gnd`, `input`, `output` and `temp`
+
+error[E-binding]: `Signal` has no field `vv`
+   --> setup_incomplete.spl:16:21
+   |
+16 |     input: Signal { vv: 0V },
+   |                     ^^ unknown
+   |
+   = help: did you mean `v`?
+   = note: `Signal` has `v` and `z`

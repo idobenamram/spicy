@@ -1,0 +1,42 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 667
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/open_ranges.spl
+---
+block Ldo 214..217
+  port vin: Power<In> 220..223
+  port vout: Power<Out> 236..240
+  port gnd: Ground 254..257
+setup Operating 291..300 for Ldo
+  vin: Supply v = <invalid> z = 0.25 Ω (0 Ω..=0.5 Ω)
+  vout: Load r = <invalid> c = 0.00001 F (0 F..=0.00002 F) i = <invalid>
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-value OpenRange 332..339 "..=5.5V"
+E-value OpenRange 388..395 "..=50mA"
+E-unsupported Unsupported 411..416 "10k.."
+
+--- rendered ---
+error[E-value]: `v` needs both ends of its range
+  --> open_ranges.spl:9:22
+  |
+9 |     vin: Supply { v: ..=5.5V, z: ..=0.5Ω },
+  |                      ^^^^^^^ no lower end
+  |
+  = note: only a resistance, an impedance or a capacitance starts at 0 when its lower end is left out
+
+error[E-value]: `i` needs both ends of its range
+   --> open_ranges.spl:10:33
+   |
+10 |     vout: Load { c: ..=20uF, i: ..=50mA },
+   |                                 ^^^^^^^ no lower end
+   |
+   = note: only a resistance, an impedance or a capacitance starts at 0 when its lower end is left out
+
+error[E-unsupported]: not supported yet: a range with no upper end (`a..`)
+   --> open_ranges.spl:11:13
+   |
+11 |     vout.r: 10k..,
+   |             ^^^^^ not supported yet

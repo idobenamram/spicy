@@ -1,0 +1,13 @@
+// An open range in a setup starts at 0 only on a field that can't be negative
+// (`z: ..=0.5Ω`); a voltage or a current needs both ends (plan §2.9 b), and a range
+// with no upper end isn't supported yet.
+block Ldo { vin: Power<In>, vout: Power<Out>, gnd: Ground }
+
+circuit Ldo {}
+
+setup Operating for Ldo {
+    vin: Supply { v: ..=5.5V, z: ..=0.5Ω },
+    vout: Load { c: ..=20uF, i: ..=50mA },
+    vout.r: 10k..,
+    temp: 25°C,
+}

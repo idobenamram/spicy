@@ -1,26 +1,32 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 621
+assertion_line: 667
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/setups.spl
 ---
 block A 97..98
-  port p: Pin 101..102
-block B 131..132
-  port p: Pin 135..136
+  port p: Power<In> 101..102
+block B 137..138
+  port p: Power<In> 141..142
+setup S 177..178 for A
+  p: Supply v = 1 V
+  temp = 298.15 K (25 °C)
+setup S 356..357 for B
+  p: Supply v = 1 V
+  temp = 298.15 K (25 °C)
 
 --- errors ---
-E-duplicate Duplicate 197..198 "S" related 165..166
-E-name UnknownBlock 342..349 "Nowhere"
+E-duplicate Duplicate 229..230 "S" related 177..178
+E-name UnknownBlock 414..421 "Nowhere"
 
 --- rendered ---
 error[E-duplicate]: setup `S` is defined twice
    --> setups.spl:12:7
    |
-10 | setup S for A { p: Supply {} }
+10 | setup S for A { p: Supply { v: 1V }, temp: 25°C }
    |       - first defined here
 11 | 
-12 | setup S for A { p: Supply {} }
+12 | setup S for A { p: Supply { v: 2V }, temp: 25°C }
    |       ^ second definition
 
 error[E-name]: setup for an unknown block `Nowhere`

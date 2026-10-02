@@ -1,0 +1,21 @@
+// A misspelled key is resolved as the slot it's renamed to, so its fix removes its
+// error and uncovers none (see `fixes_remove_their_error`); a key is renamed only to a
+// slot it could be: a port with a role, or `temp`, which has no fields and isn't a shape.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out>, aux: Pin }
+
+circuit Amp {}
+
+// Renamed to `vcc`, it's still a `Supply` without its voltage, and `12A` isn't a voltage.
+setup NoVoltage for Amp { vc: Supply { z: 1Ω }, input.v: 0V, output: Load {}, temp: 25°C }
+
+setup WrongUnit for Amp { vc: Supply { v: 12A }, input.v: 0V, output: Load {}, temp: 25°C }
+
+// Renamed to `temp`, `25` is still a temperature without its unit.
+setup Bare for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp: 25 }
+
+// `temp` has no fields and isn't a shape, and `aux` is a `Pin`: none is the slot meant.
+setup NotTemp for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, tmp.v: 25°C }
+
+setup NotTempEither for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, vc: Supply { v: 1V } }
+
+setup NotAux for Amp { vcc.v: 12V, input.v: 0V, output: Load {}, temp: 25°C, ax: Load {} }

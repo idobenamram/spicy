@@ -2,7 +2,7 @@
 
 > 2026-10-01 · The phase after `syntax_v5_plan.md`. Resolve reads what's inside `env`, `const`, `setup` and `contract`, in the MVP subset of `research/contract_v4_review_implementation.md` §4.4 (cited "[IR]"). Flatten turns the root's default setup into knobs. Then `circuits/ce_amp.spl` gives model.md §5's 8 knobs and 3 checkable specs.
 >
-> **Status:** approved 2026-10-01. Step 1 is built and awaiting review (its outcome is under step 1); steps 2–6 are to do.
+> **Status:** approved 2026-10-01. Step 1 committed (2026-10-02); step 2 built and awaiting review (its outcome is under step 2); steps 3–6 are to do.
 >
 > **After it:** the exporter (a flat design and its setup become an ngspice deck: `netlist_writer.md`, `spicy_netlist::writer`), then the engine.
 >
@@ -316,6 +316,14 @@ model.md §5's table, in id order:
   - `setups.spl`, `duplicates.spl`, `unknown_block.spl` and `circuits.spl` get new errors in their snapshots, and you review each one;
   - the resolve shuffle test (`statement_order_does_not_matter`) also reorders setup entries.
 - **Done when:** ce_amp's setup dumps as in §0.2.
+- **Outcome (2026-10-02, awaiting review):** done when holds. Built as planned, plus, each with a test or case file:
+  - `NotAShape` (`vcc: 12V`), a fourth error kind the table above didn't list; a port whose written value isn't a shape at all explains its own missing fields;
+  - one field binder shared by parts and shapes (`resolve/fields.rs`): a slot is given once, the shorthand isn't a value, an unknown field gets the rename when one unknown name meets one missing slot (and that slot isn't also reported missing), a required field left out holds the proof;
+  - a misspelled setup key is renamed to the one slot left out that it could be (a port with a role, or `temp`), and its entry is then checked as that slot, so the fix uncovers nothing; a broken entry is the setup's one error (nothing is listed as left out);
+  - a second shape for a port is checked for its own mistakes, then dropped; a second circuit taints its block (`Redefined`, as a second block);
+  - the kind namespace is classified by one `kind_of` (a file's block shadows a prelude part kind, model.md E5);
+  - speed (instructions, parse + resolve ×5): files without setups −3.8%, deep hierarchy −5.1% (one hash lookup per `declare`, the duplicate report out of the hot path), files with setups +7.5% (≈ 10k instructions and 11 allocations per setup; 8 of the 11 are the model's own `Vec`s).
+
 
 ### Step 3: the contract's default setup and measures
 

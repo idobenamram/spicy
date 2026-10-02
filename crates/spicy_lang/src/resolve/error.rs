@@ -1,7 +1,7 @@
 //! Resolve errors (model.md E18 tier 1, E23). Data first, rendered on demand, like the
 //! lexer's and parser's. Each is reported once, at the definition.
 
-use spicy_model::prelude::FieldType;
+use spicy_model::prelude::{FieldType, Shape, SignalType};
 use spicy_model::units::{Dimension, QKind, Quantity};
 
 use spicy_errors::{Diag, DiagKind, Fix, Text, list};
@@ -20,6 +20,8 @@ pub enum NameKind {
     Instance,
     /// A pin, a block's port as bound in a placement, or a part's field.
     Binding,
+    /// A field of a setup's shape (`Supply`'s `v`).
+    Field,
     Circuit,
     Contract,
     Setup,
@@ -39,6 +41,7 @@ impl NameKind {
             NameKind::Net => "a net",
             NameKind::Instance => "an instance",
             NameKind::Binding => "a pin or field",
+            NameKind::Field => "a field",
             NameKind::Circuit => "a circuit",
             NameKind::Contract => "a contract",
             NameKind::Setup => "a setup",
@@ -62,6 +65,20 @@ pub enum Namespace {
     Value,
     /// The types an `env` or `const` declares (`Temperature`, `Ohm`).
     Type,
+    /// The shapes a setup puts on a port (`Supply`), prelude names like the part kinds,
+    /// looked up only where a shape goes (`vcc: Supply { … }`).
+    Shape,
+}
+
+/// Why a setup entry doesn't fit its port's role ([`ResolveErrorKind::WrongRole`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RoleMismatch {
+    /// The shape written, which is the other direction's (`vcc: Load {}` on an input).
+    Shape(Shape),
+    /// Any entry on a ground: it's the reference.
+    Ground,
+    /// A source's field on an output (`output.v`): what the block itself drives.
+    Drives(&'static str),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,6 +114,9 @@ pub enum ResolveErrorKind {
     UnknownField {
         field: String,
         of: String,
+        /// What `of` has: pins and fields (`Binding`) for a part or block, fields for a
+        /// shape, ports for a setup's block.
+        what: NameKind,
         valid: Vec<String>,
         suggestion: Option<String>,
     },
@@ -146,6 +166,22 @@ pub enum ResolveErrorKind {
     /// A temperature written as a plain number (`25`) or in K (`300K`, which is a
     /// difference): a temperature point is written in `°C` (model.md E13).
     TemperaturePoint { kelvin: bool },
+    /// A setup entry that doesn't fit its port's role (language.md §8.2): a shape for the
+    /// other direction, anything on a ground, or a quantity the block drives.
+    WrongRole {
+        port: String,
+        signal: SignalType,
+        wrong: RoleMismatch,
+    },
+    /// A setup that leaves out a port with a role, a source's voltage or `temp`, all
+    /// listed in one error (v5 rule 1.3.1).
+    IncompleteSetup { setup: String, missing: Vec<String> },
+    /// `v: ..=5V` in a setup: a voltage or a current needs both ends of its range. Only
+    /// a field that can't be negative starts at 0 (`z: ..=0.5Ω`, plan §2.9 b).
+    OpenRange { field: String },
+    /// A port given a value where it takes a shape (`vcc: 12V`). `takes` is the shape
+    /// its role takes.
+    NotAShape { port: String, takes: Shape },
 }
 
 /// The variant names, for the test that every error kind has a case file. Only tests
@@ -179,6 +215,10 @@ impl ResolveErrorKind {
         "EnvNeedsRange",
         "TemperatureSpread",
         "TemperaturePoint",
+        "WrongRole",
+        "IncompleteSetup",
+        "OpenRange",
+        "NotAShape",
     ];
 }
 
@@ -210,6 +250,10 @@ impl DiagKind for ResolveErrorKind {
             EnvNeedsRange { .. } => "EnvNeedsRange",
             TemperatureSpread { .. } => "TemperatureSpread",
             TemperaturePoint { .. } => "TemperaturePoint",
+            WrongRole { .. } => "WrongRole",
+            IncompleteSetup { .. } => "IncompleteSetup",
+            OpenRange { .. } => "OpenRange",
+            NotAShape { .. } => "NotAShape",
         }
     }
 
@@ -232,6 +276,9 @@ impl DiagKind for ResolveErrorKind {
             Unsupported { .. } => "E-unsupported",
             EnvNeedsRange { .. } => "E-value",
             TemperatureSpread { .. } | TemperaturePoint { .. } => "E-unit",
+            WrongRole { .. } => "E-role",
+            IncompleteSetup { .. } | NotAShape { .. } => "E-setup",
+            OpenRange { .. } => "E-value",
         }
     }
 
@@ -259,6 +306,7 @@ impl DiagKind for ResolveErrorKind {
                     Namespace::Kind => "part kind or block",
                     Namespace::Value => "net, port or instance",
                     Namespace::Type => "type",
+                    Namespace::Shape => "shape",
                 };
                 let notes = suggestion
                     .iter()
@@ -338,6 +386,7 @@ impl DiagKind for ResolveErrorKind {
             UnknownField {
                 field,
                 of,
+                what,
                 valid,
                 suggestion,
             } => {
@@ -347,7 +396,7 @@ impl DiagKind for ResolveErrorKind {
                 }
                 notes.push(format!("note: `{of}` has {}", list(valid)));
                 (
-                    format!("`{of}` has no pin or field `{field}`"),
+                    format!("`{of}` has no {} `{field}`", what.noun()),
                     "unknown".to_string(),
                     notes,
                 )
@@ -460,6 +509,69 @@ impl DiagKind for ResolveErrorKind {
                 },
                 write_fix(fix),
             ),
+            WrongRole {
+                port,
+                signal,
+                wrong,
+            } => match wrong {
+                RoleMismatch::Shape(written) => {
+                    let takes = Shape::for_role(*signal);
+                    // `Supply` and `Signal` are both sources: one is just another port
+                    // type's, not the other direction's.
+                    let label = match (written, takes) {
+                        (Shape::Supply, Some(Shape::Signal)) => "a `Power<In>`'s shape",
+                        (Shape::Signal, Some(Shape::Supply)) => "an `Analog<In>`'s shape",
+                        _ => "the other direction's shape",
+                    };
+                    let takes = takes.map_or("nothing", Shape::name);
+                    (
+                        format!("`{port}: {signal}` takes a `{takes}`, not a `{}`", written.name()),
+                        label.to_string(),
+                        write_fix(fix),
+                    )
+                }
+                RoleMismatch::Ground => (
+                    format!("`{port}` is ground: a setup sets nothing on it"),
+                    "the reference, 0 V by definition".to_string(),
+                    vec![],
+                ),
+                RoleMismatch::Drives(field) => (
+                    "a setup sets a quantity this block drives".to_string(),
+                    format!(
+                        "`{port}: {signal}`: this block drives `{port}.{field}`; a setup gives it a `Load {{ r, c, i }}`"
+                    ),
+                    vec![format!(
+                        "help: a range on a quantity you drive is a guarantee: `spec …: dc({port}.{field}) within …;`"
+                    )],
+                ),
+            },
+            IncompleteSetup { setup, missing } => (
+                format!("setup `{setup}` leaves out {}", list(missing)),
+                "incomplete".to_string(),
+                vec![
+                    "note: every port with a role is set, a source's voltage has no ideal default, and `temp` isn't assumed (language.md §8.2)"
+                        .to_string(),
+                ],
+            ),
+            OpenRange { field } => (
+                format!("`{field}` needs both ends of its range"),
+                "no lower end".to_string(),
+                vec![
+                    "note: only a resistance, an impedance or a capacitance starts at 0 when its lower end is left out"
+                        .to_string(),
+                ],
+            ),
+            NotAShape { port, takes } => {
+                let first = takes.fields()[0].name;
+                (
+                    format!("`{port}` takes a shape, not a value"),
+                    "a value".to_string(),
+                    vec![format!(
+                        "help: give it the whole shape, `{port}: {} {{ {first}: … }}`, or one field, `{port}.{first}: …`",
+                        takes.name()
+                    )],
+                )
+            }
         }
     }
 }

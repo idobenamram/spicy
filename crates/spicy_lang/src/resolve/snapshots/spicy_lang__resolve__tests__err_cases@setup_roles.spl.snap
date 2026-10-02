@@ -1,0 +1,44 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 667
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_roles.spl
+---
+block Amp 141..144
+  port vcc: Power<In> 147..150
+  port gnd: Ground 163..166
+  port input: Analog<In> 176..181
+  port output: Analog<Out> 195..201
+setup Wrong 240..245 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-role WrongRole 265..269 "Load" fix 265..269 "Supply"
+E-role WrongRole 286..289 "gnd"
+E-role WrongRole 342..363 "output.v: 4.5V..=6.5V"
+
+--- rendered ---
+error[E-role]: `vcc: Power<In>` takes a `Supply`, not a `Load`
+  --> setup_roles.spl:8:10
+  |
+8 |     vcc: Load { v: 12V },
+  |          ^^^^ the other direction's shape
+  |
+  = help: write `Supply`
+
+error[E-role]: `gnd` is ground: a setup sets nothing on it
+  --> setup_roles.spl:9:5
+  |
+9 |     gnd: Supply { v: 0V },
+  |     ^^^ the reference, 0 V by definition
+
+error[E-role]: a setup sets a quantity this block drives
+   --> setup_roles.spl:11:5
+   |
+11 |     output.v: 4.5V..=6.5V,
+   |     ^^^^^^^^^^^^^^^^^^^^^ `output: Analog<Out>`: this block drives `output.v`; a setup gives it a `Load { r, c, i }`
+   |
+   = help: a range on a quantity you drive is a guarantee: `spec …: dc(output.v) within …;`

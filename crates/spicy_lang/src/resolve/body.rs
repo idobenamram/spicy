@@ -7,16 +7,17 @@
 //! the statement owns its name: a second `let` or `net` of a name is checked for its
 //! own mistakes, then dropped.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use spicy_errors::Reported;
 use spicy_model::design::{
     Block, BlockId, BlockSpans, FieldValue, Instance, InstanceOf, InstanceSpans, Merge, MergeSpans,
     NetId,
 };
-use spicy_model::prelude::{FieldSchema, PartKind, SignalType};
+use spicy_model::prelude::{FieldSchema, PartKind};
 use spicy_span::Span;
 
+use super::fields::{Given, UnboundSlots, left_out_required};
 use super::{
     BlockBuilder, NameKind, Namespace, ResolveError, ResolveErrorKind, Resolver, Scope, Signature,
     suggest, unknown_name,
@@ -82,12 +83,11 @@ impl Slots {
         i < self.pins || self.fields[i - self.pins].required
     }
 
-    /// Whether `field`'s value could go in slot `i`: a pin binds a net (a name), a
+    /// Whether `given`'s value could go in slot `i`: a pin binds a net (a name), a
     /// field takes a number. A misspelled slot is one whose value fits it.
-    fn fits(self, field: &Field, i: usize) -> bool {
-        let is_name = field
+    fn fits(self, given: Given, i: usize) -> bool {
+        let is_name = given
             .value
-            .as_ref()
             .is_none_or(|e| matches!(e.kind, ExprKind::Path(_)));
         is_name == (i < self.pins)
     }
@@ -99,18 +99,18 @@ struct Bindings<'f> {
     given: Vec<Option<Span>>,
     /// Each pin's net, once given.
     pins: Vec<Option<Result<NetId, Reported>>>,
-    /// Each field's value, once given.
-    fields: Vec<Option<FieldValue>>,
+    /// Each field's value: `Unset` until it's given, as a setup's are.
+    fields: Vec<FieldValue>,
     /// The fields that name no slot.
-    unknown: Vec<&'f Field<'f>>,
+    unknown: Vec<Given<'f, 'f>>,
 }
 
 impl Bindings<'_> {
     /// The instance's pins and fields. A pin or a required field that wasn't given
-    /// holds `unbound`, the proof it was reported; an optional one is `Unset`. (Each is
-    /// collected in place: an element is the same size either way.)
+    /// holds `unbound`, the proof it was reported; an optional one is `Unset`. (The pins
+    /// are collected in place: an element is the same size either way.)
     fn values(
-        self,
+        mut self,
         slots: Slots,
         unbound: Option<Reported>,
     ) -> (Vec<Result<NetId, Reported>>, Vec<FieldValue>) {
@@ -119,16 +119,8 @@ impl Bindings<'_> {
             .pins
             .into_iter()
             .map(|pin| pin.unwrap_or_else(|| Err(missing())));
-        let fields = self
-            .fields
-            .into_iter()
-            .zip(slots.fields)
-            .map(|(value, schema)| match value {
-                Some(value) => value,
-                None if schema.required => FieldValue::Invalid(missing()),
-                None => FieldValue::Unset,
-            });
-        (pins.collect(), fields.collect())
+        left_out_required(&mut self.fields, slots.fields, missing);
+        (pins.collect(), self.fields)
     }
 
     /// Where each pin, then each field, was given: taken out, before the values.
@@ -431,11 +423,10 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
 
     /// Why `name` isn't a part kind or block: it's something else, or nothing.
     fn not_a_kind(&mut self, name: &str, at: Span) -> ResolveError {
-        let is = if SignalType::is_name(name) {
-            Some(NameKind::SignalType)
-        } else {
-            self.names.get(name).map(|v| self.name_kind(v))
-        };
+        // Another kind (a signal type: blocks and part kinds were looked up), or one of
+        // the block's values (`vcc`).
+        let value = |name| self.names.get(name).map(|v| self.name_kind(v));
+        let is = self.r.kind_of(name).or_else(|| value(name));
         if let Some(is) = is {
             let kind = ResolveErrorKind::WrongNamespace {
                 name: name.to_string(),
@@ -456,57 +447,43 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         let mut b = Bindings {
             given: vec![None; slots.len()],
             pins: vec![None; slots.pins],
-            fields: vec![None; slots.fields.len()],
+            fields: vec![FieldValue::Unset; slots.fields.len()],
             unknown: Vec::new(),
         };
         for field in fields {
+            let given = Given::from(field);
             let name = field.name.text;
             let Some(i) = self.slot(slots.of, name) else {
-                b.unknown.push(field);
+                b.unknown.push(given);
                 continue;
             };
             // Checked even when it's the second binding of the slot: a second definition
             // is checked for its own mistakes, just not stored.
-            let first = b.given[i];
+            let first = b.given[i].is_none();
             if i < slots.pins {
                 let net = match &field.value {
                     Some(e) => self.net_ref(e, NetUse::Pin(name)),
                     None => self.net_named(name, field.name.span, NetUse::Shorthand(name)),
                 };
-                if first.is_none() {
+                if first {
                     b.pins[i] = Some(net);
                 }
             } else {
                 let f = i - slots.pins;
-                let value = match &field.value {
-                    Some(e) => self.r.value(e, slots.fields[f].ty, name),
-                    None => Err(self.r.report(ResolveErrorKind::NotAValue, field.span)),
-                };
-                if first.is_none() {
-                    b.fields[f] = Some(match value {
-                        Ok(value) => FieldValue::Given(value),
-                        // Its error may be a const's, reported at the const: the block
-                        // is broken either way (as rustc's typeck taints a body that
-                        // meets a type already holding an error).
-                        Err(reported) => {
-                            self.block.taint(reported);
-                            FieldValue::Invalid(reported)
-                        }
-                    });
+                let e = self.r.written_value(given);
+                let value = e.and_then(|e| self.r.value(e, slots.fields[f].ty, name));
+                let value = FieldValue::from(value);
+                if first {
+                    // Its error may be a const's, reported at the const: the block is
+                    // broken either way (as rustc's typeck taints a body that meets a
+                    // type already holding an error).
+                    if let FieldValue::Invalid(reported) = value {
+                        self.block.taint(reported);
+                    }
+                    b.fields[f] = value;
                 }
             }
-            // Slots, not names: a slot is given once, and its span is the whole binding.
-            match first {
-                Some(first) => {
-                    let kind = ResolveErrorKind::Duplicate {
-                        name: name.to_string(),
-                        what: NameKind::Binding,
-                    };
-                    let error = ResolveError::new(kind, field.span).with_related(first);
-                    error.report(&mut self.r.errors);
-                }
-                None => b.given[i] = Some(field.span),
-            }
+            self.r.given_once(&mut b.given[i], given);
         }
         b
     }
@@ -521,56 +498,26 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         if b.unknown.is_empty() && missing.is_empty() {
             return None;
         }
-        let mut reported = None;
         let of = self.r.path_text(path);
-        let slot_names = self.slot_names(slots.of);
-        // Each unknown name once: `valu: 1k, valu: 2k` is one misspelling written twice.
-        let mut seen: HashSet<&str> = HashSet::new();
-        let first: Vec<bool> = b.unknown.iter().map(|f| seen.insert(f.name.text)).collect();
-        // One unknown name and one missing slot that fits it is one mistake, a misnamed
-        // pin or field (`resistance:` for `value:`): reported once, with the rename.
-        let renamed = match (seen.len(), missing.as_slice()) {
-            (1, &[i]) if slots.fits(b.unknown[0], i) => Some(i),
-            _ => None,
+        let names = self.slot_names(slots.of);
+        let unbound = UnboundSlots {
+            names: &names,
+            given: &b.given,
+            missing: &missing,
         };
-        for (field, &first) in b.unknown.iter().zip(&first) {
-            let name = field.name.text;
-            let suggestion = match renamed {
-                Some(i) => Some(slot_names[i].clone()),
-                None => {
-                    let open = (0..slots.len())
-                        .filter(|&i| b.given[i].is_none() && slots.fits(field, i))
-                        .map(|i| slot_names[i].as_str());
-                    suggest(&mut self.r.suggestions_left, name, open)
-                }
-            };
-            // `C { gnd }` renamed to pin `b` is `b: gnd`, if `gnd` is a net;
-            // otherwise there's no single fix. A repeat of an unknown name gets none:
-            // renaming both would give the slot twice.
-            let fix = match (&suggestion, &field.value) {
-                _ if !first => None,
-                (Some(s), Some(_)) => Some(s.clone()),
-                (Some(s), None) if matches!(self.names.get(name), Some(ValueName::Net(_))) => {
-                    Some(format!("{s}: {name}"))
-                }
-                _ => None,
-            };
-            let kind = ResolveErrorKind::UnknownField {
-                field: name.to_string(),
-                of: of.to_string(),
-                valid: slot_names.clone(),
-                suggestion,
-            };
-            let mut error = ResolveError::new(kind, field.name.span);
-            if let Some(fix) = fix {
-                error = error.with_fix(field.name.span, fix);
-            }
-            reported = Some(error.report(&mut self.r.errors));
-        }
+        let is_net = |name: &str| matches!(self.names.get(name), Some(ValueName::Net(_)));
+        let (mut reported, renamed) = self.r.report_unknown(
+            of,
+            NameKind::Binding,
+            &b.unknown,
+            &unbound,
+            |u, i| slots.fits(b.unknown[u], i),
+            is_net,
+        );
         if renamed.is_none() && !missing.is_empty() {
             let kind = ResolveErrorKind::Missing {
                 of: of.to_string(),
-                names: missing.iter().map(|&i| slot_names[i].clone()).collect(),
+                names: missing.iter().map(|&i| names[i].clone()).collect(),
             };
             reported = Some(self.r.report(kind, path.span));
         }

@@ -1,0 +1,139 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 672
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/temperatures.spl
+---
+env a 195..196 = <invalid>
+env b 234..235 = <invalid>
+env c 269..270 = <invalid>
+env e 329..330 = <invalid>
+env ok 370..372 = 298.15 K (25 °C) ± 5 K
+env f 483..484 = <invalid>
+env g 526..527 = <invalid>
+env h 785..786 = <invalid>
+env i 817..818 = <invalid>
+env j 843..844 = <invalid>
+const T_ROOM 162..168 = 298.15 K (25 °C)
+const d 302..303 = <invalid>
+
+--- errors ---
+E-unit TemperatureSpread 222..228 "T_ROOM"
+E-unit TemperatureSpread 261..263 "5%"
+E-unit TemperaturePoint 287..289 "25" fix 287..289 "25°C"
+E-unit TemperaturePoint 292..294 "30" fix 292..294 "30°C"
+E-unit TemperaturePoint 319..323 "300K" fix 319..323 "26.85°C"
+E-unit TemperaturePoint 347..354 "263.15K" fix 347..354 "-10°C"
+E-unit TemperaturePoint 357..364 "333.15K" fix 357..364 "60°C"
+E-unit NotArithmetic 501..520 "2 * (20°C..=30°C)"
+E-value NegativeTolerance 553..558 "-5°C"
+E-unit TemperaturePoint 803..805 "25" fix 803..805 "25°C"
+E-unit TemperatureSpread 809..811 "5%"
+E-unit TemperaturePoint 835..837 "25" fix 835..837 "25°C"
+E-value EnvNeedsRange 835..837 "25"
+E-unit NotArithmetic 861..875 "2 * (25 ± 5K)"
+
+--- rendered ---
+error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
+  --> temperatures.spl:4:30
+  |
+4 | env a: Temperature in 25°C ± T_ROOM;
+  |                              ^^^^^^ a temperature, which is a point
+
+error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
+  --> temperatures.spl:5:30
+  |
+5 | env b: Temperature in 25°C ± 5%;
+  |                              ^^ a percentage
+  |
+  = note: a percentage of a temperature depends on where its zero is
+
+error[E-unit]: a temperature is written in `°C`
+  --> temperatures.spl:6:23
+  |
+6 | env c: Temperature in 25..=30;
+  |                       ^^ a plain number
+  |
+  = help: write `25°C`
+
+error[E-unit]: a temperature is written in `°C`
+  --> temperatures.spl:6:28
+  |
+6 | env c: Temperature in 25..=30;
+  |                            ^^ a plain number
+  |
+  = help: write `30°C`
+
+error[E-unit]: a temperature is written in `°C`
+  --> temperatures.spl:7:24
+  |
+7 | const d: Temperature = 300K;
+  |                        ^^^^ this is in `K`, which is a temperature difference
+  |
+  = help: write `26.85°C`
+
+error[E-unit]: a temperature is written in `°C`
+  --> temperatures.spl:8:23
+  |
+8 | env e: Temperature in 263.15K..=333.15K;
+  |                       ^^^^^^^ this is in `K`, which is a temperature difference
+  |
+  = help: write `-10°C`
+
+error[E-unit]: a temperature is written in `°C`
+  --> temperatures.spl:8:33
+  |
+8 | env e: Temperature in 263.15K..=333.15K;
+  |                                 ^^^^^^^ this is in `K`, which is a temperature difference
+  |
+  = help: write `60°C`
+
+error[E-unit]: temperatures can't be used in arithmetic here
+   --> temperatures.spl:11:23
+   |
+11 | env f: Temperature in 2 * (20°C..=30°C);
+   |                       ^^^^^^^^^^^^^^^^^ not a plain quantity
+
+error[E-value]: a tolerance can't be negative
+   --> temperatures.spl:12:30
+   |
+12 | env g: Temperature in 25°C ± -5°C;
+   |                              ^^^^ `±` already means both directions
+
+error[E-unit]: a temperature is written in `°C`
+   --> temperatures.spl:16:23
+   |
+16 | env h: Temperature in 25 ± 5%;
+   |                       ^^ a plain number
+   |
+   = help: write `25°C`
+
+error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
+   --> temperatures.spl:16:28
+   |
+16 | env h: Temperature in 25 ± 5%;
+   |                            ^^ a percentage
+   |
+   = note: a percentage of a temperature depends on where its zero is
+
+error[E-unit]: a temperature is written in `°C`
+   --> temperatures.spl:17:23
+   |
+17 | env i: Temperature in 25;
+   |                       ^^ a plain number
+   |
+   = help: write `25°C`
+
+error[E-value]: `env i` needs a range
+   --> temperatures.spl:17:23
+   |
+17 | env i: Temperature in 25;
+   |                       ^^ a single value
+   |
+   = help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`
+
+error[E-unit]: temperatures can't be used in arithmetic here
+   --> temperatures.spl:18:23
+   |
+18 | env j: Temperature in 2 * (25 ± 5K);
+   |                       ^^^^^^^^^^^^^ not a plain quantity

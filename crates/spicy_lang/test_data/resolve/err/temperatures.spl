@@ -1,0 +1,18 @@
+// A temperature is written in °C; its spread is a difference, in K or °C, never a
+// percentage or a named temperature, which is a point (model.md E13).
+const T_ROOM: Temperature = 25°C;
+env a: Temperature in 25°C ± T_ROOM;
+env b: Temperature in 25°C ± 5%;
+env c: Temperature in 25..=30;
+const d: Temperature = 300K;
+env e: Temperature in 263.15K..=333.15K;
+env ok: Temperature in 25°C ± 5K;
+// A temperature isn't scaled, even as a range, and a spread isn't negative.
+env f: Temperature in 2 * (20°C..=30°C);
+env g: Temperature in 25°C ± -5°C;
+// One mistake doesn't hide another, so fixing it uncovers nothing: a tolerance types
+// both sides, an env written without a spread needs one whatever else is wrong, and a
+// temperature isn't scaled whatever is inside.
+env h: Temperature in 25 ± 5%;
+env i: Temperature in 25;
+env j: Temperature in 2 * (25 ± 5K);

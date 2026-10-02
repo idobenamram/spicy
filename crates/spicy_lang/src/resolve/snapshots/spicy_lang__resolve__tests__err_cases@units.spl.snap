@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 673
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/units.spl
 ---
@@ -64,11 +64,11 @@ error[E-unit]: expected `Ω` (a resistance), found `F` (a capacitance)
 4 |     let r1 = Resistor { a: p, b: n, value: 10nF };
   |                                            ^^^^ this is `F` (a capacitance)
 
-error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature difference)
   --> units.spl:5:44
   |
 5 |     let r2 = Resistor { a: p, b: n, value: 47K };
-  |                                            ^^^ this is `K` (a temperature)
+  |                                            ^^^ this is `K` (a temperature difference)
   |
   = help: `K` is kelvin; kilo is lowercase `k`
 

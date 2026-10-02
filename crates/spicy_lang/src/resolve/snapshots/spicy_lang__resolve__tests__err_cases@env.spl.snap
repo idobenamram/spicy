@@ -1,0 +1,136 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 672
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/env.spl
+---
+block X 560..561
+  port p: Pin 564..565
+  port n: Pin 572..573
+  r = Resistor 602..603
+    a → p
+    b → n
+    value = <invalid>
+  r2 = Resistor 655..657
+    a → p
+    b → n
+    value = <invalid>
+block Y 796..797
+  port p: Pin 800..801
+  port n: Pin 808..809
+  r = Resistor 838..839
+    a → p
+    b → n
+    value = <invalid>
+env fixed 78..83 = <invalid>
+env zero 111..115 = <invalid>
+env point 140..145 = <invalid>
+env warm 198..202 = <invalid>
+env ambient 271..278 = <invalid>
+env typo 963..967 = <invalid>
+const loose 170..175 = <invalid>
+const confidence 239..249 = <invalid>
+const A 415..416 = 1000 Ω
+const B 434..435 = <invalid>
+const TOL 538..541 = 0.01
+
+--- errors ---
+E-value EnvNeedsRange 100..105 "25°C"
+E-value EnvNeedsRange 125..134 "12V ± 0%"
+E-value EnvNeedsRange 155..162 "5V..=5V"
+E-value SpreadNotAllowed 183..192 "10k ± 1%"
+E-name UnknownName 204..214 "Temperatur" fix 204..214 "Temperature"
+E-unsupported Unsupported 251..261 "Confidence"
+E-duplicate Duplicate 317..324 "ambient" related 271..278
+E-unsupported Unsupported 443..444 "A"
+E-unsupported Unsupported 636..643 "ambient"
+E-unsupported Unsupported 696..699 "TOL"
+E-name UnknownName 969..979 "Temperatur" fix 969..979 "Temperature"
+E-value EnvNeedsRange 983..988 "25°C"
+
+--- rendered ---
+error[E-value]: `env fixed` needs a range
+  --> env.spl:2:27
+  |
+2 | env fixed: Temperature in 25°C;
+  |                           ^^^^ a single value
+  |
+  = help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`
+
+error[E-value]: `env zero` needs a range
+  --> env.spl:3:19
+  |
+3 | env zero: Volt in 12V ± 0%;
+  |                   ^^^^^^^^ a single value
+  |
+  = help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`
+
+error[E-value]: `env point` needs a range
+  --> env.spl:4:20
+  |
+4 | env point: Volt in 5V..=5V;
+  |                    ^^^^^^^ a single value
+  |
+  = help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`
+
+error[E-value]: `loose` takes an exact value
+  --> env.spl:5:20
+  |
+5 | const loose: Ohm = 10k ± 1%;
+  |                    ^^^^^^^^ a tolerance or range
+
+error[E-name]: unknown type `Temperatur`
+  --> env.spl:6:11
+  |
+6 | env warm: Temperatur in 20°C..=30°C;
+  |           ^^^^^^^^^^ not defined
+  |
+  = help: did you mean `Temperature`?
+
+error[E-unsupported]: not supported yet: this type
+  --> env.spl:7:19
+  |
+7 | const confidence: Confidence = 3;
+  |                   ^^^^^^^^^^ not supported yet
+
+error[E-duplicate]: name `ambient` is defined twice
+  --> env.spl:9:7
+  |
+8 | env ambient: Temperature in -10°C..=60°C;
+  |     ------- first defined here
+9 | const ambient: Temperature = 25°C;
+  |       ^^^^^^^ second definition
+
+error[E-unsupported]: not supported yet: a const in another const's value
+   --> env.spl:12:16
+   |
+12 | const B: Ohm = A;
+   |                ^ not supported yet
+
+error[E-unsupported]: not supported yet: an env's name anywhere but a setup's `temp:`
+   --> env.spl:19:43
+   |
+19 |     let r = Resistor { a: p, b: n, value: ambient };
+   |                                           ^^^^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: a plain-number const after `±` (write the tolerance with `%`)
+   --> env.spl:20:49
+   |
+20 |     let r2 = Resistor { a: p, b: n, value: 1k ± TOL };
+   |                                                 ^^^ not supported yet
+
+error[E-name]: unknown type `Temperatur`
+   --> env.spl:31:11
+   |
+31 | env typo: Temperatur in 25°C;
+   |           ^^^^^^^^^^ not defined
+   |
+   = help: did you mean `Temperature`?
+
+error[E-value]: `env typo` needs a range
+   --> env.spl:31:25
+   |
+31 | env typo: Temperatur in 25°C;
+   |                         ^^^^ a single value
+   |
+   = help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`

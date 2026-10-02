@@ -485,7 +485,13 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
                 if first.is_none() {
                     b.fields[f] = Some(match value {
                         Ok(value) => FieldValue::Given(value),
-                        Err(reported) => FieldValue::Invalid(reported),
+                        // Its error may be a const's, reported at the const: the block
+                        // is broken either way (as rustc's typeck taints a body that
+                        // meets a type already holding an error).
+                        Err(reported) => {
+                            self.block.taint(reported);
+                            FieldValue::Invalid(reported)
+                        }
                     });
                 }
             }

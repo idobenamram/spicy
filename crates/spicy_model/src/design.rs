@@ -9,7 +9,7 @@
 use spicy_index::id;
 
 use crate::prelude::{PartKind, SignalType};
-use crate::units::Value;
+use crate::units::{Quantity, Value};
 use spicy_errors::Reported;
 use spicy_span::Span;
 
@@ -30,6 +30,14 @@ id!(
     /// A part or placement in one block. Numbered per block.
     InstanceId
 );
+id!(
+    /// An `env`, by its position in [`Design::envs`] (source order).
+    EnvId
+);
+id!(
+    /// A `const`, by its position in [`Design::consts`] (source order).
+    ConstId
+);
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Design {
@@ -37,6 +45,29 @@ pub struct Design {
     /// Each block's contract, indexed like `blocks`: contracts are one-to-one with the
     /// blocks they describe. Kept apart from `blocks` so flattening depends on blocks only.
     pub contracts: Vec<Option<Contract>>,
+    pub envs: Vec<Env>,
+    pub consts: Vec<Const>,
+}
+
+/// `env ambient: Temperature in -10°C..=60°C;`: a condition of the whole project, a
+/// range the engine searches. A setup names it (`temp: ambient`), and every root that
+/// does gets its own knob for it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Env {
+    pub name: String,
+    /// Its range or tolerance, typed as its declared type (a range's nominal is its
+    /// midpoint, model.md E16). `Err` when the type or the value was wrong, or the name
+    /// is defined twice.
+    pub value: Result<Value, Reported>,
+}
+
+/// `const R_TOP: Ohm = 10k;`: a fixed value of the whole project, usable where a number
+/// is expected (`value: R_TOP`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Const {
+    pub name: String,
+    /// `Err` when the type or the value was wrong, or the name is defined twice.
+    pub value: Result<Quantity, Reported>,
 }
 
 /// A block's contract. Its contents (its default setup, measures, specs) are resolved
@@ -63,11 +94,12 @@ pub struct Block {
     /// union-find, with every name kept as an alias (model.md E15).
     pub merges: Vec<Merge>,
     /// Whether an error was reported inside the block (by the lexer, the parser or
-    /// resolve), with the proof (rustc's `tainted_by_errors`). Every placeholder below
-    /// has one, and so does what leaves none: a statement the parser couldn't read, a
-    /// second `let` or binding of a name, a merged net that doesn't resolve. So flatten
-    /// doesn't check a root that places a tainted block as a whole: the checks would
-    /// report the damage (model.md E7).
+    /// resolve), or a value it reads is broken (a part's value naming a const whose own
+    /// value is wrong), with the proof (rustc's `tainted_by_errors`). Every placeholder
+    /// below has one, and so does what leaves none: a statement the parser couldn't
+    /// read, a second `let` or binding of a name, a merged net that doesn't resolve. So
+    /// flatten doesn't check a root that places a tainted block as a whole: the checks
+    /// would report the damage (model.md E7).
     pub tainted: Option<Reported>,
 }
 
@@ -161,6 +193,9 @@ pub enum InstanceOf {
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct DesignSourceMap {
     pub blocks: Vec<BlockSpans>,
+    /// Each env's and const's name, indexed like [`Design::envs`] and [`Design::consts`].
+    pub envs: Vec<Span>,
+    pub consts: Vec<Span>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

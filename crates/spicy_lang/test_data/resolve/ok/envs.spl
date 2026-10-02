@@ -1,0 +1,18 @@
+// The file's values: an env is a range the engine searches, a const a fixed value usable
+// where a number is expected (contracts_plan.md step 1).
+env ambient: Temperature in -10°C..=60°C;
+env lab: Temperature in 25°C ± 5K;
+env oven: Temperature in 85°C ± 2°C;
+env life: Duration in 0y..=10y;
+env rail: Volt in 12V ± 5%;
+const R_TOP: Ohm = 10k;
+const GAIN: f64 = 4;
+const T_LAB: Temperature = 25°C;
+
+block A { p: Pin, n: Pin }
+
+circuit A {
+    // A const is a number: a plain one takes the field's unit (`GAIN * 1k` is 4 kΩ).
+    let r1 = Resistor { a: p, b: n, value: R_TOP };
+    let r2 = Resistor { a: p, b: n, value: (GAIN * 1k) ± 1% };
+}

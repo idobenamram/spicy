@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 673
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/fixes.spl
 ---
@@ -70,27 +70,27 @@ E-binding UnknownField 1136..1138 "bb"
 E-name UnknownName 1187..1194 "Resistr" fix 1187..1194 "Resistor"
 
 --- rendered ---
-error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature difference)
    --> fixes.spl:10:48
    |
 10 |     let r1 = Resistor { a: vcc, b: gnd, value: 47K };
-   |                                                ^^^ this is `K` (a temperature)
+   |                                                ^^^ this is `K` (a temperature difference)
    |
    = help: `K` is kelvin; kilo is lowercase `k`
 
-error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature difference)
    --> fixes.spl:11:48
    |
 11 |     let r2 = Resistor { a: vcc, b: gnd, value: 5mK };
-   |                                                ^^^ this is `K` (a temperature)
+   |                                                ^^^ this is `K` (a temperature difference)
    |
    = help: `K` is kelvin; kilo is lowercase `k`
 
-error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature)
+error[E-unit]: expected `Ω` (a resistance), found `K` (a temperature difference)
    --> fixes.spl:12:48
    |
 12 |     let r3 = Resistor { a: vcc, b: gnd, value: 1K + 1K };
-   |                                                ^^^^^^^ this is `K` (a temperature)
+   |                                                ^^^^^^^ this is `K` (a temperature difference)
    |
    = help: `K` is kelvin; kilo is lowercase `k`
 

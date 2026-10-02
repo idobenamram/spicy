@@ -837,6 +837,15 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
             let _ = writeln!(out, "contract {}", block.name);
         }
     }
+    let invalid = |_| "<invalid>".to_string();
+    for (env, span) in design.envs.iter().zip(&map.envs) {
+        let value = env.value.map_or_else(invalid, |v| v.to_string());
+        let _ = writeln!(out, "env {} {} = {value}", env.name, at(*span));
+    }
+    for (c, span) in design.consts.iter().zip(&map.consts) {
+        let value = c.value.map_or_else(invalid, |q| q.to_string());
+        let _ = writeln!(out, "const {} {} = {value}", c.name, at(*span));
+    }
     out
 }
 
@@ -859,6 +868,22 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
     let in_src = |s: Span, what: &str| {
         check_span(src, s, what);
     };
+    // The file's values: each at its own name, and a name at most once (a second
+    // definition is dropped).
+    assert_eq!(design.envs.len(), map.envs.len(), "a span per env");
+    assert_eq!(design.consts.len(), map.consts.len(), "a span per const");
+    let envs = design.envs.iter().map(|e| &e.name).zip(&map.envs);
+    let consts = design.consts.iter().map(|c| &c.name).zip(&map.consts);
+    let mut names = std::collections::HashSet::new();
+    for (name, &s) in envs.chain(consts) {
+        in_src(s, "env or const name");
+        assert_eq!(
+            &src[s.range()],
+            name,
+            "an env's or const's span is its name"
+        );
+        assert!(names.insert(name), "`{name}` is defined once in the design");
+    }
     let inside = |s: Span, outer: Span, what: &str| {
         assert!(
             outer.start <= s.start && s.end <= outer.end,
@@ -942,8 +967,8 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
                 }
             }
         }
-        // Every placeholder was reported inside its block, so the block is tainted:
-        // flatten relies on it to skip checking a broken circuit.
+        // Every placeholder taints its block: flatten relies on it to skip checking a
+        // broken circuit.
         let placeholder = block.ports.iter().any(|p| p.signal.is_err())
             || block.instances.iter().any(|i| {
                 matches!(i.of, InstanceOf::Error(_))
@@ -957,7 +982,13 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
             );
         }
     }
-    for e in &resolved.errors {
+    // Each problem is reported once (model.md E23). A resolve error holds an `f64`, so
+    // it isn't hashed: the errors are compared pairwise.
+    for (i, e) in resolved.errors.iter().enumerate() {
+        let again = resolved.errors[..i]
+            .iter()
+            .any(|f| f.span == e.span && f.related == e.related && f.kind == e.kind);
+        assert!(!again, "each problem is reported once: {e:?}");
         check_problem(src, e);
     }
 }

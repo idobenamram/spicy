@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 646
+assertion_line: 678
 expression: "dump_resolve(\"ce_amp.spl\", src)"
 ---
 block CeAmp 169..174
@@ -36,3 +36,4 @@ block CeAmp 169..174
     e → emitter
     beta = 200 (100..=300)
 contract CeAmp
+env ambient 68..75 = 298.15 K (25 °C) (263.15 K..=333.15 K)

@@ -1,4 +1,5 @@
-//! The standard part kinds and signal types (model.md E8; language.md §3, §6.1).
+//! The standard part kinds, signal types and value types (model.md E8; language.md §3,
+//! §5.1, §6.1).
 //!
 //! Written in Rust for the MVP (roadmap §2.5): the language can't define parts or
 //! signals yet. A part kind is a *schema*: its pins and its fields with the unit each
@@ -133,6 +134,75 @@ impl FieldType {
     }
 }
 
+/// The type an `env` or a `const` declares (`env ambient: Temperature in …;`,
+/// `const R_TOP: Ohm = 10k;`): a quantity type by its unit (language §5.1), a time or a
+/// temperature by what it is, or a plain number.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValueType {
+    Temperature,
+    Duration,
+    Volt,
+    Amp,
+    Ohm,
+    Farad,
+    Henry,
+    Hertz,
+    Watt,
+    Number,
+}
+
+impl ValueType {
+    pub const ALL: [ValueType; 10] = [
+        ValueType::Temperature,
+        ValueType::Duration,
+        ValueType::Volt,
+        ValueType::Amp,
+        ValueType::Ohm,
+        ValueType::Farad,
+        ValueType::Henry,
+        ValueType::Hertz,
+        ValueType::Watt,
+        ValueType::Number,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            ValueType::Temperature => "Temperature",
+            ValueType::Duration => "Duration",
+            ValueType::Volt => "Volt",
+            ValueType::Amp => "Amp",
+            ValueType::Ohm => "Ohm",
+            ValueType::Farad => "Farad",
+            ValueType::Henry => "Henry",
+            ValueType::Hertz => "Hertz",
+            ValueType::Watt => "Watt",
+            ValueType::Number => "f64",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<ValueType> {
+        Self::ALL.into_iter().find(|t| t.name() == name)
+    }
+
+    /// What a value of this type is, with a spread allowed: an `env`'s is a range the
+    /// engine searches (a `const` takes it exact).
+    pub fn field_type(self) -> FieldType {
+        let dim = match self {
+            ValueType::Temperature => return FieldType::temperature(),
+            ValueType::Duration => Dimension::SECOND,
+            ValueType::Volt => Dimension::VOLT,
+            ValueType::Amp => Dimension::AMPERE,
+            ValueType::Ohm => Dimension::OHM,
+            ValueType::Farad => Dimension::FARAD,
+            ValueType::Henry => Dimension::HENRY,
+            ValueType::Hertz => Dimension::HERTZ,
+            ValueType::Watt => Dimension::WATT,
+            ValueType::Number => Dimension::NONE,
+        };
+        FieldType::tol(dim)
+    }
+}
+
 /// Direction of a port, seen from outside the block that owns it (language §3.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -231,6 +301,17 @@ mod tests {
         let (_, beta) = PartKind::Npn.field("beta").unwrap();
         assert!(beta.ty.dim.is_none() && !beta.required);
         assert!(PartKind::Resistor.field("beta").is_none());
+    }
+
+    #[test]
+    fn value_types_round_trip_by_name() {
+        for ty in ValueType::ALL {
+            assert_eq!(ValueType::from_name(ty.name()), Some(ty));
+        }
+        let temperature = ValueType::Temperature.field_type();
+        assert_eq!(temperature, FieldType::temperature());
+        let ohms = ValueType::Ohm.field_type();
+        assert_eq!(ohms, FieldType::tol(Dimension::OHM));
     }
 
     #[test]

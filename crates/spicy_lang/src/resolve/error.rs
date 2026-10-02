@@ -23,6 +23,8 @@ pub enum NameKind {
     Circuit,
     Contract,
     Setup,
+    Env,
+    Const,
     Value,
 }
 
@@ -40,6 +42,8 @@ impl NameKind {
             NameKind::Circuit => "a circuit",
             NameKind::Contract => "a contract",
             NameKind::Setup => "a setup",
+            NameKind::Env => "an env",
+            NameKind::Const => "a const",
             NameKind::Value => "a value",
         }
     }
@@ -54,8 +58,10 @@ impl NameKind {
 pub enum Namespace {
     /// Part kinds, blocks, signal types.
     Kind,
-    /// Ports, nets, instances.
+    /// Ports, nets, instances; and the file's envs and consts.
     Value,
+    /// The types an `env` or `const` declares (`Temperature`, `Ohm`).
+    Type,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -130,6 +136,16 @@ pub enum ResolveErrorKind {
     /// Syntax the parser reads but resolve doesn't handle yet: generic arguments at a
     /// placement. `what` names it.
     Unsupported { what: &'static str },
+    /// `env t: Temperature in 25°C;`: an env is a range the engine searches; a fixed
+    /// value is a `const`.
+    EnvNeedsRange { name: String },
+    /// A temperature's spread that isn't a difference: `25°C ± 5%` (a percentage of a
+    /// temperature depends on where its zero is), or a named temperature, which is a
+    /// point (`25°C ± T_ROOM`). `± 5K` and `± 5°C` are both 5 K (model.md E13).
+    TemperatureSpread { percent: bool },
+    /// A temperature written as a plain number (`25`) or in K (`300K`, which is a
+    /// difference): a temperature point is written in `°C` (model.md E13).
+    TemperaturePoint { kelvin: bool },
 }
 
 /// The variant names, for the test that every error kind has a case file. Only tests
@@ -160,6 +176,9 @@ impl ResolveErrorKind {
         "NegativeTolerance",
         "DivisionByZero",
         "Unsupported",
+        "EnvNeedsRange",
+        "TemperatureSpread",
+        "TemperaturePoint",
     ];
 }
 
@@ -188,6 +207,9 @@ impl DiagKind for ResolveErrorKind {
             NegativeTolerance => "NegativeTolerance",
             DivisionByZero => "DivisionByZero",
             Unsupported { .. } => "Unsupported",
+            EnvNeedsRange { .. } => "EnvNeedsRange",
+            TemperatureSpread { .. } => "TemperatureSpread",
+            TemperaturePoint { .. } => "TemperaturePoint",
         }
     }
 
@@ -208,6 +230,8 @@ impl DiagKind for ResolveErrorKind {
             | NegativeTolerance
             | DivisionByZero => "E-value",
             Unsupported { .. } => "E-unsupported",
+            EnvNeedsRange { .. } => "E-value",
+            TemperatureSpread { .. } | TemperaturePoint { .. } => "E-unit",
         }
     }
 
@@ -223,7 +247,7 @@ impl DiagKind for ResolveErrorKind {
         }
     }
 
-    fn text(&self, _fix: Option<&Fix>) -> Text {
+    fn text(&self, fix: Option<&Fix>) -> Text {
         use ResolveErrorKind::*;
         match self {
             UnknownName {
@@ -234,6 +258,7 @@ impl DiagKind for ResolveErrorKind {
                 let what = match namespace {
                     Namespace::Kind => "part kind or block",
                     Namespace::Value => "net, port or instance",
+                    Namespace::Type => "type",
                 };
                 let notes = suggestion
                     .iter()
@@ -267,7 +292,8 @@ impl DiagKind for ResolveErrorKind {
                     "second definition".to_string(),
                     vec![],
                 ),
-                // Nets and instances share a namespace with ports (model.md E5).
+                // Nets and instances share a namespace with ports, and envs with consts
+                // (model.md E5).
                 _ => (
                     format!("name `{name}` is defined twice"),
                     "second definition".to_string(),
@@ -405,6 +431,35 @@ impl DiagKind for ResolveErrorKind {
                 "not supported yet".to_string(),
                 vec![],
             ),
+            EnvNeedsRange { name } => (
+                format!("`env {name}` needs a range"),
+                "a single value".to_string(),
+                vec![
+                    "help: an env is a range the engine searches, like `-10°C..=60°C`; a fixed value is a `const`"
+                        .to_string(),
+                ],
+            ),
+            TemperatureSpread { percent } => (
+                "a temperature's spread is a difference, like `5K` or `5°C`".to_string(),
+                match percent {
+                    true => "a percentage".to_string(),
+                    false => "a temperature, which is a point".to_string(),
+                },
+                match percent {
+                    true => vec![
+                        "note: a percentage of a temperature depends on where its zero is".to_string(),
+                    ],
+                    false => vec![],
+                },
+            ),
+            TemperaturePoint { kelvin } => (
+                "a temperature is written in `°C`".to_string(),
+                match kelvin {
+                    true => "this is in `K`, which is a temperature difference".to_string(),
+                    false => "a plain number".to_string(),
+                },
+                write_fix(fix),
+            ),
         }
     }
 }
@@ -418,10 +473,17 @@ impl ResolveErrorKind {
     }
 }
 
-/// What a position expects, for `UnitMismatch`: "a temperature (`°C` or `K`)".
+/// The help that shows a kind's fix, when it has one: "help: write `5K`".
+fn write_fix(fix: Option<&Fix>) -> Vec<String> {
+    fix.map(|fix| format!("help: write `{}`", fix.replacement))
+        .into_iter()
+        .collect()
+}
+
+/// What a position expects, for `UnitMismatch`: "a temperature (in `°C`)".
 fn describe_expected(t: FieldType) -> String {
     match t.kind {
-        QKind::TempPoint => "a temperature (`°C` or `K`)".to_string(),
+        QKind::TempPoint => "a temperature (in `°C`)".to_string(),
         _ => describe(t.kind, t.dim),
     }
 }

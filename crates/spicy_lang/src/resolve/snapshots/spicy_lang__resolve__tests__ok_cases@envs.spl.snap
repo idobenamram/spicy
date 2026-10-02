@@ -1,0 +1,25 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 657
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/envs.spl
+---
+block A 416..417
+  port p: Pin 420..421
+  port n: Pin 428..429
+  r1 = Resistor 545..547
+    a → p
+    b → n
+    value = 10000 Ω
+  r2 = Resistor 597..599
+    a → p
+    b → n
+    value = 4000 Ω ± 1%
+env ambient 152..159 = 298.15 K (25 °C) (263.15 K..=333.15 K)
+env lab 196..199 = 298.15 K (25 °C) ± 5 K
+env oven 233..237 = 358.15 K (85 °C) ± 2 K
+env life 273..277 = 157788000 s (0 s..=315576000 s)
+env rail 305..309 = 12 V ± 5%
+const R_TOP 336..341 = 10000 Ω
+const GAIN 360..364 = 4
+const T_LAB 381..386 = 298.15 K (25 °C)

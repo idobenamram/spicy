@@ -114,7 +114,8 @@ pub enum Unit {
 
 impl Unit {
     /// `value` in this unit, in SI: `Unit::Ohm.quantity(47e3)` is 47 kΩ. The one place
-    /// that knows each unit's dimension.
+    /// that knows each unit's dimension (a declared type's is
+    /// [`ValueType::field_type`](crate::prelude::ValueType::field_type)).
     pub fn quantity(self, value: f64) -> Quantity {
         let dim = match self {
             Unit::Celsius => return Quantity::celsius(value),
@@ -171,7 +172,7 @@ const NAMED: &[(Dimension, &str, &str)] = &[
     (Dimension::FARAD, "F", "a capacitance"),
     (Dimension::HENRY, "H", "an inductance"),
     (Dimension::WATT, "W", "a power"),
-    (Dimension::KELVIN, "K", "a temperature"),
+    (Dimension::KELVIN, "K", "a temperature difference"),
     (Dimension::RADIAN, "rad", "an angle"),
 ];
 
@@ -211,6 +212,23 @@ pub struct Quantity {
 
 /// 0 °C in kelvin.
 pub const CELSIUS_OFFSET: f64 = 273.15;
+
+/// A temperature in K, read in °C without the float noise of the offset: `263.15` is
+/// `-10`, not `-9.999999999999972`. For messages and fixes; values stay in K. It has
+/// the fewest decimals, up to 9, that read back as `kelvin`: a huge value needs none,
+/// so scaling by 10⁹ never overflows (`1e300` K once read as `inf` °C), and one no
+/// number of °C reads back as exactly (`0.1` K) gets 9.
+pub fn to_celsius(kelvin: f64) -> f64 {
+    let c = kelvin - CELSIUS_OFFSET;
+    let rounded = |decimals: i32| {
+        let scale = 10f64.powi(decimals);
+        (c * scale).round() / scale
+    };
+    (0..9)
+        .map(rounded)
+        .find(|&celsius| celsius + CELSIUS_OFFSET == kelvin)
+        .unwrap_or_else(|| rounded(9))
+}
 
 impl Quantity {
     pub fn new(si: f64, dim: Dimension) -> Self {
@@ -258,7 +276,7 @@ impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             QKind::TempPoint => {
-                write!(f, "{} K ({} °C)", self.si, round9(self.si - CELSIUS_OFFSET))
+                write!(f, "{} K ({} °C)", self.si, to_celsius(self.si))
             }
             QKind::Db => write!(f, "{} dB", self.si),
             QKind::Plain if self.dim.is_none() => write!(f, "{}", self.si),
@@ -267,8 +285,8 @@ impl fmt::Display for Quantity {
     }
 }
 
-/// Removes the float noise of the °C offset from displayed values (`-10`, not
-/// `-9.999999999999972`).
+/// Removes the float noise of a unit conversion from a displayed value (`1`, not
+/// `0.9999999999999999`).
 fn round9(x: f64) -> f64 {
     (x * 1e9).round() / 1e9
 }
@@ -429,6 +447,10 @@ mod tests {
         assert_eq!(t.kind, QKind::TempPoint);
         assert!((t.si - 263.15).abs() < 1e-12);
         assert_eq!(t.to_string(), "263.15 K (-10 °C)");
+        // Read back in °C without the offset's float noise (`300.0 - 273.15` is
+        // `26.850000000000023`).
+        assert_eq!(to_celsius(300.0), 26.85);
+        assert_eq!(to_celsius(t.si), -10.0);
     }
 
     #[test]

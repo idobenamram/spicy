@@ -2,26 +2,32 @@
 //! becomes a [`Design`], each block once, with every name resolved and every value
 //! typed.
 //!
-//! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), read top
-//! to bottom in [`resolve`]:
+//! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), then a
+//! third that marks what's broken, read top to bottom in [`resolve`]:
 //! 1. **The file's names:** every block's name, its circuit and contract (each named
 //!    after it) and its setups (each naming it after `for`), then every block's
-//!    [`Signature`] (its ports). A block can be placed before its definition.
+//!    [`Signature`] (its ports). A block can be placed before its definition. And the
+//!    file's values (`resolve/env.rs`): every `env` and `const`, typed against its
+//!    declared type, the consts first, since an env's or a part's value may name one.
 //! 2. **The circuits:** each block's circuit, by a [`BodyResolver`](body::BodyResolver)
 //!    of its own, which has two passes of its own: every name the circuit declares, then
 //!    every statement, so statement order never matters.
-//! 3. **What's broken:** every block with an error inside it is tainted
-//!    ([`Block::tainted`]), so flatten doesn't check a circuit with a part missing.
+//! 3. **What's broken:** every block with an error inside it, or a read of a broken
+//!    const, is tainted ([`Block::tainted`]), so flatten doesn't check a circuit with a
+//!    part missing.
 //!
 //! Errors never stop the stage (E7): a name that doesn't resolve becomes a placeholder
 //! holding the proof it was reported (an `InstanceOf::Error`, an `Err` binding), reported
-//! once. A second definition of a name (a block, a circuit, a port, a `net` or `let`) is
-//! checked for its own mistakes, then dropped: it never enters the design.
+//! once. A second definition of a name (a block, a circuit, a port, a `net` or `let`, an
+//! `env` or `const`) is checked for its own mistakes, then dropped: it never enters the
+//! design. Which one was meant isn't known, so the first of a block, an env or a const
+//! defined twice is broken too: the block is tainted, the value is `Err`.
 //!
-//! Contracts and setups are only matched to their blocks here; their contents, and the
-//! file's `env`s and `const`s, are resolved in the next step (roadmap M1d-5).
+//! Contracts and setups are only matched to their blocks here; their contents are
+//! resolved in the next steps (contracts_plan.md steps 2–4).
 
 mod body;
+mod env;
 mod error;
 mod value;
 
@@ -31,10 +37,11 @@ use std::collections::HashMap;
 
 use spicy_errors::{Diag, DiagKind, Reported};
 use spicy_model::design::{
-    Block, BlockId, BlockSpans, Contract, Design, DesignSourceMap, Instance, InstanceSpans, Merge,
-    MergeSpans, Net, NetId, Port, PortId,
+    Block, BlockId, BlockSpans, ConstId, Contract, Design, DesignSourceMap, EnvId, Instance,
+    InstanceSpans, Merge, MergeSpans, Net, NetId, Port, PortId,
 };
 use spicy_model::prelude::{PartKind, Role, SignalType, SignalTypeError};
+use spicy_model::units::Quantity;
 use spicy_span::Span;
 
 use crate::edit_distance::edit_distance;
@@ -58,6 +65,8 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         parsed,
         errors: Vec::new(),
         blocks: Scope::default(),
+        values: Scope::default(),
+        consts: None,
         syntax: ErrorStarts::default()
             .with(&parsed.lex_errors)
             .with(&parsed.errors),
@@ -77,6 +86,14 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         .map(|(decl, circuit)| r.signature(decl, circuit.is_some()))
         .unzip();
 
+    // …and the file's values: every env's and const's name, then their values. The
+    // consts first, all typed before any can be named, since an env's value or a
+    // part's may name one.
+    let value_decls = r.declare_values();
+    let (consts, const_spans) = r.const_values(&value_decls);
+    r.consts = Some(consts.iter().map(|c| c.value).collect());
+    let (envs, env_spans) = r.env_values(&value_decls);
+
     // A second circuit of a block is checked against the block's ports (see below).
     let second_starts: Vec<BlockBuilder> = second_circuits
         .iter()
@@ -86,9 +103,15 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     // Pass 2, the circuits: each block's nets, instances and merges.
     let mut design = Design {
         contracts: contracts.iter().map(|c| c.map(|_| Contract {})).collect(),
+        envs,
+        consts,
         ..Design::default()
     };
-    let mut source_map = DesignSourceMap::default();
+    let mut source_map = DesignSourceMap {
+        envs: env_spans,
+        consts: const_spans,
+        ..DesignSourceMap::default()
+    };
     for ((signature, start), circuit) in signatures.iter().zip(starts).zip(&circuits) {
         let stmts = circuit.map_or(&[][..], |(body, _)| &body.stmts);
         let body_resolver = BodyResolver::new(&mut r, &signatures, signature, start, stmts);
@@ -109,7 +132,8 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     // Pass 3, what's broken: every block with an error in it (see `Block::tainted`).
     // One its header's or circuit's parse reported, since an error found at the next
     // item (a missing `}`) is the open one's, not the next one's; or a lexer or resolve
-    // error inside either.
+    // error inside either. (A part's value that reads a broken const, whose error is
+    // reported at the const, tainted its block in pass 2.)
     let inside = ErrorStarts::default()
         .with(&parsed.lex_errors)
         .with(&r.errors);
@@ -124,19 +148,16 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
             Some((body, span)) => (body.broken, Some(*span)),
             None => (None, None),
         };
-        block.tainted = decl
-            .broken
+        block.tainted = block
+            .tainted
+            .or(decl.broken)
             .or(circuit_broken)
             .or_else(|| inside.inside(span))
             .or_else(|| circuit_span.and_then(|s| inside.inside(s)));
     }
     // A block defined twice: which definition was meant isn't known, so the first,
     // the one the design keeps, is broken too.
-    for (decl, reported) in second_decls {
-        let first = r
-            .blocks
-            .get(decl.name.text)
-            .expect("a second block has a first");
+    for (_, Redefined { first, reported }) in second_decls {
         design.blocks[first.index()].tainted.get_or_insert(reported);
     }
 
@@ -174,22 +195,38 @@ impl ErrorStarts {
     }
 }
 
-/// The file-wide state: the blocks' names, and what every part of the stage adds to
-/// (the errors, the suggestion budget). The blocks' signatures are a separate,
-/// read-only table in pass 2 (as rust-analyzer keeps signatures apart from bodies).
+/// The file-wide state: the blocks' names, the file's values, and what every part of
+/// the stage adds to (the errors, the suggestion budget). The blocks' signatures are a
+/// separate, read-only table in pass 2 (as rust-analyzer keeps signatures apart from
+/// bodies).
 struct Resolver<'p, 'src> {
     parsed: &'p Parsed<'src>,
     errors: Vec<ResolveError>,
     /// The kind namespace's blocks (model.md E5).
     blocks: Scope<'src, BlockId>,
+    /// The file's values: its envs and consts (model.md E5).
+    values: Scope<'src, FileValue>,
+    /// Each const's value, by `ConstId`. `None` while the consts are typed, so a const's
+    /// value can't name another yet (see `named_value`).
+    consts: Option<Vec<Result<Quantity, Reported>>>,
     /// Every lexer and parser error: an expression with one inside isn't typed (see
     /// `value`).
     syntax: ErrorStarts,
     suggestions_left: usize,
 }
 
+/// What a name in the file's values is.
+#[derive(Clone, Copy)]
+enum FileValue {
+    Env(EnvId),
+    Const(ConstId),
+}
+
 /// Each block's circuit or contract, if it has one, with the span of its item.
 type PerBlock<'p, 'src> = Vec<Option<(&'p Body<'src>, Span)>>;
+
+/// The second definitions of a block name, each with the first it redefines.
+type SecondBlocks<'p, 'src> = Vec<(&'p BlockDecl<'src>, Redefined<BlockId>)>;
 
 /// What the rest of the file sees of a block: its ports, by name, which a placement
 /// binds, and whether it has a circuit to place. Read-only in pass 2.
@@ -244,6 +281,11 @@ impl BlockBuilder {
         net
     }
 
+    /// Marks the block broken ([`Block::tainted`]), keeping the first proof.
+    fn taint(&mut self, reported: Reported) {
+        self.block.tainted.get_or_insert(reported);
+    }
+
     fn push_instance(&mut self, (instance, spans): (Instance, InstanceSpans)) {
         self.block.instances.push(instance);
         self.spans.instances.push(spans);
@@ -274,22 +316,24 @@ impl<T> Default for Scope<'_, T> {
 
 impl<'src, T: Copy> Scope<'src, T> {
     /// Declares `name` as `value`. If it's already declared, reports a duplicate of the
-    /// first declaration (`what` is what kind of name it is).
+    /// first declaration (`what` is what kind of name it is), and returns the first
+    /// (as rustc's `try_define` returns the old binding).
     fn declare(
         &mut self,
         name: &Ident<'src>,
         value: T,
         what: NameKind,
         errors: &mut Vec<ResolveError>,
-    ) -> Result<(), Reported> {
-        if let Some(&(_, first)) = self.declared.get(name.text) {
+    ) -> Result<(), Redefined<T>> {
+        if let Some(&(first, at)) = self.declared.get(name.text) {
             let kind = ResolveErrorKind::Duplicate {
                 name: name.text.to_string(),
                 what,
             };
-            return Err(ResolveError::new(kind, name.span)
-                .with_related(first)
-                .report(errors));
+            let reported = ResolveError::new(kind, name.span)
+                .with_related(at)
+                .report(errors);
+            return Err(Redefined { first, reported });
         }
         self.declared.insert(name.text, (value, name.span));
         Ok(())
@@ -311,6 +355,16 @@ impl<'src, T: Copy> Scope<'src, T> {
             .iter()
             .map(|(&name, &(value, _))| (name, value))
     }
+}
+
+/// The first declaration of a name declared again, and the proof the second was
+/// reported. Which one was meant isn't known, so the first is broken too where it can
+/// be: a block defined twice is tainted (pass 3), an env's or const's value is `Err`
+/// (`resolve/env.rs`).
+#[derive(Clone, Copy)]
+struct Redefined<T> {
+    first: T,
+    reported: Reported,
 }
 
 /// How many "did you mean" searches one file gets. Each looks at every name in scope,
@@ -370,14 +424,8 @@ impl<'p, 'src> Resolver<'p, 'src> {
 
     /// Every block's name, in `blocks`. Returns the blocks of the design, in source
     /// order (a block's id is its place here), with the span of each one's whole item,
-    /// and the second definitions of a block name, each with the proof it was reported.
-    fn declare_blocks(
-        &mut self,
-    ) -> (
-        Vec<&'p BlockDecl<'src>>,
-        Vec<Span>,
-        Vec<(&'p BlockDecl<'src>, Reported)>,
-    ) {
+    /// and the second definitions of a block name, each with the first it redefines.
+    fn declare_blocks(&mut self) -> (Vec<&'p BlockDecl<'src>>, Vec<Span>, SecondBlocks<'p, 'src>) {
         let (mut first, mut spans, mut second) = (Vec::new(), Vec::new(), Vec::new());
         for item in &self.parsed.file.items {
             let ItemKind::Block(decl) = &item.kind else {
@@ -392,7 +440,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
                     first.push(decl);
                     spans.push(item.span);
                 }
-                Err(reported) => second.push((decl, reported)),
+                Err(redefined) => second.push((decl, redefined)),
             }
         }
         (first, spans, second)
@@ -587,7 +635,8 @@ mod tests {
     use super::*;
     use crate::parser::parse;
     use crate::testing::{
-        assert_every_kind_has_a_case, dump_resolve, file_name, read, resolve_errors,
+        assert_every_kind_has_a_case, check_parse_invariants, dump_resolve, file_name, read,
+        resolve_errors,
     };
     use spicy_errors::DiagKind;
 
@@ -596,6 +645,7 @@ mod tests {
     fn ok_cases() {
         insta::glob!("../../test_data/resolve", "ok/*.spl", |path| {
             let src = read(path);
+            check_parse_invariants(&src);
             let parsed = parse(&src);
             let resolved = resolve(&parsed);
             assert!(
@@ -613,6 +663,7 @@ mod tests {
     fn err_cases() {
         insta::glob!("../../test_data/resolve", "err/*.spl", |path| {
             let src = read(path);
+            check_parse_invariants(&src);
             assert!(
                 !resolve_errors(&src).is_empty(),
                 "{}: expected resolve errors",

@@ -3,7 +3,7 @@
 //!
 //! Design: `docs/ecad/model.md`.
 //! - [`units`]: dimensions, SI values, spreads.
-//! - [`prelude`]: the standard part kinds and signal types.
+//! - [`prelude`]: the standard part kinds, signal types and value types.
 //! - [`design`]: the `Design`, each block once, as written.
 //! - [`flat`]: the `FlatDesign`, one root with every placement expanded, and the `Flat`
 //!   handle that reads it with its `Design`.

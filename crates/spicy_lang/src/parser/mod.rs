@@ -24,6 +24,8 @@ mod expr;
 pub use error::{ParseError, ParseErrorKind};
 pub use expr::Infix;
 
+use std::ops::Range;
+
 use codespan_reporting::diagnostic::Diagnostic;
 
 use spicy_errors::Reported;
@@ -167,9 +169,7 @@ impl<'t, 'src> Parser<'t, 'src> {
             .iter()
             .map(|e| {
                 // Always found: the last significant token, `Eof`, starts at the end.
-                let next = self
-                    .sig
-                    .partition_point(|&(i, _)| self.tokens.span(i).start < e.span.end);
+                let next = self.first_from(e.span.end, 0..self.sig.len());
                 (e.span.start, self.span_at(next).start)
             })
             .collect()
@@ -563,6 +563,7 @@ impl<'t, 'src> Parser<'t, 'src> {
     /// the top isn't one: reported, but a soft error, so the statement becomes
     /// `StmtKind::Error` and its `;` is still read.
     fn relation(&mut self) -> PResult<Result<Relation<'src>, Reported>> {
+        let start = self.pos;
         let expr = self.expr()?;
         if let ast::ExprKind::Binary {
             op: BinOp::Rel(op),
@@ -570,9 +571,12 @@ impl<'t, 'src> Parser<'t, 'src> {
             rhs,
         } = expr.kind
         {
+            // The relation's token is the first one after its left side.
+            let op_span = self.span_at(self.first_from(lhs.span.end, start..self.pos));
             return Ok(Ok(Relation {
                 lhs: *lhs,
                 op,
+                op_span,
                 rhs: *rhs,
             }));
         }
@@ -934,6 +938,13 @@ impl<'t, 'src> Parser<'t, 'src> {
     /// Span of the significant token at `pos`.
     fn span_at(&self, pos: usize) -> Span {
         self.tokens.span(self.sig[pos].0)
+    }
+
+    /// The position of the first significant token among `among` that starts at byte
+    /// `offset` or after it; `among.end` if none does.
+    fn first_from(&self, offset: u32, among: Range<usize>) -> usize {
+        let start = among.start;
+        start + self.sig[among].partition_point(|&(i, _)| self.tokens.span(i).start < offset)
     }
 
     /// Span of the current token.

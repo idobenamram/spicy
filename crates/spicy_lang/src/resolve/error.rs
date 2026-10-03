@@ -5,7 +5,7 @@ use spicy_model::measure::{MeasureType, Method};
 use spicy_model::prelude::{FieldType, Shape, SignalType};
 use spicy_model::units::{Dimension, QKind, Quantity};
 
-use spicy_errors::{Diag, DiagKind, Fix, Text, list};
+use spicy_errors::{Diag, DiagKind, Fix, Severity, Text, list};
 
 /// One problem resolve found. `related` is the first definition of a duplicate.
 pub type ResolveError = Diag<ResolveErrorKind>;
@@ -30,6 +30,8 @@ pub enum NameKind {
     DefaultSetup,
     /// A contract's `let`: a measure.
     Measure,
+    /// A contract's `spec`.
+    Spec,
     Env,
     Const,
     Value,
@@ -52,6 +54,7 @@ impl NameKind {
             NameKind::Setup => "a setup",
             NameKind::DefaultSetup => "a default setup",
             NameKind::Measure => "a measure",
+            NameKind::Spec => "a spec",
             NameKind::Env => "an env",
             NameKind::Const => "a const",
             NameKind::Value => "a value",
@@ -229,6 +232,27 @@ pub enum ResolveErrorKind {
     /// A measure defined in terms of itself, directly or through other measures:
     /// `cycle` is each measure on the way, from the one met again.
     MeasureCycle { cycle: Vec<String> },
+    /// A spec whose measure isn't one number: `spec x: h within …` on a response, or
+    /// `h.at(1kHz)`, a phasor.
+    NotANumber { spec: String, on: MeasureType },
+    /// `<` or `>` as a spec's limit (plan §2.7): read as `<=` or `>=`, its fix.
+    StrictLimit,
+    /// `within` with one value: one number (`within 5V`), or a spread that doesn't vary
+    /// (`within 5V ± 0%`, `within 5V..=5V`), as an env's `EnvNeedsRange`.
+    WithinNeedsRange,
+    /// `within ..=6.5V`: an open range is a one-sided limit, written as one, its fix
+    /// (`<= 6.5V`) when its end is sound.
+    OpenRangeLimit,
+    /// A `pub spec` that measures an internal net, directly or through a measure
+    /// (language.md §8.3): a parent can't rely on it. The fix removes `pub`.
+    PublishedInternal {
+        spec: String,
+        net: String,
+        block: String,
+    },
+    /// A warning: a contract with specs for a block that has no circuit, which nothing
+    /// can check (plan §3.1).
+    UncheckedSpecs { block: String },
 }
 
 /// The variant names, for the test that every error kind has a case file. Only tests
@@ -273,6 +297,12 @@ impl ResolveErrorKind {
         "BadArguments",
         "NoExcitation",
         "MeasureCycle",
+        "NotANumber",
+        "StrictLimit",
+        "WithinNeedsRange",
+        "OpenRangeLimit",
+        "PublishedInternal",
+        "UncheckedSpecs",
     ];
 }
 
@@ -315,6 +345,12 @@ impl DiagKind for ResolveErrorKind {
             BadArguments { .. } => "BadArguments",
             NoExcitation => "NoExcitation",
             MeasureCycle { .. } => "MeasureCycle",
+            NotANumber { .. } => "NotANumber",
+            StrictLimit => "StrictLimit",
+            WithinNeedsRange => "WithinNeedsRange",
+            OpenRangeLimit => "OpenRangeLimit",
+            PublishedInternal { .. } => "PublishedInternal",
+            UncheckedSpecs { .. } => "UncheckedSpecs",
         }
     }
 
@@ -339,14 +375,24 @@ impl DiagKind for ResolveErrorKind {
             TemperatureSpread { .. } | TemperaturePoint { .. } => "E-unit",
             WrongRole { .. } => "E-role",
             IncompleteSetup { .. } | NotAShape { .. } => "E-setup",
-            NoDefaultSetup { .. } => "E-contract",
+            NoDefaultSetup { .. } | PublishedInternal { .. } => "E-contract",
             NotAMeasure { .. }
             | NeedsAnalysis
             | WrongMeasureType { .. }
             | BadArguments { .. }
             | NoExcitation
-            | MeasureCycle { .. } => "E-measure",
+            | MeasureCycle { .. }
+            | NotANumber { .. } => "E-measure",
             OpenRange { .. } => "E-value",
+            StrictLimit | WithinNeedsRange | OpenRangeLimit => "E-limit",
+            UncheckedSpecs { .. } => "W-unchecked",
+        }
+    }
+
+    fn severity(&self) -> Severity {
+        match self {
+            ResolveErrorKind::UncheckedSpecs { .. } => Severity::Warning,
+            _ => Severity::Error,
         }
     }
 
@@ -358,6 +404,8 @@ impl DiagKind for ResolveErrorKind {
                 NameKind::Binding => "first given here",
                 _ => "first defined here",
             },
+            ResolveErrorKind::PublishedInternal { .. } => "the internal net",
+            ResolveErrorKind::UncheckedSpecs { .. } => "has no circuit",
             _ => "",
         }
     }
@@ -412,7 +460,7 @@ impl DiagKind for ResolveErrorKind {
                     "second `setup = …;`".to_string(),
                     vec![],
                 ),
-                NameKind::Block | NameKind::Port | NameKind::Setup => (
+                NameKind::Block | NameKind::Port | NameKind::Setup | NameKind::Spec => (
                     format!("{} `{name}` is defined twice", what.noun()),
                     "second definition".to_string(),
                     vec![],
@@ -623,7 +671,7 @@ impl DiagKind for ResolveErrorKind {
                         "`{port}: {signal}`: this block drives `{port}.{field}`; a setup gives it a `Load {{ r, c, i }}`"
                     ),
                     vec![format!(
-                        "help: a range on a quantity you drive is a guarantee: `spec …: dc({port}.{field}) within …;`"
+                        "help: a range on a quantity you drive belongs in a spec: `spec …: dc({port}.{field}) within …;`"
                     )],
                 ),
             },
@@ -740,6 +788,67 @@ impl DiagKind for ResolveErrorKind {
                     notes,
                 )
             }
+            NotANumber { spec, on } => {
+                let help = match on {
+                    MeasureType::Phasor(_) => "help: take its magnitude: `.mag()`, or `.db()`",
+                    _ => {
+                        "help: reduce it to one number: `.at(1kHz).mag()`, `.at(1kHz).db()` or `.f_low(-3dB)`"
+                    }
+                };
+                (
+                    format!(
+                        "spec `{spec}` checks one number, not {}",
+                        describe_measure(*on)
+                    ),
+                    describe_measure(*on),
+                    vec![help.to_string()],
+                )
+            }
+            StrictLimit => (
+                "a spec's limit is `<=` or `>=`".to_string(),
+                "strict".to_string(),
+                [
+                    write_fix(fix),
+                    vec![
+                        "note: a value equal to the bound is inside the simulator's numerical noise, so a strict limit can't mean more"
+                            .to_string(),
+                    ],
+                ]
+                .concat(),
+            ),
+            WithinNeedsRange => (
+                "`within` takes a range or a tolerance".to_string(),
+                "one value".to_string(),
+                vec![
+                    "help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`".to_string(),
+                ],
+            ),
+            OpenRangeLimit => (
+                "an open range is a one-sided limit".to_string(),
+                "open range".to_string(),
+                match fix {
+                    Some(_) => write_fix(fix),
+                    None => vec!["help: write it with `<=` or `>=`".to_string()],
+                },
+            ),
+            PublishedInternal { spec, net, block } => (
+                format!("`{spec}` can't be `pub`"),
+                "published".to_string(),
+                vec![
+                    format!(
+                        "note: it measures `{net}`, a net of `circuit {block}`; a parent can't rely on it"
+                    ),
+                    "help: remove `pub`: an internal spec is still checked".to_string(),
+                ],
+            ),
+            UncheckedSpecs { block } => (
+                format!("`{block}`'s specs aren't checked: it has no circuit"),
+                "not checked".to_string(),
+                vec![
+                    "note: a block with no circuit is an interface; nothing simulates it"
+                        .to_string(),
+                ],
+            ),
         }
     }
 }

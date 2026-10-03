@@ -6,9 +6,9 @@ use std::fmt::Write;
 use codespan_reporting::diagnostic::Diagnostic;
 use spicy_span::Span;
 
-use spicy_errors::{Diag, DiagKind, Render, render_plain};
+use spicy_errors::{Diag, DiagKind, Render, Reported, render_plain};
 
-use crate::lexer::{LexError, TokenKind, check, scan};
+use crate::lexer::{LexError, TokenKind, check, lookalike, scan};
 use crate::parser::ast::{
     Arg, Attribute, BlockDecl, BlockEntry, Expr, ExprKind, File, Ident, Item, ItemKind, Path,
     Relation, SetupDecl, SetupEntry, Stmt, StmtKind, Type, TypeKind, ValueDecl,
@@ -519,8 +519,21 @@ impl<'a> Printer<'a> {
     }
 
     /// The two sides, as children of the statement: a relation has no span of its own.
+    /// Its token is checked between them, not printed.
     fn relation(&mut self, r: &Relation) {
         self.expr(&r.lhs);
+        self.check(r.op_span);
+        // A look-alike (`≤`) is read as what it looks like.
+        let op = &self.src[r.op_span.range()];
+        let mut chars = op.chars();
+        let read = match (chars.next(), chars.next()) {
+            (Some(c), None) => lookalike::lookup(c).map_or(op, |l| l.replacement),
+            _ => op,
+        };
+        assert!(
+            matches!(read, "within" | "<" | "<=" | ">" | ">="),
+            "a relation's token, not {op:?}"
+        );
         self.expr(&r.rhs);
     }
 
@@ -646,7 +659,7 @@ fn path_text(path: &Path) -> String {
 // --- Resolve -----------------------------------------------------------------------
 
 use spicy_model::design::{
-    Block, Design, DesignSourceMap, FieldValue, InstanceOf, Measure, PortId, Temp,
+    Block, Design, DesignSourceMap, FieldValue, InstanceOf, Limit, Measure, PortId, Temp,
 };
 use spicy_model::measure::{ArithOp, MExpr, MeasureType, Method, Reference};
 use spicy_model::units::QKind;
@@ -857,6 +870,18 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
                 }
             }
         }
+        for spec in &contract.specs {
+            let public = if spec.public { "pub " } else { "" };
+            let measure = match &spec.measure {
+                Ok(expr) => measure_text(expr, block, &contract.measures),
+                Err(_) => "<invalid>".to_string(),
+            };
+            let limit = match &spec.limit {
+                Ok(Limit { op, bound }) => format!("{} {bound}", op.name()),
+                Err(_) => "<invalid>".to_string(),
+            };
+            let _ = writeln!(out, "  {public}spec {}: {measure} {limit}", spec.name);
+        }
     }
     let invalid = |_| "<invalid>".to_string();
     for (env, span) in design.envs.iter().zip(&map.envs) {
@@ -1017,6 +1042,22 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
                 &src[at.range()],
                 measure.name,
                 "a measure's span is its name"
+            );
+        }
+        assert_eq!(contract.specs.len(), spans.specs.len(), "spans per spec");
+        for (spec, at) in contract.specs.iter().zip(&spans.specs) {
+            check_span(src, at.name, "spec name");
+            assert_eq!(
+                &src[at.name.range()],
+                spec.name,
+                "a spec's span is its name"
+            );
+            check_span(src, at.measure, "spec measure");
+            check_span(src, at.bound, "spec bound");
+            assert!(at.name.end <= at.measure.start && at.measure.end <= at.bound.start);
+            assert!(
+                spec.measure.is_ok() || spec.limit.is_err(),
+                "a broken measure breaks the limit: its unit isn't known"
             );
         }
     }
@@ -1259,7 +1300,8 @@ fn check_flatten_invariants(src: &str, parsed: &crate::parser::Parsed) {
     let errors = &elaborated.flattened.errors;
     assert_reported_once(errors);
     let map = &elaborated.resolved.source_map;
-    let upstream = parsed.has_errors() || !elaborated.resolved.errors.is_empty();
+    // A warning (`UncheckedSpecs`) is no error behind a broken root.
+    let upstream = parsed.has_errors() || Reported::among(&elaborated.resolved.errors).is_some();
     let recursion = errors
         .iter()
         .any(|e| matches!(e.kind.problem, FlattenProblem::RecursivePlacement { .. }));

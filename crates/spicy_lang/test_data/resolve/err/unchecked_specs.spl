@@ -1,0 +1,19 @@
+// A block with no circuit is an interface: its setups and contract are resolved, but
+// nothing can check its specs (contracts_plan.md §3.1).
+block Ldo { vin: Power<In>, gnd: Ground, vout: Power<Out> }
+
+setup Operating for Ldo { vin: Supply { v: 5V }, vout: Load {}, temp: 25°C }
+
+contract Ldo {
+    setup = Operating;
+    spec output: dc(vout.v) within 3.3V ± 2%;
+}
+
+// With no specs, it's an interface and nothing is said.
+block Quiet { a: Pin }
+
+setup Bench for Quiet { temp: 25°C }
+
+contract Quiet {
+    setup = Bench;
+}

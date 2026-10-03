@@ -1,0 +1,40 @@
+// A spec's limit is `within` a range or a tolerance, `<=` or `>=` one number, with
+// the bound in the measure's unit.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: base, value: 47k };
+    let r2 = Resistor { a: base, b: gnd, value: 10k };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let h = ac(output.v / input.v);
+
+    spec below: dc(output.v) < 6.5V;
+    spec above: dc(output.v) > 4.5V;
+    spec one: dc(output.v) within 5V;
+    spec open_top: dc(output.v) within ..=6.5V;
+    spec open_bottom: dc(output.v) within 4.5V..;
+    spec range_at_most: dc(output.v) <= 4.5V..=6.5V;
+    spec volts_on_hertz: h.f_low(-3dB) <= 30V;
+    spec kilo: h.f_high(-3dB) >= 20K;
+    spec both: dc(output.v) < 6.5V ± 1V;
+    // A chain is the parser's error: which side is the measure isn't guessed.
+    spec chained: 4.5V <= dc(output.v) <= 6.5V;
+    // An open range's end is typed as the fix's bound: a broken one gets no fix.
+    spec open_amps: dc(output.v) within ..=6.5A;
+    // One number needs a range whatever its own mistakes: fixing `20K` uncovers nothing.
+    spec one_kilo: h.f_low(-3dB) within 20K;
+    // A tolerance of 0 doesn't vary either.
+    spec no_width: dc(output.v) within 5V ± 0%;
+    // The limit's shape is checked even when the measure is broken: fixing the name
+    // uncovers nothing.
+    spec broken_open: dc(outptu.v) within ..=6.5V;
+    spec broken_one: dc(outptu.v) within 5V;
+}

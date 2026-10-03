@@ -48,6 +48,11 @@ id!(
     /// [`Contract::measures`] (source order). Numbered per contract.
     MeasureId
 );
+id!(
+    /// A contract's spec, by its position in [`Contract::specs`] (source order).
+    /// Numbered per contract.
+    SpecId
+);
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Design {
@@ -117,18 +122,66 @@ pub enum Temp {
     Value(Value),
 }
 
-/// A block's contract (model.md E24): the setup its specs are checked in, and its
-/// measures. Specs arrive in contracts_plan.md step 4.
+/// A block's contract (model.md E24): the setup its specs are checked in, its
+/// measures, and its specs.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Contract {
     /// `setup = Operating;`: one of the block's setups. `Err` when it's left out or
     /// names none, reported.
     pub default_setup: Result<SetupId, Reported>,
     pub measures: Vec<Measure>,
+    pub specs: Vec<Spec>,
     /// As [`Block::tainted`]: whether parsing the contract reported an error, so
     /// something written may be missing from it, or it's the first of two contracts for
-    /// its block. A broken measure doesn't taint it: only what reads that measure fails.
+    /// its block. A broken measure or spec doesn't taint it: only that spec, or what
+    /// reads that measure, can't be checked.
     pub tainted: Option<Reported>,
+}
+
+/// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a number the design must keep
+/// within a limit, in the contract's default setup.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Spec {
+    pub name: String,
+    /// `pub spec`: one a parent may rely on, which names only the block's ports
+    /// (language.md §8.3).
+    pub public: bool,
+    /// What it checks: one number. `Err` when it's wrong, reported.
+    pub measure: Result<MExpr, Reported>,
+    /// Which values pass, in the measure's unit. `Err` when it's wrong, when the
+    /// measure is (its unit isn't known), or when it's the first of two specs of one
+    /// name, reported.
+    pub limit: Result<Limit, Reported>,
+}
+
+/// A spec's limit: `within 4.5V..=6.5V`, `<= 30Hz`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Limit {
+    pub op: LimitOp,
+    /// A range or a tolerance for `within`; one exact number for `<=` and `>=`.
+    pub bound: Value,
+}
+
+/// How a spec's value is compared with its bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitOp {
+    /// `within`: inside the bound's range.
+    Within,
+    /// `<=`.
+    AtMost,
+    /// `>=`.
+    AtLeast,
+}
+
+impl LimitOp {
+    /// The relation it's written with.
+    pub fn name(self) -> &'static str {
+        match self {
+            LimitOp::Within => "within",
+            LimitOp::AtMost => "<=",
+            LimitOp::AtLeast => ">=",
+        }
+    }
 }
 
 /// `let h = ac(output.v / input.v);` in a contract.
@@ -287,6 +340,19 @@ pub struct ContractSpans {
     pub default_setup: Option<Span>,
     /// Each measure's name in `let name = …`, indexed like [`Contract::measures`].
     pub measures: Vec<Span>,
+    /// Each spec's spans, indexed like [`Contract::specs`].
+    pub specs: Vec<SpecSpans>,
+}
+
+/// Where one spec's name, measure and bound were written.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct SpecSpans {
+    /// The spec's name in `spec name: …`.
+    pub name: Span,
+    /// What it measures: `h.at(1kHz).mag()`.
+    pub measure: Span,
+    /// Its bound: `4.6 ± 5%`.
+    pub bound: Span,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

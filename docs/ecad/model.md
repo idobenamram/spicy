@@ -414,7 +414,7 @@ The midpoint rule is the one choice here the references don't settle. It matches
   - probes (`output.v` resolves to a net's voltage);
   - analysis calls (`ac`, `dc`);
   - methods (`.at`, `.mag`, `.f_low`) from a small table of built-in measure functions with declared argument and result units.
-- A spec becomes its relation (`within`, `<=`, `>=`), bound and confidence attribute.
+- A spec becomes its measure, which gives one number, and its limit: `within`, `<=` or `>=`, with the bound typed in the measure's unit. `<` and `>` are errors with the fix `<=` and `>=` (contracts_plan.md §2.7). The confidence attribute isn't read yet: attributes in a contract are "not supported yet" (§2.9 c).
 
 In the MVP only the top block's contract is analyzed. Sub-block contracts are resolved and kept, for the composition checks later (language §8.8).
 *Why:* the engine (M3) needs measures as values it can compute, with units checked (a spec comparing a gain with 30 Hz is an error now, not at run time). *From:* language §8.4, engine_flows.md. Modelica has no counterpart.
@@ -464,9 +464,11 @@ pub struct Quantity { pub si: f64, pub dim: Dimension, pub kind: QKind }
 pub struct Dimension([i8; 6]);        // s m kg A K rad
 pub enum QKind { Plain, TempPoint, Db }
 
-pub struct Contract { pub default_setup: Result<SetupId, Reported>, pub measures: Vec<Measure>, pub tainted: Option<Reported> }
-                                      // specs arrive in contracts_plan.md step 4
+pub struct Contract { pub default_setup: Result<SetupId, Reported>, pub measures: Vec<Measure>, pub specs: Vec<Spec>,
+                      pub tainted: Option<Reported> }
 pub struct Measure { pub name: String, pub value: Result<(MExpr, MeasureType), Reported> }
+pub struct Spec { pub name: String, pub public: bool, pub measure: Result<MExpr, Reported>, pub limit: Result<Limit, Reported> }
+pub struct Limit { pub op: LimitOp, pub bound: Value }   // LimitOp: Within, AtMost, AtLeast
 pub enum MExpr { Const(Quantity), Voltage(NetId), Dc(Box<MExpr>), Ac { out: NetId, input: PortId }, Measure(MeasureId),
                  Method { method: Method, of: Box<MExpr> }, Neg(Box<MExpr>), Binary { op, lhs, rhs } }   // spicy_model::measure
 

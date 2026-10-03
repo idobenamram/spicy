@@ -394,19 +394,31 @@ model.md §5's table, in id order:
   | Kind | Code | Example | Fix | Case file |
   |---|---|---|---|---|
   | `StrictLimit` | `E-limit` | `dc(x) < 6.5V` | `<=` | `resolve/err/limits.spl` |
-  | `WithinNeedsRange` | `E-limit` | `within 5V`; `within ..=6.5V` | none; `<= 6.5V` | `resolve/err/limits.spl` |
+  | `WithinNeedsRange` | `E-limit` | `within 5V`; `within 5V ± 0%` (a spread that doesn't vary, as `EnvNeedsRange`) | none | `resolve/err/limits.spl` |
+  | `OpenRangeLimit` | `E-limit` | `within ..=6.5V`: an open range is a one-sided limit | `<= 6.5V`, when its end types as that bound | `resolve/err/limits.spl` |
+  | `NotANumber` | `E-measure` | `spec x: h within …` (a response); `h.at(1kHz) within …` (a phasor) | none | `resolve/err/specs.spl` |
   | `PublishedInternal` | `E-contract` | `pub spec b: dc(base.v) within …`, directly or through a `let` | remove `pub` | `resolve/err/published_internal.spl` |
   | `UncheckedSpecs` (a warning) | `W-unchecked` | a contract with specs for a block that has no circuit (§3.1) | none | `resolve/err/unchecked_specs.spl` |
 
   **Reused:**
   - `Duplicate`, with `NameKind::Spec`;
-  - `WrongMeasureType`: `spec x: h within …` measures a response, not a number;
-  - `UnitMismatch`: `<= 30V` on a frequency.
+  - `UnitMismatch`: `<= 30V` on a frequency;
+  - `Unsupported`: attributes in a contract (§2.9 c).
 - **Tests:**
   - `resolve/ok/contract.spl`;
   - `resolve/ok/internal.spl`: v5's `base_bias` (`dc(base.v) within 1.9V..=2.3V`), an internal spec that isn't `pub`, which is allowed (syntax_v5_plan decision 3);
   - the err files.
 - **Done when:** ce_amp's 3 specs dump as in §0.2.
+- **Outcome (2026-10-03, awaiting review):** done when holds. Built as planned, with these changes, each with a test or case file:
+  - Spec names are their own namespace (`spec gain` can check `let gain`, and `spec output` isn't the port), numbered by `SpecId`. A second spec of a name breaks the first's limit.
+  - `NotANumber` replaces the reuse of `WrongMeasureType`, which names a method; `OpenRangeLimit` splits the open range out of `WithinNeedsRange` (rustc E0586 and Zig's "redundant" errors name the exact form); `WithinNeedsRange` also takes a spread that doesn't vary (`5V ± 0%`, as `EnvNeedsRange`).
+  - A limit's shape (an open range, one number) is checked even when the measure or the bound is broken, so no fix uncovers another error; the open-range fix is offered only when its end types as that bound. A chained relation (`4.5V <= x <= 6.5V`) is the parser's one error.
+  - The `pub` rule adapts §2.6 option A: each measure's first internal net is found once, when it's typed (`reaches`), because a walk per spec through shared lets is exponential (60 lets reading the next twice: 2⁵⁹ visits). After `PublishedInternal`, the spec is read as internal, as its fix reads it (rustc's E0449 ignores the qualifier the same way).
+  - `UncheckedSpecs` is given once per block, on the contract the design keeps, with the block's name as its related span.
+  - Attributes in a contract are "not supported yet" (§2.9 c); `PerBlock` carries the item for them.
+  - `Relation.op_span` (the parser) is what the strict-limit and open-range fixes replace.
+  - Displayed numbers keep 15 significant digits (`units::shown`, which replaces `round9`): a range's midpoint shows `2.1 V`, not `2.0999999999999996 V`.
+  - Speed (instructions, against `74ae521`): `resolve_file.typical` +13.7% (300 specs, about 2,100 instructions each, about the cost of a measure); `drop_elaborated` +12.4% (the specs' heap blocks); `measure_chain` +4.8% (`reaches`); `parse_file` +0.3% (`op_span`); the rest within ±0.65%. The new pair `contract_specs` (250 and 1,000 specs) grows 3.8×.
 
 ### Step 5: flatten the default setup
 
@@ -782,11 +794,11 @@ C. **Everything in `spicy_lang`**, with the engine working out the types again.
 v5 §1.4: "A `pub spec` may name only the block's own ports and observables. A spec naming an internal net or a child's value is internal." Resolve detects it.
 
 **References**
-- **rustc** [V]:
-  - "private type in public interface" is checked by `PrivateItemsInPublicInterfacesChecker` (`rustc_privacy/src/lib.rs:1522`);
-  - it walks an item's resolved generics, clauses and type (`:1367-1397`), not its syntax;
-  - it runs after name resolution and type checking (`rustc_interface/src/passes.rs:1201-1226`, "misc_checking_3");
-  - it's a hard error (E0446) only for associated types in impls. Everywhere else it's a lint, a warning by default (`rustc_lint_defs/src/builtin.rs:4395-4397`).
+- **rustc 1.98.1** [V]:
+  - "private type in public interface" is checked by `PrivateItemsInPublicInterfacesChecker` (`rustc_privacy/src/lib.rs:1536`);
+  - it walks an item's resolved generics, clauses and type (`:1370-1405`), not its syntax;
+  - it runs after name resolution and type checking (`rustc_interface/src/passes.rs:1203-1212`, "misc_checking_3"), and only in a crate with no earlier errors (`:1199-1201`);
+  - it's a hard error (E0446) only for associated types in impls. Everywhere else it's a lint, a warning by default (`rustc_lint_defs/src/builtin.rs:4311-4313`).
 - **Modelica:** "A protected element, P, in classes and components shall not be accessed via dot notation (e.g., A.P, a.P …)" (§4.1). [V]
 - **VHDL:** an architecture's signals aren't visible outside its entity; only the ports are. [R]
 - **atopile:** asserts have no visibility (none in the grammar, `AtoParser.g4:162-164`). [V]
@@ -833,7 +845,7 @@ C. **Check it later**, in flatten or the engine.
 **References**
 - **atopile:** its grammar has all four (`AtoParser.g4:187-194`), and its front end keeps them apart (`ast_visitor.py:1332-1350`). But its solver turns `<` into `<=` and `>` into `>=` and logs a warning, "not supported by solver, converting to …" (`src/faebryk/core/solver/symbolic/canonical.py:224-227, 392`). [V]
 - **ngspice `.meas`, Xyce `.MEASURE` and Gnucap `measure`** have no limits at all: a measure only computes a number. [V]
-  - ngspice rejects `goal=` with "no such parameter" (`com_measure2.c:1727`, run).
+  - ngspice rejects `goal=` with "no such parameter" (ngspice-42 `com_measure2.c:1312-1314`, run).
   - Xyce accepts `GOAL`, but nothing reads it.
 - **Our engine:** a side is `value ≤ bound` (Max) or `value ≥ bound` (Min), and a value within ε_num of the bound (about 5e-9 V on the CE amp) is UNDECIDED (numerics) (engine_types §2.3, §8). So `<` and `<=` can't give different verdicts. [V, our docs]
 
@@ -1019,9 +1031,9 @@ Resolve ignores every attribute today, in circuits too. `#[confidence(…)]` is 
   - A second setup of a name taints the first setup (step 2).
   - A second contract taints the first (step 3).
 - **Why this differs from rustc's E0428:**
-  - rustc keeps checking the first definition after E0428 and attaches no proof to it [V]: `rustc_resolve/src/imports.rs:662` keeps the old declaration, and `diagnostics/impls.rs:433-584` reports the second.
+  - rustc keeps checking the first definition after E0428 and attaches no proof to it [V]: at 1.98.1, `rustc_resolve/src/imports.rs:670-672` keeps the old declaration, and `report_conflict` (`error_helper.rs:429-438`) reports the second.
   - rustc's checks can only find real errors in the first definition. Ours would run flatten's whole-circuit checks on a circuit that may be the wrong one.
-  - So we follow rustc's E0119 instead, which taints the whole trait's coherence result (`rustc_trait_selection/src/traits/specialize/mod.rs:428-454`) [V].
+  - So we follow rustc's E0119 instead, which taints the whole trait's coherence result (`rustc_trait_selection/src/traits/specialize/mod.rs:391-436` at 1.98.1) [V].
 - **Cost:** one line per kind of item.
 
 ### 3.1 Blocks with no circuit or no contract (decided 2026-10-01)

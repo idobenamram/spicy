@@ -410,7 +410,7 @@ The same `4.5V..=6.5V` can mean "must stay inside" or "can be anywhere inside". 
 
 **`within` is the only limit operator.** `in` isn't an operator any more. It binds a name to a range (`env x: T in r`, `for f in r`) or names a mode (`in Run`), so it never means "must stay inside".
 
-On top of that, a setup describes only what the world does to the block: a source on each input, a load on each output (§3.2). A range on something the block drives is a guarantee, so it's written as a spec (§8.2).
+On top of that, a setup describes only what the world does to the block: a source on each input, a load on each output (§3.2). A range on something the block drives is what a spec checks, so it's written as a spec (§8.2).
 
 <a name="knobs-from-language"></a>
 ### 5.4 Knobs come from the language
@@ -822,7 +822,7 @@ error[E-role]: a setup sets a quantity this block drives
    |
 24 |     output.v: 4.5V..=6.5V,
    |     ^^^^^^^^ `output: Analog<Out>`: this block drives `output.v`; a setup gives it a `Load { r, c, i }`
-   = help: a range on a quantity you drive is a guarantee: `spec output_range: dc(output.v) within 4.5V..=6.5V;`
+   = help: a range on a quantity you drive belongs in a spec: `spec output_range: dc(output.v) within 4.5V..=6.5V;`
 ```
 
 #### Derived setups
@@ -949,7 +949,7 @@ contract Ldo3v3 {
 }
 ```
 
-- **Limits:** `within <range>` (a range, an open range, or `x ± tol`), `<=`, `>=`.
+- **Limits:** `within <range>` (a range or `x ± tol`), `<=`, `>=`. An open range is a one-sided limit and is written as one: `within ..=6.5V` is an error with the fix `<= 6.5V`, and `<`, `>` get the fix `<=`, `>=` (contracts_plan.md §2.7, step 4).
 - **A doc comment** above a spec is its rationale, shown in the spec table.
 
 #### Clauses

@@ -1,0 +1,34 @@
+// A contract's specs (contracts_plan.md step 4): a measure that gives one number, a
+// limit, and a bound in the measure's unit.
+const MAX_SWING: Volt = 7V;
+
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: base, value: 47k };
+    let r2 = Resistor { a: base, b: gnd, value: 10k };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let h = ac(output.v / input.v);
+    let gain = h.at(1kHz).mag();
+
+    /// Specs have their own names: `gain` checks the measure `gain`, and `output`
+    /// isn't the port.
+    spec gain: gain within 4.6 ± 5%;
+    spec output: dc(output.v) within 4.5V..=6.5V;
+    spec level: h.at(1kHz).db() >= 12dB;
+    spec bass: h.f_low(-3dB) <= 30Hz;
+    spec treble: h.f_high(-3dB, ref: dc) >= 20kHz;
+    // A bare number takes the measure's unit, as a part's value does (E12).
+    spec headroom: dc(vcc.v - output.v) >= 4;
+    spec swing: dc(output.v) <= MAX_SWING;
+    // Every probe is on a port, so it can be `pub`.
+    pub spec input_gain: ac(output.v / input.v).at(10kHz).mag() >= 3;
+}

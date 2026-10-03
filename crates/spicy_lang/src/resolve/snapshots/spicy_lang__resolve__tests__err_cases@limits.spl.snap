@@ -1,0 +1,233 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 772
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/limits.spl
+---
+block Amp 126..129
+  port vcc: Power<In> 132..135
+  port gnd: Ground 148..151
+  port input: Analog<In> 161..166
+  port output: Analog<Out> 180..186
+  net base 225..229
+  r1 = Resistor 239..241
+    a → vcc
+    b → base
+    value = 47000 Ω
+  r2 = Resistor 294..296
+    a → base
+    b → gnd
+    value = 10000 Ω
+  rc = Resistor 349..351
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 407..409
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let h: response = ac(output.v / input.v)
+  spec below: dc(output.v) <= 6.5 V
+  spec above: dc(output.v) >= 4.5 V
+  spec one: dc(output.v) <invalid>
+  spec open_top: dc(output.v) <invalid>
+  spec open_bottom: dc(output.v) <invalid>
+  spec range_at_most: dc(output.v) <invalid>
+  spec volts_on_hertz: h.f_low(-3 dB) <invalid>
+  spec kilo: h.f_high(-3 dB) <invalid>
+  spec both: dc(output.v) <invalid>
+  spec chained: <invalid> <invalid>
+  spec open_amps: dc(output.v) <invalid>
+  spec one_kilo: h.f_low(-3 dB) <invalid>
+  spec no_width: dc(output.v) <invalid>
+  spec broken_open: <invalid> <invalid>
+  spec broken_one: <invalid> <invalid>
+setup Operating 457..466 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-limit StrictLimit 662..663 "<" fix 662..663 "<="
+E-limit StrictLimit 699..700 ">" fix 699..700 ">="
+E-limit WithinNeedsRange 741..743 "5V"
+E-limit OpenRangeLimit 784..791 "..=6.5V" fix 777..791 "<= 6.5V"
+E-limit OpenRangeLimit 835..841 "4.5V.." fix 828..841 ">= 4.5V"
+E-spread RangeInComparison 883..894 "4.5V..=6.5V"
+E-unit UnitMismatch 938..941 "30V"
+E-unit UnitMismatch 976..979 "20K" fix 976..979 "20k"
+E-limit StrictLimit 1009..1010 "<" fix 1009..1010 "<="
+E-spread RangeInComparison 1011..1021 "6.5V ± 1V"
+E-chained Chained 1141..1143 "<="
+E-limit OpenRangeLimit 1272..1279 "..=6.5A"
+E-unit UnitMismatch 1275..1279 "6.5A"
+E-unit UnitMismatch 1411..1414 "20K" fix 1411..1414 "20k"
+E-limit WithinNeedsRange 1411..1414 "20K"
+E-limit WithinNeedsRange 1500..1508 "5V ± 0%"
+E-name UnknownName 1645..1651 "outptu" fix 1645..1651 "output"
+E-limit OpenRangeLimit 1662..1669 "..=6.5V"
+E-name UnknownName 1695..1701 "outptu" fix 1695..1701 "output"
+E-limit WithinNeedsRange 1712..1714 "5V"
+
+--- rendered ---
+error[E-limit]: a spec's limit is `<=` or `>=`
+   --> limits.spl:19:30
+   |
+19 |     spec below: dc(output.v) < 6.5V;
+   |                              ^ strict
+   |
+   = help: write `<=`
+   = note: a value equal to the bound is inside the simulator's numerical noise, so a strict limit can't mean more
+
+error[E-limit]: a spec's limit is `<=` or `>=`
+   --> limits.spl:20:30
+   |
+20 |     spec above: dc(output.v) > 4.5V;
+   |                              ^ strict
+   |
+   = help: write `>=`
+   = note: a value equal to the bound is inside the simulator's numerical noise, so a strict limit can't mean more
+
+error[E-limit]: `within` takes a range or a tolerance
+   --> limits.spl:21:35
+   |
+21 |     spec one: dc(output.v) within 5V;
+   |                                   ^^ one value
+   |
+   = help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`
+
+error[E-limit]: an open range is a one-sided limit
+   --> limits.spl:22:40
+   |
+22 |     spec open_top: dc(output.v) within ..=6.5V;
+   |                                        ^^^^^^^ open range
+   |
+   = help: write `<= 6.5V`
+
+error[E-limit]: an open range is a one-sided limit
+   --> limits.spl:23:43
+   |
+23 |     spec open_bottom: dc(output.v) within 4.5V..;
+   |                                           ^^^^^^ open range
+   |
+   = help: write `>= 4.5V`
+
+error[E-spread]: compare with a single value
+   --> limits.spl:24:41
+   |
+24 |     spec range_at_most: dc(output.v) <= 4.5V..=6.5V;
+   |                                         ^^^^^^^^^^^ a range or tolerance here
+   |
+   = help: to require a value inside a range, use `within`
+
+error[E-unit]: expected `Hz` (a frequency), found `V` (a voltage)
+   --> limits.spl:25:43
+   |
+25 |     spec volts_on_hertz: h.f_low(-3dB) <= 30V;
+   |                                           ^^^ this is `V` (a voltage)
+
+error[E-unit]: expected `Hz` (a frequency), found `K` (a temperature difference)
+   --> limits.spl:26:34
+   |
+26 |     spec kilo: h.f_high(-3dB) >= 20K;
+   |                                  ^^^ this is `K` (a temperature difference)
+   |
+   = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-limit]: a spec's limit is `<=` or `>=`
+   --> limits.spl:27:29
+   |
+27 |     spec both: dc(output.v) < 6.5V ± 1V;
+   |                             ^ strict
+   |
+   = help: write `<=`
+   = note: a value equal to the bound is inside the simulator's numerical noise, so a strict limit can't mean more
+
+error[E-spread]: compare with a single value
+   --> limits.spl:27:31
+   |
+27 |     spec both: dc(output.v) < 6.5V ± 1V;
+   |                               ^^^^^^^^^ a range or tolerance here
+   |
+   = help: to require a value inside a range, use `within`
+
+error[E-chained]: comparisons can't be chained
+   --> limits.spl:29:40
+   |
+29 |     spec chained: 4.5V <= dc(output.v) <= 6.5V;
+   |                                        ^^ second operator here
+   |
+   = help: for a range, write `b within a..=c`
+
+error[E-limit]: an open range is a one-sided limit
+   --> limits.spl:31:41
+   |
+31 |     spec open_amps: dc(output.v) within ..=6.5A;
+   |                                         ^^^^^^^ open range
+   |
+   = help: write it with `<=` or `>=`
+
+error[E-unit]: expected `V` (a voltage), found `A` (a current)
+   --> limits.spl:31:44
+   |
+31 |     spec open_amps: dc(output.v) within ..=6.5A;
+   |                                            ^^^^ this is `A` (a current)
+
+error[E-unit]: expected `Hz` (a frequency), found `K` (a temperature difference)
+   --> limits.spl:33:41
+   |
+33 |     spec one_kilo: h.f_low(-3dB) within 20K;
+   |                                         ^^^ this is `K` (a temperature difference)
+   |
+   = help: `K` is kelvin; kilo is lowercase `k`
+
+error[E-limit]: `within` takes a range or a tolerance
+   --> limits.spl:33:41
+   |
+33 |     spec one_kilo: h.f_low(-3dB) within 20K;
+   |                                         ^^^ one value
+   |
+   = help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`
+
+error[E-limit]: `within` takes a range or a tolerance
+   --> limits.spl:35:40
+   |
+35 |     spec no_width: dc(output.v) within 5V ± 0%;
+   |                                        ^^^^^^^ one value
+   |
+   = help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`
+
+error[E-name]: unknown net, port or instance `outptu`
+   --> limits.spl:38:26
+   |
+38 |     spec broken_open: dc(outptu.v) within ..=6.5V;
+   |                          ^^^^^^ not defined
+   |
+   = help: did you mean `output`?
+
+error[E-limit]: an open range is a one-sided limit
+   --> limits.spl:38:43
+   |
+38 |     spec broken_open: dc(outptu.v) within ..=6.5V;
+   |                                           ^^^^^^^ open range
+   |
+   = help: write it with `<=` or `>=`
+
+error[E-name]: unknown net, port or instance `outptu`
+   --> limits.spl:39:25
+   |
+39 |     spec broken_one: dc(outptu.v) within 5V;
+   |                         ^^^^^^ not defined
+   |
+   = help: did you mean `output`?
+
+error[E-limit]: `within` takes a range or a tolerance
+   --> limits.spl:39:42
+   |
+39 |     spec broken_one: dc(outptu.v) within 5V;
+   |                                          ^^ one value
+   |
+   = help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`

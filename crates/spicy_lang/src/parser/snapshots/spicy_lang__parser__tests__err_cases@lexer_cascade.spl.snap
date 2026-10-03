@@ -1,10 +1,10 @@
 ---
 source: crates/spicy_lang/src/parser/mod.rs
-assertion_line: 1059
+assertion_line: 1224
 expression: "dump_parse(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/parser/err/lexer_cascade.spl
 ---
-File 0..140
+File 0..178
   Circuit A 0..139
     Let a 16..32
       Binary Sub 24..31
@@ -19,12 +19,17 @@ File 0..140
     Let h 88..125
       ExprError 96..125 "Note { text: \"never closed };"
     Net ok 130..137
+  Contract A 141..177
+    Spec s Le 158..175
+      Path x 166..167 "x"
+      Quantity 1e0 V 172..174 "1V"
 
 --- errors ---
 E-lookalike Lookalike 26..29 "−" fix 26..29 "-"
 E-unit-space UnitSpace 60..66 "10 kΩ" fix 60..66 "10kΩ"
 E-number LeadingDecimalPoint 80..82 ".5" fix 80..82 "0.5"
 E-unterminated-string UnterminatedString 109..110 "\""
+E-lookalike Lookalike 168..171 "≤" fix 168..171 "<="
 
 --- rendered ---
 error[E-lookalike]: `−` (U+2212 MINUS SIGN) is not ASCII
@@ -58,3 +63,11 @@ error[E-unterminated-string]: unterminated string
   |                          ^ this string is never closed
   |
   = help: add `"` before the end of the line (a string is one line)
+
+error[E-lookalike]: `≤` (U+2264 LESS-THAN OR EQUAL TO) is not ASCII
+   --> lexer_cascade.spl:11:15
+   |
+11 |     spec s: x ≤ 1V;
+   |               ^ looks like `<=`
+   |
+   = help: replace it with `<=`

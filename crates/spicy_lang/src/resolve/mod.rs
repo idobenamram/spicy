@@ -15,8 +15,8 @@
 //!    every statement, so statement order never matters.
 //! 3. **The contracts:** each block's contract (`resolve/contract.rs`), against its
 //!    block as its circuit left it: its default setup, among the block's setups, then
-//!    its measures, typed against the measure table (`spicy_model::measure`). Specs
-//!    arrive in contracts_plan.md step 4.
+//!    its measures, typed against the measure table (`spicy_model::measure`), then its
+//!    specs, each a measure, a limit and a bound in the measure's unit.
 //! 4. **What's broken:** every block or setup with an error inside it, or a read of a
 //!    broken const, is tainted ([`Block::tainted`]), so flatten doesn't check a circuit
 //!    with a part missing.
@@ -53,7 +53,7 @@ use spicy_span::Span;
 
 use crate::edit_distance::edit_distance;
 use crate::parser::Parsed;
-use crate::parser::ast::{self, BlockDecl, BlockEntry, Body, Ident, ItemKind};
+use crate::parser::ast::{self, Attribute, BlockDecl, BlockEntry, Body, Ident, Item, ItemKind};
 use body::BodyResolver;
 use contract::ForContract;
 
@@ -107,7 +107,7 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     // A second circuit of a block is checked against the block's ports (see below).
     let second_starts: Vec<BlockBuilder> = second_circuits
         .iter()
-        .map(|(_, second)| starts[second.first.index()].clone())
+        .map(|(_, _, second)| starts[second.first.index()].clone())
         .collect();
 
     // Pass 2, the circuits: each block's nets, instances and merges.
@@ -133,7 +133,7 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     for &(decl, _) in &second_decls {
         r.signature(decl, false);
     }
-    for (&(body, second), start) in second_circuits.iter().zip(second_starts) {
+    for (&(body, _, second), start) in second_circuits.iter().zip(second_starts) {
         let signature = &signatures[second.first.index()];
         BodyResolver::new(&mut r, &signatures, signature, start, &body.stmts).resolve(&body.stmts);
     }
@@ -149,13 +149,26 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     design.contracts.reserve(contracts.len());
     source_map.contracts.reserve(contracts.len());
     for (b, contract) in contracts.iter().enumerate() {
-        let resolved = contract.map(|(body, _)| r.contract(body, of(BlockId::new(b))));
+        let of = of(BlockId::new(b));
+        let resolved = contract.map(|(body, item)| r.contract(body, &item.attrs, of));
+        // Specs on a block with no circuit can't be checked: one warning, on the
+        // contract the design keeps (plan §3.1). Nothing is broken, so it has no proof.
+        if let Some((contract, spans)) = &resolved
+            && !contract.specs.is_empty()
+            && !of.block.has_circuit
+        {
+            let kind = ResolveErrorKind::UncheckedSpecs {
+                block: of.block.name.clone(),
+            };
+            r.errors
+                .push(ResolveError::new(kind, spans.name).with_related(of.spans.name));
+        }
         let (contract, spans) = resolved.unzip();
         design.contracts.push(contract);
         source_map.contracts.push(spans);
     }
-    for &(body, second) in &second_contracts {
-        r.contract(body, of(second.first));
+    for &(body, item, second) in &second_contracts {
+        r.contract(body, &item.attrs, of(second.first));
     }
 
     // Pass 4, what's broken: every block with an error in it (see `Block::tainted`).
@@ -174,7 +187,7 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         .zip(&circuits);
     for (((block, decl), span), circuit) in blocks {
         let (circuit_broken, circuit_span) = match circuit {
-            Some((body, span)) => (body.broken, Some(*span)),
+            Some((body, item)) => (body.broken, Some(item.span)),
             None => (None, None),
         };
         block.tainted = block
@@ -187,12 +200,12 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     // A block defined twice, or with two circuits: which one was meant isn't known, so
     // the first, the one the design keeps, is broken too.
     let seconds = second_decls.iter().map(|&(_, second)| second);
-    let seconds = seconds.chain(second_circuits.iter().map(|&(_, second)| second));
+    let seconds = seconds.chain(second_circuits.iter().map(|&(_, _, second)| second));
     for Redefined { first, reported } in seconds {
         design.blocks[first.index()].tainted.get_or_insert(reported);
     }
     // The same for a contract, the first of two for its block.
-    for &(_, Redefined { first, reported }) in &second_contracts {
+    for &(_, _, Redefined { first, reported }) in &second_contracts {
         let contract = design.contracts[first.index()].as_mut();
         let contract = contract.expect("a block with a second contract has a first");
         contract.tainted.get_or_insert(reported);
@@ -274,12 +287,13 @@ enum FileValue {
     Const(ConstId),
 }
 
-/// Each block's circuit or contract, if it has one, with the span of its item.
-type PerBlock<'p, 'src> = Vec<Option<(&'p Body<'src>, Span)>>;
+/// Each block's circuit or contract, if it has one, with its item (its span and
+/// attributes).
+type PerBlock<'p, 'src> = Vec<Option<(&'p Body<'src>, &'p Item<'src>)>>;
 
-/// The second circuits or contracts of a block, each with its block, whose first one
-/// it redefines.
-type SecondBodies<'p, 'src> = Vec<(&'p Body<'src>, Redefined<BlockId>)>;
+/// The second circuits or contracts of a block, each with its item and its block, whose
+/// first one it redefines.
+type SecondBodies<'p, 'src> = Vec<(&'p Body<'src>, &'p Item<'src>, Redefined<BlockId>)>;
 
 /// The second definitions of a block name, each with the first it redefines.
 type SecondBlocks<'p, 'src> = Vec<(&'p BlockDecl<'src>, Redefined<BlockId>)>;
@@ -499,6 +513,14 @@ impl<'p, 'src> Resolver<'p, 'src> {
         self.report(ResolveErrorKind::Unsupported { what }, at)
     }
 
+    /// Reports each of `attrs` as "not supported yet": none is read on a setup or a
+    /// contract yet (plan §2.9 c). `what` says where they are.
+    fn no_attributes(&mut self, attrs: &[Attribute], what: &'static str) {
+        for attr in attrs {
+            self.unsupported(what, attr.span);
+        }
+    }
+
     /// Reports `name`, which names nothing in `namespace`, with the closest of
     /// `candidates` as its fix.
     fn report_unknown_name<'c>(
@@ -553,7 +575,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
     }
 
     /// Each of the `blocks` blocks' circuit or contract (`what`), the item of that kind
-    /// named after it, with the item's span. A second one of a name is a duplicate,
+    /// named after it, with the item itself. A second one of a name is a duplicate,
     /// returned with its block; one for no block is reported.
     fn match_to_blocks(
         &mut self,
@@ -570,9 +592,9 @@ impl<'p, 'src> Resolver<'p, 'src> {
             };
             let declared = seen.declare(&body.name, (), what, &mut self.errors);
             match (self.blocks.get(body.name.text), declared) {
-                (Some(block), Ok(())) => first[block.index()] = Some((body, item.span)),
+                (Some(block), Ok(())) => first[block.index()] = Some((body, item)),
                 (Some(first), Err(Redefined { reported, .. })) => {
-                    second.push((body, Redefined { first, reported }));
+                    second.push((body, item, Redefined { first, reported }));
                 }
                 (None, Ok(())) => {
                     let kind = ResolveErrorKind::UnknownBlock {
@@ -784,6 +806,10 @@ mod tests {
         );
         let measures: Vec<&str> = contract.measures.iter().map(|m| m.name.as_str()).collect();
         assert_eq!(measures, ["h"]);
+        let specs: Vec<&str> = contract.specs.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(specs, ["bias", "gain", "bass"]);
+        let checkable = |s: &spicy_model::design::Spec| s.measure.is_ok() && s.limit.is_ok();
+        assert!(contract.specs.iter().all(|s| checkable(s) && !s.public));
         insta::assert_snapshot!(dump_resolve("ce_amp.spl", src));
     }
 
@@ -856,6 +882,42 @@ mod tests {
         let parsed = parse(&src);
         assert!(parsed.errors.is_empty(), "{:?}", parsed.errors.first());
         assert!(resolve(&parsed).errors.is_empty());
+    }
+
+    /// The `pub` rule walks a measure once, however often it's read: a walk through
+    /// each read would visit `m59` 2⁵⁹ times here.
+    #[test]
+    fn a_pub_spec_walks_a_shared_measure_once() {
+        let mut src = String::from(
+            "block A { input: Analog<In>, output: Analog<Out>, gnd: Ground }\n\
+             circuit A { net mid; let r1 = Resistor { a: input, b: mid, value: 1k }; \
+             let r2 = Resistor { a: mid, b: output, value: 1k }; \
+             let r3 = Resistor { a: output, b: gnd, value: 1k }; }\n\
+             setup S for A { input: Signal { v: 0V }, output: Load {}, temp: 25°C }\n\
+             contract A {\n    setup = S;\n",
+        );
+        for i in 0..59 {
+            src.push_str(&format!("    let m{i} = m{} + m{};\n", i + 1, i + 1));
+        }
+        src.push_str("    let m59 = dc(output.v) + dc(mid.v);\n");
+        src.push_str("    pub spec all: m0 <= 1V;\n}\n");
+        let names: Vec<&str> = resolve_errors(&src).iter().map(|e| e.kind.name()).collect();
+        assert_eq!(names, ["PublishedInternal"]);
+    }
+
+    /// The fix that removes `pub` takes the whitespace after it, but not a no-break
+    /// space: to the lexer that's a look-alike, with its own error and fix.
+    #[test]
+    fn removing_pub_keeps_a_lookalike_space() {
+        let src = "block A { input: Analog<In>, output: Analog<Out> }\n\
+                   circuit A { net mid; let r = Resistor { a: input, b: mid, value: 1k }; }\n\
+                   setup S for A { input: Signal { v: 0V }, output: Load {}, temp: 25°C }\n\
+                   contract A { setup = S; pub\u{a0}spec x: dc(mid.v) <= 1V; }\n";
+        let [error] = &resolve_errors(src)[..] else {
+            panic!("one resolve error")
+        };
+        let fix = error.fix.as_ref().expect("removing `pub` is its fix");
+        assert_eq!(&src[fix.span.range()], "pub");
     }
 
     /// Each measure's name and type, and each error with the text it's on, sorted.

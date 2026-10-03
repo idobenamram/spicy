@@ -214,8 +214,8 @@ pub enum StmtKind<'src> {
     },
     /// `setup = Operating;`: the setup a contract's specs are checked in.
     DefaultSetup { setup: Path<'src> },
-    /// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a requirement the design must
-    /// meet. A `pub` one is part of what the block promises to whoever places it.
+    /// `spec gain: h.at(1kHz).mag() within 4.6 ± 5%;`: a measure that must meet a
+    /// limit. A `pub` one is part of what the block promises to whoever places it.
     Spec {
         public: Option<Span>,
         name: Ident<'src>,
@@ -233,6 +233,8 @@ pub enum StmtKind<'src> {
 pub struct Relation<'src> {
     pub lhs: Expr<'src>,
     pub op: RelOp,
+    /// The relation's token, `within` or `<=`: what a fix of the limit replaces.
+    pub op_span: Span,
     pub rhs: Expr<'src>,
 }
 

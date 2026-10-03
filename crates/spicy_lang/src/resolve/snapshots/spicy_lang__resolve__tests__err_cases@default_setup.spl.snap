@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 750
+assertion_line: 760
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/default_setup.spl
 ---
@@ -47,7 +47,7 @@ setup Bench 473..478 for Two
 setup Bench 552..557 for Three
   temp = 298.15 K (25 °C)
 setup Cold 885..889 for Five
-  temp = 233.14999999999998 K (-40 °C)
+  temp = 233.15 K (-40 °C)
 setup Hot 923..926 for Five
   temp = 358.15 K (85 °C)
 

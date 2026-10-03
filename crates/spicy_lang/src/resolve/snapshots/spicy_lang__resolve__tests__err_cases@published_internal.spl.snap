@@ -1,0 +1,83 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 760
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/published_internal.spl
+---
+block Amp 151..154
+  port vcc: Power<In> 157..160
+  port gnd: Ground 173..176
+  port input: Analog<In> 186..191
+  port output: Analog<Out> 205..211
+  net base 250..254
+  r1 = Resistor 264..266
+    a → vcc
+    b → base
+    value = 47000 Ω
+  r2 = Resistor 319..321
+    a → base
+    b → gnd
+    value = 10000 Ω
+  rc = Resistor 374..376
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 432..434
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let vb: number V = dc(base.v)
+  let h: response = ac(output.v / input.v)
+  spec base_bias: dc(base.v) within 2.1 V (1.9 V..=2.3 V)
+  spec through_let: vb >= 1.5 V
+  spec base_gain: ac(base.v / input.v).at(1000 Hz).mag() <= 1
+  pub spec gain: h.at(1000 Hz).mag() >= 3
+setup Operating 482..491 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-contract PublishedInternal 687..690 "pub" fix 687..691 "" related 250..254
+E-contract PublishedInternal 742..745 "pub" fix 742..746 "" related 250..254
+E-contract PublishedInternal 780..783 "pub" fix 780..784 "" related 250..254
+
+--- rendered ---
+error[E-contract]: `base_bias` can't be `pub`
+   --> published_internal.spl:20:5
+   |
+ 6 |     net base;
+   |         ---- the internal net
+   .
+20 |     pub spec base_bias: dc(base.v) within 1.9V..=2.3V;
+   |     ^^^ published
+   |
+   = note: it measures `base`, a net of `circuit Amp`; a parent can't rely on it
+   = help: remove `pub`: an internal spec is still checked
+
+error[E-contract]: `through_let` can't be `pub`
+   --> published_internal.spl:21:5
+   |
+ 6 |     net base;
+   |         ---- the internal net
+   .
+21 |     pub spec through_let: vb >= 1.5V;
+   |     ^^^ published
+   |
+   = note: it measures `base`, a net of `circuit Amp`; a parent can't rely on it
+   = help: remove `pub`: an internal spec is still checked
+
+error[E-contract]: `base_gain` can't be `pub`
+   --> published_internal.spl:22:5
+   |
+ 6 |     net base;
+   |         ---- the internal net
+   .
+22 |     pub spec base_gain: ac(base.v / input.v).at(1kHz).mag() <= 1;
+   |     ^^^ published
+   |
+   = note: it measures `base`, a net of `circuit Amp`; a parent can't rely on it
+   = help: remove `pub`: an internal spec is still checked

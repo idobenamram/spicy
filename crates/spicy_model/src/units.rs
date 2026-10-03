@@ -276,19 +276,21 @@ impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             QKind::TempPoint => {
-                write!(f, "{} K ({} °C)", self.si, to_celsius(self.si))
+                write!(f, "{} K ({} °C)", shown(self.si), to_celsius(self.si))
             }
-            QKind::Db => write!(f, "{} dB", self.si),
-            QKind::Plain if self.dim.is_none() => write!(f, "{}", self.si),
-            QKind::Plain => write!(f, "{} {}", self.si, self.dim.symbol()),
+            QKind::Db => write!(f, "{} dB", shown(self.si)),
+            QKind::Plain if self.dim.is_none() => write!(f, "{}", shown(self.si)),
+            QKind::Plain => write!(f, "{} {}", shown(self.si), self.dim.symbol()),
         }
     }
 }
 
-/// Removes the float noise of a unit conversion from a displayed value (`1`, not
-/// `0.9999999999999999`).
-fn round9(x: f64) -> f64 {
-    (x * 1e9).round() / 1e9
+/// A value as shown: 15 significant digits, so the float noise of one rounding
+/// doesn't show (a range's midpoint, `2.1 V`, not `2.0999999999999996 V`; `7%`, not
+/// `7.000000000000001%`). The noise of a difference of close values stays (`5V - 4.9V`
+/// shows `0.0999999999999996 V`).
+fn shown(x: f64) -> f64 {
+    format!("{x:.14e}").parse().unwrap_or(x)
 }
 
 /// How a value may vary (model.md E10). Kept as written: the budget check ("a ±5% part
@@ -385,13 +387,14 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.nominal)?;
         let unit = |v: f64| match self.nominal.kind {
-            QKind::TempPoint => format!("{v} K"),
-            _ if self.nominal.dim.is_none() => format!("{v}"),
-            _ => format!("{v} {}", self.nominal.dim.symbol()),
+            QKind::TempPoint => format!("{} K", shown(v)),
+            QKind::Db => format!("{} dB", shown(v)),
+            _ if self.nominal.dim.is_none() => format!("{}", shown(v)),
+            _ => format!("{} {}", shown(v), self.nominal.dim.symbol()),
         };
         match self.spread {
             Spread::Exact => Ok(()),
-            Spread::Rel(r) => write!(f, " ± {}%", round9(r * 100.0)),
+            Spread::Rel(r) => write!(f, " ± {}%", shown(r * 100.0)),
             Spread::Abs(a) => write!(f, " ± {}", unit(a)),
             Spread::Range { lo, hi } => write!(f, " ({}..={})", unit(lo), unit(hi)),
         }
@@ -489,6 +492,18 @@ mod tests {
             spread: Spread::Abs(0.05),
         };
         assert_eq!(v.to_string(), "3.3 V ± 0.05 V");
+        // A percentage as shown: no float noise (`0.07 * 100` is 7.000000000000001),
+        // and a tiny or huge one keeps its value (9 decimals showed `0%` and `inf%`).
+        let rel = |r| Value {
+            nominal: Quantity::ratio(1.0),
+            spread: Spread::Rel(r),
+        };
+        assert_eq!(rel(0.07).to_string(), "1 ± 7%");
+        assert_eq!(rel(1e-14).to_string(), "1 ± 0.000000000001%");
+        assert!(!rel(1e300).to_string().contains("inf"));
+        // A level's spread is in dB too, as a spec's bound on `.db()` is.
+        let level = Value::range(Quantity::db(10.0), Quantity::db(20.0));
+        assert_eq!(level.to_string(), "15 dB (10 dB..=20 dB)");
     }
 
     /// Scaling keeps a relative spread, scales an absolute one by `|k|`, and keeps a

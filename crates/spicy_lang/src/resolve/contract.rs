@@ -1,6 +1,6 @@
-//! Pass 3 for each block's contract (contracts_plan.md step 3): its default setup and
-//! its measures, against the block as its circuit left it, as passes in
-//! [`contract`](Resolver::contract):
+//! Pass 3 for each block's contract (contracts_plan.md steps 3 and 4): its default
+//! setup, its measures and its specs, against the block as its circuit left it, as
+//! passes in [`contract`](Resolver::contract):
 //! 1. **The default setup:** `setup = S;`, among the block's setups.
 //! 2. **Names:** every `let`, declared in the block's value namespace with its ports,
 //!    nets and instances (model.md E5): `let base = …` next to `net base;` is a
@@ -10,14 +10,19 @@
 //!    The lets are taken in name order, so a cycle is reported once, and the same way
 //!    whatever the statement order. Typing a measure types each one it reads inside it:
 //!    a chain of about 1,000 lets overflows a 2 MB stack (parked, contracts_plan.md §3).
+//! 4. **Specs:** each spec's name, once among the contract's specs; its measure, which
+//!    must give one number; its limit, with its bound typed in the measure's unit
+//!    (model.md E12); then the `pub` rule (plan §2.6), which reads the first internal
+//!    net of each measure, found once, when pass 3 typed it. A contract with specs on a
+//!    block with no circuit is warned about: nothing can check them (plan §3.1).
 //!
-//! Specs, which read the measures, arrive in step 4.
+//! Attributes aren't read on a contract or its statements yet (plan §2.9 c).
 
 use spicy_errors::Reported;
 use spicy_index::fx::FxHashMap;
 use spicy_model::design::{
-    Block, BlockSpans, Contract, ContractSpans, InstanceId, InstanceOf, Measure, MeasureId, NetId,
-    PortId, SetupId,
+    Block, BlockSpans, Contract, ContractSpans, InstanceId, InstanceOf, Limit, LimitOp, Measure,
+    MeasureId, NetId, PortId, SetupId, Spec, SpecId, SpecSpans,
 };
 use spicy_model::measure::{ArithOp, MExpr, MeasureType, Method, Reference};
 use spicy_model::prelude::{FieldType, Role, SignalType};
@@ -30,7 +35,9 @@ use super::{
     FileValue, NameKind, Namespace, Redefined, ResolveError, ResolveErrorKind, Resolver, Scope,
     suggest, unknown_name,
 };
-use crate::parser::ast::{self, Arg, BinOp, Body, Expr, ExprKind, Ident, StmtKind};
+use crate::parser::ast::{
+    self, Arg, Attribute, BinOp, Body, Expr, ExprKind, Ident, RelOp, Relation, StmtKind,
+};
 
 /// v5's other analyses, which are "not supported yet" rather than unknown.
 const LATER_FUNCTIONS: &[&str] = &["tran", "noise"];
@@ -86,11 +93,19 @@ enum Visit {
 
 impl<'p, 'src> Resolver<'p, 'src> {
     /// The contract `body` of the block `of`, with where each part of it was written.
+    /// `attrs` are the item's.
     pub(super) fn contract(
         &mut self,
         body: &Body<'src>,
+        attrs: &[Attribute],
         of: ForContract<'_, 'src>,
     ) -> (Contract, ContractSpans) {
+        // Attributes aren't read in a contract yet (plan §2.9 c): each is reported.
+        let in_contract = "attributes in a contract";
+        self.no_attributes(attrs, in_contract);
+        for stmt in &body.stmts {
+            self.no_attributes(&stmt.attrs, in_contract);
+        }
         // Pass 1, the default setup.
         let (default_setup, default_span) = self.default_setup(body, of);
         // Pass 2, names: the block's, then each `let`'s. A second `let` of a name is
@@ -118,24 +133,30 @@ impl<'p, 'src> Resolver<'p, 'src> {
             }
         }
         // Pass 3, measures: each first `let`, on demand, then each second one.
-        let visits = (0..lets.len()).map(|_| Visit::New).collect();
-        let resolver = MeasureResolver {
+        let mut resolver = MeasureResolver {
             r: self,
             of,
             names: &names,
             lets: &lets,
-            visits,
+            visits: (0..lets.len()).map(|_| Visit::New).collect(),
+            reaches: vec![None; lets.len()],
             path: Vec::new(),
         };
-        let measures = resolver.resolve(&seconds);
+        resolver.measures(&seconds);
+        // Pass 4, specs: each one's measure, limit and `pub` rule, then a warning if
+        // the block has no circuit to check them on.
+        let (specs, spec_spans) = resolver.specs(body);
+        let measures = resolver.finish();
         let spans = ContractSpans {
             name: body.name.span,
             default_setup: default_span,
             measures: lets.iter().map(|l| l.name.span).collect(),
+            specs: spec_spans,
         };
         let contract = Contract {
             default_setup,
             measures,
+            specs,
             tainted: body.broken,
         };
         (contract, spans)
@@ -223,7 +244,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
     }
 }
 
-/// Types one contract's measures, each on demand.
+/// Types one contract's measures, each on demand, then its specs, which read them.
 struct MeasureResolver<'r, 'p, 'src, 'a> {
     r: &'r mut Resolver<'p, 'src>,
     of: ForContract<'a, 'src>,
@@ -232,6 +253,9 @@ struct MeasureResolver<'r, 'p, 'src, 'a> {
     lets: &'a [Let<'a, 'src>],
     /// Each measure's typing, by `MeasureId`.
     visits: Vec<Visit>,
+    /// The first internal net each typed measure reads, by `MeasureId`, for the `pub`
+    /// rule: found once, when it's typed, so a measure read twice isn't walked twice.
+    reaches: Vec<Option<NetId>>,
     /// The measures being typed, each reading the next: a cycle's members.
     path: Vec<MeasureId>,
 }
@@ -242,7 +266,7 @@ impl<'src> MeasureResolver<'_, '_, 'src, '_> {
     /// Every measure, typed: each first `let` in name order, so a cycle is reported
     /// once, and the same way whatever the statement order; then each second one,
     /// `seconds`, for its own mistakes.
-    fn resolve(mut self, seconds: &[(&Ident<'src>, &Expr<'src>)]) -> Vec<Measure> {
+    fn measures(&mut self, seconds: &[(&Ident<'src>, &Expr<'src>)]) {
         let mut order: Vec<MeasureId> = (0..self.lets.len()).map(MeasureId::new).collect();
         order.sort_by_key(|id| self.lets[id.index()].name.text);
         for id in order {
@@ -251,6 +275,10 @@ impl<'src> MeasureResolver<'_, '_, 'src, '_> {
         for &(name, value) in seconds {
             let _ = self.let_value(name, value);
         }
+    }
+
+    /// The measures, once every one is typed.
+    fn finish(self) -> Vec<Measure> {
         let typed = self.lets.iter().zip(self.visits);
         typed
             .map(|(l, slot)| Measure {
@@ -273,6 +301,7 @@ impl<'src> MeasureResolver<'_, '_, 'src, '_> {
             let Let { name, value, again } = self.lets[i];
             let typed = self.let_value(name, value);
             self.path.pop();
+            self.reaches[i] = typed.as_ref().ok().and_then(|(expr, _)| self.reach(expr));
             self.visits[i] = Visit::Done(again.map_or(typed, Err));
         }
         match &self.visits[i] {
@@ -840,6 +869,242 @@ impl<'src> MeasureResolver<'_, '_, 'src, '_> {
                 Err(self.r.report(ResolveErrorKind::NotArithmetic { what }, at))
             }
         }
+    }
+
+    /// The first net `expr` reads that isn't a port's: what makes a spec internal
+    /// (language.md §8.3). A measure it reads gives the one found when it was typed.
+    fn reach(&self, expr: &MExpr) -> Option<NetId> {
+        match expr {
+            MExpr::Voltage(net) | MExpr::Ac { out: net, .. } => {
+                self.of.block.net_port(*net).is_none().then_some(*net)
+            }
+            MExpr::Measure(id) => self.reaches[id.index()],
+            MExpr::Const(_) => None,
+            MExpr::Dc(of) | MExpr::Method { of, .. } | MExpr::Neg(of) => self.reach(of),
+            MExpr::Binary { lhs, rhs, .. } => self.reach(lhs).or_else(|| self.reach(rhs)),
+        }
+    }
+
+    // --- Pass 4: specs ----------------------------------------------------------------
+
+    /// Every spec of `body`, with its spans. Specs have their own namespace, so `spec
+    /// gain` can check `let gain`. A second spec of a name is checked for its own
+    /// mistakes, then dropped; which one was meant isn't known, so the first is broken
+    /// too.
+    fn specs(&mut self, body: &Body<'src>) -> (Vec<Spec>, Vec<SpecSpans>) {
+        // Sized once for every spec, so the names never rehash and neither list grows
+        // (as `block_names`).
+        let stmts = body.stmts.iter();
+        let count = stmts
+            .filter(|stmt| matches!(stmt.kind, StmtKind::Spec { .. }))
+            .count();
+        let declared = FxHashMap::with_capacity_and_hasher(count, Default::default());
+        let mut names = Scope { declared };
+        let (mut specs, mut spans) = (Vec::with_capacity(count), Vec::with_capacity(count));
+        for stmt in &body.stmts {
+            let StmtKind::Spec {
+                public,
+                name,
+                relation,
+            } = &stmt.kind
+            else {
+                continue;
+            };
+            let id = SpecId::new(specs.len());
+            let declared = names.declare(name, id, NameKind::Spec, &mut self.r.errors);
+            let spec = self.spec(*public, name, relation);
+            match declared {
+                Ok(()) => {
+                    specs.push(spec);
+                    spans.push(SpecSpans {
+                        name: name.span,
+                        measure: relation.lhs.span,
+                        bound: relation.rhs.span,
+                    });
+                }
+                Err(Redefined { first, reported }) => {
+                    let first = &mut specs[first.index()];
+                    first.limit = first.limit.and(Err(reported));
+                }
+            }
+        }
+        (specs, spans)
+    }
+
+    /// One spec: its measure, one number; its limit, in the measure's unit; and, if it's
+    /// `pub`, the rule that it names only the block's ports. A strict limit or a `pub`
+    /// that breaks the rule is reported, then read as its fix reads it (`<=`, internal).
+    fn spec(&mut self, public: Option<Span>, name: &Ident, relation: &Relation<'src>) -> Spec {
+        // `4.5V <= x <= 6.5V` is a chain, which the parser reported at the relation it
+        // split the spec at: which side is the measure is a guess.
+        if let ExprKind::Binary {
+            op: BinOp::Rel(_), ..
+        } = relation.lhs.kind
+            && let Some(reported) = self.r.syntax.inside(relation.op_span)
+        {
+            return Spec {
+                name: name.text.to_string(),
+                public: public.is_some(),
+                measure: Err(reported),
+                limit: Err(reported),
+            };
+        }
+        let measure = self.spec_measure(name, &relation.lhs);
+        let op = self.limit_op(relation);
+        let unit = measure.as_ref().map(|&(_, dim, kind)| (dim, kind));
+        let limit = self.limit(op, relation, unit.map_err(|&reported| reported));
+        // The `pub` rule (plan §2.6): a `pub` spec reads no internal net, directly or
+        // through a measure. Whether a broken measure does isn't known.
+        let public = match (public, &measure) {
+            (Some(at), Ok((expr, ..))) => match self.reach(expr) {
+                Some(net) => {
+                    self.published_internal(at, name, net);
+                    false
+                }
+                None => true,
+            },
+            _ => public.is_some(),
+        };
+        Spec {
+            name: name.text.to_string(),
+            public,
+            measure: measure.map(|(expr, ..)| expr),
+            limit,
+        }
+    }
+
+    /// A spec's measure, with the unit and kind of the number it gives, which its bound
+    /// takes: one number (`dc(output.v)`, `h.at(1kHz).mag()`), checked as a `let`'s
+    /// value is, then not a response or a phasor.
+    fn spec_measure(
+        &mut self,
+        name: &Ident,
+        e: &Expr<'src>,
+    ) -> Result<(MExpr, Dimension, QKind), Reported> {
+        let (expr, ty) = self.let_value(name, e)?;
+        let MeasureType::Number { dim, kind } = ty else {
+            let kind = ResolveErrorKind::NotANumber {
+                spec: name.text.to_string(),
+                on: ty,
+            };
+            return Err(self.r.report(kind, e.span));
+        };
+        Ok((expr, dim, kind))
+    }
+
+    /// A spec's relation as its limit. `<` and `>` are reported, with the fix `<=` or
+    /// `>=`, and read as that (plan §2.7).
+    fn limit_op(&mut self, relation: &Relation) -> LimitOp {
+        let op = match relation.op {
+            RelOp::Within => return LimitOp::Within,
+            RelOp::Le => return LimitOp::AtMost,
+            RelOp::Ge => return LimitOp::AtLeast,
+            RelOp::Lt => LimitOp::AtMost,
+            RelOp::Gt => LimitOp::AtLeast,
+        };
+        let at = relation.op_span;
+        let error = ResolveError::new(ResolveErrorKind::StrictLimit, at).with_fix(at, op.name());
+        error.report(&mut self.r.errors);
+        op
+    }
+
+    /// A spec's limit: its bound, typed as a value in the measure's unit and kind
+    /// (`unit`, model.md E12), or `unit`'s proof when the measure is broken. `within`
+    /// takes a range or a tolerance that varies, and an open range is a one-sided limit,
+    /// written as one; `<=` and `>=` take one exact number. The shape is checked even
+    /// when the measure is broken: fixing the measure uncovers nothing.
+    fn limit(
+        &mut self,
+        op: LimitOp,
+        relation: &Relation<'src>,
+        unit: Result<(Dimension, QKind), Reported>,
+    ) -> Result<Limit, Reported> {
+        let bound = &relation.rhs;
+        let within = op == LimitOp::Within;
+        let ty = unit.map(|(dim, kind)| FieldType {
+            dim,
+            kind,
+            spread_allowed: within,
+        });
+        if within && let Some((end, one_sided)) = open_range(bound) {
+            return Err(self.open_range_limit(relation, end, one_sided, ty));
+        }
+        let typed = ty.and_then(|ty| self.r.value(bound, ty, op.name()));
+        // `within 5V ± 0%` doesn't vary either, as an env's value (`EnvNeedsRange`). One
+        // written as one number can't, whatever its own mistakes or its measure's, so
+        // it's reported with them: fixing `20K` to `20k` uncovers nothing.
+        if within {
+            let varies = match &typed {
+                Ok(value) => value.varies(),
+                Err(_) => !self.r.is_one_number(bound),
+            };
+            if !varies {
+                let kind = ResolveErrorKind::WithinNeedsRange;
+                return Err(self.r.report(kind, bound.span));
+            }
+        }
+        Ok(Limit { op, bound: typed? })
+    }
+
+    /// Reports `within` an open range (`..=6.5V`), a one-sided limit. The fix writes it
+    /// as one (`<= 6.5V`) when its end types as that limit's bound (in `ty`): a broken
+    /// end would be copied into the fix.
+    fn open_range_limit(
+        &mut self,
+        relation: &Relation<'src>,
+        end: &Expr<'src>,
+        one_sided: LimitOp,
+        ty: Result<FieldType, Reported>,
+    ) -> Reported {
+        let mut error = ResolveError::new(ResolveErrorKind::OpenRangeLimit, relation.rhs.span);
+        let exact = ty.map(|ty| FieldType {
+            spread_allowed: false,
+            ..ty
+        });
+        if let Ok(ty) = exact
+            && self.r.value(end, ty, one_sided.name()).is_ok()
+        {
+            let written = &self.r.src()[end.span.range()];
+            let at = Span::new(relation.op_span.start, relation.rhs.span.end);
+            error = error.with_fix(at, format!("{} {written}", one_sided.name()));
+        }
+        error.report(&mut self.r.errors)
+    }
+
+    /// Reports `pub` (written at `at`) on spec `name`, which reads the internal net
+    /// `net`: with the net's declaration, and the fix that removes `pub` and the
+    /// whitespace the lexer skips after it (a no-break space is an error of its own,
+    /// with its own fix).
+    fn published_internal(&mut self, at: Span, name: &Ident, net: NetId) {
+        let block = self.of.block;
+        let kind = ResolveErrorKind::PublishedInternal {
+            spec: name.text.to_string(),
+            net: block.net(net).name.clone(),
+            block: block.name.clone(),
+        };
+        let after_pub = &self.r.src()[at.end as usize..];
+        let space = after_pub.len() - after_pub.trim_start_matches([' ', '\t', '\r', '\n']).len();
+        let removed = Span::new(at.start, at.end + space as u32);
+        let error = ResolveError::new(kind, at)
+            .with_related(self.of.spans.nets[net.index()])
+            .with_fix(removed, "");
+        error.report(&mut self.r.errors);
+    }
+}
+
+/// The end of `bound` and the one-sided limit it stands for, if it's an open range:
+/// `..=6.5V` is `<= 6.5V`, `4.5V..` is `>= 4.5V`.
+fn open_range<'e, 'src>(bound: &'e Expr<'src>) -> Option<(&'e Expr<'src>, LimitOp)> {
+    match &unparen(bound).kind {
+        ExprKind::Range {
+            lo: None,
+            hi: Some(end),
+        } => Some((end, LimitOp::AtMost)),
+        ExprKind::Range {
+            lo: Some(end),
+            hi: None,
+        } => Some((end, LimitOp::AtLeast)),
+        _ => None,
     }
 }
 

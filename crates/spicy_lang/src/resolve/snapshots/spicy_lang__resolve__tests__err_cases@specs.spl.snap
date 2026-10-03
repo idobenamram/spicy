@@ -1,0 +1,97 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 760
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/specs.spl
+---
+block Amp 113..116
+  port vcc: Power<In> 119..122
+  port gnd: Ground 135..138
+  port input: Analog<In> 148..153
+  port output: Analog<Out> 167..173
+  net base 212..216
+  r1 = Resistor 226..228
+    a → vcc
+    b → base
+    value = 47000 Ω
+  r2 = Resistor 281..283
+    a → base
+    b → gnd
+    value = 10000 Ω
+  rc = Resistor 336..338
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 394..396
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let h: response = ac(output.v / input.v)
+  spec response: <invalid> <invalid>
+  spec phasor: <invalid> <invalid>
+  spec bare: <invalid> <invalid>
+  spec unknown: <invalid> <invalid>
+  spec twice: dc(output.v) <invalid>
+  spec attributed: dc(output.v) <= 6.5 V
+setup Operating 444..453 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-measure NotANumber 639..640 "h"
+E-measure NotANumber 672..682 "h.at(1kHz)"
+E-measure NeedsAnalysis 712..720 "output.v" fix 712..720 "dc(output.v)"
+E-name UnknownName 762..768 "outptu" fix 762..768 "output"
+E-duplicate Duplicate 915..920 "twice" related 866..871
+E-unsupported Unsupported 948..971 "#[confidence(sigma(3))]"
+
+--- rendered ---
+error[E-measure]: spec `response` checks one number, not a response over frequency
+   --> specs.spl:19:20
+   |
+19 |     spec response: h within 4..=5;
+   |                    ^ a response over frequency
+   |
+   = help: reduce it to one number: `.at(1kHz).mag()`, `.at(1kHz).db()` or `.f_low(-3dB)`
+
+error[E-measure]: spec `phasor` checks one number, not a phasor (a response at one frequency)
+   --> specs.spl:20:18
+   |
+20 |     spec phasor: h.at(1kHz) within 4..=5;
+   |                  ^^^^^^^^^^ a phasor (a response at one frequency)
+   |
+   = help: take its magnitude: `.mag()`, or `.db()`
+
+error[E-measure]: a probe is measured in an analysis
+   --> specs.spl:21:16
+   |
+21 |     spec bare: output.v within 4.5V..=6.5V;
+   |                ^^^^^^^^ a probe
+   |
+   = help: write `dc(output.v)`
+
+error[E-name]: unknown net, port or instance `outptu`
+   --> specs.spl:22:22
+   |
+22 |     spec unknown: dc(outptu.v) within 4.5V..=6.5V;
+   |                      ^^^^^^ not defined
+   |
+   = help: did you mean `output`?
+
+error[E-duplicate]: spec `twice` is defined twice
+   --> specs.spl:25:10
+   |
+24 |     spec twice: dc(output.v) within 4.5V..=6.5V;
+   |          ----- first defined here
+25 |     spec twice: dc(output.v) <= 6.5V;
+   |          ^^^^^ second definition
+
+error[E-unsupported]: not supported yet: attributes in a contract
+   --> specs.spl:26:5
+   |
+26 |     #[confidence(sigma(3))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ not supported yet

@@ -6,3 +6,7 @@ circuit A {
     let h = Note { text: "never closed };
     net ok;
 }
+
+contract A {
+    spec s: x ≤ 1V;
+}

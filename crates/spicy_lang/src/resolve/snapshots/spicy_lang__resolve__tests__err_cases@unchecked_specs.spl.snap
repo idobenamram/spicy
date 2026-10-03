@@ -1,0 +1,38 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 772
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/unchecked_specs.spl
+---
+block Ldo 150..153
+  port vin: Power<In> 156..159
+  port gnd: Ground 172..175
+  port vout: Power<Out> 185..189
+block Quiet 435..440
+  port a: Pin 443..444
+contract Ldo
+  setup = Operating
+  spec output: dc(vout.v) within 3.3 V ± 2%
+contract Quiet
+  setup = Bench
+setup Operating 211..220 for Ldo
+  vin: Supply v = 5 V
+  vout: Load
+  temp = 298.15 K (25 °C)
+setup Bench 459..464 for Quiet
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+W-unchecked UncheckedSpecs 293..296 "Ldo" related 150..153
+
+--- rendered ---
+warning[W-unchecked]: `Ldo`'s specs aren't checked: it has no circuit
+  --> unchecked_specs.spl:7:10
+  |
+3 | block Ldo { vin: Power<In>, gnd: Ground, vout: Power<Out> }
+  |       --- has no circuit
+  .
+7 | contract Ldo {
+  |          ^^^ not checked
+  |
+  = note: a block with no circuit is an interface; nothing simulates it

@@ -1,7 +1,7 @@
 //! Inputs for resolve: many names, many values, many mistakes about names, setups of a
-//! block with many ports, and a contract with many measures. Each is one shape at any
-//! size, for a scaling pair (`n` and `4n`); its doc says the problems resolve finds in
-//! it, and a test pins them.
+//! block with many ports, and contracts with many measures or many specs. Each is one
+//! shape at any size, for a scaling pair (`n` and `4n`); its doc says the problems
+//! resolve finds in it, and a test pins them.
 
 use std::fmt::Write;
 
@@ -148,6 +148,33 @@ pub fn measure_chain(n: usize) -> String {
     src
 }
 
+/// A contract of `n` specs, four kinds in turn: a range on a port's operating point, a
+/// tolerance on a gain read through the measure `h`, a one-sided limit, and a limit on
+/// an internal net. Each fourth spec, the gain, is `pub`, so the `pub` rule walks it
+/// through `h`. Clean.
+pub fn contract_specs(n: usize) -> String {
+    let mut src = String::from(
+        "block A { input: Analog<In>, output: Analog<Out>, gnd: Ground }\n\n\
+         circuit A {\n    net mid;\n    \
+         let r1 = Resistor { a: input, b: mid, value: 1k };\n    \
+         let r2 = Resistor { a: mid, b: output, value: 1k };\n    \
+         let r3 = Resistor { a: output, b: gnd, value: 1k };\n}\n\n\
+         setup S for A { input: Signal { v: 0V }, output: Load {}, temp: 25°C }\n\n\
+         contract A {\n    setup = S;\n    let h = ac(output.v / input.v);\n",
+    );
+    for i in 0..n {
+        let (public, check) = match i % 4 {
+            0 => ("", "dc(output.v) within 4.5V..=6.5V"),
+            1 => ("pub ", "h.at(1kHz).mag() within 4.6 ± 5%"),
+            2 => ("", "h.f_low(-3dB) <= 30Hz"),
+            _ => ("", "dc(mid.v) >= 1V"),
+        };
+        writeln!(src, "    {public}spec s{i:05}: {check};").unwrap();
+    }
+    src.push_str("}\n");
+    src
+}
+
 #[cfg(test)]
 mod tests {
     use spicy_lang::parser::parse;
@@ -165,8 +192,14 @@ mod tests {
     }
 
     #[test]
-    fn named_values_wide_setups_and_measure_chains_are_clean() {
-        for src in [named_values(5), wide_setup(5), measure_chain(5)] {
+    fn named_values_wide_setups_measure_chains_and_specs_are_clean() {
+        let inputs = [
+            named_values(5),
+            wide_setup(5),
+            measure_chain(5),
+            contract_specs(5),
+        ];
+        for src in inputs {
             assert_eq!(Problems::of(&src), Problems::default(), "{src}");
         }
     }
@@ -177,6 +210,15 @@ mod tests {
         let contract = resolved.design.contracts[0].as_ref().unwrap();
         let typed: Vec<bool> = contract.measures.iter().map(|m| m.value.is_ok()).collect();
         assert_eq!(typed, [true; 5]);
+    }
+
+    /// Clean (above), so every spec is checked; the `pub` ones keep `pub`.
+    #[test]
+    fn every_fourth_spec_is_pub() {
+        let resolved = resolve(&parse(&contract_specs(5)));
+        let contract = resolved.design.contracts[0].as_ref().unwrap();
+        let public: Vec<bool> = contract.specs.iter().map(|s| s.public).collect();
+        assert_eq!(public, [false, true, false, false, false]);
     }
 
     #[test]

@@ -1,0 +1,28 @@
+// A spec checks one number, has a name its contract gives once, and reads its measure
+// as a `let` does.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: base, value: 47k };
+    let r2 = Resistor { a: base, b: gnd, value: 10k };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let h = ac(output.v / input.v);
+
+    spec response: h within 4..=5;
+    spec phasor: h.at(1kHz) within 4..=5;
+    spec bare: output.v within 4.5V..=6.5V;
+    spec unknown: dc(outptu.v) within 4.5V..=6.5V;
+    // Which one was meant isn't known: the first is broken too.
+    spec twice: dc(output.v) within 4.5V..=6.5V;
+    spec twice: dc(output.v) <= 6.5V;
+    #[confidence(sigma(3))]
+    spec attributed: dc(output.v) <= 6.5V;
+}

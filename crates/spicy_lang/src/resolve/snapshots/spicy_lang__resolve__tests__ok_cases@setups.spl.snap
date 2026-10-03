@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 652
+assertion_line: 745
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/setups.spl
 ---
@@ -31,4 +31,4 @@ setup Wide 941..945 for Ldo
   vin: Supply v = 5 V
   vout: Load
   en: Signal v = 0 V
-  temp = 315.65 K (42.5 °C) (233.14999999999998 K..=398.15 K)
+  temp = 315.65 K (42.5 °C) (233.15 K..=398.15 K)

@@ -1,0 +1,39 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 745
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/internal.spl
+---
+block Amp 152..155
+  port vcc: Power<In> 158..161
+  port gnd: Ground 174..177
+  port input: Analog<In> 187..192
+  port output: Analog<Out> 206..212
+  net base 251..255
+  r1 = Resistor 265..267
+    a → vcc
+    b → base
+    value = 47000 Ω
+  r2 = Resistor 320..322
+    a → base
+    b → gnd
+    value = 10000 Ω
+  rc = Resistor 375..377
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 433..435
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let vb: number V = dc(base.v)
+  spec base_bias: dc(base.v) within 2.1 V (1.9 V..=2.3 V)
+  spec through_let: vb >= 1.5 V
+  spec base_gain: ac(base.v / input.v).at(1000 Hz).mag() <= 1
+setup Operating 483..492 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)

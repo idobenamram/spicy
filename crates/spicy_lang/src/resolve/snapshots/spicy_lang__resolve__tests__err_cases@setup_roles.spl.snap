@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 667
+assertion_line: 772
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/setup_roles.spl
 ---
@@ -41,4 +41,4 @@ error[E-role]: a setup sets a quantity this block drives
 11 |     output.v: 4.5V..=6.5V,
    |     ^^^^^^^^^^^^^^^^^^^^^ `output: Analog<Out>`: this block drives `output.v`; a setup gives it a `Load { r, c, i }`
    |
-   = help: a range on a quantity you drive is a guarantee: `spec …: dc(output.v) within …;`
+   = help: a range on a quantity you drive belongs in a spec: `spec …: dc(output.v) within …;`

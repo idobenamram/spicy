@@ -228,7 +228,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         envs: &[Env],
     ) -> (Setup, SetupSpans) {
         // Attributes aren't read on setups yet (plan §2.9 c): none is ignored silently.
-        self.no_attributes(attrs);
+        self.no_attributes(attrs, "attributes on a setup");
         // Pass 1, keys: what each entry sets. An entry the parser couldn't read was
         // reported there, and it may be what the setup leaves out (`temp 25°C`), so
         // then nothing is known to be left out. A key that names nothing is reported
@@ -236,7 +236,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         // sets that slot.
         let (mut entries, mut unreadable) = (Vec::new(), None);
         for entry in &decl.entries {
-            self.no_attributes(&entry.attrs);
+            self.no_attributes(&entry.attrs, "attributes on a setup");
             match &entry.kind {
                 SetupEntry::Set { key, value } => {
                     if let Some(target) = self.key(key, of) {
@@ -288,13 +288,6 @@ impl<'p, 'src> Resolver<'p, 'src> {
             })
         });
         build_setup(decl, of, ports, temp, incomplete)
-    }
-
-    /// Reports each attribute: none is read on a setup or its entries yet.
-    fn no_attributes(&mut self, attrs: &[Attribute]) {
-        for attr in attrs {
-            self.unsupported("attributes on a setup", attr.span);
-        }
     }
 
     // --- Pass 1: keys ---------------------------------------------------------------

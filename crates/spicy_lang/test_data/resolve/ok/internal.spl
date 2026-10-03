@@ -1,0 +1,22 @@
+// An internal spec, one that measures a net inside the circuit, is allowed when it
+// isn't `pub` (syntax_v5_plan decision 3): v5's `base_bias`.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: base, value: 47k };
+    let r2 = Resistor { a: base, b: gnd, value: 10k };
+    let rc = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let vb = dc(base.v);
+
+    spec base_bias: dc(base.v) within 1.9V..=2.3V;
+    spec through_let: vb >= 1.5V;
+    spec base_gain: ac(base.v / input.v).at(1kHz).mag() <= 1;
+}

@@ -2,7 +2,7 @@
 //! directly, with a Pratt loop for expressions (`expr.rs`). It never fails: broken code
 //! becomes `Error` nodes that keep their spans, and every problem is collected.
 //!
-//! One function per rule of grammar.md §3, in this file's order: `file` → `item` →
+//! One function per rule of docs/ecad/grammar.md#syntax, in this file's order: `file` → `item` →
 //! `block_decl`, `setup_decl` (each through `entries` → `with_docs`), `value_decl`
 //! (`env`, `const`), or `body` → `stmts` → `with_docs` → `stmt` → `net_stmt` …
 //! `spec_stmt`, then `expr` (`expr.rs`: `expr_bp` → `unary` → `postfix` → `primary`).
@@ -729,7 +729,7 @@ impl<'t, 'src> Parser<'t, 'src> {
         self.nested(|p| {
             let path = p.path()?;
             let args = match p.eat(TokenKind::Lt) {
-                // `A<>`: grammar.md §3 requires at least one argument.
+                // `A<>`: docs/ecad/grammar.md#syntax requires at least one argument.
                 Some(_) if p.peek() == TokenKind::Gt => return Err(p.expected("a type")),
                 Some(open) => p.list(open, TokenKind::Gt, Self::ty)?,
                 None => Vec::new(),
@@ -1176,7 +1176,7 @@ impl Parser<'_, '_> {
     }
 }
 
-/// The case-file suite and property tests (ast.md §5).
+/// The case-file suite and property tests (docs/ecad/ast.md#testing).
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -1632,8 +1632,8 @@ mod tests {
         assert_eq!(&src[related.range()], "[");
     }
 
-    /// Review: what statement recovery skips and where it stops (grammar.md §6), one
-    /// rule per case.
+    /// Review: what statement recovery skips and where it stops
+    /// (docs/ecad/grammar.md#recovery), one rule per case.
     #[test]
     fn statement_recovery() {
         let cases: [(&str, &[&str], &[&str]); 8] = [

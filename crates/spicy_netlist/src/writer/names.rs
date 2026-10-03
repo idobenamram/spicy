@@ -1,4 +1,4 @@
-//! The names a written netlist uses (docs/ecad/netlist_writer.md §2).
+//! The names a written netlist uses (docs/ecad/netlist_writer.md#decisions).
 
 use std::collections::HashSet;
 

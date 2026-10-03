@@ -1,4 +1,4 @@
-//! Expressions: a Pratt loop over the precedence table of grammar.md §4.1, plus the
+//! Expressions: a Pratt loop over the precedence table of docs/ecad/grammar.md#precedence, plus the
 //! shape rules of §4.2–4.3 (the `±` operand rule, no chaining, no spread in a range
 //! endpoint or a comparison). Ranges may leave out an end (`..=b`, `a..`).
 //!
@@ -116,7 +116,7 @@ impl<'src> Parser<'_, 'src> {
 
     /// A range, at its `..=` or `..`, after its lower end `lo` if it has one: `lo..=hi`,
     /// `..=hi`, or `lo..` with no upper end. `lo..hi` and `..hi` are reported and read
-    /// as `..=` (grammar.md §7 #8).
+    /// as `..=` (docs/ecad/grammar.md#syntax-errors, #8).
     fn range(&mut self, lo: Option<Tree<'src>>) -> PResult<Tree<'src>> {
         let dots = self.peek() == TokenKind::DotDot;
         let op_span = self.bump();
@@ -147,12 +147,14 @@ impl<'src> Parser<'_, 'src> {
         self.node(kind, span, children)
     }
 
-    /// `a..b` or `..b` (grammar.md §7 #8), with the fix `..=`.
+    /// `a..b` or `..b` (docs/ecad/grammar.md#syntax-errors, #8), with the fix `..=`.
     fn half_open(&mut self, dots: Span) {
         self.error_replacing(ParseErrorKind::HalfOpenRange, dots, "..=");
     }
 
-    /// grammar.md §4.2 and §4.3. These are soft errors: the node is still built.
+    /// Checks the rules in docs/ecad/grammar.md#tolerance-operand and
+    /// docs/ecad/grammar.md#spreads-and-relations. These are soft errors: the node is
+    /// still built.
     fn check_shape(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) {
         match op {
             BinOp::Tol => self.check_tolerance_operands(lhs, rhs),
@@ -179,11 +181,11 @@ impl<'src> Parser<'_, 'src> {
         }
     }
 
-    /// The `±` operand rule (grammar.md §4.2): an unparenthesized `+ - * /` on either side
-    /// is ambiguous. The error spells out both readings, each of which parses without
-    /// the ambiguity: the "whole" one parenthesizes every such operand, and the "one term"
-    /// one attaches `±` to the terms right next to it, so `a + b * c ± 1%` reads
-    /// `a + b * (c ± 1%)`.
+    /// The `±` operand rule (docs/ecad/grammar.md#tolerance-operand): an unparenthesized
+    /// `+ - * /` on either side is ambiguous. The error spells out both readings, each of
+    /// which parses without the ambiguity: the "whole" one parenthesizes every such
+    /// operand, and the "one term" one attaches `±` to the terms right next to it, so
+    /// `a + b * c ± 1%` reads `a + b * (c ± 1%)`.
     fn check_tolerance_operands(&mut self, lhs: &Expr, rhs: &Expr) {
         let span = match (is_arithmetic(lhs), is_arithmetic(rhs)) {
             (false, false) => return,

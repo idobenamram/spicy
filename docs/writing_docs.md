@@ -59,7 +59,7 @@ A section number changes when someone adds a section. A line number changes with
 - **Older docs.** Most older docs have no anchors. To refer to one of their sections, name the doc and the section number or the decision ID, for example `model.md` §4 or `model.md` E16.
 - **Section numbers.** New docs do not number their headings. If a long doc must number its headings, use the [ISO 2145](https://en.wikipedia.org/wiki/ISO_2145) form, with no period after the last number: `2`, `2.1`, `2.1.3`. Links still use anchors.
 - **Steps and lists.** Number a list only when the order matters.
-- **Check the links.** Before you commit a doc change, run `lychee .` from the repository root ([lychee](https://github.com/lycheeverse/lychee) 0.24.2). It fails when a link points to a missing file or to a missing heading or anchor. CI runs the same check, with the settings in `lychee.toml`.
+- **Check the links.** Before you commit a change to a doc or to a doc reference in code, run `scripts/check_links.sh` ([lychee](https://github.com/lycheeverse/lychee) 0.24.2). It fails when a link, or a `docs/….md#anchor` in a code comment, points to a missing file or to a missing heading or anchor. CI runs the same check.
 
 <a name="code-comments"></a>
 ## Code comments

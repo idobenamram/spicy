@@ -52,6 +52,7 @@ Nominal: VC 5.5032 V, |H(1 kHz)| 4.5908, f_low 20.127 Hz. Q1 uses D-A's model. T
 
 ---
 
+<a name="knob-model"></a>
 ## 2. The knob model
 
 A **knob** is one independent thing that can vary. It's named by instance path (`amp.r1.value`, `temp`) and has a range. The language creates knobs (language §5.4; M1d's `KnobTable`); part records supply their data (language §6.5).

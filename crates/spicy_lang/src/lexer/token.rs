@@ -3,7 +3,7 @@ use spicy_span::Span;
 /// Index of a token in [`Tokens`].
 pub type TokenIdx = u32;
 
-/// What a token is. One byte, so the token list stays compact (lexer.md §3, L3).
+/// What a token is. One byte, so the token list stays compact (docs/ecad/lexer.md#decisions, L3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum TokenKind {

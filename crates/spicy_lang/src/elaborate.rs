@@ -1,4 +1,5 @@
-//! Elaboration (model.md §0): the syntax tree becomes flat designs, in two steps.
+//! Elaboration (docs/ecad/model.md#stage-names): the syntax tree becomes flat designs, in
+//! two steps.
 //! 1. **Resolve** ([`crate::resolve`]): each block once, names resolved, values typed.
 //! 2. **Flatten** ([`spicy_model::flatten`]): every root with its placements expanded,
 //!    its nets merged and named, its parts devices, and its whole-net checks.
@@ -39,7 +40,8 @@ pub fn elaborate(parsed: &Parsed) -> Elaborated {
     }
 }
 
-/// The case-file suite for flatten (model.md §9), and the properties of the whole stage.
+/// The case-file suite for flatten (docs/ecad/model.md#flatten-plan), and the properties
+/// of the whole stage.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,9 +98,9 @@ mod tests {
         });
     }
 
-    /// The MVP design (model.md §5): one root, 6 devices, 6 nets with `gnd` as ground,
-    /// and a knob for each of the 6 part fields with a spread. (`vcc.v` and `temp` come
-    /// from the contract, in M1d-5.)
+    /// The MVP design (docs/ecad/model.md#ce-amp-example): one root, 6 devices, 6 nets
+    /// with `gnd` as ground, and a knob for each of the 6 part fields with a spread.
+    /// (`vcc.v` and `temp` come from the contract, in M1d-5.)
     #[test]
     fn ce_amp() {
         let src = include_str!("../../../circuits/ce_amp.spl");
@@ -235,7 +237,7 @@ mod tests {
     }
 
     /// Adding an unrelated part renames nothing: every net, device and knob keeps its
-    /// path (model.md §6, stability).
+    /// path (docs/ecad/model.md#testing, stability).
     #[test]
     fn an_unrelated_part_renames_nothing() {
         let src = read(&test_file("ok/stereo.spl"));

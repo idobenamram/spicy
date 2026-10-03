@@ -1,4 +1,5 @@
-//! Reading a `Quantity` token: `47k`, `4k7`, `1uF`, `10°C`, `5%` (grammar.md §2.5, §5).
+//! Reading a `Quantity` token: `47k`, `4k7`, `1uF`, `10°C`, `5%`
+//! (docs/ecad/grammar.md#quantities, docs/ecad/grammar.md#unit-suffix).
 //!
 //! Everything the lexer knows about numbers and units is in this file, each rule once:
 //! - **Where the token ends:** [`quantity_len`], the number ([`scan_mantissa`]) and then
@@ -235,8 +236,8 @@ pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError> {
     })
 }
 
-/// A suffix split into its parts (grammar.md §5.2): `kHz` is the prefix `k` and the
-/// unit `Hz`.
+/// A suffix split into its parts (docs/ecad/grammar.md#unit-splitting): `kHz` is the
+/// prefix `k` and the unit `Hz`.
 struct Suffix {
     /// The prefix letter and its power of ten.
     prefix: Option<(char, i32)>,
@@ -306,9 +307,9 @@ fn decode_infix(
     Ok((frac_start..frac_end, Suffix { prefix, unit }))
 }
 
-/// Splits the suffix `text[start..]` by the rules of grammar.md §5.2, in order: the
-/// whole suffix as a unit, then as a prefix, then prefix + unit. An empty suffix has
-/// neither.
+/// Splits the suffix `text[start..]` by the rules of docs/ecad/grammar.md#unit-splitting,
+/// in order: the whole suffix as a unit, then as a prefix, then prefix + unit. An empty
+/// suffix has neither.
 fn split_suffix(text: &str, start: usize) -> Result<Suffix, QuantityError> {
     let s = &text[start..];
     if s.is_empty() {
@@ -556,7 +557,7 @@ mod tests {
         }
     }
 
-    /// Every row of grammar.md §5.2.
+    /// Every row of docs/ecad/grammar.md#unit-splitting.
     #[test]
     fn grammar_table() {
         use Unit::*;

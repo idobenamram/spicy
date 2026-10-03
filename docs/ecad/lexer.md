@@ -101,6 +101,7 @@ atopile's unit decoding (`decode_symbol` in `Units.py`) is the same idea as ours
 
 ---
 
+<a name="decisions"></a>
 ## 3. Decisions
 
 | # | Decision | Why |
@@ -168,6 +169,7 @@ pub fn decode_quantity(text: &str) -> Result<QuantityLit, QuantityError>;
 
 ---
 
+<a name="scanning"></a>
 ## 5. Pass 1: scanning rules
 
 At each position, the first matching rule wins:
@@ -194,8 +196,10 @@ At each position, the first matching rule wins:
 
 ---
 
+<a name="checks"></a>
 ## 6. Pass 2: checks
 
+<a name="check-reports"></a>
 ### 6.1 What it reports
 
 Numbers `#…` refer to the error list in `grammar.md` §7.
@@ -215,6 +219,7 @@ Numbers `#…` refer to the error list in `grammar.md` §7.
 
 The remaining `grammar.md` §7 errors belong to the parser (M1c). That moves #2 and #3 from the parser to the lexer; `grammar.md` is updated to match.
 
+<a name="one-error-per-span"></a>
 ### 6.2 One loop, one error per span
 
 `check` is **one loop over the tokens** with a `match` on each token's kind, so each token is looked at once. This is how rustc does it (it validates each raw token as it's produced, in `next_token_from_cursor`), and rust-analyzer too (`LexedStr::new`). Zig goes further and checks a number literal only when `AstGen` uses it. We don't, because we want errors inside regions the parser skips while recovering.
@@ -225,6 +230,7 @@ Every check reports at or after its own token, so claims only move forward. One 
 
 **Measured on 10 MB** (release, the amplifier repeated): scanning takes about 24 ms and checking about 9 ms. Checking took about 20 ms when it was seven separate passes over the tokens.
 
+<a name="lookalikes"></a>
 ### 6.3 The look-alike table
 
 rustc has 264 entries. We start with the ones that come from datasheets, PDFs and word processors (the AI will paste from them):
@@ -244,6 +250,7 @@ rustc has 264 entries. We start with the ones that come from datasheets, PDFs an
 
 ---
 
+<a name="testing"></a>
 ## 7. Testing
 
 Four kinds of test, each with a job the others can't do.

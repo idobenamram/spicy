@@ -61,6 +61,7 @@ The tree always exists. The broken statement still has a node the editor and the
 
 ---
 
+<a name="decisions"></a>
 ## 3. Decisions
 
 | # | Decision | Why |
@@ -83,6 +84,7 @@ The tree always exists. The broken statement still has a node the editor and the
 
 ---
 
+<a name="types"></a>
 ## 4. The types
 
 ```rust
@@ -123,6 +125,7 @@ pub enum   Arg            { Positional(Expr), Named { name, value, span } }   //
 
 ---
 
+<a name="testing"></a>
 ## 5. Testing
 
 - **Case files,** the same layout as the lexer: `test_data/parser/{ok,err}/*.spl`. Each gets a snapshot of an indented tree dump showing every node's kind, span and source text, then the errors. Spans are visible in every snapshot (see Spade's gap).

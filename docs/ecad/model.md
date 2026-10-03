@@ -13,6 +13,7 @@
 
 ---
 
+<a name="stage-names"></a>
 ## 0. What this stage is, and what we call it
 
 The parser gives us a tree of what the text **says**: names are just text, and `47k` has no unit yet. The simulator needs a flat list of devices connected to numbered nodes. The stage in between answers what the text **means**.
@@ -155,11 +156,13 @@ For `ce_amp.spl`, `CeAmp` is the only root, and paths are relative to it (`r1`, 
 
 ### 3.2 Resolve: names
 
-**E4. Two passes.**
+**E4. Three passes.**
 1. *Collect:*
    - every block's name, and its **signature** (its ports and their types) from its header;
-   - each `circuit`, `contract` and `setup` matched to its block by name: a circuit or contract by its own name, a setup by the name after `for`. Setup names are per block, so every block can have its own `Operating`.
+   - each `circuit`, `contract` and `setup` matched to its block by name: a circuit or contract by its own name, a setup by the name after `for`. Setup names are per block, so every block can have its own `Operating`;
+   - the values of every `const` and `env`, then each setup against its block's ports.
 2. *Bodies:* resolve every statement of every circuit.
+3. *What's broken:* mark every block that has an error inside it (`Block::tainted`), so that flatten does not check a root that places a broken block as a whole (E7).
 
 Inside a circuit, collect all `net` and `let` names first too. The ports come from the header.
 
@@ -279,6 +282,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
 - **`%` and `ppm`:** after `±` they are always **relative** (`4.6 ± 5%` means ±0.23); anywhere else they are plain factors (0.01, 1e-6). So a plain-number const after `±` isn't supported yet: once named, `TOL = 1%` is the number 0.01, and whether it was relative can't be seen (decided 2026-10-02). *From:* atopile's tolerance rule, uom's and pint's `percent` = 0.01.
 - **`dB`:** its own kind, never a dimension, accepted only where a level is expected (`f_low(-3dB)`). It means 20·log₁₀ of an amplitude ratio, the Bode and SPICE `vdb` convention, so −3 dB is a factor of 0.708. *From:* Unitful, which refuses to guess between 10·log and 20·log.
 
+<a name="flatten-instances"></a>
 ### 3.5 Flatten: instances, nets, knobs
 
 **E14. Flatten eagerly, top-down, as a pure function.**
@@ -333,6 +337,7 @@ The midpoint rule is the one choice here the references don't settle. It matches
 
 *Why:* pipeline.md §3: one `FlatDesign` serves every run; each run only changes numbers. *From:* pipeline.md's `Binding` and circuit.md.
 
+<a name="flatten-checks"></a>
 ### 3.6 Flatten: roles and checks
 
 **E18. Checks come in two tiers.**
@@ -481,6 +486,7 @@ pub struct DesignSourceMap { … }      // every id → span, and provenance for
 
 ---
 
+<a name="ce-amp-example"></a>
 ## 5. `ce_amp.spl` through the stage (what the tests will pin)
 
 `circuits/ce_amp.spl`, without its doc comments:
@@ -548,6 +554,7 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs. The c
 
 ---
 
+<a name="testing"></a>
 ## 6. Testing
 
 - **Case files** `test_data/{resolve,flatten}/{ok,err}/*.spl`, the same layout as the lexer and parser. Snapshots of two dumps (`Design`, and `FlatDesign` with its knobs), then the rendered diagnostics.
@@ -568,6 +575,7 @@ This is the "done when" of roadmap M1d: exactly these 8 knobs and 3 specs. The c
 
 ---
 
+<a name="questions"></a>
 ## 7. Questions: answered and open
 
 1. **Names in code:** `elaborate` for the whole, `resolve` and `flatten` for the steps. **Agreed** 2026-09-27.
@@ -614,6 +622,7 @@ Where the first implementation differs from the text above, and why:
 - **A tolerance is relative only when written with `%`:** `± 1%`, `± (1%)` and `± 2 * 0.5%` alike. Anything else is absolute, in the nominal's unit: `47k ± 50` is ±50 Ω, and `± (1V / 1V)` is a plain 1 (±1 on `beta`, a unit mismatch on a resistance), not ±100%.
 - **Suggestions are budgeted** (64 per file): each looks at every name in scope, so thousands of unknown names would be quadratic. Names are looked up by hash.
 
+<a name="flatten-plan"></a>
 ## 9. Flatten: the plan (M1d-4, first version)
 
 From the two reference reports, `research/flatten_hdl.md` (Yosys, CIRCT, slang, Verilator, rustc, Spade) and `research/flatten_circuit.md` (our `spicy_netlist`, atopile, KiCad, Modelica, Xyce, ngspice). Decided 2026-09-28.

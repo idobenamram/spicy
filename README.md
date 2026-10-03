@@ -53,9 +53,9 @@ SPICY_UPDATE_SNAPSHOTS=1 cargo test -p spicy_simulate
 
 Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
-Check the links in the docs with [lychee](https://github.com/lycheeverse/lychee) 0.24.2 (CI runs the same check, settings in `lychee.toml`):
+Check the links in the docs and the doc references in code comments, with [lychee](https://github.com/lycheeverse/lychee) 0.24.2 (CI runs the same check):
 ```bash
-lychee .
+scripts/check_links.sh
 ```
 
 ### Vibe Coding

@@ -1,5 +1,5 @@
-//! Characters that look like ASCII but aren't (lexer.md §6.3). Mostly what datasheets,
-//! PDFs and word processors produce. rustc keeps a table of 264
+//! Characters that look like ASCII but aren't (docs/ecad/lexer.md#lookalikes). Mostly
+//! what datasheets, PDFs and word processors produce. rustc keeps a table of 264
 //! (`rustc_parse/src/lexer/unicode_chars.rs`); we start with the ones we expect.
 
 use super::token::TokenKind;
@@ -60,7 +60,8 @@ pub(crate) fn lookup(c: char) -> Option<&'static Lookalike> {
     TABLE.iter().find(|l| l.found == c)
 }
 
-/// Spaces that should be treated like a space when checking `10 kΩ` (lexer.md §6.1).
+/// Spaces that should be treated like a space when checking `10 kΩ`
+/// (docs/ecad/lexer.md#check-reports).
 pub(super) fn is_space_like(c: char) -> bool {
     lookup(c).is_some_and(|l| l.replacement == " ")
 }

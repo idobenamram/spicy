@@ -1,6 +1,6 @@
-//! The `FlatDesign`: one root block with every placement expanded, every net merged
-//! and named, every part a device and every value that varies a knob (model.md §9).
-//! Built by [`crate::flatten`].
+//! The `FlatDesign`: one root block with every placement expanded, every net merged and
+//! named, every part a device and every value that varies a knob
+//! (docs/ecad/model.md#flatten-plan). Built by [`crate::flatten`].
 //!
 //! It holds ids into the [`Design`], never names copied out of it: a name is looked up
 //! when it's needed, through a [`Flat`], the flat design read together with its
@@ -184,9 +184,10 @@ pub enum KnobSource {
     Field { device: FlatDeviceId, field: usize },
 }
 
-/// How the engine treats a knob (engine.md §2). Decided by where the knob comes from,
-/// not by how its spread is written: a part's `± 1%` and its `100..=300` are both
-/// "the real part is anywhere in here" (language.md §5.4).
+/// How the engine treats a knob (docs/ecad/engine.md#knob-model). Decided by where the
+/// knob comes from, not by how its spread is written: a part's `± 1%` and its `100..=300`
+/// are both "the real part is anywhere in here"
+/// (docs/ecad/language.md#knobs-from-language).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KnobKind {
     /// A part's spread: a random variation across the parts built.

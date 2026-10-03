@@ -49,10 +49,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check the links in the docs (settings in lychee.toml)
-        uses: lycheeverse/lychee-action@v2.9.0
-        with:
-          lycheeVersion: v0.24.2
-          args: .
+      - name: Install lychee 0.24.2
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfLO https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-x86_64-unknown-linux-gnu.tar.gz
+          echo "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a  lychee-x86_64-unknown-linux-gnu.tar.gz" | sha256sum --check
+          mkdir -p lychee && tar -xzf lychee-x86_64-unknown-linux-gnu.tar.gz -C lychee
+          dirname "$(find "$RUNNER_TEMP/lychee" -name lychee -type f)" >> "$GITHUB_PATH"
+
+      - name: Check the links in the docs and in code comments (settings in lychee.toml)
+        run: scripts/check_links.sh
 
 

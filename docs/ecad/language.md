@@ -412,6 +412,7 @@ The same `4.5V..=6.5V` can mean "must stay inside" or "can be anywhere inside". 
 
 On top of that, a setup describes only what the world does to the block: a source on each input, a load on each output (§3.2). A range on something the block drives is a guarantee, so it's written as a spec (§8.2).
 
+<a name="knobs-from-language"></a>
 ### 5.4 Knobs come from the language
 
 | Written | Knob | Kind |
@@ -1087,6 +1088,7 @@ The exact spelling of every method is still to settle (v5 §4.6). Call arguments
 
 **MVP:** named arguments and `m[s]` are parsed. The first elaboration takes `dc`, `ac`, `.at`, `.mag`, `.db`, `.f_low` and `.f_high` ([IR] §4.4).
 
+<a name="benches"></a>
 ### 8.5 Benches are setups
 
 v0.1 had three kinds of bench. v5 writes each as a setup, and `bench` is no longer a reserved word:

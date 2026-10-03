@@ -1,5 +1,6 @@
-//! Lexer errors (lexer.md §6.1): what `check` reports, as data, and the words each one
-//! renders to (as `parser/error.rs` and `resolve/error.rs` for their stages).
+//! Lexer errors (docs/ecad/lexer.md#check-reports): what `check` reports, as data, and
+//! the words each one renders to (as `parser/error.rs` and `resolve/error.rs` for their
+//! stages).
 
 use super::lookalike;
 use super::quantity::{QuantityErrorKind, SUFFIX_NOTE, other_case, suffix_suggestions};

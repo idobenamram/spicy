@@ -37,6 +37,7 @@ Q2 outn inn tail QNPN
 .end
 ```
 
+<a name="decisions"></a>
 ## 2. Decisions
 
 1. **One crate, a reader and a writer.** `spicy_parser` is renamed `spicy_netlist`, with the existing code in `reader` and the new code in `writer`. Gnucap keeps each language's reader and writer in one module (`apps/lang_spice.cc`: `parse_instance` … `print_instance`, lines 222–788). The reader's `lower` already goes from SPICE to `spicy_circuit`; the writer goes back, next to it. A change to one is reviewed with the other, and the round trip is tested inside the crate.

@@ -188,7 +188,7 @@ pub struct DiodeModel {
     /// Emission coefficient.
     pub n: f64,
     /// Series resistance (Ω); 0 means none. Not simulated yet: a nonzero
-    /// value adds an internal node (docs/ecad/circuit.md §4.3).
+    /// value adds an internal node (docs/ecad/circuit.md#internal-nodes).
     pub rs: f64,
     /// Energy gap (eV), in the saturation current's temperature law. Not simulated yet.
     pub eg: f64,

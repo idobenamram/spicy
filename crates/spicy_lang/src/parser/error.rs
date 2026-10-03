@@ -1,5 +1,5 @@
-//! Parser errors (ast.md §3, grammar.md §7). Data first, rendered on demand, like the
-//! lexer's.
+//! Parser errors (docs/ecad/ast.md#decisions, docs/ecad/grammar.md#syntax-errors). Data
+//! first, rendered on demand, like the lexer's.
 
 use super::ast::{BinOp, BodyKind};
 use super::expr::Infix;

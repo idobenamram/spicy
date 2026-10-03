@@ -119,6 +119,7 @@ It matters more as the simulator grows:
 
 This reverses what I proposed before (copy `.model` values into each device). The earlier survey had already marked it "a judgement call, not precedent" (`staged_ir_survey.md` §5), and it doesn't hold up against the sources.
 
+<a name="internal-nodes"></a>
 ### 4.3 Internal nodes and branch rows belong to the simulator
 
 **Simulators.**

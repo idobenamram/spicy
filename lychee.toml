@@ -1,4 +1,5 @@
-# Link check for the docs. Run `lychee .` from the repository root; CI runs the same.
+# Link check for the docs and for the doc references in code comments.
+# Run `scripts/check_links.sh`; CI runs the same.
 # The rules for links are in docs/writing_docs.md ("Make links and numbers that do not break").
 
 # Check only the files in the repository: no network, so the check is fast and never flaky.

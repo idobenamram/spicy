@@ -1,6 +1,6 @@
 # spicy_model
 
-The design model: what the engine, the backends and the editor read (roadmap §2.4). It knows no syntax trees and no simulators (roadmap §2.3).
+The design model: what the engine, the backends and the editor read ([what `spicy_model` holds](../../ARCHITECTURE.md#spicy-model)). It knows no syntax trees and no simulators ([who owns what](../../ARCHITECTURE.md#ownership)).
 
 Design: `docs/ecad/model.md`.
 

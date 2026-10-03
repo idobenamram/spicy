@@ -1,4 +1,4 @@
-//! Pass 2: reads the tokens and reports every problem (lexer.md §6).
+//! Pass 2: reads the tokens and reports every problem (docs/ecad/lexer.md#checks).
 
 use spicy_span::Span;
 
@@ -14,11 +14,11 @@ use super::token::{TokenIdx, TokenKind, Tokens};
 ///
 /// One pass over the tokens, each looked at once (as rustc cooks each raw token in
 /// `next_token_from_cursor`, and rust-analyzer in `LexedStr::new`). Each check below
-/// looks at one token kind and returns at most one error; this loop decides what's
-/// kept. Each error claims its span, and an error starting inside a claimed span is
-/// dropped (lexer.md §6.2): that's how `10 kΩ` reports only "remove the space", not
-/// also "identifiers are ASCII" for `kΩ`. Every check reports at or after its own
-/// token, so claims only move forward and one position is enough to track them.
+/// looks at one token kind and returns at most one error; this loop decides what's kept.
+/// Each error claims its span, and an error starting inside a claimed span is dropped
+/// (docs/ecad/lexer.md#one-error-per-span): that's how `10 kΩ` reports only "remove the
+/// space", not also "identifiers are ASCII" for `kΩ`. Every check reports at or after its
+/// own token, so claims only move forward and one position is enough to track them.
 pub fn check(tokens: &Tokens) -> Vec<LexError> {
     let mut out = Errors::default();
     for i in 0..tokens.len() {

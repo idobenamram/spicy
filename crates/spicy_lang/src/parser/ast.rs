@@ -1,4 +1,4 @@
-//! The syntax tree (ast.md §4): what the text *says*, before names or units mean
+//! The syntax tree (docs/ecad/ast.md#types): what the text *says*, before names or units mean
 //! anything. Elaboration (`spicy_model`, roadmap M1d) reads it and decides what each
 //! name refers to.
 //!
@@ -196,7 +196,7 @@ pub struct Attribute<'src> {
 /// the `;` is missing).
 pub type Stmt<'src> = Node<'src, StmtKind<'src>>;
 
-/// What a statement is (grammar.md §3).
+/// What a statement is (docs/ecad/grammar.md#syntax).
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind<'src> {
     /// `net base;` declares an internal node; `net x = [a, b];` merges existing ones
@@ -207,7 +207,7 @@ pub enum StmtKind<'src> {
     },
     /// `let name = value;`. The same syntax places a part (`Resistor { … }`), places a
     /// block (`CeAmp { … }`) or defines a measure (`ac(…)`); elaboration tells them apart
-    /// by what the value's path refers to (grammar.md §3).
+    /// by what the value's path refers to (docs/ecad/grammar.md#syntax).
     Let {
         name: Ident<'src>,
         value: Expr<'src>,
@@ -236,7 +236,7 @@ pub struct Relation<'src> {
     pub rhs: Expr<'src>,
 }
 
-/// The relations a `spec` can use (grammar.md §4.1, level 1).
+/// The relations a `spec` can use (docs/ecad/grammar.md#precedence, level 1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RelOp {
     /// `x within a..=b` or `x within n ± t`: inside a range or tolerance.
@@ -295,8 +295,9 @@ pub enum ExprKind<'src> {
     /// `Resistor { a: vcc, value: 47k }`: placing a part or a block. Boxed, as rustc's
     /// `ExprKind::Struct`, so the rarer, larger node doesn't make every `Expr` larger.
     StructLit(Box<StructLit<'src>>),
-    /// `(a + b)`. Kept rather than dropped, because it matters: `(a + b) ± 1%` is
-    /// allowed and `a + b ± 1%` isn't (grammar.md §4.2), and the formatter prints it.
+    /// `(a + b)`. Kept rather than dropped, because it matters: `(a + b) ± 1%` is allowed
+    /// and `a + b ± 1%` isn't (docs/ecad/grammar.md#tolerance-operand), and the formatter
+    /// prints it.
     Paren(Box<Expr<'src>>),
     /// `[a, b]`: a list, as in `net x = [a, b];`.
     Array(Vec<Expr<'src>>),
@@ -340,8 +341,8 @@ pub enum ExprKind<'src> {
     Error(Reported),
 }
 
-/// Binary operators, loosest first (grammar.md §4.1). `..=`, between `Rel` and `Tol`,
-/// builds an [`ExprKind::Range`] instead.
+/// Binary operators, loosest first (docs/ecad/grammar.md#precedence). `..=`, between
+/// `Rel` and `Tol`, builds an [`ExprKind::Range`] instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
     /// A comparison: `within`, `<`, `<=`, `>`, `>=`. Only valid at the top of a `spec`,

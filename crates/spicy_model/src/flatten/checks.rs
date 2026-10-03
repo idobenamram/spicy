@@ -174,8 +174,9 @@ fn shorted_parts(c: Circuit, errors: &mut Vec<FlattenError>) {
     }
 }
 
-/// Nets that no part connects to ground, one warning per group of them (model.md §7,
-/// question 4), with paths from the placement they're all in.
+/// Nets that no part connects to ground, one warning per group of them
+/// (docs/ecad/model.md#questions, question 4), with paths from the placement they're all
+/// in.
 fn isolated_nets(c: Circuit, ground: FlatNetId, errors: &mut Vec<FlattenError>) {
     let flat = c.flat;
     // The nets connected through a part (Xyce's topology check, with each part as one
@@ -217,7 +218,7 @@ fn isolated_nets(c: Circuit, ground: FlatNetId, errors: &mut Vec<FlattenError>) 
     }
 }
 
-/// Whether the bench connects the local net `name` (language.md §8.5): one of the
+/// Whether the bench connects the local net `name` (docs/ecad/language.md#benches): one of the
 /// root's own ports with a role, which the bench drives (an input) or loads (an output).
 fn on_the_bench(flat: Flat, name: LocalNet) -> bool {
     name.at == FlatInstanceId::ROOT

@@ -30,7 +30,7 @@ use quantity::quantity_len;
 
 const BOM: &str = "\u{FEFF}";
 
-/// Pass 1: cuts `src` into tokens (lexer.md §5).
+/// Pass 1: cuts `src` into tokens (docs/ecad/lexer.md#scanning).
 ///
 /// Never fails. The tokens tile the input exactly and end with a zero-length `Eof`.
 ///
@@ -218,7 +218,7 @@ fn is_escape(c: char) -> bool {
 }
 
 /// The language's keywords get their own kinds; every reserved word is `KwReserved`
-/// (grammar.md §2.3). `mode`, `event`, `observe`, `emits`, `with` and `on` aren't
+/// (docs/ecad/grammar.md#identifiers). `mode`, `event`, `observe`, `emits`, `with` and `on` aren't
 /// here: they're keywords only where the parser expects them, so they stay usable as
 /// names (a part's `mode:` field).
 fn keyword(word: &str) -> Option<TokenKind> {
@@ -296,7 +296,7 @@ impl Scanner<'_> {
     }
 }
 
-/// The case-file suite and property tests (lexer.md §7).
+/// The case-file suite and property tests (docs/ecad/lexer.md#testing).
 #[cfg(test)]
 mod tests {
     use super::{LexErrorKind, check, scan};

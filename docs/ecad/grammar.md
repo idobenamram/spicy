@@ -57,6 +57,7 @@ Trivia stays in the token list so the file can be rebuilt byte for byte (roadmap
 
 A doc comment followed by nothing it can attach to (e.g. just before `}`) is a warning, as in Rust.
 
+<a name="identifiers"></a>
 ### 2.3 Identifiers and keywords
 
 - **Identifiers:** ASCII only for now, `[A-Za-z_][A-Za-z0-9_]*`.
@@ -98,6 +99,7 @@ A doc comment followed by nothing it can attach to (e.g. just before `}`) is a w
 
 **`+/-`** is read as one token only when the three characters touch. It's invalid Rust, so accepting it can't change the meaning of Rust-looking code (P1).
 
+<a name="quantities"></a>
 ### 2.5 Quantities (numbers with an optional unit)
 
 One token, `Quantity`, read greedily:
@@ -124,6 +126,7 @@ Strings are values (`Note { text: "…" }`). Their first real use is attribute a
 
 ---
 
+<a name="syntax"></a>
 ## 3. Syntax (EBNF)
 
 `{ x }` is zero or more, `[ x ]` is optional, `","` is a token. Trivia may appear between any two tokens.
@@ -202,6 +205,7 @@ path          = IDENT { "::" IDENT } ;
 
 ## 4. Operator precedence
 
+<a name="precedence"></a>
 ### 4.1 The table
 
 Loosest first:
@@ -223,6 +227,7 @@ Loosest first:
   - **`a..b` and `..b`** are errors, with the fix `..=`: a range's end is written after `..=`. (`a..` with nothing after it is the open range.)
 - **Level 3 sits above ranges and below arithmetic,** so `4.6 ± 5%` is a single operand of `within`.
 
+<a name="tolerance-operand"></a>
 ### 4.2 The `±` operand rule
 
 **An operand of `±` that is an unparenthesized `+ - * /` expression is an error.** The parser sees it through the `Paren` node.
@@ -258,6 +263,7 @@ error: ambiguous tolerance
 
 *Why this rule and not just a precedence level:* Rust does the same with `a < b < c`, rejecting it at parse time instead of picking a meaning. It also fits P8: one way to write each thing, and a fix-it instead of a silent reading.
 
+<a name="spreads-and-relations"></a>
 ### 4.3 Mixing spreads and relations
 
 These parse, but the parser rejects their shape:
@@ -270,6 +276,7 @@ These parse, but the parser rejects their shape:
 
 ---
 
+<a name="unit-suffix"></a>
 ## 5. Reading a unit suffix
 
 After lexing, the suffix of each `Quantity` is split into an optional prefix and an optional unit. The dimension is checked later, in elaboration (`47k` as a `Resistor`'s `value:` becomes ohms).
@@ -282,6 +289,7 @@ After lexing, the suffix of each `Quantity` is split into an optional prefix and
 
 Look-alike characters are treated as the same: `µ` (U+00B5) and `μ` (U+03BC); `Ω` (U+03A9) and `Ω` (U+2126).
 
+<a name="unit-splitting"></a>
 ### 5.2 Splitting rule
 
 Try each in order and take the first that matches:
@@ -311,6 +319,7 @@ Worked through:
 
 ---
 
+<a name="recovery"></a>
 ## 6. Error recovery
 
 - **At statement level:** after an error, skip tokens (scanning again from the statement's start, so brackets opened before the error are known) until one of:
@@ -327,6 +336,7 @@ Worked through:
 
 ---
 
+<a name="syntax-errors"></a>
 ## 7. Syntax errors in the MVP
 
 Each gets a snapshot test of its rendered diagnostic. The lexer reports #2–3, #9–15, #22–24 and #29–30 (`lexer.md` §6); the parser reports the rest.

@@ -1,6 +1,7 @@
-//! Flatten, the second step of elaboration (model.md §0, §3.5–3.6, §9): a [`Design`],
-//! each block once, becomes one [`FlatDesign`] per root, with every placement
-//! expanded, every net merged and named, every part a device and every spread a knob.
+//! Flatten, the second step of elaboration (docs/ecad/model.md#flatten-instances and
+//! docs/ecad/model.md#flatten-checks): a [`Design`], each block once, becomes one
+//! [`FlatDesign`] per root, with every placement expanded, every net merged and named,
+//! every part a device and every spread a knob.
 //!
 //! Read top to bottom in [`flatten`], one pass after another:
 //! - **Pass 1, recursion**, once per design: every placement cycle, reported once with
@@ -73,8 +74,8 @@ pub fn flatten(design: &Design, map: &DesignSourceMap) -> Flattened {
     let cut = recursion::find_cycles(design, map, &blocks, &children, &mut errors);
     let broken = broken_blocks(design, &cut);
 
-    // Pass 2, the roots: every block nothing places (model.md §7, question 2), each
-    // flattened on its own, in name order.
+    // Pass 2, the roots: every block nothing places (docs/ecad/model.md#questions,
+    // question 2), each flattened on its own, in name order.
     let flattener = RootFlattener {
         design,
         map,

@@ -264,9 +264,9 @@ M3a–M3e run on hand-written ngspice netlists and hand-built contracts, so they
   - **Done when:** the backend-rule tests pass (plan §8.4), and the nominal CE amp gives VC 5.503227 V, |H(1 kHz)| 4.590771, f_low 20.126944 Hz (TNOM 25 °C). 🔍
 - **M3c: `worst_case`.** The knob space, cones (the capacitor rule), the measures, the run table, enumeration per spec side, the inside-the-box guards (tangent check, 8 audit points, pooling, ascent), the numerical band, and the worst-case verdict table; the answer-key harness.
   - **Done when:** `worst_case` equals the answer key on every M3 case of plan §8.2; run counts pinned. 🔍
-- **M3d: `sigma(3)`.** The exact distribution map (D3), the 3σ-point search from two starts, the other range corners, range nudges, the uniform-spread check, and the sigma verdict table; the σ answer-key harness.
+- **M3d: `sigma(3)`.** The exact distribution map (round-2 decision D3, `research/engine_synthesis.md`), the 3σ-point search from two starts, the other range corners, range nudges, the uniform-spread check, and the sigma verdict table; the σ answer-key harness.
   - **Done when:** σ values within 1e-4 of the σ key on the CE amp (both XTB settings), the plan's §8.3 UNDECIDEDs exactly, no false PASS on the adversarial suite; run counts pinned. 🔍
-- **M3e: Output and store.** Records with `claim`, `next`, tags and `not_modeled`; the terminal table; `--format json` (unstable); `--explain`, `--at`, `--deep`; the per-revision store (`.spicy/checks/<rev>.json`) and `stale`.
+- **M3e: Output and store.** Records with `claim`, `next`, tags and `not_modeled`; the terminal table; `--format json` (unstable); `--explain`, `--at`, `--deep`; the per-revision store (`.spicy/checks/<rev>.json` in the engine plan; `cli_plan.md` CLI-11 proposes `circuits/.spicy/results/<rev>.json`, on hold with the engine design) and `stale`.
   - **Done when:** snapshots of the CE amp and every suite case, as table and JSON. 🔍
 - **M3f: End to end.** The flat design's knobs → knob space, the contract → plan, the engine deck.
   - **Done when:** checking `circuits/ce_amp.spl` prints the plan's §2.8 table, equal to the answer key: bias FAIL at `worst_case` (6.5595 V) beside PASS at `sigma(3)` (6.2813 V); every other side PASS. Snapshot-tested. 🔍

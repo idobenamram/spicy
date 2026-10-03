@@ -289,37 +289,91 @@ impl fmt::Display for Quantity {
 /// its 5, so a value written with up to 15 digits shows them all. Adapts gnucap's
 /// `ftos`: 15 digits in listings and messages, 5 in results.
 fn amount(q: Quantity) -> String {
-    // Rounded first, so the prefix is the rounded value's: `999.9999999999999` is `1 k`.
-    let shown = significant(q.si, SHOWN_DIGITS);
     match q.kind {
-        QKind::TempPoint => format!("{shown} K"),
-        QKind::Db => format!("{shown} dB"),
-        QKind::Plain if q.dim.is_none() => format!("{shown}"),
+        QKind::TempPoint => format!("{} K", significant(q.si, SHOWN_DIGITS)),
+        QKind::Db => format!("{} dB", significant(q.si, SHOWN_DIGITS)),
+        QKind::Plain if q.dim.is_none() => format!("{}", significant(q.si, SHOWN_DIGITS)),
         // A prefix binds to the first base unit only: `4.7 ks²` is 4.7 (ks)², not
         // 4700 s². Only a named unit takes one (adapts atopile's `compact_repr`).
         QKind::Plain if q.dim.quantity_name().is_none() => {
-            format!("{shown} {}", q.dim.symbol())
+            format!("{} {}", significant(q.si, SHOWN_DIGITS), q.dim.symbol())
         }
         QKind::Plain => {
-            let (number, prefix) = engineering(shown);
-            format!("{number} {prefix}{}", q.dim.symbol())
+            let mut text = String::new();
+            push_engineering(&mut text, q.si, SHOWN_DIGITS, &q.dim.symbol());
+            text
         }
     }
 }
 
-/// `x`, already rounded, with the SI prefix, from f to T, that leaves 1 to 999 before
-/// the point: `4700` is `4.7` and `k`. A value outside the prefixes is written in `e`
-/// notation (`2.5e-18`).
-fn engineering(x: f64) -> (String, &'static str) {
-    // Zero takes no prefix (and no sign, see `significant`).
-    if x == 0.0 || !x.is_finite() {
-        return (x.to_string(), "");
+/// Appends `x` with `unit` to `text` in engineering notation: rounded once to
+/// `digits` significant digits (3 to 17), with the SI prefix, from f to T, that
+/// leaves 1 to 999 before the point (`4.7 kΩ`, `-1.6667 mA`, `0 V`); outside the
+/// prefixes, the exponent stays (`2.5e-18 A`). One formatter for every reader, its
+/// digits a parameter: messages show 15, the CLI's results 5, as gnucap's `ftos`
+/// serves its listings and its tables. It writes into its caller's buffer, since a
+/// results table writes millions.
+pub fn push_engineering(text: &mut String, x: f64, digits: usize, unit: &str) {
+    use std::fmt::Write as _;
+    // Zero has no sign: `-0 V` would read as a value below zero.
+    if x == 0.0 {
+        let _ = write!(text, "0 {unit}");
+        return;
     }
-    // The exponent as written, not `log10`'s, which rounds `9.99999999999999e-7` up to
-    // -6 (`0.999999999999999 µ`).
-    let written = format!("{x:e}");
-    let (_, exponent) = written.split_once('e').expect("`e` notation");
-    let power = exponent.parse::<i32>().expect("an exponent").div_euclid(3) * 3;
+    if !x.is_finite() {
+        let _ = write!(text, "{x} {unit}");
+        return;
+    }
+    // Rounded once, by the standard library (`-1.6667e-3`), so the prefix is the
+    // rounded value's (`999.996` to 5 digits is `1 k`); the point then moves in the
+    // text, as a division would add its own float noise.
+    let digits = digits.clamp(3, 17);
+    let start = text.len();
+    let _ = write!(text, "{x:.*e}", digits - 1);
+    let (mantissa, exponent) = text[start..].split_once('e').expect("`e` notation");
+    let exponent: i32 = exponent.parse().expect("an exponent");
+    let negative = mantissa.starts_with('-');
+    let mut written = [b'0'; 17];
+    let mantissa_digits = mantissa.bytes().filter(u8::is_ascii_digit);
+    for (digit, byte) in written.iter_mut().zip(mantissa_digits) {
+        *digit = byte;
+    }
+    text.truncate(start);
+    let power = exponent.div_euclid(3) * 3;
+    match si_prefix(power) {
+        // The point moves right by what the prefix leaves: `1.6667e4` is `16.667 k`.
+        Some(prefix) => {
+            let point = 1 + (exponent - power) as usize;
+            push_decimal(text, negative, &written[..digits], point);
+            let _ = write!(text, " {prefix}{unit}");
+        }
+        // Outside the prefixes, the exponent stays: `2.5e-18`.
+        None => {
+            push_decimal(text, negative, &written[..digits], 1);
+            let _ = write!(text, "e{exponent} {unit}");
+        }
+    }
+}
+
+/// Appends `digits` with a point after the first `point` of them, without the zeros
+/// that end its fraction: `16670` with the point after 2 is `16.67`, `50000` after 1
+/// is `5`.
+fn push_decimal(text: &mut String, negative: bool, digits: &[u8], point: usize) {
+    if negative {
+        text.push('-');
+    }
+    let (whole, fraction) = digits.split_at(point);
+    let zeros = fraction.iter().rev().take_while(|&&d| d == b'0').count();
+    let fraction = &fraction[..fraction.len() - zeros];
+    text.extend(whole.iter().map(|&d| char::from(d)));
+    if !fraction.is_empty() {
+        text.push('.');
+        text.extend(fraction.iter().map(|&d| char::from(d)));
+    }
+}
+
+/// The SI prefix for a power of 10 that is a multiple of 3, from f to T.
+fn si_prefix(power: i32) -> Option<&'static str> {
     let prefix = match power {
         -15 => "f",
         -12 => "p",
@@ -331,12 +385,9 @@ fn engineering(x: f64) -> (String, &'static str) {
         6 => "M",
         9 => "G",
         12 => "T",
-        _ => return (written, ""),
+        _ => return None,
     };
-    // Rounded again: the division has its own float noise (`8.59e-7 / 1e-9` is
-    // `858.9999999999999`).
-    let number = significant(x / 10f64.powi(power), SHOWN_DIGITS);
-    (number.to_string(), prefix)
+    Some(prefix)
 }
 
 /// The significant digits a value is shown with. 15 hide the float noise of one
@@ -565,6 +616,31 @@ mod tests {
 
     /// A unit's value takes the SI prefix that leaves 1 to 999 before the point, as the
     /// CLI writes it, but with every digit a message needs; a plain number, a level and
+    /// The CLI's results write the same notation with 5 digits: its cases, from
+    /// `spicy_cli::render::text`.
+    #[test]
+    fn five_digits_as_the_cli_writes_them() {
+        let cases = [
+            (5.0, "V", "5 V"),
+            (0.0, "V", "0 V"),
+            (10.0 / 3.0, "V", "3.3333 V"),
+            (-1.0 / 600.0, "A", "-1.6667 mA"),
+            (1e-6, "s", "1 µs"),
+            (4.7e3, "Hz", "4.7 kHz"),
+            (123456.0, "Hz", "123.46 kHz"),
+            (999.996, "V", "1 kV"),
+            (2.5e-18, "A", "2.5e-18 A"),
+            (-1e-16 * 1.0000001, "A", "-1e-16 A"),
+            (9.99995e14, "Hz", "1e15 Hz"),
+            (-0.0, "A", "0 A"),
+        ];
+        for (value, unit, written) in cases {
+            let mut text = String::new();
+            push_engineering(&mut text, value, 5, unit);
+            assert_eq!(text, written, "{value}");
+        }
+    }
+
     /// a temperature in K take none.
     #[test]
     fn values_are_shown_with_a_prefix() {

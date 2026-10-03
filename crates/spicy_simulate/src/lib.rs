@@ -1,3 +1,8 @@
+//! Our circuit simulator: modified nodal analysis (MNA) with a KLU sparse solver.
+//! It reads one circuit from `spicy_circuit` (a `Circuit` and its `Params`) and runs
+//! the operating point and DC sweeps ([`dc`]), AC ([`ac`]) and transient ([`trans`]).
+//! Today the CLI calls it. Later the engine calls it through a backend (`ARCHITECTURE.md`).
+
 pub mod ac;
 pub mod dc;
 // mod nodes;

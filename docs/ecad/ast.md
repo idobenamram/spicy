@@ -143,3 +143,96 @@ pub enum   Arg            { Positional(Expr), Named { name, value, span } }   //
 
 1. **Comment attachment for the formatter.** rust-analyzer attaches leading comments to the next item and stops at a blank line (`shortcuts.rs:240-270`). We'll decide when the formatter comes.
 2. **Node IDs for side tables:** when elaboration needs them (pipeline.md decision 9).
+
+---
+
+<a name="front-end-choices"></a>
+## 7. Front-end choices
+
+Moved here from roadmap §4.3–4.5 on 2026-10-03.
+
+<a name="choices"></a>
+### 7.1 The choices
+
+| Choice | Recommendation | Why |
+|---|---|---|
+| Lexer | **Hand-written**, like `spicy_netlist`'s (std only, or the tiny `unscanny` it already uses). **No `logos`** | [7.2](#why-ast) |
+| Parser | **Hand-written** recursive descent, with a Pratt loop for expressions. Design borrowed from Spade ([7.3](#spade)), code written from scratch | [7.2](#why-ast), [7.3](#spade) |
+| Syntax tree | **A typed AST with byte spans on every node, plus the lexer's full token list (whitespace and comments included).** No lossless tree, no `rowan` | [7.2](#why-ast) |
+| Diagnostics | **`codespan-reporting`**, see the comparison below | The only new crate the front-end adds |
+| Tests | Snapshot tests: syntax trees, rendered diagnostics, the elaborated model, lowered circuits. Numeric outputs use the tolerance-based snapshots from M0 | The project's style; full precision is stored, but last-digit noise across machines doesn't fail tests |
+
+**Diagnostics libraries compared** (current versions: codespan-reporting 0.13, ariadne 0.6, miette 7):
+
+| | **codespan-reporting** | **ariadne** | **miette** |
+|---|---|---|---|
+| **Look** | rustc-style, which is what Rust users read every day | The prettiest: colored arrows, and it handles overlapping labels best | Fancy "graphical" or plain modes |
+| **Maturity** | Long-lived and widely used in compilers (Spade uses a fork). Slow-moving, stable | Actively developed, but 0.x with breaking changes between versions | Stable 7.x; built mainly for application error chains |
+| **How you use it** | Build `Diagnostic` values (labels, notes) and render against a file database | Builder API with a source cache | Derive macros on your error types (`#[derive(Diagnostic)]`) |
+| **Spans** | Byte ranges, which match our spans | Character offsets by default (byte offsets configurable in recent versions; check when integrating) | Byte offsets |
+| **Plain text for snapshot tests** | Yes | Yes | Yes |
+| **Fit for us** | ✅ A compiler's diagnostics, rustc-familiar, low churn | Good if appearance matters most | Better suited to app errors than to a compiler |
+
+**Recommendation: codespan-reporting.** Later, the SPICE parser's hand-rolled error snippets (`format_error_snippet` in the CLI) could move to it too, so both front-ends report errors the same way.
+
+<a name="why-ast"></a>
+### 7.2 Why an AST and a hand-written lexer (decided 2026-09-26)
+
+**The goals:** fast, modern, and as few crates as possible. The front-end ends up with **zero parsing dependencies**; its only new crate is `codespan-reporting`.
+
+**The two kinds of syntax tree, on one line:**
+
+```rust
+    let r1 = Resistor { value: 47k ± 1% };  // top
+```
+
+- **AST (abstract syntax tree).** Keeps the meaning, with byte ranges ("spans") pointing back into the file:
+  ```
+  Let { name: "r1" @8..10,
+        value: StructLit { path: "Resistor" @13..21,
+                           fields: [value: Tol(47k, 1%) @31..40] },
+        span: 4..43 }
+  ```
+  Spaces and the `// top` comment aren't in the tree. They stay in the token list.
+- **CST (concrete syntax tree, "lossless").** Every character is a leaf: `WHITESPACE "    "`, `LET_KW "let"`, `WHITESPACE " "`, `IDENT "r1"`, … `SEMI ";"`, `WHITESPACE "  "`, `COMMENT "// top"`. Joining the leaves gives back the file. The nodes are untyped, so a typed layer (`LetStmt::name()`) is written on top. `rowan` is the library rust-analyzer uses for this.
+
+**What we chose:** an AST with a span on every node, **plus the lexer's full token list**, whitespace and comments included, exactly as `spicy_netlist`'s lexer already keeps whitespace and newline tokens. The file is always reproducible byte for byte from the tokens. This is Zig's design: `zig fmt` formats from the AST plus the token list. Go's `gofmt` works from an AST plus a comment list.
+
+`spicy_netlist` is the same kind: a hand-written lexer, then phases that build typed structures (`Deck`) directly. It has no syntax-tree layer that keeps the source.
+
+| | **AST + spans + token list** (chosen) | **CST with `rowan`** |
+|---|---|---|
+| Crates | None | `rowan` 0.16 + 4 (countme, hashbrown, rustc-hash, text-size) |
+| Code to write | The parser builds typed nodes directly | The parser emits start/finish events, plus a hand-written typed layer: roughly twice the code |
+| Speed | Faster (no trivia nodes). Both are far faster than our file sizes need | Slower, but it wouldn't matter |
+| Editor and AI edits ("change r1's value") | Replace the bytes at the node's span | Patch the tree |
+| Canonical formatter | From AST + tokens (Zig, Go) | Easier comment placement |
+| Formatting one statement without reflowing others (language_editor_mapping R14) | Format only the edited statement's span | Same |
+| Moving code together with its comments, keeping odd hand formatting | Harder | Its real strength |
+| Incremental reparsing on every keystroke | Not needed: a design file reparses from scratch in far less time than a keystroke | Its other strength, for very large codebases |
+| Used by | rustc, Go, Zig, Spade, `spicy_netlist` | rust-analyzer, Roslyn (C#), Swift |
+
+**Why this replaces the earlier "lossless from day one":** the three things lossless was meant for (precise edits, a formatter, error recovery) all work from spans plus the token list. The fear was that retrofitting would mean rewriting the parser. The MVP grammar is about 15 rules, so a rewrite would cost days, not a redesign. And if we ever need a CST, it doesn't require `rowan`: a plain `Node { kind, children }` over our tokens is a small amount of our own code.
+
+**Why no `logos`.** logos (Spade's lexer) turns regexes on an enum into a lexer at compile time. It saves typing for many simple tokens, but:
+- **Our hard tokens are the ones it doesn't help with.** Unit literals (`47k`, `4k7`, `10kΩ`, `1µF`, `5%`), `100..=300` (the lexer must not read `100.` as a decimal), `±` and `+/-`, and nested `/* */` comments all need hand-written code either way. Even Spade handles block comments outside logos, in its parser.
+- **It's a proc-macro crate**, so it pulls a compile-time stack (syn, quote, regex-syntax, …) into the build.
+- **A hand lexer for about 40 token kinds is a few hundred lines,** in the same style as `spicy_netlist`'s (`crates/spicy_netlist/src/reader/lexer.rs`).
+
+<a name="spade"></a>
+### 7.3 What we take from Spade, and what we don't
+
+Spade's parser (`externals/spade/spade-parser`) is the reference for *how* ours is structured. **Its code is not copied or ported:** Spade's compiler crates are EUPL-1.2, a copyleft licence that isn't compatible with our MIT licence, and its README explicitly refuses LLM-generated contributions.
+
+**We take:**
+- Parse functions return `Result<Option<T>>`: `Ok(None)` means "not mine, nothing consumed", `Ok(Some)` means parsed, `Err` is a diagnostic.
+- A statement loop that dispatches on the leading keyword (`let`, `net`, `port`, `assume`, `spec`, `#[…]`).
+- **Recovery:** after an error, skip to a token that can restart a statement, so one broken statement gives one error and the next parses normally. A missing `;` is reported with an insert-`;` fix and parsing just continues. Ours is tighter than Spade's in one way: since every statement ends in `;`, recovery also skips *past* the next `;`.
+- A Pratt loop for expressions, with an ordered enum of binding powers.
+- Brace-named arguments (`Resistor { a: vcc, … }`), with a flag that forbids them where a `{` opens a body (`for i in 0..N {`, later), as in Rust.
+- A diagnostic builder (error, primary and secondary labels, help, suggested replacement), rendered by codespan-reporting.
+- Snapshot tests of rendered errors (Spade has about 800).
+
+**We leave:**
+- Splitting `>>` into `> >` for nested generics. Spade needs it because it has shift operators. We have none, so there's no `>>` token and `Tol<Ohm>` inside `Foo<…>` just works.
+- Pipelines, registers, macros, and the parse-trace machinery.

@@ -1,0 +1,10 @@
+# Link check for the docs. Run `lychee .` from the repository root; CI runs the same.
+# The rules for links are in docs/writing_docs.md ("Make links and numbers that do not break").
+
+# Check only the files in the repository: no network, so the check is fast and never flaky.
+offline = true
+# A link to `file.md#name` fails when `file.md` has no heading or `<a name>` anchor for `name`.
+include_fragments = "anchor-only"
+# Also check `.claude/commands/`. Files that `.gitignore` names (`target/`, `externals/`) stay out.
+hidden = true
+no_progress = true

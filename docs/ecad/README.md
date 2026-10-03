@@ -13,15 +13,15 @@ Design documents for the AI-native schematic and simulation editor built on spic
    - **[syntax_v5_plan.md](syntax_v5_plan.md)**: how the front end moved to the v5 syntax: the steps, and the decisions made on the way (no `->`, one range node, when `setup` and `pub` start an item).
    - **[grammar.md](grammar.md)**: the exact MVP grammar (v0.2): tokens, keywords, EBNF, operator precedence, unit literals, recovery, syntax errors.
    - **[model.md](model.md)**: elaboration, from syntax tree to flat design: `Design`, `FlatDesign`, knobs, nets, units, checks; compared with compilers, hardware elaborators, Modelica and circuit tools.
-   - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests; compared with Spade, atopile, rustc, rust-analyzer and Zig.
+   - **[ast.md](ast.md)**: the syntax tree and parser: storage, error nodes and recovery, what the parser rejects, tests, and the front-end choices (an AST and not a lossless tree, no `logos`, `codespan-reporting`, what we take from Spade); compared with Spade, atopile, rustc, rust-analyzer and Zig.
    - **[lexer.md](lexer.md)**: the lexer design: two passes, token layout, errors, and how it's tested, compared with Spade, atopile, Rust and Zig.
-   - **[stage_review.md](stage_review.md)**: the cleanup process every stage goes through (a reusable prompt): the readability standard, the subagents (reference researcher, flow reviewers, type auditor), and the checks.
+   - **[`/stage-review`](../../.claude/commands/stage-review.md)** (a Claude Code command): the cleanup process every stage goes through: the readability standard, the subagents (reference researcher, flow reviewers, type auditor), the checks, and the tools that measure speed.
 5. **[specs.md](specs.md)**: spec concepts (contracts, confidence, automatic checks). The syntax lives in language.md §8.
 6. **[pipeline.md](pipeline.md)**: the data pipeline: which struct holds a circuit at each stage, which crate owns it, when it's built, and why it exists.
    - **[circuit.md](circuit.md)**: the circuit data model (`spicy_circuit`): today's flow traced through the code, and each design choice checked against ngspice, Xyce, Gnucap, OSDI/VACASK and compilers.
    - **[netlist_writer.md](netlist_writer.md)**: the SPICE netlist writer (M1f's numeric export): names, numbers, what gets written, and the round-trip test (decided 2026-09-30).
    - **[netlist_reader.md](netlist_reader.md)**: how the SPICE reader should behave where ngspice, Xyce, Gnucap, LTspice, PSpice and HSPICE disagree (parked: netlists are a side path).
-7. **[roadmap.md](roadmap.md)**: what gets built, in what order, and how each step is reviewed.
+7. **[roadmap.md](roadmap.md)**: where the work is, what gets built next, and how each step is reviewed.
 
 ## Reference
 
@@ -86,10 +86,14 @@ Design documents for the AI-native schematic and simulation editor built on spic
     - [model_circuit_tools.md](research/model_circuit_tools.md): atopile, ngspice, Xyce, KiCad and our SPICE parser (nets, naming, identity)
     - [model_units.md](research/model_units.md): uom, F#, Unitful, pint (dimensions, temperature, %, dB)
     - These reports are kept as written. Where they disagree with the main docs, the main docs win. One known case: they propose a `logos` lexer and a lossless `rowan` tree; we chose a hand-written lexer and a typed AST with spans plus the full token list (roadmap.md §4.4).
+  - How the assistant writes (behind the writing rules in `AGENTS.md`):
+    - [reply_clarity_ste.md](research/reply_clarity_ste.md): ASD-STE100 applied to three past sessions; which rules would have prevented the user's confusion
 - **[archive/](archive/)**: superseded versions, kept for history ([engine_v1.md](archive/engine_v1.md), [engine_v2.md](archive/engine_v2.md), [engine_v3.md](archive/engine_v3.md)).
 
 ## Conventions
 
 - Paths to code (`crates/spicy_simulate/src/…`) are relative to the repository root.
 - Paths to other docs are relative to the doc they appear in.
-- Section references look like `engine.md §5.2`.
+- New text links to a section by its anchor, not by its number ([how](../writing_docs.md#links)). Older docs use section numbers such as `engine.md §5.2`. Those references stay as they are.
+- The rules for judging code and for writing docs are in [`docs/code_quality.md`](../code_quality.md) and [`docs/writing_docs.md`](../writing_docs.md).
+- The architecture (data flow, crates, who owns what) is in [`ARCHITECTURE.md`](../../ARCHITECTURE.md), and the project's terms are in [`docs/glossary.md`](../glossary.md).

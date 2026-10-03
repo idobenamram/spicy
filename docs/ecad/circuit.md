@@ -1,6 +1,6 @@
 # The Circuit Data Model (`spicy_circuit`)
 
-> 2026-09-26 · Design note for pipeline step 3 (`pipeline.md` §9). **Status: all recommendations agreed (2026-09-26); nothing is implemented yet.** It revises three earlier recommendations (§8 lists them).
+> 2026-09-26 · Design note for pipeline step 3 (`pipeline.md` §9). **Status: all recommendations agreed (2026-09-26). Pipeline step 3 built the first part on 2026-09-26: `spicy_circuit`, the SPICE lowering, and the simulator's switch to `Circuit`. The parts that this note marks as later come with their features.** It revises three earlier recommendations (§8 lists them).
 > Grounded in `research/data_model_survey.md`: ngspice, Xyce, Gnucap and OSDI/VACASK read at the source level, plus MLIR and data-oriented compilers (Cranelift, rustc, rust-analyzer, Zig, Carbon, JAX). Citations here are shortened to file:line; the survey has the full paths.
 
 This note answers four questions:

@@ -43,4 +43,16 @@ jobs:
         run: |
           cargo test --workspace --all-features --all-targets --no-fail-fast
 
+  doc-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check the links in the docs (settings in lychee.toml)
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: .
+
 

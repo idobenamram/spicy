@@ -1,6 +1,6 @@
 # The Data Pipeline: Where Each Struct Lives, and Why
 
-> 2026-09-25 · Design note. **Status:** the direction is agreed. Step 1 (cleanup) is done and committed. Steps 2 and 4 are deferred until the engine runs many simulations; the others are discussed one at a time (§9).
+> 2026-09-25 · Design note. **Status:** the direction is agreed. Steps 1 (cleanup) and 3 (`spicy_circuit`) are done and committed. Steps 2 and 4 are deferred until the engine runs many simulations; the others are discussed one at a time (§9).
 > Based on two research reports: `research/staged_ir_survey.md` (how compilers and circuit simulators pass data between stages) and `research/circuit_redteam.md` (our code, measured). References like **[MLIR20]** point into `bibliography.md` §14.
 
 This note answers one question: **as a circuit travels from text to simulation results, what data structure holds it at each stage, which crate owns that structure, when is it built, how long does it live, and why does it exist at all?**

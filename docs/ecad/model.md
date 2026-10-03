@@ -1,6 +1,6 @@
 # Elaboration: from Syntax Tree to Flat Design (M1d)
 
-> 2026-09-27 · Design note for roadmap M1d. **Status:** agreed 2026-09-27; implementation starting with *resolve*.
+> 2026-09-27 · Design note for roadmap M1d. **Status:** agreed 2026-09-27. Resolve and flatten are built (committed 2026-09-27 and 2026-09-30). The contracts phase is in `contracts_plan.md`. Its step 6 corrects this note where it disagrees with the code (`contracts_plan.md` §4).
 > 2026-09-30: examples and syntax updated to v5 (syntax_v5_plan.md).
 > What happens between the parser's syntax tree and the simulator-ready circuit: the stages, every structure, the checks, and the tests. Every decision says where it comes from.
 > Research round (2026-09-27), five reports, each claim checked against the source:

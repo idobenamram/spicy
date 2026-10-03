@@ -6,11 +6,23 @@ Spicy is a small Rust project for  running basic circuit simulations using Modif
 
 ## Crates
 
-- Netlists (SPICE reader): see `crates/spicy_netlist` ([README](crates/spicy_netlist/README.md))
+- Netlists (SPICE reader and writer): see `crates/spicy_netlist` ([README](crates/spicy_netlist/README.md))
 - Simulator: see `crates/spicy_simulate` ([README](crates/spicy_simulate/README.md))
+- Simulator input (one flat, numeric circuit): `crates/spicy_circuit`
 - CLI/TUI: see `crates/spicy_cli` ([README](crates/spicy_cli/README.md))
+- Circuit language front-end (`.spl`): see `crates/spicy_lang` ([README](crates/spicy_lang/README.md))
+- Design model: see `crates/spicy_model` ([README](crates/spicy_model/README.md))
+- Shared by the stages: `crates/spicy_span` (source spans), `crates/spicy_index` (typed indices), `crates/spicy_errors` (diagnostics)
+
+## Docs
+
+- How the crates fit together: [`ARCHITECTURE.md`](ARCHITECTURE.md). The project's terms: [`docs/glossary.md`](docs/glossary.md).
+- The design of the circuit language, the engine and the editor: [`docs/ecad/README.md`](docs/ecad/README.md). The current state is in the [roadmap](docs/ecad/roadmap.md#status).
+- How to judge a code change: [`docs/code_quality.md`](docs/code_quality.md). How to write docs and comments: [`docs/writing_docs.md`](docs/writing_docs.md).
 
 ## Quickstart
+
+The simulator needs the system OpenBLAS (Debian/Ubuntu: `sudo apt-get install libopenblas-dev`).
 
 1) Run the TUI on a sample netlist
 
@@ -41,6 +53,11 @@ SPICY_UPDATE_SNAPSHOTS=1 cargo test -p spicy_simulate
 
 Fuzzing support exists under `fuzz/` (requires `cargo-fuzz`).
 
+Check the links in the docs with [lychee](https://github.com/lycheeverse/lychee) 0.24.2 (CI runs the same check, settings in `lychee.toml`):
+```bash
+lychee .
+```
+
 ### Vibe Coding
 A lot of the surrounding code in this project is vibe coded, like:
 1. the binaries klu_mtx.rs klu_solve_cmp, some scripts
@@ -51,49 +68,9 @@ Those files are not for the faint of heart, human eyes should not lay eyes on th
 The parser and main simulation code are hand crafted by human intelligence,
 and only assisted by ai. Those should be readable.
 
-# TODO:
+## TODO
 
-## Parser
-- [x] output raw files
-- [x] support libs in parser
-- [x] support models in parser
-- [x] add diodes
-- [x] add BJT transistor
-- [ ] support underscore in names (maybe we over complicated the lexer)
-
-
-## Simulation
-- [x] implementation of KLU
-- [x] refactor errors and metrics in klu
-- [x] test KLU implementation
-      - [x] make sure the output is bit exact to c
-      - [x] make sure solve close 
-      - [x] make sure unroll optimization doesn't lose numerical stability
-- [x] hook up to simulation code
-- [x] cleanup device function use
-- [x] implement basic newton iteration
-- [x] implement diode model
-- [x] implement transistor model
-- [ ] support UIC again (using a simulation mode)
-- [ ] make from_spec nicer with getting values and defaults somehow
-- [ ] creating netlist validation step
-- [ ] implement gmin stepping
-- [ ] implement source stepping
-
-## KLU
-- [ ] implement klu statistics and use them to know when to fully factorize the matrix again.
-- [ ] implement bench marks for all algorithms and the full algorithms
-      - [x] analyze
-- [ ] make sure singular matricies work (when not using halt_if_singular)
-- [ ] refactor the functions and structs of KLU (mostly numeric) to something a little nicer
-- [ ] support KLU complex?
-
-### Optimizations
-- [ ] create spicyVec for boundary checks
-
-## visualizations
-- [ ] merge the recorder macro
-- [ ] generate nice visualizations for btf and amd
+The open items are in the roadmap's [follow-up tables](docs/ecad/roadmap.md#readme-follow-ups).
 
 ## License
 

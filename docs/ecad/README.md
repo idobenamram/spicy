@@ -97,3 +97,4 @@ Design documents for the AI-native schematic and simulation editor built on spic
 - New text links to a section by its anchor, not by its number ([how](../writing_docs.md#links)). Older docs use section numbers such as `engine.md §5.2`. Those references stay as they are.
 - The rules for judging code and for writing docs are in [`docs/code_quality.md`](../code_quality.md) and [`docs/writing_docs.md`](../writing_docs.md).
 - The architecture (data flow, crates, who owns what) is in [`ARCHITECTURE.md`](../../ARCHITECTURE.md), and the project's terms are in [`docs/glossary.md`](../glossary.md).
+- The reference projects (rustc, Zig, ngspice and others), at the versions we read, are in [`docs/references.md`](../references.md).

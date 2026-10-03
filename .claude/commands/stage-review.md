@@ -17,21 +17,21 @@ Clean-up means **simplifying without losing anything**: behavior, error messages
 - **Each part is added together with its span** (a builder with `push_*`), so the data and its source map can't drift apart.
 - **One home for each concept, in the lowest crate that needs it.** One `Span`, one `Diag<K>`, one unit enum. A struct that repeats another's fields, a field stored twice, or a parallel enum is merged. A one-use wrapper is removed.
 - **The file reads top-down in the order things happen,** and long files split along real concerns (e.g. `resolve/body.rs`).
-- **Grounded in references:** rustc, rust-analyzer, Zig, Spade (`externals/spade`), atopile (`externals/atopile`), with citations.
+- **Grounded in references** from `docs/references.md` (copies in `externals/`, from `scripts/fetch_references.sh`), cited as `docs/writing_docs.md#references` says: *follows*, *adapts* or *departs from*, in one short line in the code.
 
 ## The process
 
 1. **Map the flow yourself first.** Read the stage and its design notes. Write down the passes as they really are, and where the code hides them.
 
 2. **Run subagents in parallel.** Each works on its own scratch copy (`rsync` of the repo into the scratchpad, its own `CARGO_TARGET_DIR`, a baseline commit inside the copy) and **never modifies the main tree**.
-   - **Reference researcher.** How rustc_parse/rustc_resolve, rust-analyzer, Zig and Spade structure the same thing:
+   - **Reference researcher.** How rustc_parse/rustc_resolve, rust-analyzer, Zig and Spade structure the same thing, read in `externals/` at the versions of `docs/references.md`:
      - the top-level driver;
      - how duplicate definitions are handled;
      - how values are built and stored;
      - how data and source maps are kept in sync;
      - per-scope state.
 
-     It gives citations to file:line, says which it verified in the source and which are from memory, and names the patterns that confirm, refine or argue *against* the plan. It also says what not to copy.
+     It cites as `docs/writing_docs.md#references` says (file:line at the pinned version), marks every claim it did not check in the source "(not checked)", and names the patterns that confirm, refine or argue *against* the plan. It also says what not to copy (the "Copying" column of `docs/references.md`).
    - **Flow reviewer, one per complicated part** (e.g. the Pratt loop, recovery, value typing). The prompt puts readability first, then:
      - patches: special cases standing in for a rule, each with the rule named;
      - functions that are too long, do several jobs, take boolean flags or duplicate another;

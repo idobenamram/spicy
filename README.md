@@ -19,6 +19,7 @@ Spicy is a small Rust project for  running basic circuit simulations using Modif
 - How the crates fit together: [`ARCHITECTURE.md`](ARCHITECTURE.md). The project's terms: [`docs/glossary.md`](docs/glossary.md).
 - The design of the circuit language, the engine and the editor: [`docs/ecad/README.md`](docs/ecad/README.md). The current state is in the [roadmap](docs/ecad/roadmap.md#status).
 - How to judge a code change: [`docs/code_quality.md`](docs/code_quality.md). How to write docs and comments: [`docs/writing_docs.md`](docs/writing_docs.md).
+- The projects we learn from, at the versions we read: [`docs/references.md`](docs/references.md). `scripts/fetch_references.sh` copies them into `externals/`.
 
 ## Quickstart
 

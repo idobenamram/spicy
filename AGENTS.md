@@ -7,6 +7,7 @@ Instructions for AI agents that work in this repository.
 
 - To decide if a change makes the code better, use [`docs/code_quality.md`](docs/code_quality.md). It covers tests, less code, one clear reason for each struct, speed, and code that reads from top to bottom.
 - To write or edit a doc or a code comment, use [`docs/writing_docs.md`](docs/writing_docs.md). It covers short docs, one purpose for each section, links that do not break, and one format for decisions. Before you commit a doc change, run `scripts/check_links.sh` to check the links.
+- When a design or code takes an idea from another project, cite it as [`docs/writing_docs.md`](docs/writing_docs.md#references) says: one short line in code (*follows*, *adapts* or *departs from*). The versions we read are in [`docs/references.md`](docs/references.md). `scripts/fetch_references.sh` copies them into `externals/`.
 - To review a stage of the pipeline, run `/stage-review` ([`.claude/commands/stage-review.md`](.claude/commands/stage-review.md)). It holds the review process, the review subagents, and the tools that measure speed.
 
 <a name="writing-rules"></a>

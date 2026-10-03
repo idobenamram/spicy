@@ -46,6 +46,28 @@ Use the sections of [MADR 4.0](https://github.com/adr/madr/blob/4.0.0/template/a
 
 Each decision has a status: proposed, accepted, rejected, or replaced by another decision.
 
+<a name="references"></a>
+## Cite references
+
+When a design or a piece of code takes an idea from another project, say so. Then a reader can find the reason for the decision. The projects, and the version of each that we read, are in [`references.md`](references.md).
+
+- **The relation.** Use one of three words: *follows* (we do the same), *adapts* (we do it with a change: name the change), or *departs from* (we do it differently: give the reason).
+- **In a code comment.** Write one short line: the relation, the project and the item. When a doc explains the decision, add the link. Do not write the version, the file or the reasoning: `references.md` has the version, and the doc has the reasoning.
+  ```rust
+  /// Proof that an error was reported. Follows rustc's `ErrorGuaranteed`.
+  /// Follows rustc's `tainted_by_errors` (docs/ecad/model.md#e7).
+  //! Adapts rustc's look-alike table (`unicode_chars.rs`): only what datasheets produce.
+  ```
+- **In a doc.** In the options of a decision, give the project with its version, the file and the item, what the item does, the relation, and the reason:
+  ```markdown
+  - **ngspice-42**, `translate_inst_name()` in `src/frontend/subckt.c`: a device in a
+    subcircuit gets its kind letter and a dot in front (`r1` in `x1` → `r.x1.r1`).
+    **Followed** by the netlist writer, so ngspice prints the same names.
+  ```
+- **How you know.** Cite only what you read in the source, at the version in `references.md`. When a claim comes from documentation or from memory, add "(not checked)".
+- **Line numbers.** Write a line number only in a doc, and only with the version (`ngspice-42`, `src/frontend/subckt.c:1133`). Never write one in a code comment.
+- **Copying.** Learn from a reference, but copy its code only when `references.md` allows it, and add the notice.
+
 <a name="links"></a>
 ## Make links and numbers that do not break
 

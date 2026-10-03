@@ -117,7 +117,10 @@ pub enum ResolveErrorKind {
         /// What `of` has: pins and fields (`Binding`) for a part or block, fields for a
         /// shape, ports for a setup's block.
         what: NameKind,
+        /// The first of `of`'s pins, fields or ports, in order, and how many more there
+        /// are: a block can have thousands of ports, and each error would copy them all.
         valid: Vec<String>,
+        unlisted: usize,
         suggestion: Option<String>,
     },
     /// Pins or ports not bound, or required fields not given, all in one error.
@@ -388,13 +391,18 @@ impl DiagKind for ResolveErrorKind {
                 of,
                 what,
                 valid,
+                unlisted,
                 suggestion,
             } => {
                 let mut notes = Vec::new();
                 if let Some(s) = suggestion {
                     notes.push(format!("help: did you mean `{s}`?"));
                 }
-                notes.push(format!("note: `{of}` has {}", list(valid)));
+                let has = match unlisted {
+                    0 => list(valid),
+                    _ => format!("{}, … and {unlisted} more", list_quoted(valid)),
+                };
+                notes.push(format!("note: `{of}` has {has}"));
                 (
                     format!("`{of}` has no {} `{field}`", what.noun()),
                     "unknown".to_string(),
@@ -583,6 +591,12 @@ impl ResolveErrorKind {
         matches!(self, ResolveErrorKind::UnitMismatch { found, .. }
             if found.kind == QKind::Plain && found.dim == Dimension::KELVIN)
     }
+}
+
+/// `names` quoted and separated by commas: `` `a`, `b` ``.
+fn list_quoted(names: &[String]) -> String {
+    let quoted: Vec<String> = names.iter().map(|name| format!("`{name}`")).collect();
+    quoted.join(", ")
 }
 
 /// The help that shows a kind's fix, when it has one: "help: write `5K`".

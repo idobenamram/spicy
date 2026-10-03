@@ -445,34 +445,4 @@ mod tests {
         );
         assert!(elapsed.as_secs_f64() < 2.0, "took {elapsed:?}");
     }
-
-    /// Throughput on files with contracts, for the record: `ce_amp.spl`'s items repeated,
-    /// each copy renamed apart, so every copy is a root with its env, setup and
-    /// contract. Run with
-    /// `cargo test -p spicy_lang --release -- --ignored --nocapture elaborate_speed`.
-    #[test]
-    #[ignore]
-    fn elaborate_speed() {
-        let one = include_str!("../../../circuits/ce_amp.spl");
-        let copies = 10_000_000 / one.len();
-        let src: String = (0..copies)
-            .map(|i| {
-                one.replace("ambient", &format!("ambient{i}"))
-                    .replace("CeAmp", &format!("CeAmp{i}"))
-                    .replace("Operating", &format!("Operating{i}"))
-            })
-            .collect();
-        let parsed = parse(&src);
-        let start = std::time::Instant::now();
-        let elaborated = elaborate(&parsed);
-        let elapsed = start.elapsed();
-        assert!(elaborated.resolved.errors.is_empty() && elaborated.flattened.errors.is_empty());
-        assert_eq!(elaborated.flattened.roots.len(), copies);
-        let mb = src.len() as f64 / 1e6;
-        println!(
-            "{mb:.1} MB, {copies} copies of ce_amp: elaborate {:.0} MB/s, {:.0} ns a copy",
-            mb / elapsed.as_secs_f64(),
-            elapsed.as_nanos() as f64 / copies as f64
-        );
-    }
 }

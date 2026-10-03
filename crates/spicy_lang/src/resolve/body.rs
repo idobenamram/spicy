@@ -7,7 +7,7 @@
 //! the statement owns its name: a second `let` or `net` of a name is checked for its
 //! own mistakes, then dropped.
 
-use std::collections::HashMap;
+use spicy_index::fx::FxHashMap;
 
 use spicy_errors::Reported;
 use spicy_model::design::{
@@ -147,7 +147,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         let declares =
             |stmt: &&Stmt| matches!(stmt.kind, StmtKind::Net { .. } | StmtKind::Let { .. });
         let count = signature.ports.declared.len() + stmts.iter().filter(declares).count();
-        let mut declared = HashMap::with_capacity(count);
+        let mut declared = FxHashMap::with_capacity_and_hasher(count, Default::default());
         for (&name, &(port, at)) in &signature.ports.declared {
             declared.insert(name, (ValueName::Net(block.block.port_net(port)), at));
         }

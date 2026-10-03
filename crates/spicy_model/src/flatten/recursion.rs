@@ -12,7 +12,7 @@
 //! placement closes a cycle, and so what is reported and cut, depends only on the
 //! names, never on statement or block order (model.md E4).
 
-use std::collections::HashMap;
+use spicy_index::fx::FxHashMap;
 
 use super::{FlattenError, FlattenProblem};
 use crate::design::{BlockId, Design, DesignSourceMap, InstanceId};
@@ -36,9 +36,9 @@ pub(super) fn find_cycles(
     blocks: &[BlockId],
     children: &[Vec<(InstanceId, BlockId)>],
     errors: &mut Vec<FlattenError>,
-) -> HashMap<(BlockId, InstanceId), Reported> {
+) -> FxHashMap<(BlockId, InstanceId), Reported> {
     let mut visit = vec![Visit::New; design.blocks.len()];
-    let mut cut = HashMap::new();
+    let mut cut = FxHashMap::default();
     for &start in blocks {
         if visit[start.index()] != Visit::New {
             continue;

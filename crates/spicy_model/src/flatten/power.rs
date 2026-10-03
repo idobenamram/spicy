@@ -16,8 +16,8 @@
 //! net's pins and not its sheet pins. Each innermost port counts, as KiCad, Modelica and
 //! atopile count them: two outputs of one block on one rail are two sources.
 
+use spicy_index::fx::FxHashMap;
 use std::cmp::Reverse;
-use std::collections::HashMap;
 
 use super::checks::{Circuit, port_joins_at, port_signal};
 use super::{FlattenError, FlattenProblem, UnionFind, in_order_found, written};
@@ -167,7 +167,7 @@ fn no_source(c: Circuit, net: FlatNetId, sinks: &[PowerMember], errors: &mut Vec
 /// of all: nothing places the root.
 struct Replay<'m> {
     /// Each of the net's local nets, by its position in the net's names.
-    index: HashMap<LocalNet, usize>,
+    index: FxHashMap<LocalNet, usize>,
     /// The member at each local net, by the same position, if it has one.
     member: Vec<Option<&'m PowerMember>>,
     joined: UnionFind,
@@ -190,7 +190,7 @@ impl<'m> Replay<'m> {
     /// ports are gathered yet.
     fn new(flat: Flat, net: FlatNetId, members: &'m [PowerMember]) -> Self {
         let names = &flat.data.nets[net.index()].names;
-        let index: HashMap<LocalNet, usize> =
+        let index: FxHashMap<LocalNet, usize> =
             names.iter().enumerate().map(|(i, &n)| (n, i)).collect();
         let mut member = vec![None; names.len()];
         let mut gathered: Vec<Option<Gathered>> = (0..names.len()).map(|_| None).collect();

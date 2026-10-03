@@ -1853,23 +1853,4 @@ mod tests {
         assert_eq!(counts, items);
         insta::assert_snapshot!(dump_parse("ce_amp.spl", src));
     }
-
-    /// Throughput, for the record. Run with
-    /// `cargo test -p spicy_lang --release -- --ignored --nocapture parser_speed`.
-    #[test]
-    #[ignore]
-    fn parser_speed() {
-        let one = include_str!("../../../../circuits/ce_amp.spl");
-        let src = one.repeat(10_000_000 / one.len());
-        let start = std::time::Instant::now();
-        let parsed = parse(&src);
-        let elapsed = start.elapsed();
-        assert!(parsed.errors.is_empty() && parsed.lex_errors.is_empty());
-        let mb = src.len() as f64 / 1e6;
-        println!(
-            "{mb:.1} MB, {} items: lex + check + parse {:.0} MB/s",
-            parsed.file.items.len(),
-            mb / elapsed.as_secs_f64()
-        );
-    }
 }

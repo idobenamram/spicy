@@ -403,26 +403,4 @@ mod tests {
             assert!(result.is_ok(), "invariant failed on input {src:?}");
         }
     }
-
-    /// Throughput, for the record. Run with
-    /// `cargo test -p spicy_lang --release -- --ignored --nocapture speed`.
-    #[test]
-    #[ignore]
-    fn speed() {
-        let one = include_str!("../../../../circuits/ce_amp.spl");
-        let src = one.repeat(10_000_000 / one.len());
-        let start = std::time::Instant::now();
-        let tokens = scan(&src);
-        let scanned = start.elapsed();
-        let errors = check(&tokens);
-        let total = start.elapsed();
-        assert!(errors.is_empty());
-        let mb = src.len() as f64 / 1e6;
-        println!(
-            "{mb:.1} MB, {} tokens: scan {:.0} MB/s, scan + check {:.0} MB/s",
-            tokens.len(),
-            mb / scanned.as_secs_f64(),
-            mb / total.as_secs_f64()
-        );
-    }
 }

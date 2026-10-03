@@ -31,7 +31,7 @@ use checks::Circuit;
 
 pub use error::{FlattenError, FlattenErrorKind, FlattenProblem, InBlock};
 
-use std::collections::{HashMap, HashSet};
+use spicy_index::fx::{FxHashMap, FxHashSet};
 use std::hash::Hash;
 
 use crate::design::{
@@ -192,7 +192,7 @@ fn in_order_found<K: Copy + Eq + Hash, T>(
     items: impl IntoIterator<Item = (K, T)>,
 ) -> Vec<(K, Vec<T>)> {
     let mut groups: Vec<(K, Vec<T>)> = Vec::new();
-    let mut index: HashMap<K, usize> = HashMap::new();
+    let mut index: FxHashMap<K, usize> = FxHashMap::default();
     for (key, item) in items {
         let k = *index.entry(key).or_insert_with(|| {
             groups.push((key, Vec::new()));
@@ -229,7 +229,7 @@ fn placed_parts(block: &Block) -> Vec<(InstanceId, PartKind)> {
 
 /// The merge targets in `block`: the `x` of each `net x = [..]`, which rank for naming
 /// the merged net ([`Rank`]).
-fn merge_targets(block: &Block) -> HashSet<NetId> {
+fn merge_targets(block: &Block) -> FxHashSet<NetId> {
     block.merges.iter().map(|merge| merge.net).collect()
 }
 
@@ -251,7 +251,7 @@ fn in_name_order<T>(block: &Block, pick: impl Fn(&Instance) -> Option<T>) -> Vec
 /// reported inside it, or a placement pass 1 cut.
 fn broken_blocks(
     design: &Design,
-    cut: &HashMap<(BlockId, InstanceId), Reported>,
+    cut: &FxHashMap<(BlockId, InstanceId), Reported>,
 ) -> Vec<Option<Reported>> {
     let mut broken: Vec<Option<Reported>> = design.blocks.iter().map(|b| b.tainted).collect();
     for (&(block, _), &reported) in cut {
@@ -280,9 +280,9 @@ struct RootFlattener<'d> {
     /// Each block's parts, in name order.
     parts: &'d [Vec<(InstanceId, PartKind)>],
     /// Each block's merge targets ([`merge_targets`]).
-    targets: &'d [HashSet<NetId>],
+    targets: &'d [FxHashSet<NetId>],
     /// The placements on a cycle, not expanded.
-    cut: &'d HashMap<(BlockId, InstanceId), Reported>,
+    cut: &'d FxHashMap<(BlockId, InstanceId), Reported>,
     /// Each block's proof that something in it is broken ([`broken_blocks`]).
     broken: &'d [Option<Reported>],
 }
@@ -539,7 +539,7 @@ enum Rank {
 
 impl Rank {
     /// How `net` of `block` ranks; `targets` are the block's merge targets.
-    fn of(block: &Block, net: NetId, targets: &HashSet<NetId>) -> Rank {
+    fn of(block: &Block, net: NetId, targets: &FxHashSet<NetId>) -> Rank {
         if block.net_port(net).is_some() {
             Rank::Port
         } else if targets.contains(&net) {

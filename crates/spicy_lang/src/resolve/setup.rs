@@ -965,4 +965,57 @@ mod tests {
             [] as [&str; 0]
         );
     }
+
+    /// A block with thousands of ports and as many misspelled keys stays linear: each
+    /// error's note lists the first ten ports, then how many more (a first version
+    /// copied every port into every error: 16 s for 20 000 keys on 20 000 ports).
+    #[test]
+    fn unknown_keys_on_a_wide_block_stay_linear() {
+        use std::fmt::Write;
+        let n = 4000;
+        let mut src = String::from("block B { ");
+        for i in 0..n {
+            write!(src, "p{i:05}: Power<In>, ").unwrap();
+        }
+        src.push_str("}\n\ncircuit B {}\n\nsetup S for B {\n");
+        for i in 0..n {
+            writeln!(src, "    p{i:05}.v: 1V,").unwrap();
+            writeln!(src, "    q{i:05}: Supply {{ v: 1V }},").unwrap();
+        }
+        src.push_str("    temp: 25°C,\n}\n");
+        let parsed = parse(&src);
+        let start = std::time::Instant::now();
+        let resolved = resolve(&parsed);
+        let elapsed = start.elapsed();
+        assert_eq!(resolved.errors.len(), n);
+        let ResolveErrorKind::UnknownField {
+            valid, unlisted, ..
+        } = &resolved.errors[0].kind
+        else {
+            panic!("{:?}", resolved.errors[0]);
+        };
+        // The block's ports, then `temp`.
+        assert_eq!((valid.len(), *unlisted), (10, n + 1 - 10));
+        assert!(elapsed.as_secs_f64() < 2.0, "took {elapsed:?}");
+    }
+
+    /// The note of an unknown key lists the first ten slots, then how many more.
+    #[test]
+    fn a_long_slot_list_is_cut_short() {
+        let ports: Vec<String> = (0..12).map(|i| format!("p{i:02}: Power<In>")).collect();
+        let paths: Vec<String> = (0..12).map(|i| format!("p{i:02}.v: 1V")).collect();
+        let src = format!(
+            "block B {{ {} }}\n\ncircuit B {{}}\n\nsetup S for B {{ {}, x: 1V, temp: 25°C }}\n",
+            ports.join(", "),
+            paths.join(", ")
+        );
+        let resolved = resolve(&parse(&src));
+        let [error] = &resolved.errors[..] else {
+            panic!("{:#?}", resolved.errors);
+        };
+        let notes = error.kind.text(None).2;
+        let expected = "note: `B` has `p00`, `p01`, `p02`, `p03`, `p04`, `p05`, `p06`, `p07`, \
+                        `p08`, `p09`, … and 3 more";
+        assert_eq!(notes.last().map(String::as_str), Some(expected));
+    }
 }

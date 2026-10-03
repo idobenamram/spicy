@@ -209,7 +209,7 @@ model.md §5's table, in id order:
 - tests pass, and you've reviewed every snapshot change;
 - `cargo clippy --workspace --all-targets` and `cargo fmt` are clean;
 - `fuzz_spicy_lang_parser` runs clean for 10 minutes. It checks the resolve and flatten invariants too (`testing::check_parse_invariants`). The step's new case files go in its seed corpus;
-- the benchmark: `elaborate_speed` (added in step 1) for files with contracts, and no slowdown above about 3% on files without them (the flatten cases, `deep_hierarchy_stays_linear`);
+- the benchmark: the suite (`crates/spicy_bench`, added after step 2) against a baseline of the step's base commit: the typical design with and without env, setup and contract (R1, R2, F1, F2), no slowdown above about 3% where the step adds nothing, and every scaling pair still linear;
 - `/stage-review` has run on the stage the step touched, and you've reviewed the result.
 
 **Where the code goes** (the crate rules):
@@ -239,7 +239,7 @@ model.md §5's table, in id order:
     - a temperature's tolerance is a difference in K (`25°C ± 5K`);
     - a temperature point is written in °C.
   - **A `const` can be used where a number is expected:** `term()` looks a name up among the consts (`value: R_TOP`, and from step 2 a setup's `temp: T_LAB`). A name that isn't a const is still `NotAValue`, as today.
-  - The ignored `elaborate_speed` test: ce_amp's items repeated N times, renamed apart. Its number today is the baseline.
+  - The ignored `elaborate_speed` test: ce_amp's items repeated N times, renamed apart. Its number today is the baseline. (Replaced after step 2 by the benchmark suite, `crates/spicy_bench`.)
 - **New errors:**
 
   | Kind | Code | Example | Fix | Case file |

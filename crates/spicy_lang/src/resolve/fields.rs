@@ -7,7 +7,7 @@
 //!   ([`report_unknown`](Resolver::report_unknown)).
 //! - A required field left out holds the proof it was reported ([`left_out_required`]).
 
-use std::collections::HashSet;
+use spicy_index::fx::FxHashSet;
 
 use spicy_errors::Reported;
 use spicy_model::design::FieldValue;
@@ -16,6 +16,11 @@ use spicy_span::Span;
 
 use super::{NameKind, ResolveError, ResolveErrorKind, Resolver, suggest};
 use crate::parser::ast::{Expr, Field, Ident};
+
+/// How many of a kind's slots an unknown field's note lists, in order (rustc lists a
+/// few, then "and N others"): every error copies them, so a block with thousands of
+/// ports and as many misspelled keys would otherwise copy the ports once per key.
+const LISTED: usize = 10;
 
 /// One `name: value` given to a slot: a field of `Kind { … }`, or the last segment of a
 /// setup's path (`vcc.v: 12V`). `value` is `None` for the shorthand `C { gnd }`; `span`
@@ -94,7 +99,7 @@ impl Resolver<'_, '_> {
     ) -> (Option<Reported>, Option<usize>) {
         let mut reported = None;
         // Each unknown name once: `valu: 1k, valu: 2k` is one misspelling written twice.
-        let mut seen: HashSet<&str> = HashSet::new();
+        let mut seen: FxHashSet<&str> = FxHashSet::default();
         let first: Vec<bool> = unknown.iter().map(|g| seen.insert(g.name.text)).collect();
         let renamed = match (seen.len(), slots.missing) {
             (1, &[i]) if fits(0, i) => Some(i),
@@ -120,11 +125,13 @@ impl Resolver<'_, '_> {
                 (Some(s), None) if is_net(name) => Some(format!("{s}: {name}")),
                 _ => None,
             };
+            let listed = slots.names.len().min(LISTED);
             let kind = ResolveErrorKind::UnknownField {
                 field: name.to_string(),
                 of: of.to_string(),
                 what,
-                valid: slots.names.to_vec(),
+                valid: slots.names[..listed].to_vec(),
+                unlisted: slots.names.len() - listed,
                 suggestion,
             };
             let mut error = ResolveError::new(kind, given.name.span);

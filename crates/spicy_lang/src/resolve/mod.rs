@@ -37,7 +37,7 @@ mod value;
 
 pub use error::{NameKind, Namespace, ResolveError, ResolveErrorKind};
 
-use std::collections::HashMap;
+use spicy_index::fx::FxHashMap;
 use std::collections::hash_map::Entry;
 
 use spicy_errors::{Diag, DiagKind, Reported};
@@ -326,13 +326,13 @@ impl BlockBuilder {
 /// `try_plant_decl_into_local_module`, Spade's `ensure_is_unique`).
 #[derive(Clone)]
 struct Scope<'src, T> {
-    declared: HashMap<&'src str, (T, Span)>,
+    declared: FxHashMap<&'src str, (T, Span)>,
 }
 
 impl<T> Default for Scope<'_, T> {
     fn default() -> Self {
         Self {
-            declared: HashMap::new(),
+            declared: FxHashMap::default(),
         }
     }
 }

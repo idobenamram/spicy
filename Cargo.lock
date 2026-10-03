@@ -2485,6 +2485,7 @@ dependencies = [
  "codespan-reporting",
  "insta",
  "spicy_errors",
+ "spicy_index",
  "spicy_model",
  "spicy_span",
 ]

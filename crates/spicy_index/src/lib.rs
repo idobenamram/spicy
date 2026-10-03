@@ -1,7 +1,10 @@
 //! Typed indices: one `u32` newtype per kind of thing (a block, a net, a device), so an
 //! index into one table can't be used for another. Shared by every crate that numbers
 //! things (`spicy_model`, `spicy_circuit`), as rustc's `rustc_index` gives every
-//! compiler crate its `newtype_index!`.
+//! compiler crate its `newtype_index!`. And the hash maps those crates look things up
+//! in ([`fx`]).
+
+pub mod fx;
 
 /// Defines a `u32` index newtype: `id!(/// A net. NetId);` gives `NetId::new(i)` and
 /// `id.index()`.

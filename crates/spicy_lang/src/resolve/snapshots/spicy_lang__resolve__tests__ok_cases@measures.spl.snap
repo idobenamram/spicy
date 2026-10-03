@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 704
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/measures.spl
 ---
@@ -13,16 +13,16 @@ block Amp 175..178
   r1 = Resistor 288..290
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   q1 = Npn 346..348
     c → output
     b → base
     e → gnd
 contract Amp
   setup = Operating
-  let gain: number = h.at(1000 Hz).mag()
+  let gain: number = h.at(1 kHz).mag()
   let h: response = ac(output.v / input.v)
-  let level: level dB = h.at(1000 Hz).db()
+  let level: level dB = h.at(1 kHz).db()
   let bass: number Hz = h.f_low(-3 dB)
   let top: number Hz = h.f_high(-3 dB, ref: dc)
   let peak: number Hz = h.f_high(-1 dB)

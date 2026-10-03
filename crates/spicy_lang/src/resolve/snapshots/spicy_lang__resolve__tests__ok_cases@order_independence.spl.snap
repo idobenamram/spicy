@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 568
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/order_independence.spl
 ---
@@ -23,11 +23,11 @@ block Amp 307..310
   r = Resistor 406..407
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   c = Capacitor 462..463
     a → input
     b → base
-    value = 0.0000001 F ± 10%
+    value = 100 nF ± 10%
   q = Npn 542..543
     c → output
     b → base

@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/pin_not_net.spl
 ---
@@ -9,11 +9,11 @@ block A 6..7
   r1 = Resistor 40..42
     a → <unbound>
     b → p
-    value = 1000 Ω
+    value = 1 kΩ
   r2 = Resistor 91..93
     a → <unbound>
     b → p
-    value = 1000 Ω
+    value = 1 kΩ
 
 --- errors ---
 E-binding NotANet 59..62 "47k"

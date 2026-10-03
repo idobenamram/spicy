@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 772
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/limits.spl
 ---
@@ -13,15 +13,15 @@ block Amp 126..129
   r1 = Resistor 239..241
     a → vcc
     b → base
-    value = 47000 Ω
+    value = 47 kΩ
   r2 = Resistor 294..296
     a → base
     b → gnd
-    value = 10000 Ω
+    value = 10 kΩ
   rc = Resistor 349..351
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   q1 = Npn 407..409
     c → output
     b → base
@@ -44,6 +44,9 @@ contract Amp
   spec no_width: dc(output.v) <invalid>
   spec broken_open: <invalid> <invalid>
   spec broken_one: <invalid> <invalid>
+  spec level_percent: h.at(1 kHz).db() <invalid>
+  spec unity_percent: h.at(1 kHz).db() <invalid>
+  spec wrong_percent: h.at(1 kHz).db() <invalid>
 setup Operating 457..466 for Amp
   vcc: Supply v = 12 V
   input: Signal v = 0 V
@@ -71,6 +74,10 @@ E-name UnknownName 1645..1651 "outptu" fix 1645..1651 "output"
 E-limit OpenRangeLimit 1662..1669 "..=6.5V"
 E-name UnknownName 1695..1701 "outptu" fix 1695..1701 "output"
 E-limit WithinNeedsRange 1712..1714 "5V"
+E-unit PercentSpread 1850..1853 "10%"
+E-unit PercentSpread 1909..1912 "10%"
+E-unit UnitMismatch 2026..2029 "12V"
+E-unit PercentSpread 2033..2036 "10%"
 
 --- rendered ---
 error[E-limit]: a spec's limit is `<=` or `>=`
@@ -231,3 +238,34 @@ error[E-limit]: `within` takes a range or a tolerance
    |                                          ^^ one value
    |
    = help: write a range, `4.5V..=6.5V`, or a tolerance, `5.5V ± 1V`
+
+error[E-unit]: a level's spread can't be a percentage
+   --> limits.spl:41:55
+   |
+41 |     spec level_percent: h.at(1kHz).db() within 12dB ± 10%;
+   |                                                       ^^^ a percentage
+   |
+   = help: for a spread in dB, write `12dB ± 1.2dB`
+   = help: for 10% of the gain, write the spec on `.mag()`, the gain as a ratio: `within 3.98 ± 10%`
+
+error[E-unit]: a level's spread can't be a percentage
+   --> limits.spl:42:54
+   |
+42 |     spec unity_percent: h.at(1kHz).db() within 0dB ± 10%;
+   |                                                      ^^^ a percentage
+   |
+   = help: for 10% of the gain, write the spec on `.mag()`, the gain as a ratio: `within 1 ± 10%`
+
+error[E-unit]: expected a level in `dB`, found `V` (a voltage)
+   --> limits.spl:44:48
+   |
+44 |     spec wrong_percent: h.at(1kHz).db() within 12V ± 10%;
+   |                                                ^^^ this is `V` (a voltage)
+
+error[E-unit]: a level's spread can't be a percentage
+   --> limits.spl:44:54
+   |
+44 |     spec wrong_percent: h.at(1kHz).db() within 12V ± 10%;
+   |                                                      ^^^ a percentage
+   |
+   = help: write the spread in dB, like `± 1dB`, or the spec on `.mag()`, the gain as a ratio, with the percentage

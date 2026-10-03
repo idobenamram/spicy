@@ -662,7 +662,7 @@ use spicy_model::design::{
     Block, Design, DesignSourceMap, FieldValue, InstanceOf, Limit, Measure, NetId, PortId, Temp,
 };
 use spicy_model::measure::{ArithOp, MExpr, MeasureType, Method, Reference};
-use spicy_model::units::QKind;
+use spicy_model::units::{Dimension, QKind, Quantity};
 
 use spicy_model::flat::{
     Flat, FlatDesign, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
@@ -980,12 +980,12 @@ fn measure_text(expr: &MExpr, block: &Block, measures: &[Measure]) -> String {
         MExpr::Measure(id) => measures[id.index()].name.clone(),
         MExpr::Method { method, of } => {
             let args = match method {
-                Method::At { hz } => format!("{hz} Hz"),
+                Method::At { hz } => Quantity::new(*hz, Dimension::HERTZ).to_string(),
                 Method::Mag | Method::Db => String::new(),
-                Method::FLow { db } => format!("{db} dB"),
+                Method::FLow { db } => Quantity::db(*db).to_string(),
                 Method::FHigh { db, reference } => match reference {
-                    Reference::Peak => format!("{db} dB"),
-                    Reference::Dc => format!("{db} dB, ref: dc"),
+                    Reference::Peak => Quantity::db(*db).to_string(),
+                    Reference::Dc => format!("{}, ref: dc", Quantity::db(*db)),
                 },
             };
             format!("{}.{}({args})", text(of), method.name())
@@ -1352,6 +1352,12 @@ fn check_flatten_invariants(src: &str, parsed: &crate::parser::Parsed) {
                 upstream || recursion,
                 "a broken root has an error behind it"
             );
+        }
+        // Only a checked root can fail its checks, and then flatten reported an error.
+        if flat.failed_checks.is_some() {
+            assert!(flat.tainted.is_none(), "a broken root isn't checked");
+            let reported = Reported::among(errors).is_some();
+            assert!(reported, "failed checks have an error behind them");
         }
         for ground in &flat.grounds {
             let grounded = flat.nets[ground.index()].names.iter().any(|name| {

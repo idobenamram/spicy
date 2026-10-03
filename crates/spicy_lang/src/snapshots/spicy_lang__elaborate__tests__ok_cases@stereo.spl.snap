@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 75
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/ok/stereo.spl
 ---
@@ -10,13 +11,13 @@ root Stereo
   net v12  aliases left.vcc, right.vcc
   net left.base
   net right.base
-  Capacitor left.c a→left_in b→left.base value=0.000001 F
+  Capacitor left.c a→left_in b→left.base value=1 µF
   Resistor left.r1 a→v12 b→left.base value=knob left.r1.value
   Resistor left.r2 a→left.base b→gnd value=knob left.r2.value
-  Capacitor right.c a→right_in b→right.base value=0.000001 F
+  Capacitor right.c a→right_in b→right.base value=1 µF
   Resistor right.r1 a→v12 b→right.base value=knob right.r1.value
   Resistor right.r2 a→right.base b→gnd value=knob right.r2.value
-  knob left.r1.value Statistical 47000 Ω ± 1%
-  knob left.r2.value Statistical 10000 Ω ± 1%
-  knob right.r1.value Statistical 47000 Ω ± 1%
-  knob right.r2.value Statistical 10000 Ω ± 1%
+  knob left.r1.value Statistical 47 kΩ ± 1%
+  knob left.r2.value Statistical 10 kΩ ± 1%
+  knob right.r1.value Statistical 47 kΩ ± 1%
+  knob right.r2.value Statistical 10 kΩ ± 1%

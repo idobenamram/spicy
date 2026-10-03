@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 667
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/open_ranges.spl
 ---
@@ -9,8 +9,8 @@ block Ldo 214..217
   port vout: Power<Out> 236..240
   port gnd: Ground 254..257
 setup Operating 291..300 for Ldo
-  vin: Supply v = <invalid> z = 0.25 Ω (0 Ω..=0.5 Ω)
-  vout: Load r = <invalid> c = 0.00001 F (0 F..=0.00002 F) i = <invalid>
+  vin: Supply v = <invalid> z = 250 mΩ (0 Ω..=500 mΩ)
+  vout: Load r = <invalid> c = 10 µF (0 F..=20 µF) i = <invalid>
   temp = 298.15 K (25 °C)
 
 --- errors ---

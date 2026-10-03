@@ -1,15 +1,15 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/two_roots.spl
 ---
 root One
   net g (ground)  aliases f.a, f.b
-  Resistor f.r a→g b→g value=1000 Ω
+  Resistor f.r a→g b→g value=1 kΩ
 root Two
   net g (ground)  aliases f.a, f.b
-  Resistor f.r a→g b→g value=1000 Ω
+  Resistor f.r a→g b→g value=1 kΩ
 
 --- errors ---
 W-short ShortedPart 230..267 "let r = Resistor { a, b, value: 1k };"

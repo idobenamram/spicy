@@ -16,3 +16,6 @@ env g: Temperature in 25°C ± -5°C;
 env h: Temperature in 25 ± 5%;
 env i: Temperature in 25;
 env j: Temperature in 2 * (25 ± 5K);
+
+// The message shows the temperature in K without the float noise of the offset.
+env k: Temperature in -40°C ± 10%;

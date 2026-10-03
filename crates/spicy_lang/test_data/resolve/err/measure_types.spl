@@ -21,6 +21,8 @@ contract Amp {
     let zero = h.at(0Hz);
     let kilovolt = h.at(1kV);
     let up = h.f_low(3dB);
+    // A computed level's fix negates all of it.
+    let up_sum = h.f_low(1 + 2);
     let reference = h.f_high(-3dB, ref: top);
     let pair = dc(output.v, input.v);
     let typo = h.at(1kHz).mg();

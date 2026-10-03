@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/value_arith.spl
 ---
@@ -50,7 +50,7 @@ block A 6..7
   c1 = Capacitor 951..953
     a → p
     b → n
-    value = 0.000001 F
+    value = 1 µF
     rating = <invalid>
 
 --- errors ---

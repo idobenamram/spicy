@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicate_port.spl
 ---
@@ -10,7 +10,7 @@ block A 76..77
   r = Resistor 145..146
     a → p
     b → q
-    value = 1000 Ω
+    value = 1 kΩ
 
 --- errors ---
 E-duplicate Duplicate 88..89 "p" related 80..81

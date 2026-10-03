@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 672
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/env.spl
 ---
@@ -30,7 +30,7 @@ env ambient 271..278 = <invalid>
 env typo 963..967 = <invalid>
 const loose 170..175 = <invalid>
 const confidence 239..249 = <invalid>
-const A 415..416 = 1000 Ω
+const A 415..416 = 1 kΩ
 const B 434..435 = <invalid>
 const TOL 538..541 = 0.01
 

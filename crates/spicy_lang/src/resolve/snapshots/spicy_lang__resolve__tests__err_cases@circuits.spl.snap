@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 621
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/circuits.spl
 ---
@@ -13,7 +13,7 @@ block Top 161..164
   r = Resistor 239..240
     a → a
     b → b
-    value = 1000 Ω
+    value = 1 kΩ
 block Interface 282..291
   port a: Pin 294..295
   port b: Pin 302..303

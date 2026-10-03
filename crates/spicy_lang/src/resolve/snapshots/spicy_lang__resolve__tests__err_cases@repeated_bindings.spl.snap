@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/repeated_bindings.spl
 ---
@@ -10,11 +10,11 @@ block A 6..7
   r1 = Resistor 133..135
     a → v
     b → g
-    value = 1000 Ω
+    value = 1 kΩ
   r2 = Resistor 193..195
     a → v
     b → g
-    value = 1000 Ω
+    value = 1 kΩ
   r3 = Resistor 333..335
     a → v
     b → g

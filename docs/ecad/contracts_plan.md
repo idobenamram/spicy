@@ -192,7 +192,7 @@ model.md §5's table, in id order:
 | k6 | `vcc.v` | range | 12 V | ± 5% (11.4 … 12.6 V) | setup `Operating` |
 | k7 | `ambient` | range | 298.15 K (25 °C) | 263.15 … 333.15 K | env, through `temp:` |
 
-**The 3 specs are checkable.** `Flat::checkable_specs` returns a spec when the root, its contract and its setup are sound and the spec itself resolved. They give the engine its 5 sides (engine_types §2.3):
+**The 3 specs are checkable.** `Flat::checkable_specs` returns a spec when the root, its contract and its setup are sound, the root's own checks found no error (decided 2026-10-03: a power input with no source makes a simulation meaningless; a warning, such as a shorted part, doesn't block), and the spec itself resolved. They give the engine its 5 sides (engine_types §2.3):
 
 | Spec | Measure | Unit | Sides | Engine needs |
 |---|---|---|---|---|
@@ -416,7 +416,7 @@ model.md §5's table, in id order:
   - `UncheckedSpecs` is given once per block, on the contract the design keeps, with the block's name as its related span.
   - Attributes in a contract are "not supported yet" (§2.9 c); `PerBlock` carries the item for them.
   - `Relation.op_span` (the parser) is what the strict-limit and open-range fixes replace.
-  - Displayed numbers keep 15 significant digits (`units::shown`, which replaces `round9`): a range's midpoint shows `2.1 V`, not `2.0999999999999996 V`.
+  - Displayed numbers keep 15 significant digits (`units::significant`, which replaces `round9`): a range's midpoint shows `2.1 V`, not `2.0999999999999996 V`.
   - Speed (instructions, against `74ae521`): `resolve_file.typical` +13.7% (300 specs, about 2,100 instructions each, about the cost of a measure); `drop_elaborated` +12.4% (the specs' heap blocks); `measure_chain` +4.8% (`reaches`); `parse_file` +0.3% (`op_span`); the rest within ±0.65%. The new pair `contract_specs` (250 and 1,000 specs) grows 3.8×.
 
 ### Step 5: flatten the default setup
@@ -1031,6 +1031,10 @@ Resolve ignores every attribute today, in circuits too. `#[confidence(…)]` is 
 | `fn`'s return type needs `->` | **Parked** until `fn` |
 | v5 writes both `impl T for X {}` and `pub block X: T` | **Parked** until traits |
 | A chain of `let`s in a contract, each reading the next, overflows a 2 MB stack: about 450 in a debug build, 1,100 in release (step 3 review) | **Parked (2026-10-03).** No real contract comes near it. Meanwhile the programs that run the front end give it a large stack (rustc runs on 17 MiB, rust-analyzer on 16 MiB). If one ever does: (A) a depth limit with an error, as rustc's `depth_limit` queries (128 by default), counting expression levels too on a 2 MB stack; or (B) type the lets in dependency order with an explicit stack, as flatten's cycle search (a tested prototype is in the step 3 review), so the stack holds one expression |
+| A percentage spread on a dB level (`12dB ± 10%`), accepted until step 5 | **Settled (2026-10-03): an error, `PercentSpread`,** as on a temperature: of the level or of the gain isn't written (model.md E13). A spelling that names its base ("% of …") can come later without breaking a file |
+| A bare number where a level is expected (`.db() >= 12`) | **Settled (2026-10-03): it takes dB,** as E12 gives every other position its unit |
+| An error from flatten's own checks (a power input with no source) on a root with specs | **Settled (2026-10-03): none of its specs is checkable** (`FlatDesign.failed_checks`); a warning doesn't block |
+| Numbers in messages and dumps (`0.00000000001 F`) | **Settled (2026-10-03): an SI prefix on a unit (`10 pF`, `4.7 kΩ`),** as the CLI writes results, with up to 15 significant digits rather than its 5: every value shows as written, and the float noise of one rounding is hidden (`units::amount`; adapts gnucap's `ftos`, 15 digits in listings, 5 in results). A named unit takes the prefix; a product of base units doesn't (`4700 s²`, not `4.7 ks²`) |
 | v5 §4.7 cites [IR] "§8" for its questions | **A doc fix:** they're in [IR] §6 |
 | [IR] §4.2's ce_amp setup leaves out `input` and `output` | **Settled by rule 1** (§2.2): that setup would be an `IncompleteSetup`. `circuits/ce_amp.spl` has both. model.md §5 notes it |
 

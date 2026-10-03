@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 745
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/contract.spl
 ---
@@ -13,15 +13,15 @@ block Amp 165..168
   r1 = Resistor 278..280
     a → vcc
     b → base
-    value = 47000 Ω
+    value = 47 kΩ
   r2 = Resistor 333..335
     a → base
     b → gnd
-    value = 10000 Ω
+    value = 10 kΩ
   rc = Resistor 388..390
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   q1 = Npn 446..448
     c → output
     b → base
@@ -29,15 +29,17 @@ block Amp 165..168
 contract Amp
   setup = Operating
   let h: response = ac(output.v / input.v)
-  let gain: number = h.at(1000 Hz).mag()
+  let gain: number = h.at(1 kHz).mag()
   spec gain: gain within 4.6 ± 5%
   spec output: dc(output.v) within 5.5 V (4.5 V..=6.5 V)
-  spec level: h.at(1000 Hz).db() >= 12 dB
+  spec level: h.at(1 kHz).db() >= 12 dB
+  spec level_bare: h.at(1 kHz).db() <= 20 dB
+  spec corner_bare: h.f_low(-3 dB) <= 30 Hz
   spec bass: h.f_low(-3 dB) <= 30 Hz
-  spec treble: h.f_high(-3 dB, ref: dc) >= 20000 Hz
+  spec treble: h.f_high(-3 dB, ref: dc) >= 20 kHz
   spec headroom: dc(vcc.v - output.v) >= 4 V
   spec swing: dc(output.v) <= 7 V
-  pub spec input_gain: ac(output.v / input.v).at(10000 Hz).mag() >= 3
+  pub spec input_gain: ac(output.v / input.v).at(10 kHz).mag() >= 3
 const MAX_SWING 136..145 = 7 V
 setup Operating 496..505 for Amp
   vcc: Supply v = 12 V

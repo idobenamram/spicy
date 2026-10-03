@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/placements.spl
 ---
@@ -12,20 +12,20 @@ root One
   net b.rail  aliases b.load.vcc
   net b.x
   net b.y
-  Resistor a.island a→a.x b→a.y value=1000 Ω
-  Resistor a.short a→gnd b→gnd value=1000 Ω
-  Resistor a.load.r a→a.rail b→gnd value=1000 Ω
-  Resistor b.island a→b.x b→b.y value=1000 Ω
-  Resistor b.short a→gnd b→gnd value=1000 Ω
-  Resistor b.load.r a→b.rail b→gnd value=1000 Ω
+  Resistor a.island a→a.x b→a.y value=1 kΩ
+  Resistor a.short a→gnd b→gnd value=1 kΩ
+  Resistor a.load.r a→a.rail b→gnd value=1 kΩ
+  Resistor b.island a→b.x b→b.y value=1 kΩ
+  Resistor b.short a→gnd b→gnd value=1 kΩ
+  Resistor b.load.r a→b.rail b→gnd value=1 kΩ
 root Two
   net gnd (ground)  aliases c.gnd, c.load.gnd
   net c.rail  aliases c.load.vcc
   net c.x
   net c.y
-  Resistor c.island a→c.x b→c.y value=1000 Ω
-  Resistor c.short a→gnd b→gnd value=1000 Ω
-  Resistor c.load.r a→c.rail b→gnd value=1000 Ω
+  Resistor c.island a→c.x b→c.y value=1 kΩ
+  Resistor c.short a→gnd b→gnd value=1 kΩ
+  Resistor c.load.r a→c.rail b→gnd value=1 kΩ
 
 --- errors ---
 W-isolated IsolatedNets 321..322 "x"

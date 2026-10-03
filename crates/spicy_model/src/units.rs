@@ -272,25 +272,87 @@ impl Quantity {
 }
 
 impl fmt::Display for Quantity {
-    /// `47000 Ω`, `263.15 K (-10 °C)`, `-3 dB`, `200`.
+    /// `47 kΩ`, `263.15 K (-10 °C)`, `-3 dB`, `200`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            QKind::TempPoint => {
-                write!(f, "{} K ({} °C)", shown(self.si), to_celsius(self.si))
-            }
-            QKind::Db => write!(f, "{} dB", shown(self.si)),
-            QKind::Plain if self.dim.is_none() => write!(f, "{}", shown(self.si)),
-            QKind::Plain => write!(f, "{} {}", shown(self.si), self.dim.symbol()),
+        f.write_str(&amount(*self))?;
+        if self.kind == QKind::TempPoint {
+            write!(f, " ({} °C)", to_celsius(self.si))?;
+        }
+        Ok(())
+    }
+}
+
+/// `q` with its unit, as messages and dumps show it: a named unit gets an SI prefix
+/// (`4.7 kΩ`, `10 pF`, `50 mV`); a plain number, a level, a temperature in K or a
+/// product of base units gets none (`200`, `-3 dB`, `298.15 K`, `4700 s²`). Follows
+/// the CLI's engineering notation, with [`SHOWN_DIGITS`] significant digits rather than
+/// its 5, so a value written with up to 15 digits shows them all. Adapts gnucap's
+/// `ftos`: 15 digits in listings and messages, 5 in results.
+fn amount(q: Quantity) -> String {
+    // Rounded first, so the prefix is the rounded value's: `999.9999999999999` is `1 k`.
+    let shown = significant(q.si, SHOWN_DIGITS);
+    match q.kind {
+        QKind::TempPoint => format!("{shown} K"),
+        QKind::Db => format!("{shown} dB"),
+        QKind::Plain if q.dim.is_none() => format!("{shown}"),
+        // A prefix binds to the first base unit only: `4.7 ks²` is 4.7 (ks)², not
+        // 4700 s². Only a named unit takes one (adapts atopile's `compact_repr`).
+        QKind::Plain if q.dim.quantity_name().is_none() => {
+            format!("{shown} {}", q.dim.symbol())
+        }
+        QKind::Plain => {
+            let (number, prefix) = engineering(shown);
+            format!("{number} {prefix}{}", q.dim.symbol())
         }
     }
 }
 
-/// A value as shown: 15 significant digits, so the float noise of one rounding
-/// doesn't show (a range's midpoint, `2.1 V`, not `2.0999999999999996 V`; `7%`, not
-/// `7.000000000000001%`). The noise of a difference of close values stays (`5V - 4.9V`
-/// shows `0.0999999999999996 V`).
-fn shown(x: f64) -> f64 {
-    format!("{x:.14e}").parse().unwrap_or(x)
+/// `x`, already rounded, with the SI prefix, from f to T, that leaves 1 to 999 before
+/// the point: `4700` is `4.7` and `k`. A value outside the prefixes is written in `e`
+/// notation (`2.5e-18`).
+fn engineering(x: f64) -> (String, &'static str) {
+    // Zero takes no prefix (and no sign, see `significant`).
+    if x == 0.0 || !x.is_finite() {
+        return (x.to_string(), "");
+    }
+    // The exponent as written, not `log10`'s, which rounds `9.99999999999999e-7` up to
+    // -6 (`0.999999999999999 µ`).
+    let written = format!("{x:e}");
+    let (_, exponent) = written.split_once('e').expect("`e` notation");
+    let power = exponent.parse::<i32>().expect("an exponent").div_euclid(3) * 3;
+    let prefix = match power {
+        -15 => "f",
+        -12 => "p",
+        -9 => "n",
+        -6 => "µ",
+        -3 => "m",
+        0 => "",
+        3 => "k",
+        6 => "M",
+        9 => "G",
+        12 => "T",
+        _ => return (written, ""),
+    };
+    // Rounded again: the division has its own float noise (`8.59e-7 / 1e-9` is
+    // `858.9999999999999`).
+    let number = significant(x / 10f64.powi(power), SHOWN_DIGITS);
+    (number.to_string(), prefix)
+}
+
+/// The significant digits a value is shown with. 15 hide the float noise of one
+/// rounding (a range's midpoint, `2.1`, not `2.0999999999999996`; `7%`, not
+/// `7.000000000000001%`), not that of a difference of close values (`5 - 4.9` is
+/// `0.0999999999999996`). Two values that differ only past the 15th digit read the
+/// same (`0.1 + 0.2` and `0.3`).
+pub const SHOWN_DIGITS: usize = 15;
+
+/// `x` rounded to `digits` significant digits, with no sign on zero: `-0 dB` would
+/// read as a level below zero.
+pub fn significant(x: f64, digits: usize) -> f64 {
+    let rounded: f64 = format!("{x:.*e}", digits.saturating_sub(1))
+        .parse()
+        .unwrap_or(x);
+    rounded + 0.0
 }
 
 /// How a value may vary (model.md E10). Kept as written: the budget check ("a ±5% part
@@ -383,18 +445,13 @@ impl Value {
 }
 
 impl fmt::Display for Value {
-    /// `47000 Ω ± 1%`, `12 V ± 0.05 V`, `200 (100..=300)`.
+    /// `47 kΩ ± 1%`, `12 V ± 50 mV`, `200 (100..=300)`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.nominal)?;
-        let unit = |v: f64| match self.nominal.kind {
-            QKind::TempPoint => format!("{} K", shown(v)),
-            QKind::Db => format!("{} dB", shown(v)),
-            _ if self.nominal.dim.is_none() => format!("{}", shown(v)),
-            _ => format!("{} {}", shown(v), self.nominal.dim.symbol()),
-        };
+        let unit = |si: f64| amount(Quantity { si, ..self.nominal });
         match self.spread {
             Spread::Exact => Ok(()),
-            Spread::Rel(r) => write!(f, " ± {}%", shown(r * 100.0)),
+            Spread::Rel(r) => write!(f, " ± {}%", significant(r * 100.0, SHOWN_DIGITS)),
             Spread::Abs(a) => write!(f, " ± {}", unit(a)),
             Spread::Range { lo, hi } => write!(f, " ({}..={})", unit(lo), unit(hi)),
         }
@@ -477,7 +534,7 @@ mod tests {
             nominal: Quantity::new(47_000.0, Dimension::OHM),
             spread: Spread::Rel(0.01),
         };
-        assert_eq!(r.to_string(), "47000 Ω ± 1%");
+        assert_eq!(r.to_string(), "47 kΩ ± 1%");
         assert_eq!(r.bounds(), (46_530.0, 47_470.0));
         let beta = Value {
             nominal: Quantity::ratio(200.0),
@@ -491,7 +548,7 @@ mod tests {
             nominal: Quantity::new(3.3, Dimension::VOLT),
             spread: Spread::Abs(0.05),
         };
-        assert_eq!(v.to_string(), "3.3 V ± 0.05 V");
+        assert_eq!(v.to_string(), "3.3 V ± 50 mV");
         // A percentage as shown: no float noise (`0.07 * 100` is 7.000000000000001),
         // and a tiny or huge one keeps its value (9 decimals showed `0%` and `inf%`).
         let rel = |r| Value {
@@ -504,6 +561,37 @@ mod tests {
         // A level's spread is in dB too, as a spec's bound on `.db()` is.
         let level = Value::range(Quantity::db(10.0), Quantity::db(20.0));
         assert_eq!(level.to_string(), "15 dB (10 dB..=20 dB)");
+    }
+
+    /// A unit's value takes the SI prefix that leaves 1 to 999 before the point, as the
+    /// CLI writes it, but with every digit a message needs; a plain number, a level and
+    /// a temperature in K take none.
+    #[test]
+    fn values_are_shown_with_a_prefix() {
+        let shown = |si, dim| Quantity::new(si, dim).to_string();
+        assert_eq!(shown(4700.0, Dimension::OHM), "4.7 kΩ");
+        assert_eq!(shown(1e-11, Dimension::FARAD), "10 pF");
+        assert_eq!(shown(1e-6, Dimension::FARAD), "1 µF");
+        assert_eq!(shown(-0.05, Dimension::VOLT), "-50 mV");
+        assert_eq!(shown(4712.3456789, Dimension::OHM), "4.7123456789 kΩ");
+        // The division by the prefix's power has its own float noise, rounded away.
+        assert_eq!(shown(8.59e-7, Dimension::FARAD), "859 nF");
+        // Rounded first, so the prefix is the rounded value's.
+        assert_eq!(shown(999.9999999999999, Dimension::VOLT), "1 kV");
+        assert_eq!(shown(0.0, Dimension::VOLT), "0 V");
+        assert_eq!(shown(-0.0, Dimension::VOLT), "0 V");
+        assert_eq!(shown(2.5e-18, Dimension::AMPERE), "2.5e-18 A");
+        assert_eq!(Quantity::ratio(1e-6).to_string(), "0.000001");
+        assert_eq!(Quantity::db(-3.0).to_string(), "-3 dB");
+        assert_eq!(Quantity::celsius(25.0).to_string(), "298.15 K (25 °C)");
+        assert_eq!(
+            shown(9.99999999999999e-7, Dimension::VOLT),
+            "999.999999999999 nV"
+        );
+        // A product of base units takes none: `4.7 ks²` would be 4.7 (ks)².
+        let volt_squared = Dimension::VOLT * Dimension::VOLT;
+        assert_eq!(shown(4700.0, volt_squared), "4700 s⁻⁶·m⁴·kg²·A⁻²");
+        assert_eq!(Quantity::db(-0.0).to_string(), "0 dB");
     }
 
     /// Scaling keeps a relative spread, scales an absolute one by `|k|`, and keeps a

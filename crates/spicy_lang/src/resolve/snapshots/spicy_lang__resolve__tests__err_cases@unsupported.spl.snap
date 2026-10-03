@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 594
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/unsupported.spl
 ---
@@ -10,11 +10,11 @@ block A 141..142
   r = Resistor 183..184
     a → p
     b → n
-    value = 1000 Ω
+    value = 1 kΩ
   s = Resistor 238..239
     a → p
     b → <unbound>
-    value = 1000 Ω
+    value = 1 kΩ
   t = Resistor 362..363
     a → p
     b → n
@@ -26,7 +26,7 @@ block A 141..142
   v = Resistor 463..464
     a → <unbound>
     b → n
-    value = 1000 Ω
+    value = 1 kΩ
 
 --- errors ---
 E-unsupported Unsupported 196..201 "N = 2"

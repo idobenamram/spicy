@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 75
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/ok/supply.spl
 ---
@@ -11,10 +12,10 @@ root Board
   net three  aliases linked.v5, load3.vcc, linked.mid, linked.link.a, linked.link.b, linked.reg.out, linked.link.both
   net two  aliases load2.vcc, sensed.sense, sensed.v5, sensed.out, sensed.reg.out
   Resistor linked.reg.r a→v12 b→three value=10 Ω
-  Resistor load.r a→five b→gnd value=1000 Ω
-  Resistor load2.r a→two b→gnd value=1000 Ω
-  Resistor load3.r a→three b→gnd value=1000 Ω
-  Resistor load4.r a→four b→gnd value=1000 Ω
+  Resistor load.r a→five b→gnd value=1 kΩ
+  Resistor load2.r a→two b→gnd value=1 kΩ
+  Resistor load3.r a→three b→gnd value=1 kΩ
+  Resistor load4.r a→four b→gnd value=1 kΩ
   Resistor merged.reg.r a→v12 b→four value=10 Ω
   Resistor sensed.reg.r a→v12 b→two value=10 Ω
   Resistor sup.reg.r a→v12 b→five value=10 Ω

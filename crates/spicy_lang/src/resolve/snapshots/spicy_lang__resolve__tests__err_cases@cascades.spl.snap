@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/cascades.spl
 ---
@@ -10,7 +10,7 @@ block A 33..34
   r1 = Resistor 172..174
     a → vcc
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r2 = Resistor 297..299
     a → vcc
     b → gnd

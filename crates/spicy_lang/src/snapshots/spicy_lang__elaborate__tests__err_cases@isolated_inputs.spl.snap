@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/isolated_inputs.spl
 ---
@@ -12,9 +12,9 @@ root Bench
   net load
   net m  aliases s.i
   net n
-  Resistor lone a→out b→n value=1000 Ω
-  Resistor pull a→vcc b→load value=1000 Ω
-  Resistor s.r a→m b→k value=1000 Ω
+  Resistor lone a→out b→n value=1 kΩ
+  Resistor pull a→vcc b→load value=1 kΩ
+  Resistor s.r a→m b→k value=1 kΩ
 
 --- errors ---
 W-isolated IsolatedNets 464..465 "k"

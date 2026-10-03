@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 568
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/two_placements.spl
 ---
@@ -29,4 +29,4 @@ block Stage 340..345
   r = Resistor 443..444
     a → input
     b → output
-    value = 10000 Ω ± 1%
+    value = 10 kΩ ± 1%

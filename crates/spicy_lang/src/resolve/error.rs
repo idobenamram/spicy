@@ -3,7 +3,7 @@
 
 use spicy_model::measure::{MeasureType, Method};
 use spicy_model::prelude::{FieldType, Shape, SignalType};
-use spicy_model::units::{Dimension, QKind, Quantity};
+use spicy_model::units::{Dimension, QKind, Quantity, SHOWN_DIGITS, significant, to_celsius};
 
 use spicy_errors::{Diag, DiagKind, Fix, Severity, Text, list};
 
@@ -181,10 +181,19 @@ pub enum ResolveErrorKind {
     /// `env t: Temperature in 25°C;`: an env is a range the engine searches; a fixed
     /// value is a `const`.
     EnvNeedsRange { name: String },
-    /// A temperature's spread that isn't a difference: `25°C ± 5%` (a percentage of a
-    /// temperature depends on where its zero is), or a named temperature, which is a
-    /// point (`25°C ± T_ROOM`). `± 5K` and `± 5°C` are both 5 K (model.md E13).
-    TemperatureSpread { percent: bool },
+    /// A temperature's spread that is a temperature, which is a point (`25°C ± T_ROOM`),
+    /// not a difference. `± 5K` and `± 5°C` are both 5 K (model.md E13).
+    TemperatureSpread,
+    /// A percentage spread on a value whose zero is arbitrary, so which percentage is
+    /// meant isn't written (model.md E13): `25°C ± 10%` is 2.5 K of the °C reading or
+    /// 29.8 K of kelvin; `12dB ± 10%` is 1.2 dB of the level, or 10% of the gain.
+    /// `kind` is the value's (`TempPoint` or `Db`), `nominal` its SI value if it typed,
+    /// and `percent` the spread's.
+    PercentSpread {
+        kind: QKind,
+        nominal: Option<f64>,
+        percent: f64,
+    },
     /// A temperature written as a plain number (`25`) or in K (`300K`, which is a
     /// difference): a temperature point is written in `°C` (model.md E13).
     TemperaturePoint { kelvin: bool },
@@ -285,6 +294,7 @@ impl ResolveErrorKind {
         "Unsupported",
         "EnvNeedsRange",
         "TemperatureSpread",
+        "PercentSpread",
         "TemperaturePoint",
         "WrongRole",
         "IncompleteSetup",
@@ -332,7 +342,8 @@ impl DiagKind for ResolveErrorKind {
             DivisionByZero => "DivisionByZero",
             Unsupported { .. } => "Unsupported",
             EnvNeedsRange { .. } => "EnvNeedsRange",
-            TemperatureSpread { .. } => "TemperatureSpread",
+            TemperatureSpread => "TemperatureSpread",
+            PercentSpread { .. } => "PercentSpread",
             TemperaturePoint { .. } => "TemperaturePoint",
             WrongRole { .. } => "WrongRole",
             IncompleteSetup { .. } => "IncompleteSetup",
@@ -372,7 +383,7 @@ impl DiagKind for ResolveErrorKind {
             | DivisionByZero => "E-value",
             Unsupported { .. } => "E-unsupported",
             EnvNeedsRange { .. } => "E-value",
-            TemperatureSpread { .. } | TemperaturePoint { .. } => "E-unit",
+            TemperatureSpread | PercentSpread { .. } | TemperaturePoint { .. } => "E-unit",
             WrongRole { .. } => "E-role",
             IncompleteSetup { .. } | NotAShape { .. } => "E-setup",
             NoDefaultSetup { .. } | PublishedInternal { .. } => "E-contract",
@@ -618,19 +629,16 @@ impl DiagKind for ResolveErrorKind {
                         .to_string(),
                 ],
             ),
-            TemperatureSpread { percent } => (
+            TemperatureSpread => (
                 "a temperature's spread is a difference, like `5K` or `5°C`".to_string(),
-                match percent {
-                    true => "a percentage".to_string(),
-                    false => "a temperature, which is a point".to_string(),
-                },
-                match percent {
-                    true => vec![
-                        "note: a percentage of a temperature depends on where its zero is".to_string(),
-                    ],
-                    false => vec![],
-                },
+                "a temperature, which is a point".to_string(),
+                vec![],
             ),
+            PercentSpread {
+                kind,
+                nominal,
+                percent,
+            } => percent_spread(*kind, *nominal, *percent),
             TemperaturePoint { kelvin } => (
                 "a temperature is written in `°C`".to_string(),
                 match kelvin {
@@ -862,6 +870,70 @@ impl ResolveErrorKind {
     }
 }
 
+/// The text of `PercentSpread`: which readings the percentage has, worked out on the
+/// value written, and how to write each one so it's unambiguous.
+fn percent_spread(kind: QKind, nominal: Option<f64>, percent: f64) -> Text {
+    // A spread is a distance: `± -5%` reads as 5%, so no help suggests a negative one.
+    let percent = percent.abs();
+    let p = significant(percent, SHOWN_DIGITS);
+    let of = |x: f64| significant(x.abs() * percent / 100.0, 3);
+    let nominal = nominal.map(|x| significant(x, SHOWN_DIGITS));
+    // `tolerance` reports a percentage on a temperature or a level, never on a plain
+    // quantity, whose zero is zero.
+    let what = match kind {
+        QKind::TempPoint => "a temperature's",
+        _ => "a level's",
+    };
+    let notes = match (kind, nominal) {
+        (QKind::TempPoint, Some(kelvin)) => {
+            let celsius = to_celsius(kelvin);
+            let (reading, absolute) = (of(celsius), of(kelvin));
+            // A reading whose base is 0 (0 °C, or 0 K) has no spread to offer: a spread
+            // of 0 doesn't vary, which is an error of its own.
+            let spreads: Vec<String> = [reading, absolute]
+                .into_iter()
+                .filter(|&spread| spread != 0.0)
+                .map(|spread| format!("`± {spread}K`"))
+                .collect();
+            vec![
+                format!(
+                    "note: {p}% of {celsius} °C is {reading} K, but {p}% of {kelvin} K is {absolute} K: which one is meant isn't written"
+                ),
+                format!(
+                    "help: write the spread as a difference, {}",
+                    spreads.join(" or ")
+                ),
+            ]
+        }
+        (QKind::TempPoint, None) => vec![
+            "note: a percentage of a temperature depends on where its zero is, 0 °C or 0 K"
+                .to_string(),
+            "help: write the spread as a difference, like `± 5K`".to_string(),
+        ],
+        (_, Some(db)) => {
+            let mut notes = Vec::new();
+            // A percentage of 0 dB is nothing: only the gain's reading is left.
+            if db != 0.0 {
+                notes.push(format!("help: for a spread in dB, write `{db}dB ± {}dB`", of(db)));
+            }
+            let gain = significant(10f64.powf(db / 20.0), 3);
+            notes.push(format!(
+                "help: for {p}% of the gain, write the spec on `.mag()`, the gain as a ratio: `within {gain} ± {p}%`"
+            ));
+            notes
+        }
+        (_, None) => vec![
+            "help: write the spread in dB, like `± 1dB`, or the spec on `.mag()`, the gain as a ratio, with the percentage"
+                .to_string(),
+        ],
+    };
+    (
+        format!("{what} spread can't be a percentage"),
+        "a percentage".to_string(),
+        notes,
+    )
+}
+
 /// `names` quoted and separated by commas: `` `a`, `b` ``.
 fn list_quoted(names: &[String]) -> String {
     let quoted: Vec<String> = names.iter().map(|name| format!("`{name}`")).collect();
@@ -903,5 +975,37 @@ pub(super) fn describe(kind: QKind, dim: Dimension) -> String {
             Some(name) => format!("`{}` ({name})", dim.symbol()),
             None => format!("`{}`", dim.symbol()),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `PercentSpread`'s help gives spreads that are valid and mean one reading: no float
+    /// noise (-40 °C is 233.14999999999998 K as a float), no negative spread for `± -5%`,
+    /// and no spread of 0 for the reading whose zero the value is.
+    #[test]
+    fn percent_spread_helps_with_valid_spreads() {
+        let notes = |kind, nominal, percent| percent_spread(kind, Some(nominal), percent).2;
+        let celsius = |c| Quantity::celsius(c).si;
+        assert_eq!(
+            notes(QKind::TempPoint, celsius(-40.0), 5.0),
+            [
+                "note: 5% of -40 °C is 2 K, but 5% of 233.15 K is 11.7 K: which one is meant isn't written",
+                "help: write the spread as a difference, `± 2K` or `± 11.7K`",
+            ]
+        );
+        assert_eq!(
+            notes(QKind::TempPoint, celsius(0.0), -5.0)[1],
+            "help: write the spread as a difference, `± 13.7K`"
+        );
+        assert_eq!(
+            notes(QKind::Db, 0.1 + 0.2, -10.0),
+            [
+                "help: for a spread in dB, write `0.3dB ± 0.03dB`",
+                "help: for 10% of the gain, write the spec on `.mag()`, the gain as a ratio: `within 1.04 ± 10%`",
+            ]
+        );
     }
 }

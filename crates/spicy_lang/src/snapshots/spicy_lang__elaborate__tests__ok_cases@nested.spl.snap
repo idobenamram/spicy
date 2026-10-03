@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 75
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/ok/nested.spl
 ---
@@ -7,4 +8,4 @@ root Board
   net gnd (ground)  aliases s.gnd, s.left.gnd
   net rail  aliases s.v12, s.left.vcc
   Resistor s.left.r a→rail b→gnd value=knob s.left.r.value
-  knob s.left.r.value Statistical 1000 Ω ± 5%
+  knob s.left.r.value Statistical 1 kΩ ± 5%

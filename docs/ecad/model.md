@@ -256,6 +256,7 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
   - an endpoint of `..=`;
   - the nominal of `±`;
   - the bound of a relation (`… within 4.6 ± 5%` → the measure's unit).
+- A level's position takes dB the same way: `.db() >= 12` is 12 dB, `.f_low(-3)` is −3 dB (decided 2026-10-03). This follows SPICE, where `.meas … WHEN vdb(out)=-3` reads the bare `-3` as dB (ngspice-42, run), and departs from pint, which reads a bare number next to dB as a power ratio. A temperature's doesn't: a point is written in °C (E13).
 - Anywhere else a bare number is dimensionless.
 - Computed values follow the same rule, by tracking whether a sub-expression is still unitless (refined while implementing):
   - If everything in it is unitless, the result is unitless and takes the expected unit at the end: `2 * 4.7k` and `1k + 2k` in a `value:` are 9.4 kΩ and 3 kΩ.
@@ -276,11 +277,12 @@ Value { nominal: Quantity, spread: Exact | Rel(0.01) | Abs(0.05 V) | Range(lo, h
   - point + point, and point × anything, are errors;
   - a difference is written in K (`25°C + 15K`, `25°C ± 5K`). After `±` it may also be written in °C: `25°C ± 5°C` is ±5 K, since the position says it's a difference, and the SI and datasheets write `±0.5°C` (decided 2026-10-02);
   - a point is written in °C: a plain number (`25`) or a value in K (`300K`) where a temperature is expected is an error, with the same temperature in °C as the fix (`26.85°C`). In SPICE `K` means kilo (`.temp 300K` is 300 000 °C in ngspice), so K never reads as a point;
-  - a spread is never a percentage (where zero is decides it) or a named temperature (a point).
+  - a spread is never a percentage, since where zero is decides it: 10% of `25°C` is 2.5 K of the °C reading (as thermocouple standards write "% of reading in °C") or 29.8 K of kelvin (as uom computes), and the error shows both; nor a named temperature (a point).
 
   *From:* uom (separate point and interval types; an interval may be in degrees Celsius), pint and Unitful (their errors for offset units).
 - **`%` and `ppm`:** after `±` they are always **relative** (`4.6 ± 5%` means ±0.23); anywhere else they are plain factors (0.01, 1e-6). So a plain-number const after `±` isn't supported yet: once named, `TOL = 1%` is the number 0.01, and whether it was relative can't be seen (decided 2026-10-02). *From:* atopile's tolerance rule, uom's and pint's `percent` = 0.01.
 - **`dB`:** its own kind, never a dimension, accepted only where a level is expected (`f_low(-3dB)`). It means 20·log₁₀ of an amplitude ratio, the Bode and SPICE `vdb` convention, so −3 dB is a factor of 0.708. *From:* Unitful, which refuses to guess between 10·log and 20·log.
+  - A spread is never a percentage either (decided 2026-10-03): 10% of `12dB` is 1.2 dB of the level (as step attenuators are specified, "% of setting") or 10% of the gain, about −0.9/+0.8 dB (as gain errors are), and the two differ by 4.6 times at 40 dB. The error shows both spellings: `12dB ± 1.2dB`, or the spec on `.mag()`, `within 3.98 ± 10%`. No tool read documents `x dB ± y%`; pint refuses it by default.
 
 <a name="flatten-instances"></a>
 ### 3.5 Flatten: instances, nets, knobs

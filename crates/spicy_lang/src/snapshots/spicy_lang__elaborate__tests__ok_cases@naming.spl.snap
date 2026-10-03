@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 75
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/ok/naming.spl
 ---
@@ -9,9 +10,9 @@ root Top
   net sum  aliases a, b
   net x  aliases y, m
   net zzz  aliases c.aaa
-  Resistor r1 a→zzz b→p value=1000 Ω
-  Resistor r2 a→sum b→x value=1000 Ω
-  Resistor r3 a→sum b→g value=1000 Ω
-  Resistor r4 a→sum b→g value=1000 Ω
-  Resistor r5 a→x b→g value=1000 Ω
-  Resistor c.r a→zzz b→g value=1000 Ω
+  Resistor r1 a→zzz b→p value=1 kΩ
+  Resistor r2 a→sum b→x value=1 kΩ
+  Resistor r3 a→sum b→g value=1 kΩ
+  Resistor r4 a→sum b→g value=1 kΩ
+  Resistor r5 a→x b→g value=1 kΩ
+  Resistor c.r a→zzz b→g value=1 kΩ

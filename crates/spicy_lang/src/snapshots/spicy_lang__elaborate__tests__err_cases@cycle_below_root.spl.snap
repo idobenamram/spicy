@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/cycle_below_root.spl
 ---
@@ -10,7 +10,7 @@ root EnterB
   net g (ground)  aliases b.g
 root EnterC
   net g (ground)  aliases c.g
-  Resistor c.r a→g b→g value=1000 Ω
+  Resistor c.r a→g b→g value=1 kΩ
 
 --- errors ---
 E-recursion RecursivePlacement 811..812 "A" related 517..518

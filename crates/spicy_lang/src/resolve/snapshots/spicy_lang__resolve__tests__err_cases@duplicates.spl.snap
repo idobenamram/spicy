@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 719
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicates.spl
 ---
@@ -10,7 +10,7 @@ block A 6..7
   r = Resistor 70..71
     a → p
     b → n
-    value = 1000 Ω
+    value = 1 kΩ
 contract A
   setup = S
 setup S 204..205 for A

@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/isolated.spl
 ---
@@ -10,10 +10,10 @@ root Island
   net x
   net y
   net z
-  Resistor alone a→x b→y value=1000 Ω
-  Capacitor c a→y b→x value=0.000001 F
-  Resistor driven a→input b→g value=1000 Ω
-  Resistor r a→z b→z value=1000 Ω
+  Resistor alone a→x b→y value=1 kΩ
+  Capacitor c a→y b→x value=1 µF
+  Resistor driven a→input b→g value=1 kΩ
+  Resistor r a→z b→z value=1 kΩ
 
 --- errors ---
 W-isolated IsolatedNets 214..215 "x"

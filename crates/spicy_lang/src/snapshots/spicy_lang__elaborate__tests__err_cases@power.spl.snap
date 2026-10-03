@@ -1,24 +1,24 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/power.spl
 ---
 root PassedOn
   net gnd (ground)  aliases pass.gnd, pass.inner.gnd
   net rail  aliases pass.vcc, pass.inner.vcc
-  Resistor r a→rail b→gnd value=1000 Ω
-  Resistor pass.inner.r a→rail b→gnd value=1000 Ω
+  Resistor r a→rail b→gnd value=1 kΩ
+  Resistor pass.inner.r a→rail b→gnd value=1 kΩ
 root TwoSources
   net gnd (ground)  aliases reg.gnd
   net vcc  aliases reg.input, reg.out
-  Resistor reg.load a→vcc b→gnd value=1000 Ω
+  Resistor reg.load a→vcc b→gnd value=1 kΩ
   Resistor reg.r a→vcc b→vcc value=10 Ω
 root Unpowered
   net gnd (ground)  aliases load.gnd
   net rail  aliases load.vcc
-  Resistor r a→rail b→gnd value=1000 Ω
-  Resistor load.r a→rail b→gnd value=1000 Ω
+  Resistor r a→rail b→gnd value=1 kΩ
+  Resistor load.r a→rail b→gnd value=1 kΩ
 
 --- errors ---
 W-short ShortedPart 238..287 "let r = Resistor { a: input, b: out, value: 10 };"

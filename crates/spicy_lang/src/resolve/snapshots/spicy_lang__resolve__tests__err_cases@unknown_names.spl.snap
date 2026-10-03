@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/unknown_names.spl
 ---
@@ -11,7 +11,7 @@ block A 6..7
   r2 = Resistor 115..117
     a → vcc
     b → <unbound>
-    value = 1000 Ω
+    value = 1 kΩ
   r3 = <error> 168..170
   r4 = <error> 197..199
 

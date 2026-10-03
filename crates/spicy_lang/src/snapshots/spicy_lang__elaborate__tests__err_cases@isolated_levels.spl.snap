@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/isolated_levels.spl
 ---
@@ -8,7 +8,7 @@ root Top
   net g (ground)
   net n  aliases inner.p
   net inner.x
-  Resistor inner.r a→n b→inner.x value=1000 Ω
+  Resistor inner.r a→n b→inner.x value=1 kΩ
 
 --- errors ---
 W-isolated IsolatedNets 374..375 "n"

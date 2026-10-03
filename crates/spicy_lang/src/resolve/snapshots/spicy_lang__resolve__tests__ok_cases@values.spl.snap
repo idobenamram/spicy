@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 568
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/values.spl
 ---
@@ -10,27 +10,27 @@ block Values 6..12
   r1 = Resistor 58..60
     a → a
     b → b
-    value = 47000 Ω ± 1%
+    value = 47 kΩ ± 1%
   r2 = Resistor 108..110
     a → a
     b → b
-    value = 4700 Ω
+    value = 4.7 kΩ
   r3 = Resistor 154..156
     a → a
     b → b
-    value = 9400 Ω
+    value = 9.4 kΩ
   r4 = Resistor 203..205
     a → a
     b → b
-    value = 3000 Ω
+    value = 3 kΩ
   r5 = Resistor 251..253
     a → a
     b → b
-    value = 10000 Ω ± 50 Ω
+    value = 10 kΩ ± 50 Ω
   r6 = Resistor 304..306
     a → a
     b → b
-    value = 47000 Ω
+    value = 47 kΩ
   r7 = Resistor 350..352
     a → a
     b → b
@@ -38,12 +38,12 @@ block Values 6..12
   c1 = Electrolytic 398..400
     p → a
     n → b
-    value = 0.000001 F ± 20%
+    value = 1 µF ± 20%
     rating = 25 V
   c2 = Capacitor 472..474
     a → a
     b → b
-    value = 0.000000022 F ± 5%
+    value = 22 nF ± 5%
   q1 = Npn 523..525
     c → a
     b → b

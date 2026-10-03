@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 147
+assertion_line: 146
 expression: "dump_elaborate(\"ce_amp.spl\", src)"
 ---
 root CeAmp
@@ -16,12 +16,12 @@ root CeAmp
   Resistor r2 a→base b→gnd value=knob r2.value
   Resistor rc a→vcc b→output value=knob rc.value
   Resistor re a→emitter b→gnd value=knob re.value
-  knob c_in.value Statistical 0.000001 F ± 20%
+  knob c_in.value Statistical 1 µF ± 20%
   knob q1.beta Statistical 200 (100..=300)
-  knob r1.value Statistical 47000 Ω ± 1%
-  knob r2.value Statistical 10000 Ω ± 1%
-  knob rc.value Statistical 4700 Ω ± 1%
-  knob re.value Statistical 1000 Ω ± 1%
+  knob r1.value Statistical 47 kΩ ± 1%
+  knob r2.value Statistical 10 kΩ ± 1%
+  knob rc.value Statistical 4.7 kΩ ± 1%
+  knob re.value Statistical 1 kΩ ± 1%
   knob vcc.v Range 12 V ± 5%
   knob ambient Range 298.15 K (25 °C) (263.15 K..=333.15 K)
   setup Operating

@@ -52,10 +52,13 @@ impl Circuit<'_> {
     }
 }
 
-/// The block's own checks.
-pub(super) fn run(c: Circuit, errors: &mut Vec<FlattenError>) {
+/// The block's own checks. The proof of an error among what they found, if there is
+/// one; a warning (a shorted part) isn't one.
+pub(super) fn run(c: Circuit, errors: &mut Vec<FlattenError>) -> Option<Reported> {
+    let before = errors.len();
     super::power::check(c, errors);
     shorted_parts(c, errors);
+    Reported::among(&errors[before..])
 }
 
 /// The checks for simulating a root: its ground net, node 0 (E20), and the nets nothing

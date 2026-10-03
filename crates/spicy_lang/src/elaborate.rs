@@ -146,16 +146,23 @@ mod tests {
         insta::assert_snapshot!(dump_elaborate("ce_amp.spl", src));
     }
 
-    /// A spec is checkable only when its root, contract and default setup are sound and
-    /// it resolved itself (contracts_plan.md §0.4): no `setup = S;` leaves the root no
-    /// flat setup, a setup, a circuit or a contract with an error inside leaves it
-    /// broken, and a broken spec is left out on its own.
+    /// A spec is checkable only when its root, contract and default setup are sound, the
+    /// root's own checks found no error, and it resolved itself (contracts_plan.md
+    /// §0.4): no `setup = S;` leaves the root no flat setup, a setup, a circuit or a
+    /// contract with an error inside leaves it broken, and a broken spec is left out on
+    /// its own.
     #[test]
     fn only_sound_specs_are_checkable() {
         let head = "block A { vcc: Power<In>, gnd: Ground }\n\
                     circuit A { let r = Resistor { a: vcc, b: gnd, value: 1k }; }\n";
         let broken_head = "block A { vcc: Power<In>, gnd: Ground }\n\
                            circuit A { let r = Resistor { a: vcc, b: gnd, value: 1V }; }\n";
+        let unpowered = "block A { vcc: Power<In>, gnd: Ground }\n\
+                         circuit A { net x; let r = Resistor { a: vcc, b: gnd, value: 1k }; \
+                         let l = L { vcc: x, gnd: gnd }; }\n";
+        let shorted = "block A { vcc: Power<In>, gnd: Ground }\n\
+                       circuit A { let r = Resistor { a: vcc, b: gnd, value: 1k }; \
+                       let s = Resistor { a: vcc, b: vcc, value: 1k }; }\n";
         let setup = "setup S for A { vcc: Supply { v: 1V }, temp: 25°C }\n";
         let broken_setup = "setup S for A { vcc: Supply { v: 1A }, temp: 25°C }\n";
         let specs = "spec ok: dc(vcc.v) <= 2V; spec bad: dc(vcc.v) <= 2Hz;";
@@ -179,6 +186,22 @@ mod tests {
                 format!("{head}{setup}contract A {{ setup = S; {specs} spec; }}\n"),
                 true,
                 vec![],
+            ),
+            // The root's own checks find an error: `l`'s supply has no source.
+            (
+                format!(
+                    "{unpowered}{setup}contract A {{ setup = S; {specs} }}\n\
+                     block L {{ vcc: Power<In>, gnd: Ground }}\n\
+                     circuit L {{ let r = Resistor {{ a: vcc, b: gnd, value: 1k }}; }}\n"
+                ),
+                true,
+                vec![],
+            ),
+            // A warning from them doesn't block: `s` is shorted.
+            (
+                format!("{shorted}{setup}contract A {{ setup = S; {specs} }}\n"),
+                true,
+                vec!["ok"],
             ),
             // A lexer error in the contract: what was written may be missing from it.
             (

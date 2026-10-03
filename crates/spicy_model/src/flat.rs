@@ -96,6 +96,13 @@ pub struct FlatDesign {
     /// recursion. Then something written is missing from it, and it isn't checked or
     /// simulated as a whole (model.md E7).
     pub tainted: Option<Reported>,
+    /// The proof that its own checks (flatten's pass 9: a power input with no source)
+    /// found an error in it, not a warning. Then none of its specs is checkable: a
+    /// simulation of it would mean nothing (ngspice runs an unpowered circuit at 0 V,
+    /// so a spec could pass unchecked). Follows rustc's `has_errors` and Xyce's
+    /// `safeBarrier`, which count only errors. `None` too when it wasn't checked, being
+    /// `tainted`.
+    pub failed_checks: Option<Reported>,
 }
 
 impl FlatDesign {
@@ -349,12 +356,13 @@ impl<'d> Flat<'d> {
 
     /// The root's specs the engine can check, with their ids: those that resolved,
     /// when the root, its contract and its default setup are sound (contracts_plan.md
-    /// §0.4). A spec whose measure resolved reads only measures that did.
+    /// §0.4), and the root's own checks found no error. A spec whose measure resolved
+    /// reads only measures that did.
     pub fn checkable_specs(self) -> impl Iterator<Item = (SpecId, &'d Spec)> {
         let setup = self.data.setup.as_ref();
         let setup_sound =
             setup.is_some_and(|s| self.design.setups[s.setup.index()].tainted.is_none());
-        let sound = self.data.tainted.is_none() && setup_sound;
+        let sound = self.data.tainted.is_none() && self.data.failed_checks.is_none() && setup_sound;
         let contract = self.contract().filter(|c| sound && c.tainted.is_none());
         let specs = contract.map_or(&[][..], |c| &c.specs);
         let specs = specs
@@ -394,6 +402,7 @@ mod tests {
             root_nets: vec![],
             setup: None,
             tainted: None,
+            failed_checks: None,
         };
         let ancestors = |at| data.ancestors(at).collect::<Vec<_>>();
         assert_eq!(ancestors(id(2)), [id(2), id(1), id(0)]);

@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/power_levels.spl
 ---
@@ -10,9 +10,9 @@ root Board
   net five  aliases double.v5, double.reg.out, double.reg2.out
   net seven  aliases dual.o1, dual.o2, dual.reg1.out, dual.reg2.out
   net six  aliases one.v5, two.v5, one.reg.out, two.reg.out
-  Resistor r a→five b→gnd value=1000 Ω
-  Resistor r2 a→six b→gnd value=1000 Ω
-  Resistor r3 a→seven b→gnd value=1000 Ω
+  Resistor r a→five b→gnd value=1 kΩ
+  Resistor r2 a→six b→gnd value=1 kΩ
+  Resistor r3 a→seven b→gnd value=1 kΩ
   Resistor double.reg.r a→v12 b→five value=10 Ω
   Resistor double.reg2.r a→v12 b→five value=10 Ω
   Resistor dual.reg1.r a→v12 b→seven value=10 Ω

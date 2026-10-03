@@ -24,6 +24,9 @@ contract Amp {
     spec gain: gain within 4.6 ± 5%;
     spec output: dc(output.v) within 4.5V..=6.5V;
     spec level: h.at(1kHz).db() >= 12dB;
+    // A bare number takes the level's dB too (E12).
+    spec level_bare: h.at(1kHz).db() <= 20;
+    spec corner_bare: h.f_low(-3) <= 30Hz;
     spec bass: h.f_low(-3dB) <= 30Hz;
     spec treble: h.f_high(-3dB, ref: dc) >= 20kHz;
     // A bare number takes the measure's unit, as a part's value does (E12).

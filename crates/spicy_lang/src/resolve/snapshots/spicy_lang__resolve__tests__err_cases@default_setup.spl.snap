@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 760
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/default_setup.spl
 ---
@@ -13,7 +13,7 @@ block Amp 107..110
   r1 = Resistor 220..222
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   q1 = Npn 278..280
     c → output
     b → base

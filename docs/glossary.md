@@ -8,7 +8,7 @@ A doc name such as `model.md` means a file in `docs/ecad/`. A label after it, su
 ## The language
 
 - **block** (`spicy_model::design::Block`): the interface of a reusable piece of circuit: a name and its ports, for example `pub block CeAmp { vcc: Power<In>, … }`. You can place a block many times, and it has at most one circuit. In the code, one `Block` holds the header and the circuit. Defined in `language.md` §2–2.1.
-- **checkable spec** (`spicy_model::flat::Flat::checkable_specs`): a spec of a root that the engine can check. The root, its contract and its default setup have no errors, and the spec itself resolved. Defined in `contracts_plan.md` §0.4, §3.1.
+- **checkable spec** (`spicy_model::flat::Flat::checkable_specs`): a spec of a root that the engine can check. The root, its contract and its default setup have no errors, the root's own checks (flatten's pass 9) found no error, and the spec itself resolved. Defined in `contracts_plan.md` §0.4, §3.1.
 - **circuit** (the item): the implementation of a block: its nets and its parts, for example `circuit CeAmp { net base … }`. Defined in `language.md` §2, §4.1. Not the same as `spicy_circuit::Circuit`, the input of the simulator.
 - **const** (`spicy_model::design::Const`): a fixed value for the whole project, for example `const confidence: Confidence = sigma(3)`. Defined in `language.md` §2, §8.1.
 - **contract** (`spicy_model::design::Contract`): the promises of a block: its default setup, its measures, its specs and, later, its `rated` limits. The header, the setups and the contract of a block are together the text form of its I/O (input/output) page in the editor. Defined in `language.md` §8.1.

@@ -81,7 +81,8 @@ impl Resolver<'_, '_> {
             // ends are, so `25 ± 5%` in a temperature reports both, and fixing `25`
             // doesn't uncover the other.
             (BinOp::Tol, ..) => {
-                let (nominal, spread) = (self.scalar(lhs, expected), self.tolerance(rhs, expected));
+                let nominal = self.scalar(lhs, expected);
+                let spread = self.tolerance(rhs, expected, nominal.as_ref().ok());
                 Ok(Value {
                     nominal: nominal?,
                     spread: spread?,
@@ -159,7 +160,14 @@ impl Resolver<'_, '_> {
     /// `5V ± 0.1V`). A ratio without `%`, like `± (1V / 1V)`, is absolute too: `±` reads
     /// as relative only where it's written so. A temperature's spread is a difference
     /// (see [`temperature_difference`](Self::temperature_difference)).
-    fn tolerance(&mut self, e: &Expr, expected: FieldType) -> Result<Spread, Reported> {
+    /// `nominal` is the value's, if it typed, for the message of a percentage that
+    /// isn't allowed.
+    fn tolerance(
+        &mut self,
+        e: &Expr,
+        expected: FieldType,
+        nominal: Option<&Quantity>,
+    ) -> Result<Spread, Reported> {
         let t = self.term(e)?;
         let relative = t.q.is_ratio() && has_percent(e);
         // A plain-number const can't show whether it's relative (`TOL = 1%` is the
@@ -169,9 +177,14 @@ impl Resolver<'_, '_> {
             return Err(self.unsupported(what, e.span));
         }
         let size = match expected.kind {
-            // A percentage of a temperature depends on where its zero is (model.md E13).
-            QKind::TempPoint if relative => {
-                let kind = ResolveErrorKind::TemperatureSpread { percent: true };
+            // A percentage of a temperature or a level depends on where its zero is, so
+            // which one is meant isn't written (model.md E13).
+            QKind::TempPoint | QKind::Db if relative => {
+                let kind = ResolveErrorKind::PercentSpread {
+                    kind: expected.kind,
+                    nominal: nominal.map(|q| q.si),
+                    percent: t.q.si * 100.0,
+                };
                 return Err(self.report(kind, e.span));
             }
             QKind::TempPoint => self.temperature_difference(t, e)?,
@@ -197,7 +210,7 @@ impl Resolver<'_, '_> {
             return Ok(kelvin);
         }
         if t.q.kind == QKind::TempPoint {
-            let kind = ResolveErrorKind::TemperatureSpread { percent: false };
+            let kind = ResolveErrorKind::TemperatureSpread;
             return Err(self.report(kind, e.span));
         }
         // In K, as a plain quantity: a difference, not a point.
@@ -214,10 +227,16 @@ impl Resolver<'_, '_> {
     /// if it's unitless (model.md E12: `47k`, `2 * 4.7k` and `1k + 2k` are all ohms in a
     /// `value:`), then checked.
     fn typed(&mut self, t: Term, expected: FieldType, e: &Expr) -> Result<Quantity, Reported> {
-        let q = if t.unitless {
-            Quantity::new(t.q.si, expected.dim)
-        } else {
-            t.q
+        let q = match (t.unitless, expected.kind) {
+            // A temperature is written in °C (E13): `25` stays a plain number, reported
+            // below.
+            (true, QKind::TempPoint) => Quantity::new(t.q.si, expected.dim),
+            // Any other position gives it its unit (E12), a level's dB too (`.db() >= 12`).
+            (true, kind) => Quantity {
+                kind,
+                ..Quantity::new(t.q.si, expected.dim)
+            },
+            (false, _) => t.q,
         };
         if q.dim == expected.dim && q.kind == expected.kind {
             return Ok(q);
@@ -614,9 +633,9 @@ mod tests {
     /// `*` or `/` makes the other side a plain factor (model.md E12).
     #[test]
     fn unit_inference() {
-        assert_eq!(value("1V / 1mA"), "1000 Ω");
+        assert_eq!(value("1V / 1mA"), "1 kΩ");
         assert_eq!(value("2 * 1k / 4"), "500 Ω");
-        assert_eq!(value("1k - 3k"), "-2000 Ω");
+        assert_eq!(value("1k - 3k"), "-2 kΩ");
         assert_eq!(value("2 * 1V"), r#"UnitMismatch "2 * 1V""#);
         assert_eq!(value("1V / 1mA - 1V / 1mA"), "0 Ω");
         // `%` is a plain factor outside a tolerance.
@@ -626,9 +645,9 @@ mod tests {
 
     #[test]
     fn tolerances_relative_or_absolute() {
-        assert_eq!(value("1k ± 2"), "1000 Ω ± 2 Ω");
-        assert_eq!(value("1k ± 2Ω"), "1000 Ω ± 2 Ω");
-        assert_eq!(value("1k ± (1V / 1A)"), "1000 Ω ± 1 Ω");
+        assert_eq!(value("1k ± 2"), "1 kΩ ± 2 Ω");
+        assert_eq!(value("1k ± 2Ω"), "1 kΩ ± 2 Ω");
+        assert_eq!(value("1k ± (1V / 1A)"), "1 kΩ ± 1 Ω");
         assert_eq!(value("1k ± 1V"), r#"UnitMismatch "1V""#);
         assert_eq!(value("1k ± 3dB"), r#"UnitMismatch "3dB""#);
         // Relative only when written with `%`: units that cancel are a plain number, so
@@ -638,7 +657,7 @@ mod tests {
         assert_eq!(beta("200 ± (2 * 5%)"), "200 ± 10%");
         assert_eq!(beta("200 ± (1V / 1V)"), "200 ± 1");
         assert_eq!(value("1k ± (1V / 1V)"), r#"UnitMismatch "(1V / 1V)""#);
-        assert_eq!(value("1k ± 0"), "1000 Ω ± 0 Ω");
+        assert_eq!(value("1k ± 0"), "1 kΩ ± 0 Ω");
         assert_eq!(value("1k ± (1% - 2%)"), r#"NegativeTolerance "(1% - 2%)""#);
     }
 
@@ -650,7 +669,7 @@ mod tests {
         assert_eq!(beta("(50..=150) / -2"), "-50 (-75..=-25)");
         assert_eq!(value("0 * (1k ± 1%)"), "0 Ω ± 1%");
         assert_eq!(value("50% * (1k ± 10)"), "500 Ω ± 5 Ω");
-        assert_eq!(value("2 * 3 * (1k ± 1%)"), "6000 Ω ± 1%");
+        assert_eq!(value("2 * 3 * (1k ± 1%)"), "6 kΩ ± 1%");
         assert_eq!(value("2 * ((1k ± 1%) / 4)"), "500 Ω ± 1%");
         assert_eq!(
             value("(1k ± -1%) * 1V"),
@@ -761,7 +780,7 @@ mod tests {
             let value = resolved.design.envs[0].value.unwrap();
             assert_eq!(value.spread, Spread::Abs(kelvin), "{spread}");
         }
-        assert_eq!(temperature("25°C ± 5%"), r#"TemperatureSpread "5%""#);
+        assert_eq!(temperature("25°C ± 5%"), r#"PercentSpread "5%""#);
         assert_eq!(temperature("25°C ± T_LAB"), r#"TemperatureSpread "T_LAB""#);
         assert_eq!(
             temperature("25°C ± (2 * 5°C)"),
@@ -783,7 +802,7 @@ mod tests {
     fn a_fix_uncovers_no_error() {
         assert_eq!(
             temperature("25 ± 5%"),
-            r#"TemperaturePoint "25" fix "25°C"; TemperatureSpread "5%""#
+            r#"TemperaturePoint "25" fix "25°C"; PercentSpread "5%""#
         );
         assert_eq!(
             value("47K ± 1V"),

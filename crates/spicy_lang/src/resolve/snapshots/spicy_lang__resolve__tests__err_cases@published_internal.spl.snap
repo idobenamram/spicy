@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 760
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/published_internal.spl
 ---
@@ -13,15 +13,15 @@ block Amp 151..154
   r1 = Resistor 264..266
     a → vcc
     b → base
-    value = 47000 Ω
+    value = 47 kΩ
   r2 = Resistor 319..321
     a → base
     b → gnd
-    value = 10000 Ω
+    value = 10 kΩ
   rc = Resistor 374..376
     a → vcc
     b → output
-    value = 4700 Ω
+    value = 4.7 kΩ
   q1 = Npn 432..434
     c → output
     b → base
@@ -32,8 +32,8 @@ contract Amp
   let h: response = ac(output.v / input.v)
   spec base_bias: dc(base.v) within 2.1 V (1.9 V..=2.3 V)
   spec through_let: vb >= 1.5 V
-  spec base_gain: ac(base.v / input.v).at(1000 Hz).mag() <= 1
-  pub spec gain: h.at(1000 Hz).mag() >= 3
+  spec base_gain: ac(base.v / input.v).at(1 kHz).mag() <= 1
+  pub spec gain: h.at(1 kHz).mag() >= 3
 setup Operating 482..491 for Amp
   vcc: Supply v = 12 V
   input: Signal v = 0 V

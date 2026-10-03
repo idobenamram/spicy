@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 673
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/fixes.spl
 ---
@@ -12,7 +12,7 @@ block A 139..140
   n2 = Resistor 212..214
     a → vcc
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r1 = Resistor 325..327
     a → vcc
     b → gnd
@@ -28,11 +28,11 @@ block A 139..140
   r4 = Resistor 580..582
     a → <unbound>
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r5 = Resistor 690..692
     a → vcc
     b → <unbound>
-    value = 1000 Ω
+    value = 1 kΩ
   r6 = Resistor 804..806
     a → vcc
     b → gnd
@@ -40,15 +40,15 @@ block A 139..140
   r7 = Resistor 862..864
     a → <unbound>
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r8 = Resistor 916..918
     a → <unbound>
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r9 = Resistor 1039..1041
     a → vcc
     b → gnd
-    value = 1000 Ω
+    value = 1 kΩ
   r10 = Resistor 1103..1106
     a → vcc
     b → gnd

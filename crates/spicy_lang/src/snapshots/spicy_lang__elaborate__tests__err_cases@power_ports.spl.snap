@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/power_ports.spl
 ---
@@ -12,16 +12,16 @@ root Board
   net line  aliases plain.p, plain.load.vcc
   net rail  aliases pass.a, pass.b, pass.inner.vcc
   net seven  aliases dual.o1, dual.o2, dual.reg.out
-  Resistor dual.r a→seven b→gnd value=1000 Ω
+  Resistor dual.r a→seven b→gnd value=1 kΩ
   Resistor dual.reg.r a→v12 b→seven value=10 Ω
-  Resistor load.r a→eight b→gnd value=1000 Ω
-  Resistor pass.r a→rail b→gnd value=1000 Ω
-  Resistor pass.inner.r a→rail b→gnd value=1000 Ω
-  Resistor plain.load.r a→line b→gnd value=1000 Ω
+  Resistor load.r a→eight b→gnd value=1 kΩ
+  Resistor pass.r a→rail b→gnd value=1 kΩ
+  Resistor pass.inner.r a→rail b→gnd value=1 kΩ
+  Resistor plain.load.r a→line b→gnd value=1 kΩ
   Resistor r1.r a→v12 b→bus value=10 Ω
   Resistor r2.r a→v12 b→bus value=10 Ω
   Resistor r3.r a→v12 b→bus value=10 Ω
-  Resistor tied.r a→eight b→gnd value=1000 Ω
+  Resistor tied.r a→eight b→gnd value=1 kΩ
 
 --- errors ---
 E-power SeveralSources 1968..1977 "o2: seven" related 1957..1966

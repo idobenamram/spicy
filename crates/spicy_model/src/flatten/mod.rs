@@ -102,17 +102,16 @@ pub fn flatten(design: &Design, map: &DesignSourceMap) -> Flattened {
     // Pass 9, the block's own checks (E18 tier 2), on each root with nothing broken in
     // it: a placeholder has been reported, and checking around it would only report
     // it again. A problem inside a block counts every placement of the block, in every
-    // root checked.
-    let checked: Vec<&FlatDesign> = flat_roots.iter().filter(|d| d.tainted.is_none()).collect();
-    let placements = placements_per_block(design, checked.iter().copied());
-    for &data in &checked {
-        let flat = Flat { design, data };
+    // root checked, so the placements are counted first.
+    let checked = flat_roots.iter().filter(|root| root.tainted.is_none());
+    let placements = placements_per_block(design, checked);
+    for data in flat_roots.iter_mut().filter(|root| root.tainted.is_none()) {
         let circuit = Circuit {
-            flat,
+            flat: Flat { design, data },
             map,
             placements: &placements,
         };
-        checks::run(circuit, &mut errors);
+        data.failed_checks = checks::run(circuit, &mut errors);
     }
 
     // A problem inside a block is reported once, however many placements have it,
@@ -339,6 +338,8 @@ impl RootFlattener<'_> {
             root_nets,
             setup,
             tainted,
+            // Pass 9 sets it, once every root's placements are counted.
+            failed_checks: None,
         })
     }
 

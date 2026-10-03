@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 672
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/temperatures.spl
 ---
@@ -14,12 +14,13 @@ env g 526..527 = <invalid>
 env h 785..786 = <invalid>
 env i 817..818 = <invalid>
 env j 843..844 = <invalid>
+env k 963..964 = <invalid>
 const T_ROOM 162..168 = 298.15 K (25 °C)
 const d 302..303 = <invalid>
 
 --- errors ---
 E-unit TemperatureSpread 222..228 "T_ROOM"
-E-unit TemperatureSpread 261..263 "5%"
+E-unit PercentSpread 261..263 "5%"
 E-unit TemperaturePoint 287..289 "25" fix 287..289 "25°C"
 E-unit TemperaturePoint 292..294 "30" fix 292..294 "30°C"
 E-unit TemperaturePoint 319..323 "300K" fix 319..323 "26.85°C"
@@ -28,10 +29,11 @@ E-unit TemperaturePoint 357..364 "333.15K" fix 357..364 "60°C"
 E-unit NotArithmetic 501..520 "2 * (20°C..=30°C)"
 E-value NegativeTolerance 553..558 "-5°C"
 E-unit TemperaturePoint 803..805 "25" fix 803..805 "25°C"
-E-unit TemperatureSpread 809..811 "5%"
+E-unit PercentSpread 809..811 "5%"
 E-unit TemperaturePoint 835..837 "25" fix 835..837 "25°C"
 E-value EnvNeedsRange 835..837 "25"
 E-unit NotArithmetic 861..875 "2 * (25 ± 5K)"
+E-unit PercentSpread 991..994 "10%"
 
 --- rendered ---
 error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
@@ -40,13 +42,14 @@ error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
 4 | env a: Temperature in 25°C ± T_ROOM;
   |                              ^^^^^^ a temperature, which is a point
 
-error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
+error[E-unit]: a temperature's spread can't be a percentage
   --> temperatures.spl:5:30
   |
 5 | env b: Temperature in 25°C ± 5%;
   |                              ^^ a percentage
   |
-  = note: a percentage of a temperature depends on where its zero is
+  = note: 5% of 25 °C is 1.25 K, but 5% of 298.15 K is 14.9 K: which one is meant isn't written
+  = help: write the spread as a difference, `± 1.25K` or `± 14.9K`
 
 error[E-unit]: a temperature is written in `°C`
   --> temperatures.spl:6:23
@@ -108,13 +111,14 @@ error[E-unit]: a temperature is written in `°C`
    |
    = help: write `25°C`
 
-error[E-unit]: a temperature's spread is a difference, like `5K` or `5°C`
+error[E-unit]: a temperature's spread can't be a percentage
    --> temperatures.spl:16:28
    |
 16 | env h: Temperature in 25 ± 5%;
    |                            ^^ a percentage
    |
-   = note: a percentage of a temperature depends on where its zero is
+   = note: a percentage of a temperature depends on where its zero is, 0 °C or 0 K
+   = help: write the spread as a difference, like `± 5K`
 
 error[E-unit]: a temperature is written in `°C`
    --> temperatures.spl:17:23
@@ -137,3 +141,12 @@ error[E-unit]: temperatures can't be used in arithmetic here
    |
 18 | env j: Temperature in 2 * (25 ± 5K);
    |                       ^^^^^^^^^^^^^ not a plain quantity
+
+error[E-unit]: a temperature's spread can't be a percentage
+   --> temperatures.spl:21:31
+   |
+21 | env k: Temperature in -40°C ± 10%;
+   |                               ^^^ a percentage
+   |
+   = note: 10% of -40 °C is 4 K, but 10% of 233.15 K is 23.3 K: which one is meant isn't written
+   = help: write the spread as a difference, `± 4K` or `± 23.3K`

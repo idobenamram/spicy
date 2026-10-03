@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 568
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/scaled_spreads.spl
 ---
@@ -10,27 +10,27 @@ block Spreads 6..13
   r1 = Resistor 60..62
     a → a
     b → b
-    value = 2000 Ω ± 1%
+    value = 2 kΩ ± 1%
   r2 = Resistor 115..117
     a → a
     b → b
-    value = 5000 Ω ± 250 Ω
+    value = 5 kΩ ± 250 Ω
   r3 = Resistor 172..174
     a → a
     b → b
-    value = 47000 Ω ± 1%
+    value = 47 kΩ ± 1%
   r4 = Resistor 224..226
     a → a
     b → b
-    value = 47000 Ω ± 1%
+    value = 47 kΩ ± 1%
   r5 = Resistor 282..284
     a → a
     b → b
-    value = -2000 Ω ± 200 Ω
+    value = -2 kΩ ± 200 Ω
   c1 = Capacitor 339..341
     a → a
     b → b
-    value = 0.000001 F ± 10%
+    value = 1 µF ± 10%
     rating = 25 V
   q1 = Npn 408..410
     c → a

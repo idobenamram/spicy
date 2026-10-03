@@ -37,4 +37,9 @@ contract Amp {
     // uncovers nothing.
     spec broken_open: dc(outptu.v) within ..=6.5V;
     spec broken_one: dc(outptu.v) within 5V;
+    // A percentage of a level is ambiguous: of the dB number, or of the gain?
+    spec level_percent: h.at(1kHz).db() within 12dB ± 10%;
+    spec unity_percent: h.at(1kHz).db() within 0dB ± 10%;
+    // A nominal that doesn't type leaves only the general help.
+    spec wrong_percent: h.at(1kHz).db() within 12V ± 10%;
 }

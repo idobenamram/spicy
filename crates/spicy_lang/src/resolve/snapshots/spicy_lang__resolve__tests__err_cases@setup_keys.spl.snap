@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 667
+assertion_line: 781
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/setup_keys.spl
 ---
@@ -14,7 +14,7 @@ block Amp 137..140
 setup Keys 287..291 for Amp
   vcc: Supply v = 12 V
   input: Signal v = 0 V
-  output: Load c = 0.000000001 F
+  output: Load c = 1 nF
   temp = 298.15 K (25 °C)
 
 --- errors ---

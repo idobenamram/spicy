@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 568
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/merges.spl
 ---
@@ -11,5 +11,5 @@ block M 6..7
   r = Resistor 68..69
     a → x
     b → b
-    value = 1000 Ω
+    value = 1 kΩ
   merge x = [a, b]

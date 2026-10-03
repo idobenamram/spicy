@@ -1,17 +1,17 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
-assertion_line: 88
+assertion_line: 90
 expression: "dump_elaborate(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/flatten/err/ground.spl
 ---
 root NoGround
   net a
   net b
-  Resistor r a→a b→b value=1000 Ω
+  Resistor r a→a b→b value=1 kΩ
 root TwoGrounds
   net g1 (ground)
   net g2 (ground)
-  Resistor r a→g1 b→g2 value=1000 Ω
+  Resistor r a→g1 b→g2 value=1 kΩ
 
 --- errors ---
 E-ground NoGround 74..82 "NoGround"

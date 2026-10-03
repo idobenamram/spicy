@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 797
+assertion_line: 822
 expression: "dump_resolve(\"ce_amp.spl\", src)"
 ---
 block CeAmp 169..174
@@ -13,23 +13,23 @@ block CeAmp 169..174
   r1 = Resistor 347..349
     a → vcc
     b → base
-    value = 47000 Ω ± 1%
+    value = 47 kΩ ± 1%
   r2 = Resistor 408..410
     a → base
     b → gnd
-    value = 10000 Ω ± 1%
+    value = 10 kΩ ± 1%
   rc = Resistor 469..471
     a → vcc
     b → output
-    value = 4700 Ω ± 1%
+    value = 4.7 kΩ ± 1%
   re = Resistor 533..535
     a → emitter
     b → gnd
-    value = 1000 Ω ± 1%
+    value = 1 kΩ ± 1%
   c_in = Electrolytic 596..600
     p → base
     n → input
-    value = 0.000001 F ± 20%
+    value = 1 µF ± 20%
   q1 = Npn 666..668
     c → output
     b → base
@@ -39,7 +39,7 @@ contract CeAmp
   setup = Operating
   let h: response = ac(output.v / input.v)
   spec bias: dc(output.v) within 5.5 V (4.5 V..=6.5 V)
-  spec gain: h.at(1000 Hz).mag() within 4.6 ± 5%
+  spec gain: h.at(1 kHz).mag() within 4.6 ± 5%
   spec bass: h.f_low(-3 dB) <= 30 Hz
 env ambient 68..75 = 298.15 K (25 °C) (263.15 K..=333.15 K)
 setup Operating 813..822 for CeAmp

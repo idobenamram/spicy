@@ -734,7 +734,14 @@ impl<'src> MeasureResolver<'_, '_, 'src, '_> {
             let mut error = ResolveError::new(kind, level.span);
             if db > 0.0 {
                 let written = &self.r.src()[level.span.range()];
-                error = error.with_fix(level.span, format!("-{written}"));
+                // A computed level is negated whole: `-1 + 2` is 1 dB, `-(1 + 2)` is -3 dB.
+                let fix = match level.kind {
+                    ExprKind::Quantity(_) | ExprKind::Paren(_) | ExprKind::Path(_) => {
+                        format!("-{written}")
+                    }
+                    _ => format!("-({written})"),
+                };
+                error = error.with_fix(level.span, fix);
             }
             return Err(error.report(&mut self.r.errors));
         }

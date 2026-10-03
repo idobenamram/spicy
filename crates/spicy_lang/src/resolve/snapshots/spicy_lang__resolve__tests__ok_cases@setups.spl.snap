@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 745
+assertion_line: 766
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/ok/setups.spl
 ---
@@ -11,15 +11,15 @@ block Ldo 264..267
   port en: Analog<In> 317..319
 env ambient 159..166 = 298.15 K (25 °C) (263.15 K..=333.15 K)
 const T_LAB 205..210 = 298.15 K (25 °C)
-const R_MIN 239..244 = 10000 Ω
+const R_MIN 239..244 = 10 kΩ
 setup Operating 522..531 for Ldo
-  vin: Supply v = 4.9 V (4.3 V..=5.5 V) z = 0.25 Ω (0 Ω..=0.5 Ω)
-  vout: Load c = 0.00001 F (0 F..=0.00002 F) i = 0.0275 A (0.005 A..=0.05 A)
+  vin: Supply v = 4.9 V (4.3 V..=5.5 V) z = 250 mΩ (0 Ω..=500 mΩ)
+  vout: Load c = 10 µF (0 F..=20 µF) i = 27.5 mA (5 mA..=50 mA)
   en: Signal v = 3.3 V
   temp = ambient
 setup Bench 791..796 for Ldo
   vin: Supply v = 5 V ± 1%
-  vout: Load r = 10000 Ω
+  vout: Load r = 10 kΩ
   en: Signal v = 0 V
   temp = 298.15 K (25 °C)
 setup Hot 870..873 for Ldo

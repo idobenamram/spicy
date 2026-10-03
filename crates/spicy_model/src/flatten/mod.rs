@@ -6,10 +6,11 @@
 //! Read top to bottom in [`flatten`], one pass after another:
 //! - **Pass 1, recursion**, once per design: every placement cycle, reported once with
 //!   its chain (`recursion.rs`).
-//! - **Pass 2, the roots:** every block nothing places, each flattened on its own by
-//!   passes 3 to 7: **the instance tree**, **the joins**, **the nets** (merged and
-//!   named), **the devices and knobs**, **the ground nets**.
-//! - **Pass 8, the block's own checks** (`checks.rs`) on every root: power sources
+//! - **Pass 2, the roots:** every block nothing places that has a circuit, each
+//!   flattened on its own by passes 3 to 8: **the instance tree**, **the joins**, **the
+//!   nets** (merged and named), **the devices and knobs**, **the default setup**
+//!   (`setup.rs`), **the ground nets**.
+//! - **Pass 9, the block's own checks** (`checks.rs`) on every root: power sources
 //!   (`power.rs`), shorted parts.
 //! - Last, **each problem once:** the reports of one problem, from every placement and
 //!   every root, grouped into one (model.md E23).
@@ -27,6 +28,7 @@ mod checks;
 mod error;
 mod power;
 mod recursion;
+mod setup;
 
 use checks::Circuit;
 
@@ -41,16 +43,17 @@ use crate::design::{
 };
 use crate::flat::{
     Flat, FlatDesign, FlatDevice, FlatDeviceId, FlatField, FlatInstance, FlatInstanceId, FlatNet,
-    FlatNetId, Knob, KnobId, KnobKind, KnobSource, LocalInstance, LocalNet,
+    FlatNetId, Knob, KnobId, KnobSource, LocalInstance, LocalNet,
 };
 use crate::prelude::PartKind;
+use crate::units::Value;
 use spicy_errors::Reported;
 
 /// Everything flattening produces: each root's flat design, and every problem found.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Flattened {
-    /// One per block nothing places, in name order; a root with more placements than
-    /// [`MAX_PLACEMENTS`] is reported instead.
+    /// One per block nothing places that has a circuit, in name order; a root with more
+    /// placements than [`MAX_PLACEMENTS`] is reported instead.
     pub roots: Vec<FlatDesign>,
     pub errors: Vec<FlattenError>,
 }
@@ -75,7 +78,8 @@ pub fn flatten(design: &Design, map: &DesignSourceMap) -> Flattened {
     let broken = broken_blocks(design, &cut);
 
     // Pass 2, the roots: every block nothing places (docs/ecad/model.md#questions,
-    // question 2), each flattened on its own, in name order.
+    // question 2) that has a circuit (contracts_plan.md §3.1: one with none is an
+    // interface), each flattened on its own, in name order.
     let flattener = RootFlattener {
         design,
         map,
@@ -85,8 +89,9 @@ pub fn flatten(design: &Design, map: &DesignSourceMap) -> Flattened {
         cut: &cut,
         broken: &broken,
     };
-    let mut flat_roots = Vec::new();
-    for root in roots(&blocks, &children) {
+    let roots = roots(design, &blocks, &children);
+    let mut flat_roots = Vec::with_capacity(roots.len());
+    for root in roots {
         match flattener.flatten(root) {
             Ok(flat) => flat_roots.push(flat),
             // Too large to flatten: reported instead.
@@ -94,7 +99,7 @@ pub fn flatten(design: &Design, map: &DesignSourceMap) -> Flattened {
         }
     }
 
-    // Pass 8, the block's own checks (E18 tier 2), on each root with nothing broken in
+    // Pass 9, the block's own checks (E18 tier 2), on each root with nothing broken in
     // it: a placeholder has been reported, and checking around it would only report
     // it again. A problem inside a block counts every placement of the block, in every
     // root checked.
@@ -261,13 +266,20 @@ fn broken_blocks(
     broken
 }
 
-/// The blocks nothing places, in the order of `blocks` (name order).
-fn roots(blocks: &[BlockId], children: &[Vec<(InstanceId, BlockId)>]) -> Vec<BlockId> {
+/// The blocks nothing places that have a circuit, in the order of `blocks` (name
+/// order).
+fn roots(
+    design: &Design,
+    blocks: &[BlockId],
+    children: &[Vec<(InstanceId, BlockId)>],
+) -> Vec<BlockId> {
     let mut placed = vec![false; children.len()];
     for &(_, child) in children.iter().flatten() {
         placed[child.index()] = true;
     }
-    let roots = blocks.iter().filter(|b| !placed[b.index()]);
+    let roots = blocks
+        .iter()
+        .filter(|&&b| !placed[b.index()] && design.block(b).has_circuit);
     roots.copied().collect()
 }
 
@@ -299,23 +311,33 @@ impl RootFlattener<'_> {
         let entries = Entries::new(self.design, &instances);
         let mut joins = self.joins(&instances, &entries);
 
-        // Pass 5, the nets: one per group of joined entries, named by rank (E15).
+        // Pass 5, the nets: one per group of joined entries, named by rank (E15). The
+        // root's own nets are kept as flat nets too: where its probes and sources land.
         let (nets, net_of) = self.nets(&instances, &entries, &mut joins);
+        // The root's entries come first (`Entries::new`).
+        let root_nets = net_of[..self.design.block(root).nets.len()].to_vec();
 
         // Pass 6, the devices and the knobs.
-        let (devices, knobs) = self.devices(&instances, &entries, &net_of);
+        let (devices, mut knobs) = self.devices(&instances, &entries, &net_of);
 
-        // Pass 7, the ground nets: every net with a `Ground` port. Lowering makes the
+        // Pass 7, the default setup: its fields fixed or Range knobs, after the part
+        // knobs, so a setup renumbers no part knob.
+        let setup = self.setup(root, &mut knobs);
+
+        // Pass 8, the ground nets: every net with a `Ground` port. Lowering makes the
         // one ground net node 0 (E20), checked when the root is simulated.
         let grounds = checks::ground_nets(self.design, &instances, &nets);
+
         // Whether anything in it is broken: then it isn't checked as a whole (E7).
         let tainted = self.tainted(&instances);
         Ok(FlatDesign {
             instances,
             nets,
             devices,
-            knobs,
+            knobs: knobs.list,
             grounds,
+            root_nets,
+            setup,
             tainted,
         })
     }
@@ -468,17 +490,17 @@ impl RootFlattener<'_> {
     }
 
     /// Every leaf part, placement by placement in tree order and each one's parts in
-    /// name order, with its pins on flat nets and its fields fixed or knobs. A given
-    /// value with a spread becomes a knob of its own per placement (E16): two
-    /// placements are two physical parts.
+    /// name order, with its pins on flat nets and its fields fixed or knobs, and the
+    /// knobs. A given value with a spread becomes a knob of its own per placement
+    /// (E16): two placements are two physical parts.
     fn devices(
         &self,
         instances: &[FlatInstance],
         entries: &Entries,
         net_of: &[FlatNetId],
-    ) -> (Vec<FlatDevice>, Vec<Knob>) {
+    ) -> (Vec<FlatDevice>, Knobs) {
         let mut devices = Vec::new();
-        let mut knobs = Vec::new();
+        let mut knobs = Knobs::default();
         for (at, instance) in instances.iter().enumerate() {
             let at = FlatInstanceId::new(at);
             let block = self.design.block(instance.block);
@@ -494,22 +516,7 @@ impl RootFlattener<'_> {
                     .fields
                     .iter()
                     .enumerate()
-                    .map(|(field, value)| match *value {
-                        FieldValue::Unset => FlatField::Unset,
-                        FieldValue::Invalid(reported) => FlatField::Invalid(reported),
-                        // A spread of nothing isn't a knob (`± 0%`).
-                        FieldValue::Given(value) if !value.varies() => {
-                            FlatField::Exact(value.nominal)
-                        }
-                        FieldValue::Given(value) => {
-                            knobs.push(Knob {
-                                source: KnobSource::Field { device, field },
-                                value,
-                                kind: KnobKind::Statistical,
-                            });
-                            FlatField::Knob(KnobId::new(knobs.len() - 1))
-                        }
-                    })
+                    .map(|(field, &value)| knobs.field(value, KnobSource::Field { device, field }))
                     .collect();
                 devices.push(FlatDevice {
                     kind,
@@ -526,6 +533,34 @@ impl RootFlattener<'_> {
     /// isn't complete, and isn't checked as a whole.
     fn tainted(&self, instances: &[FlatInstance]) -> Option<Reported> {
         instances.iter().find_map(|i| self.broken[i.block.index()])
+    }
+}
+
+/// One root's knobs, in id order, as passes 6 and 7 add them: a field refers to its
+/// knob by id (E17). [`RootFlattener::flatten`] keeps the list as [`FlatDesign::knobs`].
+#[derive(Default)]
+struct Knobs {
+    list: Vec<Knob>,
+}
+
+impl Knobs {
+    /// `value` as a flat field: a knob from `source` if it's given and varies (E16).
+    fn field(&mut self, value: FieldValue, source: KnobSource) -> FlatField {
+        match value {
+            FieldValue::Unset => FlatField::Unset,
+            FieldValue::Invalid(reported) => FlatField::Invalid(reported),
+            FieldValue::Given(value) => self.given(value, source),
+        }
+    }
+
+    /// `value`, fixed, or a knob from `source` if it varies: a spread of nothing isn't a
+    /// knob (`± 0%`; ngspice's `agauss` returns the nominal for one).
+    fn given(&mut self, value: Value, source: KnobSource) -> FlatField {
+        if !value.varies() {
+            return FlatField::Exact(value.nominal);
+        }
+        self.list.push(Knob { source, value });
+        FlatField::Knob(KnobId::new(self.list.len() - 1))
     }
 }
 

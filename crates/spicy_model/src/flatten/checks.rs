@@ -1,7 +1,7 @@
 //! The checks that need the whole circuit (model.md E18 tier 2), on one root's flat
 //! nets, in two tiers, as Modelica checks every class on its own but balances only the
 //! model it simulates (spec §4.8):
-//! - **The block's own** ([`run`], pass 8 of flatten, on every root): power sources
+//! - **The block's own** ([`run`], pass 9 of flatten, on every root): power sources
 //!   (`power.rs`) and shorted parts, true wherever the block is used.
 //! - **For simulating it** ([`simulation`], when a root is simulated): exactly one
 //!   ground net, node 0 (E20), and the nets nothing connects to it. A library block,

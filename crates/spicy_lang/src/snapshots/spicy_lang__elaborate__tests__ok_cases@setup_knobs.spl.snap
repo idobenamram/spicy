@@ -1,0 +1,48 @@
+---
+source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 75
+expression: "dump_elaborate(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/flatten/ok/setup_knobs.spl
+---
+root Bench
+  net gnd (ground)
+  net input
+  net output
+  net vcc
+  Resistor r_bottom a→output b→gnd value=1000 Ω
+  Resistor r_in a→input b→gnd value=knob r_in.value
+  Resistor r_top a→vcc b→output value=1000 Ω
+  knob r_in.value Statistical 10000 Ω ± 1%
+  knob vcc.v Range 5 V ± 5%
+  knob vcc.z Range 0.25 Ω (0 Ω..=0.5 Ω)
+  knob output.r Range 10000 Ω ± 10%
+  knob temp Range 315.65 K (42.5 °C) (233.15 K..=398.15 K)
+  setup Wide
+    vcc: Supply v=knob vcc.v z=knob vcc.z
+    input: Signal v=0 V z=50 Ω
+    output: Load r=knob output.r c=0.00000000001 F
+    temp=knob temp
+  checkable specs: out
+root Left
+  net gnd (ground)
+  net vcc
+  Resistor r a→vcc b→gnd value=1000 Ω
+  knob ambient Range 298.15 K (25 °C) (263.15 K..=333.15 K)
+  setup Hot
+    vcc: Supply v=3.3 V
+    temp=knob ambient
+root Point
+  net gnd (ground)
+  net vcc
+  Resistor r a→vcc b→gnd value=1000 Ω
+  setup Room
+    vcc: Supply v=1 V
+    temp=298.15 K (25 °C)
+root Right
+  net gnd (ground)
+  net vcc
+  Resistor r a→vcc b→gnd value=2000 Ω
+  knob ambient Range 298.15 K (25 °C) (263.15 K..=333.15 K)
+  setup Hot
+    vcc: Supply v=3.3 V
+    temp=knob ambient

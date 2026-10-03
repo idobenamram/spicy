@@ -659,13 +659,14 @@ fn path_text(path: &Path) -> String {
 // --- Resolve -----------------------------------------------------------------------
 
 use spicy_model::design::{
-    Block, Design, DesignSourceMap, FieldValue, InstanceOf, Limit, Measure, PortId, Temp,
+    Block, Design, DesignSourceMap, FieldValue, InstanceOf, Limit, Measure, NetId, PortId, Temp,
 };
 use spicy_model::measure::{ArithOp, MExpr, MeasureType, Method, Reference};
 use spicy_model::units::QKind;
 
 use spicy_model::flat::{
-    Flat, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
+    Flat, FlatDesign, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
+    LocalNet,
 };
 use spicy_model::flatten::{FlattenError, FlattenProblem, check_simulation};
 use spicy_model::prelude::{Shape, SignalType};
@@ -765,26 +766,52 @@ pub fn dump_flat(flat: Flat) -> String {
             pins.join(" ")
         );
         for (field, value) in device.kind.fields().iter().zip(&device.fields) {
-            match value {
-                FlatField::Unset => {}
-                FlatField::Exact(q) => {
-                    let _ = write!(out, " {}={q}", field.name);
-                }
-                FlatField::Knob(k) => {
-                    let _ = write!(out, " {}=knob {}", field.name, flat.knob_path(*k));
-                }
-                FlatField::Invalid(_) => {
-                    let _ = write!(out, " {}=<invalid>", field.name);
-                }
-            }
+            flat_field(&mut out, flat, field.name, value);
         }
         out.push('\n');
     }
     for (id, knob) in flat.data.knobs.iter().enumerate() {
         let path = flat.knob_path(KnobId::new(id));
-        let _ = writeln!(out, "  knob {path} {:?} {}", knob.kind, knob.value);
+        let _ = writeln!(out, "  knob {path} {:?} {}", knob.source.kind(), knob.value);
+    }
+    if let Some(setup) = &flat.data.setup {
+        let root = flat.design.block(flat.data.root());
+        let _ = writeln!(
+            out,
+            "  setup {}",
+            flat.design.setups[setup.setup.index()].name
+        );
+        for (port, entry) in setup.ports.iter().enumerate() {
+            let Some(entry) = entry else { continue };
+            let name = root.port_name(PortId::new(port));
+            let _ = write!(out, "    {name}: {}", entry.shape.name());
+            for (field, value) in entry.shape.fields().iter().zip(&entry.fields) {
+                flat_field(&mut out, flat, field.name, value);
+            }
+            out.push('\n');
+        }
+        let _ = write!(out, "   ");
+        flat_field(&mut out, flat, "temp", &setup.temp);
+        out.push('\n');
+    }
+    let checkable: Vec<&str> = flat
+        .checkable_specs()
+        .map(|(_, s)| s.name.as_str())
+        .collect();
+    if !checkable.is_empty() {
+        let _ = writeln!(out, "  checkable specs: {}", checkable.join(", "));
     }
     out
+}
+
+/// ` name=value` for a flat field, a knob by its path; nothing for one not written.
+fn flat_field(out: &mut String, flat: Flat, name: &str, value: &FlatField) {
+    let _ = match value {
+        FlatField::Unset => Ok(()),
+        FlatField::Exact(q) => write!(out, " {name}={q}"),
+        FlatField::Knob(k) => write!(out, " {name}=knob {}", flat.knob_path(*k)),
+        FlatField::Invalid(_) => write!(out, " {name}=<invalid>"),
+    };
 }
 
 /// Every resolve error of `src`, for the coverage rule and the fix test.
@@ -1318,14 +1345,8 @@ fn check_flatten_invariants(src: &str, parsed: &crate::parser::Parsed) {
             let part = view.instance(device.origin);
             assert_eq!(part.of, InstanceOf::Part(device.kind));
         }
-        for (k, knob) in flat.knobs.iter().enumerate() {
-            let KnobSource::Field { device, field } = knob.source;
-            assert_eq!(
-                flat.devices[device.index()].fields[field],
-                FlatField::Knob(KnobId::new(k)),
-                "a knob's source is the field that refers to it"
-            );
-        }
+        check_knobs(flat);
+        check_root_nets_and_setup(view);
         if flat.tainted.is_some() {
             assert!(
                 upstream || recursion,
@@ -1389,21 +1410,123 @@ fn check_flatten_invariants(src: &str, parsed: &crate::parser::Parsed) {
             .map(|i| design.block(i.block).nets.len())
             .sum();
         assert_eq!(entries.len(), locals, "every local net is in a flat net");
-        let mut knobs = BTreeSet::new();
         for device in &flat.devices {
             for net in device.pins.iter().flatten() {
                 assert!(net.index() < flat.nets.len(), "pins point at existing nets");
             }
-            for field in &device.fields {
-                if let FlatField::Knob(k) = field {
-                    assert!(k.index() < flat.knobs.len(), "knobs exist");
-                    assert!(knobs.insert(*k), "each knob belongs to one field");
-                }
-            }
         }
-        assert_eq!(knobs.len(), flat.knobs.len(), "every knob is referenced");
     }
     for e in &elaborated.flattened.errors {
         check_problem(src, e);
+    }
+}
+
+/// Each knob is referred to by one field, the one its source names, and its kind
+/// follows that source (E16, E17).
+fn check_knobs(flat: &FlatDesign) {
+    // Every field that can refer to a knob: the devices', then the setup's.
+    let mut fields: Vec<FlatField> = Vec::new();
+    for device in &flat.devices {
+        fields.extend(&device.fields);
+    }
+    if let Some(setup) = &flat.setup {
+        for entry in setup.ports.iter().flatten() {
+            fields.extend(&entry.fields);
+        }
+        fields.push(setup.temp);
+    }
+    let mut referred = BTreeSet::new();
+    for field in fields {
+        if let FlatField::Knob(k) = field {
+            assert!(k.index() < flat.knobs.len(), "knobs exist");
+            assert!(referred.insert(k), "each knob belongs to one field");
+        }
+    }
+    // So every knob is referred to: by the field its source names.
+    let setup = flat.setup.as_ref();
+    for (k, knob) in flat.knobs.iter().enumerate() {
+        let refers = match knob.source {
+            KnobSource::Field { device, field } => flat.devices[device.index()].fields[field],
+            KnobSource::SetupField { port, field } => {
+                let entry = setup.and_then(|s| s.ports[port.index()].as_ref());
+                entry.expect("its port's shape").fields[field]
+            }
+            KnobSource::SetupTemp | KnobSource::Env(_) => setup.expect("its setup").temp,
+        };
+        let k = KnobId::new(k);
+        assert_eq!(refers, FlatField::Knob(k), "a knob's source refers to it");
+    }
+}
+
+/// The root's nets and its default setup: a flat net per root net, the one its local
+/// net is in; a setup entry per root port, each with its shape's fields; and every
+/// probe of a checkable spec on a flat net.
+fn check_root_nets_and_setup(view: Flat) {
+    let flat = view.data;
+    let root = view.block(FlatInstanceId::ROOT);
+    assert_eq!(
+        flat.root_nets.len(),
+        root.nets.len(),
+        "a flat net per root net"
+    );
+    for (net, &flat_net) in flat.root_nets.iter().enumerate() {
+        let local = LocalNet {
+            at: FlatInstanceId::ROOT,
+            net: NetId::new(net),
+        };
+        assert!(flat.nets[flat_net.index()].names.contains(&local));
+    }
+    if let Some(setup) = &flat.setup {
+        let written = &view.design.setups[setup.setup.index()];
+        assert_eq!(written.block, flat.root(), "the root's own setup");
+        assert_eq!(
+            setup.ports.len(),
+            root.ports.len(),
+            "an entry per root port"
+        );
+        for (entry, written) in setup.ports.iter().zip(&written.ports) {
+            assert_eq!(entry.is_some(), written.is_some());
+            if let Some(entry) = entry {
+                assert_eq!(entry.fields.len(), entry.shape.fields().len());
+            }
+        }
+    }
+    // Every probe of the contract is on a root net, and a sound measure or spec reads
+    // only sound measures, so a checkable spec reads no broken one. Each measure is
+    // checked once, not through each reader: 60 lets that each read the next twice are
+    // 2⁵⁹ paths.
+    let Some(contract) = view.contract() else {
+        return;
+    };
+    let measures = contract.measures.iter();
+    let measures = measures.filter_map(|m| m.value.as_ref().ok().map(|(expr, _)| expr));
+    let specs = contract
+        .specs
+        .iter()
+        .filter_map(|s| s.measure.as_ref().ok());
+    for expr in measures.chain(specs) {
+        for leaf in leaves(expr) {
+            match leaf {
+                MExpr::Voltage(net) | MExpr::Ac { out: net, .. } => {
+                    let on = flat.root_net(*net);
+                    assert!(on.index() < flat.nets.len(), "a probe is on a flat net");
+                }
+                MExpr::Measure(id) => assert!(
+                    contract.measures[id.index()].value.is_ok(),
+                    "a sound measure reads only sound ones"
+                ),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// The probes and the measures `expr` reads itself, not through the measures it reads.
+fn leaves(expr: &MExpr) -> Vec<&MExpr> {
+    match expr {
+        MExpr::Voltage(_) | MExpr::Ac { .. } | MExpr::Measure(_) => vec![expr],
+        MExpr::Const(_) => vec![],
+        MExpr::Dc(of) | MExpr::Method { of, .. } | MExpr::Neg(of) => leaves(of),
+        MExpr::Binary { lhs, rhs, .. } => [leaves(lhs), leaves(rhs)].concat(),
     }
 }

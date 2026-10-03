@@ -1,7 +1,9 @@
 //! Inputs for flatten's scaling pairs, one shape each: a deep hierarchy ([`deep`]), one
-//! wide circuit ([`wide_circuit`]), and a problem in every part of a placed block
-//! ([`shorted`]). The fourth pair, many roots, flattens [`crate::typical::library`].
-//! The tests also check the two typical inputs as flatten reads them.
+//! wide circuit ([`wide_circuit`]), a problem in every part of a placed block
+//! ([`shorted`]), and a root whose default setup has many ports
+//! ([`wide_default_setup`]). The fifth pair, many roots, flattens
+//! [`crate::typical::library`]. The tests also check the two typical inputs as flatten
+//! reads them.
 
 use std::fmt::Write;
 
@@ -117,12 +119,46 @@ pub fn shorted(n: usize) -> String {
     src
 }
 
+/// A root `W` of `n` supply inputs and a ground, with no parts, whose contract's
+/// default setup gives each input a voltage with a spread: flatten's pass 8 makes a
+/// flat setup of `n + 1` ports and `n` Range knobs, and the other passes see one
+/// placement on `n + 1` nets. `wide_default_setup(2)`:
+///
+/// ```text
+/// block W { p00000: Power<In>, p00001: Power<In>, gnd: Ground }
+///
+/// circuit W {}
+///
+/// setup S for W {
+///     p00000: Supply { v: 1V ± 5% },
+///     p00001: Supply { v: 1V ± 5% },
+///     temp: 25°C,
+/// }
+///
+/// contract W {
+///     setup = S;
+/// }
+/// ```
+pub fn wide_default_setup(n: usize) -> String {
+    let mut src = String::from("block W { ");
+    for i in 0..n {
+        write!(src, "p{i:05}: Power<In>, ").unwrap();
+    }
+    src.push_str("gnd: Ground }\n\ncircuit W {}\n\nsetup S for W {\n");
+    for i in 0..n {
+        writeln!(src, "    p{i:05}: Supply {{ v: 1V ± 5% }},").unwrap();
+    }
+    src.push_str("    temp: 25°C,\n}\n\ncontract W {\n    setup = S;\n}\n");
+    src
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Problems;
     use spicy_lang::elaborate::elaborate;
     use spicy_lang::parser::parse;
+    use spicy_model::flat::KnobKind;
 
     /// Each root's placements, devices and nets: the size of what flatten builds.
     fn flat_sizes(src: &str) -> Vec<(usize, usize, usize)> {
@@ -161,5 +197,21 @@ mod tests {
             assert_eq!((in_block.found, in_block.placements), (2, 2));
         }
         assert_eq!(flat_sizes(&src), [(3, 12, 3)]);
+    }
+
+    /// One placement on `n + 1` nets, no parts, and a flat setup with a shape on each
+    /// input (none on `gnd`) and a Range knob for each input's voltage.
+    #[test]
+    fn a_wide_default_setup_is_clean_with_a_knob_per_input() {
+        let src = wide_default_setup(4);
+        assert_eq!(Problems::of(&src), Problems::default(), "{src}");
+        assert_eq!(flat_sizes(&src), [(1, 0, 5)]);
+        let elaborated = elaborate(&parse(&src));
+        let root = &elaborated.flattened.roots[0];
+        let setup = root.setup.as_ref().expect("a flat default setup");
+        let shaped: Vec<bool> = setup.ports.iter().map(Option::is_some).collect();
+        assert_eq!(shaped, [true, true, true, true, false]);
+        let kinds: Vec<KnobKind> = root.knobs.iter().map(|knob| knob.source.kind()).collect();
+        assert_eq!(kinds, [KnobKind::Range; 4]);
     }
 }

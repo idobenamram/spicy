@@ -13,8 +13,11 @@ use std::fmt;
 
 use spicy_index::id;
 
-use crate::design::{Block, BlockId, Design, Instance, InstanceId, NetId};
-use crate::prelude::PartKind;
+use crate::design::{
+    Block, BlockId, Contract, Design, EnvId, Instance, InstanceId, NetId, PortId, SetupId, Spec,
+    SpecId,
+};
+use crate::prelude::{PartKind, Shape};
 use crate::units::{Quantity, Value};
 use spicy_errors::Reported;
 
@@ -73,13 +76,21 @@ pub struct FlatDesign {
     /// order.
     pub devices: Vec<FlatDevice>,
     /// Every value that varies, one per placed field with a spread (E16), in the order
-    /// of the devices.
+    /// of the devices; then the default setup's (contracts_plan.md §2.3), so a setup
+    /// renumbers no part knob.
     pub knobs: Vec<Knob>,
     /// The nets with a `Ground` port, in net order. Lowering makes the one ground net
     /// node 0 (E20); that there's exactly one is checked when the root is simulated
     /// ([`check_simulation`](crate::flatten::check_simulation)), since a library block
     /// needn't be a whole circuit.
     pub grounds: Vec<FlatNetId>,
+    /// Each of the root's nets, by its own `NetId`, as a flat net: where a probe
+    /// (`output.v`) or a setup's source lands.
+    pub root_nets: Vec<FlatNetId>,
+    /// The root's default setup, flattened. `None` when the root has no contract, or its
+    /// `setup = S;` didn't resolve: then nothing of the setup is simulated, and none of
+    /// its specs is checkable (contracts_plan.md §3.1).
+    pub setup: Option<FlatSetup>,
     /// The proof that something in it is broken, if anything is (rustc's
     /// `tainted_by_errors`): a block in it with an error inside, or a placement cut for
     /// recursion. Then something written is missing from it, and it isn't checked or
@@ -91,6 +102,11 @@ impl FlatDesign {
     /// The block this design is the flattening of: the root placement's.
     pub fn root(&self) -> BlockId {
         self.instances[FlatInstanceId::ROOT.index()].block
+    }
+
+    /// The flat net that the root's net `net` is in.
+    pub fn root_net(&self, net: NetId) -> FlatNetId {
+        self.root_nets[net.index()]
     }
 
     /// The placement that placed `at`. `None` for the root.
@@ -167,13 +183,35 @@ pub enum FlatField {
     Invalid(Reported),
 }
 
+/// The root's default setup with each field fixed or a knob, as a device's fields are
+/// (E17), built by flatten's setup pass. Lowering turns each port's shape into the
+/// deck's sources and loads (contracts_plan.md §2.8).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatSetup {
+    /// The setup it flattens: its name, its spans, and whether it's broken
+    /// ([`Setup::tainted`](crate::design::Setup::tainted)).
+    pub setup: SetupId,
+    /// What's on each of the root's ports, by `PortId`, as in the setup: `None` for a
+    /// port that takes nothing.
+    pub ports: Vec<Option<FlatPortSetup>>,
+    pub temp: FlatField,
+}
+
+/// One root port's shape, `vcc: Supply { v: 12V ± 5% }`, with each field fixed or a
+/// knob.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatPortSetup {
+    pub shape: Shape,
+    /// Each field, in the shape's field order.
+    pub fields: Vec<FlatField>,
+}
+
 /// A varying value: `left.r1.value`, `47 kΩ ± 1%`. Its path, its identity, is built
 /// from where it comes from ([`Flat::knob_path`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Knob {
     pub source: KnobSource,
     pub value: Value,
-    pub kind: KnobKind,
 }
 
 /// Where a knob comes from.
@@ -182,6 +220,28 @@ pub enum KnobSource {
     /// A device's field with a spread: `left.r1.value`. `field` is its index in the part
     /// kind's fields.
     Field { device: FlatDeviceId, field: usize },
+    /// A field of the root's default setup with a spread: `vcc.v`. `field` is its index
+    /// in its port's shape's fields.
+    SetupField { port: PortId, field: usize },
+    /// The default setup's own temperature range: `temp: -40°C..=125°C`.
+    SetupTemp,
+    /// The env the default setup's `temp` names: `ambient`. One per root, however many
+    /// of its setups read it.
+    Env(EnvId),
+}
+
+impl KnobSource {
+    /// How the engine treats the knob, which follows where it comes from, not how its
+    /// spread is written: a part's spread is statistical, a setup's or an env's range a
+    /// range.
+    pub fn kind(self) -> KnobKind {
+        match self {
+            KnobSource::Field { .. } => KnobKind::Statistical,
+            KnobSource::SetupField { .. } | KnobSource::SetupTemp | KnobSource::Env(_) => {
+                KnobKind::Range
+            }
+        }
+    }
 }
 
 /// How the engine treats a knob (docs/ecad/engine.md#knob-model). Decided by where the
@@ -193,7 +253,7 @@ pub enum KnobKind {
     /// A part's spread: a random variation across the parts built.
     Statistical,
     /// An operating condition the design must meet everywhere in (a setup's range, an
-    /// `env` such as the ambient temperature). From setups, M1d-5.
+    /// `env` such as the ambient temperature).
     Range,
 }
 
@@ -259,14 +319,49 @@ impl<'d> Flat<'d> {
         self.path(origin.at).child(&self.instance(origin).name)
     }
 
-    /// A knob's path, its identity: `left.r1.value`.
+    /// A knob's path, its identity: `left.r1.value`; a setup's as its field is written,
+    /// `vcc.v`, `temp`, or the env's name, `ambient` (contracts_plan.md §2.3). A root's
+    /// port can't share a name with its `let`s, so these never collide.
     pub fn knob_path(self, knob: KnobId) -> HierPath {
         match self.data.knobs[knob.index()].source {
             KnobSource::Field { device, field } => {
                 let kind = self.data.devices[device.index()].kind;
                 self.device_path(device).child(kind.fields()[field].name)
             }
+            KnobSource::SetupField { port, field } => {
+                let setup = self.data.setup.as_ref();
+                let entry = setup.and_then(|s| s.ports[port.index()].as_ref());
+                let shape = entry.expect("a setup knob's port has a shape").shape;
+                let port = self.block(FlatInstanceId::ROOT).port_name(port);
+                HierPath::default()
+                    .child(port)
+                    .child(shape.fields()[field].name)
+            }
+            KnobSource::SetupTemp => HierPath::default().child("temp"),
+            KnobSource::Env(env) => HierPath::default().child(&self.design.envs[env.index()].name),
         }
+    }
+
+    /// The root's contract, if it has one.
+    pub fn contract(self) -> Option<&'d Contract> {
+        self.design.contracts[self.data.root().index()].as_ref()
+    }
+
+    /// The root's specs the engine can check, with their ids: those that resolved,
+    /// when the root, its contract and its default setup are sound (contracts_plan.md
+    /// §0.4). A spec whose measure resolved reads only measures that did.
+    pub fn checkable_specs(self) -> impl Iterator<Item = (SpecId, &'d Spec)> {
+        let setup = self.data.setup.as_ref();
+        let setup_sound =
+            setup.is_some_and(|s| self.design.setups[s.setup.index()].tainted.is_none());
+        let sound = self.data.tainted.is_none() && setup_sound;
+        let contract = self.contract().filter(|c| sound && c.tainted.is_none());
+        let specs = contract.map_or(&[][..], |c| &c.specs);
+        let specs = specs
+            .iter()
+            .enumerate()
+            .map(|(i, spec)| (SpecId::new(i), spec));
+        specs.filter(|(_, spec)| spec.measure.is_ok() && spec.limit.is_ok())
     }
 }
 
@@ -296,6 +391,8 @@ mod tests {
             devices: vec![],
             knobs: vec![],
             grounds: vec![],
+            root_nets: vec![],
+            setup: None,
             tainted: None,
         };
         let ancestors = |at| data.ancestors(at).collect::<Vec<_>>();

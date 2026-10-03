@@ -1,0 +1,66 @@
+// A root's default setup, flattened (contracts_plan.md step 5): a field with a spread
+// is a Range knob after the part knobs, a point stays fixed, and an unwritten field
+// stays unset.
+env ambient: Temperature in -10°C..=60°C;
+
+block Bench { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Bench {
+    let r_in = Resistor { a: input, b: gnd, value: 10k ± 1% };
+    let r_top = Resistor { a: vcc, b: output, value: 1k };
+    let r_bottom = Resistor { a: output, b: gnd, value: 1k };
+}
+
+// A source's `z`, a load's `r` and `c`, and the setup's own temperature range.
+setup Wide for Bench {
+    vcc: Supply { v: 5V ± 5%, z: ..=0.5Ω },
+    input: Signal { v: 0V, z: 50Ω },
+    output: Load { r: 10k ± 10%, c: 10pF },
+    temp: -40°C..=125°C,
+}
+
+contract Bench {
+    setup = Wide;
+    spec out: dc(output.v) within 2V..=3V;
+}
+
+// Two roots that read one env: each has its own `ambient` knob.
+block Left { vcc: Power<In>, gnd: Ground }
+
+circuit Left {
+    let r = Resistor { a: vcc, b: gnd, value: 1k };
+}
+
+setup Hot for Left { vcc: Supply { v: 3.3V }, temp: ambient }
+
+contract Left {
+    setup = Hot;
+}
+
+block Right { vcc: Power<In>, gnd: Ground }
+
+circuit Right {
+    let r = Resistor { a: vcc, b: gnd, value: 2k };
+}
+
+setup Hot for Right { vcc: Supply { v: 3.3V }, temp: ambient }
+
+contract Right {
+    setup = Hot;
+}
+
+// A point temperature is fixed: no knob.
+block Point { vcc: Power<In>, gnd: Ground }
+
+circuit Point {
+    let r = Resistor { a: vcc, b: gnd, value: 1k };
+}
+
+setup Room for Point { vcc: Supply { v: 1V }, temp: 25°C }
+
+contract Point {
+    setup = Room;
+}
+
+// A block with no circuit is an interface, not a root: nothing flattens it.
+block Interface { a: Pin }

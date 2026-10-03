@@ -139,9 +139,9 @@ FlatDesign {
     knobs: vec![
         /* k0..k5: c_in.value, q1.beta, r1.value, r2.value, rc.value, re.value, as today */
         Knob { source: KnobSource::SetupField { port: PortId(0), field: 0 },  // k6  vcc.v
-               value: 12 V ± 5%, kind: KnobKind::Range },
+               value: 12 V ± 5% },                                    // kind(): Range
         Knob { source: KnobSource::Env(EnvId(0)),                             // k7  ambient
-               value: 298.15 K (263.15 K..=333.15 K), kind: KnobKind::Range },
+               value: 298.15 K (263.15 K..=333.15 K) },               // kind(): Range
     ],
     // The root's nets, by the root's own NetId (vcc, gnd, input, output, base, emitter):
     // where a probe (`output.v`) or a source lands.
@@ -155,7 +155,6 @@ FlatDesign {
             Some(FlatPortSetup { shape: Shape::Load,   fields: vec![Unset, Unset, Unset] }),
         ],
         temp: FlatField::Knob(k7),
-        tainted: None,
     }),
     /* instances, nets, devices, grounds, tainted: as today */
 }
@@ -445,6 +444,13 @@ model.md §5's table, in id order:
     - every probe of a checkable spec maps to a net;
   - the shuffle test (`order_does_not_matter`) already shuffles contract statements, and the flat dump now includes the setup.
 - **Done when:** roadmap M1d's "done when" holds: `ce_amp.spl` elaborates to exactly the 8 knobs and 3 specs of model.md §5.
+- **Outcome (2026-10-03, awaiting review):** done when holds (`elaborate::tests::ce_amp`). Built as planned, with these changes, each with a test or case file:
+  - The setup is pass 7, right after the devices (both add knobs), and the ground nets pass 8; the checks are pass 9. `root_nets` comes with pass 5, whose net table it slices.
+  - A knob's kind is `KnobSource::kind()`, decided by where it comes from, not a stored field: a part knob with a Range kind can't be built. `FlatSetup` keeps no copy of the setup's taint: `checkable_specs` reads it in the `Design`, as it reads the contract's.
+  - A lexer error inside a contract taints it, as it taints a block or a setup (a step 4 gap); a resolve error still breaks only its own measure or spec.
+  - `temp: <env>` checks the env's unit: an env of volts there was a silent voltage temperature (a step 2 gap, `resolve/err/setup_temp.spl`).
+  - The fuzz invariants check each measure once and assert that a sound measure or spec reads only sound measures, so a checkable spec reads no broken one.
+  - Speed (instructions, against `83ca351`): `flatten_design.typical` −2.6% (code layout, and the knob builder returned by pass 6); `many_roots` +8% (about 1,600 instructions per root with a contract: its setup's ports and knobs); resolve +0.1%. The new pair `wide_default_setup` (a root whose setup has many ports) grows 4.3×, from the nets' sort by name, which is n log n already.
 
 ### Step 6: the design notes
 
@@ -459,8 +465,11 @@ model.md §5's table, in id order:
 - **`syntax_v5_plan.md` §3:** mark each open point settled or parked (§3 here).
 - **`engine_types.md` and `engine_plan.md`:**
   - `KnobTable` → `FlatDesign.knobs`;
+  - `FlatContract` and the v0.1 "default bench" (engine_plan §1.3) → `Flat::checkable_specs`, `FlatDesign.setup` and `FlatDesign::root_net`;
   - `temp` → `ambient`;
-  - the knob order (§4).
+  - the knob order (§4): the adapter keeps the `FlatDesign`'s order, so knob i is the same knob in every crate (step 5 review).
+- **`model.md` §9:** flatten's nine passes (the setup is pass 7), and that Range knobs now come from setups; E16's citations for setup and env knobs (ngspice-42 `.temp` and `agauss`, Xyce `-local_variation` and `categorizeParams`, read in the step 5 review).
+- **`references.md`:** rows for slang, Verilator and Yosys before a doc cites them (owned by the docs session).
 
 ---
 
@@ -905,7 +914,7 @@ The exporter (M1e lowering, then `spicy_netlist::writer`) turns one root and its
 A. **The flat setup, as shapes, plus the root's nets.** The specs stay in the `Design`.
 ```rust
 pub struct FlatDesign { /* … */ pub root_nets: Vec<FlatNetId>, pub setup: Option<FlatSetup> }
-pub struct FlatSetup { pub setup: SetupId, pub ports: Vec<Option<FlatPortSetup>>, pub temp: FlatField, pub tainted: Option<Reported> }
+pub struct FlatSetup { pub setup: SetupId, pub ports: Vec<Option<FlatPortSetup>>, pub temp: FlatField }  // broken: `design.setups[setup].tainted`
 pub struct FlatPortSetup { pub shape: Shape, pub fields: Vec<FlatField> }
 // lowering (M1e), for each root port with a shape:
 let net = flat.data.root_nets[root.port_net(port).index()];

@@ -692,16 +692,25 @@ impl<'p, 'src> Resolver<'p, 'src> {
         temp
     }
 
-    /// What `temp: e` holds: the env `e` names, or else `e` typed as a temperature.
+    /// What `temp: e` holds: the env `e` names, if it's a temperature, or else `e` typed
+    /// as one.
     fn temp_value(&mut self, e: &Expr, envs: &[Env]) -> Result<Temp, Reported> {
+        let ty = FieldType::temperature();
         if let ExprKind::Path(path) = &unparen(e).kind
             && let Some(FileValue::Env(id)) = self.values.get(self.path_text(path))
         {
             // A broken env was reported at its definition: its proof is the setup's.
-            return envs[id.index()].value.map(|_| Temp::Env(id));
+            let found = envs[id.index()].value?.nominal;
+            if (found.dim, found.kind) != (ty.dim, ty.kind) {
+                let kind = ResolveErrorKind::UnitMismatch {
+                    expected: ty,
+                    found,
+                };
+                return Err(self.report(kind, e.span));
+            }
+            return Ok(Temp::Env(id));
         }
-        self.setup_value(e, FieldType::temperature(), "temp")
-            .map(Temp::Value)
+        self.setup_value(e, ty, "temp").map(Temp::Value)
     }
 }
 

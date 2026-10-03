@@ -1,0 +1,23 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 772
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/setup_temp.spl
+---
+block Amp 107..110
+  port vcc: Power<In> 113..116
+  port gnd: Ground 129..132
+env rail 75..79 = 12 V ± 5%
+setup Operating 166..175 for Amp
+  vcc: Supply v = 12 V
+  temp = <invalid>
+
+--- errors ---
+E-unit UnitMismatch 216..220 "rail"
+
+--- rendered ---
+error[E-unit]: expected a temperature (in `°C`), found `V` (a voltage)
+  --> setup_temp.spl:8:57
+  |
+8 | setup Operating for Amp { vcc: Supply { v: 12V }, temp: rail }
+  |                                                         ^^^^ this is `V` (a voltage)

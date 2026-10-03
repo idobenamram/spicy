@@ -210,6 +210,15 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         let contract = contract.expect("a block with a second contract has a first");
         contract.tainted.get_or_insert(reported);
     }
+    // A contract with a lexer error in it may miss what was written, as a block may (its
+    // parse errors taint it already). A resolve error breaks only its own measure or
+    // spec, which carries the proof.
+    let lexed = ErrorStarts::default().with(&parsed.lex_errors);
+    for (contract, written) in design.contracts.iter_mut().zip(&contracts) {
+        if let (Some(contract), Some((_, item))) = (contract, written) {
+            contract.tainted = contract.tainted.or_else(|| lexed.inside(item.span));
+        }
+    }
     // The same for a setup: one with an error in it, or the first of two of one name for
     // one block.
     for s in &mut setups.resolved {

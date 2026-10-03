@@ -119,10 +119,10 @@ mod tests {
         assert_eq!(kinds, [true, true]);
     }
 
-    /// The typical pair (`flatten_design`'s two inputs, `resolve_file`'s too) has the same blocks, and differs
-    /// only in the env, setup and contract of each copy. Flatten reads only the blocks
-    /// today, so it does the same work on both; once it flattens the default setup
-    /// (contracts plan step 5), the difference is that cost.
+    /// The typical pair (`flatten_design`'s two inputs, `resolve_file`'s too) has the
+    /// same blocks, and differs only in the env, setup and contract of each copy.
+    /// Flatten reads a setup only on a root, and the board's root has none (the copies
+    /// are placed), so it does the same work on both.
     #[test]
     fn the_typical_pair_differs_only_in_env_setup_and_contract() {
         let with = resolve(&parse(&board(3, Contracts::With))).design;

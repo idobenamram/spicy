@@ -1,5 +1,6 @@
 ---
 source: crates/spicy_lang/src/elaborate.rs
+assertion_line: 147
 expression: "dump_elaborate(\"ce_amp.spl\", src)"
 ---
 root CeAmp
@@ -21,3 +22,11 @@ root CeAmp
   knob r2.value Statistical 10000 Ω ± 1%
   knob rc.value Statistical 4700 Ω ± 1%
   knob re.value Statistical 1000 Ω ± 1%
+  knob vcc.v Range 12 V ± 5%
+  knob ambient Range 298.15 K (25 °C) (263.15 K..=333.15 K)
+  setup Operating
+    vcc: Supply v=knob vcc.v
+    input: Signal v=0 V
+    output: Load
+    temp=knob ambient
+  checkable specs: bias, gain, bass

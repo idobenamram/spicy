@@ -1,0 +1,8 @@
+// A setup's `temp` is a temperature: an env it names must be one too.
+env rail: Volt in 12V ± 5%;
+
+block Amp { vcc: Power<In>, gnd: Ground }
+
+circuit Amp {}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, temp: rail }

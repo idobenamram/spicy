@@ -51,7 +51,7 @@ mod tests {
         file_name, flatten_errors, read,
     };
     use spicy_errors::DiagKind;
-    use spicy_model::flat::{FlatField, FlatInstanceId, FlatNetId, KnobId};
+    use spicy_model::flat::{FlatField, FlatInstanceId, FlatNetId, KnobId, KnobKind};
     use spicy_model::flatten::{FlattenErrorKind, check_simulation};
     use spicy_span::Span;
 
@@ -99,8 +99,9 @@ mod tests {
     }
 
     /// The MVP design (docs/ecad/model.md#ce-amp-example): one root, 6 devices, 6 nets
-    /// with `gnd` as ground, and a knob for each of the 6 part fields with a spread.
-    /// (`vcc.v` and `temp` come from the contract, in M1d-5.)
+    /// with `gnd` as ground, a knob for each of the 6 part fields with a spread, then
+    /// the setup's `vcc.v` and the env `ambient` (contracts_plan.md §0.4), and its 3
+    /// specs checkable.
     #[test]
     fn ce_amp() {
         let src = include_str!("../../../circuits/ce_amp.spl");
@@ -124,8 +125,111 @@ mod tests {
         let knobs: Vec<String> = (0..flat.data.knobs.len())
             .map(|k| flat.knob_path(KnobId::new(k)).to_string())
             .collect();
-        assert_eq!(knobs.len(), 6, "{knobs:?}");
+        let parts = [
+            "c_in.value",
+            "q1.beta",
+            "r1.value",
+            "r2.value",
+            "rc.value",
+            "re.value",
+        ];
+        assert_eq!(knobs, [&parts[..], &["vcc.v", "ambient"]].concat());
+        let kinds: Vec<KnobKind> = flat.data.knobs.iter().map(|k| k.source.kind()).collect();
+        let (part, range) = (KnobKind::Statistical, KnobKind::Range);
+        let parts_then_setup = [part, part, part, part, part, part, range, range];
+        assert_eq!(kinds, parts_then_setup);
+        let specs: Vec<&str> = flat
+            .checkable_specs()
+            .map(|(_, s)| s.name.as_str())
+            .collect();
+        assert_eq!(specs, ["bias", "gain", "bass"]);
         insta::assert_snapshot!(dump_elaborate("ce_amp.spl", src));
+    }
+
+    /// A spec is checkable only when its root, contract and default setup are sound and
+    /// it resolved itself (contracts_plan.md §0.4): no `setup = S;` leaves the root no
+    /// flat setup, a setup, a circuit or a contract with an error inside leaves it
+    /// broken, and a broken spec is left out on its own.
+    #[test]
+    fn only_sound_specs_are_checkable() {
+        let head = "block A { vcc: Power<In>, gnd: Ground }\n\
+                    circuit A { let r = Resistor { a: vcc, b: gnd, value: 1k }; }\n";
+        let broken_head = "block A { vcc: Power<In>, gnd: Ground }\n\
+                           circuit A { let r = Resistor { a: vcc, b: gnd, value: 1V }; }\n";
+        let setup = "setup S for A { vcc: Supply { v: 1V }, temp: 25°C }\n";
+        let broken_setup = "setup S for A { vcc: Supply { v: 1A }, temp: 25°C }\n";
+        let specs = "spec ok: dc(vcc.v) <= 2V; spec bad: dc(vcc.v) <= 2Hz;";
+        let cases = [
+            (
+                format!("{head}{setup}contract A {{ {specs} }}\n"),
+                false,
+                vec![],
+            ),
+            (
+                format!("{head}{broken_setup}contract A {{ setup = S; {specs} }}\n"),
+                true,
+                vec![],
+            ),
+            (
+                format!("{broken_head}{setup}contract A {{ setup = S; {specs} }}\n"),
+                true,
+                vec![],
+            ),
+            (
+                format!("{head}{setup}contract A {{ setup = S; {specs} spec; }}\n"),
+                true,
+                vec![],
+            ),
+            // A lexer error in the contract: what was written may be missing from it.
+            (
+                format!("{head}{setup}contract A {{ setup = S; {specs} @ }}\n"),
+                true,
+                vec![],
+            ),
+            (
+                format!("{head}{setup}contract A {{ setup = S; {specs} }}\n"),
+                true,
+                vec!["ok"],
+            ),
+        ];
+        for (src, has_setup, checkable) in cases {
+            let elaborated = elaborate(&parse(&src));
+            let [flat] = elaborated.roots().collect::<Vec<_>>()[..] else {
+                panic!("one root")
+            };
+            assert_eq!(flat.data.setup.is_some(), has_setup, "{src}");
+            let names: Vec<&str> = flat
+                .checkable_specs()
+                .map(|(_, s)| s.name.as_str())
+                .collect();
+            assert_eq!(names, checkable, "{src}");
+        }
+    }
+
+    /// Red team: the invariants check each measure once, however many specs and lets
+    /// read it, as resolve's `pub` rule does. Followed through every reader, 4 specs on
+    /// 22 lets that each read the next twice are 2²⁴ walks: seconds here, and out of
+    /// memory a few lets deeper.
+    #[test]
+    fn the_invariants_check_a_shared_measure_once() {
+        let mut src = String::from(
+            "block A { vcc: Power<In>, gnd: Ground }\n\
+             circuit A { let r = Resistor { a: vcc, b: gnd, value: 1k }; }\n\
+             setup S for A { vcc: Supply { v: 1V }, temp: 25°C }\n\
+             contract A {\n    setup = S;\n",
+        );
+        for i in 0..22 {
+            src.push_str(&format!("    let m{i} = m{} + m{};\n", i + 1, i + 1));
+        }
+        src.push_str("    let m22 = dc(vcc.v);\n");
+        for k in 0..4 {
+            src.push_str(&format!("    spec s{k}: m0 <= 1V;\n"));
+        }
+        src.push_str("}\n");
+        let start = std::time::Instant::now();
+        check_parse_invariants(&src);
+        let elapsed = start.elapsed();
+        assert!(elapsed.as_secs_f64() < 1.0, "took {elapsed:?}");
     }
 
     /// The flat part of the dump: every root's nets, devices and knobs, by path.

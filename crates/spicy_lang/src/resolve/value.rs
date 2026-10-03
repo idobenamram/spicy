@@ -166,7 +166,7 @@ impl Resolver<'_, '_> {
         // number 0.01 once named), so it isn't a tolerance yet (decided 2026-10-02).
         if t.q.is_ratio() && !relative && names_a_const(e) {
             let what = "a plain-number const after `±` (write the tolerance with `%`)";
-            return Err(self.report(ResolveErrorKind::Unsupported { what }, e.span));
+            return Err(self.unsupported(what, e.span));
         }
         let size = match expected.kind {
             // A percentage of a temperature depends on where its zero is (model.md E13).
@@ -301,30 +301,33 @@ impl Resolver<'_, '_> {
 
     /// A name where a number is expected: a const's value. A net, a port or an instance
     /// is no value, even one named like a const, so a const is the only reading here.
-    /// An env is a range the engine searches, named only by a setup's `temp:`.
     fn named_value(&mut self, path: &ast::Path, at: Span) -> Result<Term, Reported> {
-        let kind = match self.values.get(self.path_text(path)) {
-            Some(FileValue::Const(c)) => match &self.consts {
-                // A plain-number const acts like a plain number: `GAIN * 1k` is in Ω. A
-                // broken one was reported at its definition: its proof is the reader's.
-                Some(consts) => {
-                    return consts[c.index()].map(|q| Term {
-                        q,
-                        unitless: q.is_ratio(),
-                    });
-                }
+        let Some(value) = self.values.get(self.path_text(path)) else {
+            return Err(self.report(ResolveErrorKind::NotAValue, at));
+        };
+        // A plain-number const acts like a plain number: `GAIN * 1k` is in Ω.
+        let q = self.file_value(value, at)?;
+        Ok(Term {
+            q,
+            unitless: q.is_ratio(),
+        })
+    }
+
+    /// The number a file value names where one is expected (`at`), in a part's value or
+    /// a measure: a const's. A broken one was reported at its definition: its proof is
+    /// the reader's. An env is a range the engine searches, named only by a setup's
+    /// `temp:`.
+    pub(super) fn file_value(&mut self, value: FileValue, at: Span) -> Result<Quantity, Reported> {
+        let what = match value {
+            FileValue::Const(c) => match &self.consts {
+                Some(consts) => return consts[c.index()],
                 // The consts aren't typed yet: this is another const's value (see
                 // `const_values`).
-                None => ResolveErrorKind::Unsupported {
-                    what: "a const in another const's value",
-                },
+                None => "a const in another const's value",
             },
-            Some(FileValue::Env(_)) => ResolveErrorKind::Unsupported {
-                what: "an env's name anywhere but a setup's `temp:`",
-            },
-            None => ResolveErrorKind::NotAValue,
+            FileValue::Env(_) => "an env's name anywhere but a setup's `temp:`",
         };
-        Err(self.report(kind, at))
+        Err(self.unsupported(what, at))
     }
 
     /// `lhs op rhs` for one of `+ - * /`; `at` is the whole expression.
@@ -375,7 +378,7 @@ impl Resolver<'_, '_> {
     /// levels aren't linear quantities: `2 * 10°C` and `3dB + 3dB` have no single
     /// meaning, so they're only written as they are. `at` is the arithmetic, for the
     /// error.
-    fn linear(&mut self, kind: QKind, at: Span) -> Result<(), Reported> {
+    pub(super) fn linear(&mut self, kind: QKind, at: Span) -> Result<(), Reported> {
         let what = match kind {
             QKind::Plain => return Ok(()),
             QKind::TempPoint => "temperatures",
@@ -388,10 +391,10 @@ impl Resolver<'_, '_> {
 impl Term {
     /// A literal's value with its written unit. A literal without one is dimensionless
     /// and unitless: `typed` gives it the expected unit.
-    fn literal(QuantityLit { value, unit }: QuantityLit) -> Self {
+    fn literal(lit: QuantityLit) -> Self {
         Term {
-            q: unit.map_or(Quantity::ratio(value), |unit| unit.quantity(value)),
-            unitless: unit.is_none(),
+            q: literal_quantity(lit),
+            unitless: lit.unit.is_none(),
         }
     }
 
@@ -405,6 +408,11 @@ impl Term {
             describe(self.q.kind, self.q.dim)
         }
     }
+}
+
+/// A literal's value in its written unit; one written without a unit is a ratio.
+pub(super) fn literal_quantity(QuantityLit { value, unit }: QuantityLit) -> Quantity {
+    unit.map_or(Quantity::ratio(value), |unit| unit.quantity(value))
 }
 
 /// A literal, possibly negated, with its sign: `47k`, `-10°C` (the number -10 in °C),

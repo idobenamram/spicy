@@ -193,6 +193,15 @@ impl FieldType {
         }
     }
 
+    /// A level in dB, exact: `.f_low(-3dB)`'s argument.
+    pub const fn level() -> Self {
+        Self {
+            dim: Dimension::NONE,
+            kind: QKind::Db,
+            spread_allowed: false,
+        }
+    }
+
     /// An absolute temperature with a spread (`env ambient: Temperature in -10°C..=60°C;`).
     pub const fn temperature() -> Self {
         Self {

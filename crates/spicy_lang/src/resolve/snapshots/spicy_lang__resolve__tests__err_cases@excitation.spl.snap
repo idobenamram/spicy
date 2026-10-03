@@ -1,0 +1,78 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 750
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/excitation.spl
+---
+block Amp 144..147
+  port vcc: Power<In> 150..153
+  port gnd: Ground 166..169
+  port input: Analog<In> 179..184
+  port output: Analog<Out> 198..204
+  net base 243..247
+  r1 = Resistor 257..259
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 315..317
+    c → output
+    b → base
+    e → gnd
+block Broken 708..714
+  port input: <error> 717..722
+  port output: Analog<Out> 736..742
+contract Amp
+  setup = Operating
+  let alone = <invalid>
+  let backwards = <invalid>
+  let product = <invalid>
+contract Broken
+  setup = Bench
+  let h = <invalid>
+setup Operating 365..374 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+setup Bench 784..789 for Broken
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-measure NoExcitation 523..531 "output.v"
+E-measure NoExcitation 557..575 "input.v / output.v"
+E-measure NoExcitation 599..617 "output.v * input.v"
+E-type BadSignalType 724..730 "Analgo"
+
+--- rendered ---
+error[E-measure]: `ac` measures a net's voltage over an input port's
+   --> excitation.spl:15:20
+   |
+15 |     let alone = ac(output.v);
+   |                    ^^^^^^^^ nothing here is excited
+   |
+   = help: write `ac(out.v / in.v)`, where `in` is an input port: the setup's source there gets the AC stimulus
+
+error[E-measure]: `ac` measures a net's voltage over an input port's
+   --> excitation.spl:16:24
+   |
+16 |     let backwards = ac(input.v / output.v);
+   |                        ^^^^^^^^^^^^^^^^^^ nothing here is excited
+   |
+   = help: write `ac(out.v / in.v)`, where `in` is an input port: the setup's source there gets the AC stimulus
+
+error[E-measure]: `ac` measures a net's voltage over an input port's
+   --> excitation.spl:17:22
+   |
+17 |     let product = ac(output.v * input.v);
+   |                      ^^^^^^^^^^^^^^^^^^ nothing here is excited
+   |
+   = help: write `ac(out.v / in.v)`, where `in` is an input port: the setup's source there gets the AC stimulus
+
+error[E-type]: `Analgo` isn't a port type
+   --> excitation.spl:21:23
+   |
+21 | block Broken { input: Analgo<In>, output: Analog<Out> }
+   |                       ^^^^^^ not a valid port type
+   |
+   = note: port types are `Pin`, `Ground`, `Power<In|Out>`, `Analog<In|Out>`

@@ -1,6 +1,6 @@
 ---
 source: crates/spicy_lang/src/resolve/mod.rs
-assertion_line: 582
+assertion_line: 719
 expression: "dump_resolve(&file_name(path), &src)"
 input_file: crates/spicy_lang/test_data/resolve/err/duplicates.spl
 ---
@@ -12,6 +12,9 @@ block A 6..7
     b → n
     value = 1000 Ω
 contract A
+  setup = S
+setup S 204..205 for A
+  temp = 298.15 K (25 °C)
 
 --- errors ---
 E-duplicate Duplicate 18..19 "p" related 10..11
@@ -20,7 +23,7 @@ E-duplicate Duplicate 108..117 "value: 2k" related 97..106
 E-duplicate Duplicate 129..130 "r" related 70..71
 E-duplicate Duplicate 150..154 "a: n" related 144..148
 E-duplicate Duplicate 184..185 "A" related 6..7
-E-duplicate Duplicate 221..222 "A" related 207..208
+E-duplicate Duplicate 264..265 "A" related 238..239
 
 --- rendered ---
 error[E-duplicate]: port `p` is defined twice
@@ -73,11 +76,11 @@ error[E-duplicate]: block `A` is defined twice
    |       ^ second definition
 
 error[E-duplicate]: block `A` has two contracts
-   --> duplicates.spl:13:10
+   --> duplicates.spl:15:10
    |
-12 | contract A {}
+14 | contract A { setup = S; }
    |          - first contract here
-13 | contract A {}
+15 | contract A { setup = S; }
    |          ^ second contract
    |
    = help: merge them into one `contract`

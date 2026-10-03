@@ -1,0 +1,223 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 750
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/measures.spl
+---
+block Amp 176..179
+  port vcc: Power<In> 182..185
+  port gnd: Ground 198..201
+  port input: Analog<In> 211..216
+  port output: Analog<Out> 230..236
+  net base 275..279
+  r1 = Resistor 289..291
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 347..349
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let part = <invalid>
+  let constant = <invalid>
+  let bare = <invalid>
+  let typo = <invalid>
+  let call = <invalid>
+  let instance = <invalid>
+  let pin = <invalid>
+  let current = <invalid>
+  let transient = <invalid>
+  let impedance = <invalid>
+  let gain = <invalid>
+  let twice = <invalid>
+  let of_measure = <invalid>
+  let of_const = <invalid>
+  let port_value = <invalid>
+  let unknown_probe = <invalid>
+  let constant_dc = <invalid>
+  let ratio = <invalid>
+  let bare_net = <invalid>
+  let level = <invalid>
+  let doubled = <invalid>
+const LIMIT 504..509 = 1 V
+setup Operating 397..406 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-measure NotAMeasure 576..614 "Resistor { a: vcc, b: gnd, value: 1k }"
+E-measure NotAMeasure 635..641 "2 * 5V"
+E-measure NeedsAnalysis 658..666 "output.v" fix 658..666 "dc(output.v)"
+E-duplicate Duplicate 676..680 "base" related 275..279
+E-name UnknownName 715..720 "outpt" fix 715..720 "output"
+E-name UnknownName 740..743 "dcc" fix 740..743 "dc"
+E-name WrongNamespace 777..779 "r1"
+E-unsupported Unsupported 801..805 "q1.c"
+E-unsupported Unsupported 833..834 "i"
+E-unsupported Unsupported 857..861 "tran"
+E-unsupported Unsupported 903..904 "z"
+E-duplicate Duplicate 1070..1074 "gain" related 921..925
+E-name WrongNamespace 1138..1142 "gain"
+E-name WrongNamespace 1169..1174 "LIMIT"
+E-name WrongNamespace 1203..1209 "output"
+E-name UnknownName 1246..1247 "w" fix 1246..1247 "v"
+E-measure NotAMeasure 1321..1327 "dc(5V)"
+E-measure NeedsAnalysis 1406..1424 "output.v / input.v"
+E-name UnknownName 1619..1624 "outpt"
+E-name UnknownName 1643..1649 "levels"
+E-name UnknownName 1675..1681 "twicee"
+
+--- rendered ---
+error[E-measure]: `part` isn't a measure
+   --> measures.spl:17:16
+   |
+17 |     let part = Resistor { a: vcc, b: gnd, value: 1k };
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ a part or a block
+   |
+   = help: a contract's `let` measures the design, like `dc(out.v)` or `ac(out.v / in.v)`; parts go in the circuit
+
+error[E-measure]: `constant` isn't a measure
+   --> measures.spl:18:20
+   |
+18 |     let constant = 2 * 5V;
+   |                    ^^^^^^ a constant
+   |
+   = help: a contract's `let` measures the design, like `dc(out.v)` or `ac(out.v / in.v)`; parts go in the circuit
+
+error[E-measure]: a probe is measured in an analysis
+   --> measures.spl:19:16
+   |
+19 |     let bare = output.v;
+   |                ^^^^^^^^ a probe
+   |
+   = help: write `dc(output.v)`
+
+error[E-duplicate]: name `base` is defined twice
+   --> measures.spl:20:9
+   |
+ 6 |     net base;
+   |         ---- first defined here
+   .
+20 |     let base = dc(output.v);
+   |         ^^^^ second definition
+
+error[E-name]: unknown net, port or instance `outpt`
+   --> measures.spl:21:19
+   |
+21 |     let typo = dc(outpt.v);
+   |                   ^^^^^ not defined
+   |
+   = help: did you mean `output`?
+
+error[E-name]: unknown function `dcc`
+   --> measures.spl:22:16
+   |
+22 |     let call = dcc(output.v);
+   |                ^^^ not defined
+   |
+   = help: did you mean `dc`?
+
+error[E-name]: `r1` is an instance, not a net or a port
+   --> measures.spl:23:23
+   |
+23 |     let instance = dc(r1.v);
+   |                       ^^ expected a net or a port
+
+error[E-unsupported]: not supported yet: part pins (`q1.c`)
+   --> measures.spl:24:18
+   |
+24 |     let pin = dc(q1.c);
+   |                  ^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: the probes `.i` and `.z(f)`
+   --> measures.spl:25:26
+   |
+25 |     let current = dc(vcc.i);
+   |                          ^ not supported yet
+
+error[E-unsupported]: not supported yet: `tran` and `noise`
+   --> measures.spl:26:21
+   |
+26 |     let transient = tran(output.v);
+   |                     ^^^^ not supported yet
+
+error[E-unsupported]: not supported yet: the probes `.i` and `.z(f)`
+   --> measures.spl:27:31
+   |
+27 |     let impedance = dc(output.z(1kHz));
+   |                               ^ not supported yet
+
+error[E-duplicate]: name `gain` is defined twice
+   --> measures.spl:31:9
+   |
+28 |     let gain = dc(output.v);
+   |         ---- first defined here
+   .
+31 |     let gain = dc(vcc.v);
+   |         ^^^^ second definition
+
+error[E-name]: `gain` is a measure, not a net or a port
+   --> measures.spl:33:25
+   |
+33 |     let of_measure = dc(gain.v);
+   |                         ^^^^ expected a net or a port
+
+error[E-name]: `LIMIT` is a const, not a net or a port
+   --> measures.spl:34:23
+   |
+34 |     let of_const = dc(LIMIT.v);
+   |                       ^^^^^ expected a net or a port
+
+error[E-name]: `output` is a port, not a measure
+   --> measures.spl:35:25
+   |
+35 |     let port_value = dc(output);
+   |                         ^^^^^^ expected a measure
+
+error[E-name]: unknown probe `w`
+   --> measures.spl:36:35
+   |
+36 |     let unknown_probe = dc(output.w);
+   |                                   ^ not defined
+   |
+   = help: did you mean `v`?
+
+error[E-measure]: `constant_dc` isn't a measure
+   --> measures.spl:38:23
+   |
+38 |     let constant_dc = dc(5V);
+   |                       ^^^^^^ a constant
+   |
+   = help: a contract's `let` measures the design, like `dc(out.v)` or `ac(out.v / in.v)`; parts go in the circuit
+
+error[E-measure]: a probe is measured in an analysis
+   --> measures.spl:40:17
+   |
+40 |     let ratio = output.v / input.v;
+   |                 ^^^^^^^^^^^^^^^^^^ a probe
+   |
+   = help: `dc(…)` gives its operating point, and `ac(out.v / in.v)` its response to an input
+
+error[E-name]: unknown measure or const `outpt`
+   --> measures.spl:43:23
+   |
+43 |     let bare_net = dc(outpt);
+   |                       ^^^^^ not defined
+
+error[E-name]: unknown measure or const `levels`
+   --> measures.spl:44:17
+   |
+44 |     let level = levels.mag();
+   |                 ^^^^^^ not defined
+
+error[E-name]: unknown measure or const `twicee`
+   --> measures.spl:45:19
+   |
+45 |     let doubled = twicee * 2;
+   |                   ^^^^^^ not defined
+   |
+   = help: did you mean `twice`?

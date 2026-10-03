@@ -2,8 +2,8 @@
 //! becomes a [`Design`], each block once, with every name resolved and every value
 //! typed.
 //!
-//! Two passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), then a
-//! third that marks what's broken, read top to bottom in [`resolve`]:
+//! Three passes (model.md E4, as rustc, rust-analyzer, Spade and Modelica do), then a
+//! fourth that marks what's broken, read top to bottom in [`resolve`]:
 //! 1. **The file's names:** every block's name, its circuit and contract (each named
 //!    after it), then every block's [`Signature`] (its ports). A block can be placed
 //!    before its definition. Then the file's values (`resolve/env.rs`): every `env` and
@@ -13,22 +13,24 @@
 //! 2. **The circuits:** each block's circuit, by a [`BodyResolver`](body::BodyResolver)
 //!    of its own, which has two passes of its own: every name the circuit declares, then
 //!    every statement, so statement order never matters.
-//! 3. **What's broken:** every block or setup with an error inside it, or a read of a
+//! 3. **The contracts:** each block's contract (`resolve/contract.rs`), against its
+//!    block as its circuit left it: its default setup, among the block's setups, then
+//!    its measures, typed against the measure table (`spicy_model::measure`). Specs
+//!    arrive in contracts_plan.md step 4.
+//! 4. **What's broken:** every block or setup with an error inside it, or a read of a
 //!    broken const, is tainted ([`Block::tainted`]), so flatten doesn't check a circuit
 //!    with a part missing.
 //!
 //! Errors never stop the stage (E7): a name that doesn't resolve becomes a placeholder
 //! holding the proof it was reported (an `InstanceOf::Error`, an `Err` binding), reported
-//! once. A second definition of a name (a block, a circuit, a setup, a port, a `net` or
-//! `let`, an `env` or `const`) is checked for its own mistakes, then dropped: it never
-//! enters the design. Which one was meant isn't known, so the first is broken too: a
-//! block with two definitions or two circuits, or a setup, is tainted; an env's or
-//! const's value is `Err`.
-//!
-//! Contracts are only matched to their blocks here; their contents are resolved in the
-//! next steps (contracts_plan.md steps 3–4).
+//! once. A second definition of a name (a block, a circuit, a contract, a setup, a port,
+//! a `net` or `let`, an `env` or `const`) is checked for its own mistakes, then dropped:
+//! it never enters the design. Which one was meant isn't known, so the first is broken
+//! too: a block with two definitions or two circuits, a contract or a setup, is tainted;
+//! an env's, a const's or a measure's value is `Err`.
 
 mod body;
+mod contract;
 mod env;
 mod error;
 mod fields;
@@ -42,8 +44,8 @@ use std::collections::hash_map::Entry;
 
 use spicy_errors::{Diag, DiagKind, Reported};
 use spicy_model::design::{
-    Block, BlockId, BlockSpans, ConstId, Contract, Design, DesignSourceMap, EnvId, Instance,
-    InstanceSpans, Merge, MergeSpans, Net, NetId, Port, PortId,
+    Block, BlockId, BlockSpans, ConstId, Design, DesignSourceMap, EnvId, Instance, InstanceSpans,
+    Merge, MergeSpans, Net, NetId, Port, PortId,
 };
 use spicy_model::prelude::{PartKind, Role, SignalType, SignalTypeError};
 use spicy_model::units::Quantity;
@@ -53,6 +55,7 @@ use crate::edit_distance::edit_distance;
 use crate::parser::Parsed;
 use crate::parser::ast::{self, BlockDecl, BlockEntry, Body, Ident, ItemKind};
 use body::BodyResolver;
+use contract::ForContract;
 
 /// Everything resolving produces: the design, where each part of it was written, and
 /// every problem found.
@@ -83,7 +86,7 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     // definition.
     let (decls, block_spans, second_decls) = r.declare_blocks();
     let (circuits, second_circuits) = r.match_to_blocks(NameKind::Circuit, decls.len());
-    let (contracts, _) = r.match_to_blocks(NameKind::Contract, decls.len());
+    let (contracts, second_contracts) = r.match_to_blocks(NameKind::Contract, decls.len());
     let (signatures, starts): (Vec<Signature>, Vec<BlockBuilder>) = decls
         .iter()
         .zip(&circuits)
@@ -99,7 +102,7 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     let (envs, env_spans) = r.env_values(&value_decls);
     // …and the setups, each against its block's ports: its values may name a const, and
     // its `temp` an env.
-    let (mut setups, second_setups) = r.setups(&signatures, &starts, &circuits, &envs);
+    let mut setups = r.setups(&signatures, &starts, &circuits, &envs);
 
     // A second circuit of a block is checked against the block's ports (see below).
     let second_starts: Vec<BlockBuilder> = second_circuits
@@ -109,7 +112,6 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
 
     // Pass 2, the circuits: each block's nets, instances and merges.
     let mut design = Design {
-        contracts: contracts.iter().map(|c| c.map(|_| Contract {})).collect(),
         envs,
         consts,
         ..Design::default()
@@ -136,7 +138,27 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
         BodyResolver::new(&mut r, &signatures, signature, start, &body.stmts).resolve(&body.stmts);
     }
 
-    // Pass 3, what's broken: every block with an error in it (see `Block::tainted`).
+    // Pass 3, the contracts: each against its block as its circuit left it, and its
+    // setups (`resolve/contract.rs`). A second contract of a block is checked the same
+    // way, for its own mistakes, then dropped.
+    let of = |b: BlockId| ForContract {
+        block: &design.blocks[b.index()],
+        spans: &source_map.blocks[b.index()],
+        setups: &setups.by_block[b.index()],
+    };
+    design.contracts.reserve(contracts.len());
+    source_map.contracts.reserve(contracts.len());
+    for (b, contract) in contracts.iter().enumerate() {
+        let resolved = contract.map(|(body, _)| r.contract(body, of(BlockId::new(b))));
+        let (contract, spans) = resolved.unzip();
+        design.contracts.push(contract);
+        source_map.contracts.push(spans);
+    }
+    for &(body, second) in &second_contracts {
+        r.contract(body, of(second.first));
+    }
+
+    // Pass 4, what's broken: every block with an error in it (see `Block::tainted`).
     // One its header's or circuit's parse reported, since an error found at the next
     // item (a missing `}`) is the open one's, not the next one's; or a lexer or resolve
     // error inside either. (A part's value that reads a broken const, whose error is
@@ -169,16 +191,27 @@ pub fn resolve(parsed: &Parsed) -> Resolved {
     for Redefined { first, reported } in seconds {
         design.blocks[first.index()].tainted.get_or_insert(reported);
     }
+    // The same for a contract, the first of two for its block.
+    for &(_, Redefined { first, reported }) in &second_contracts {
+        let contract = design.contracts[first.index()].as_mut();
+        let contract = contract.expect("a block with a second contract has a first");
+        contract.tainted.get_or_insert(reported);
+    }
     // The same for a setup: one with an error in it, or the first of two of one name for
     // one block.
-    for s in &mut setups {
+    for s in &mut setups.resolved {
         let inside = s.broken.or_else(|| inside.inside(s.item));
         s.setup.tainted = s.setup.tainted.or(inside);
     }
-    for Redefined { first, reported } in second_setups {
-        setups[first.index()].setup.tainted.get_or_insert(reported);
+    for Redefined { first, reported } in setups.seconds {
+        setups.resolved[first.index()]
+            .setup
+            .tainted
+            .get_or_insert(reported);
     }
-    (design.setups, source_map.setups) = setups.into_iter().map(|s| (s.setup, s.spans)).unzip();
+    (design.setups, source_map.setups) = (setups.resolved.into_iter())
+        .map(|s| (s.setup, s.spans))
+        .unzip();
 
     Resolved {
         design,
@@ -382,12 +415,26 @@ impl<'src, T: Copy> Scope<'src, T> {
             .iter()
             .map(|(&name, &(value, _))| (name, value))
     }
+
+    /// Every name, in the order of the ids they were declared with, for a message.
+    fn names_in_order(&self) -> Vec<String>
+    where
+        T: Ord,
+    {
+        let mut names: Vec<_> = self.iter().collect();
+        names.sort_unstable_by_key(|&(_, id)| id);
+        names
+            .into_iter()
+            .map(|(name, _)| name.to_string())
+            .collect()
+    }
 }
 
 /// The first declaration of a name declared again, and the proof the second was
 /// reported. Which one was meant isn't known, so the first is broken too where it can
-/// be: a block or a setup defined twice is tainted (pass 3), an env's or const's value
-/// is `Err` (`resolve/env.rs`).
+/// be: a block, a contract or a setup defined twice is tainted (pass 4), an env's or
+/// const's value is `Err` (`resolve/env.rs`), and so is a measure's
+/// (`resolve/contract.rs`).
 #[derive(Clone, Copy)]
 struct Redefined<T> {
     first: T,
@@ -445,6 +492,25 @@ impl<'p, 'src> Resolver<'p, 'src> {
 
     fn report(&mut self, kind: ResolveErrorKind, at: Span) -> Reported {
         ResolveError::new(kind, at).report(&mut self.errors)
+    }
+
+    /// Reports `what`, which v5 has and the MVP doesn't support yet.
+    fn unsupported(&mut self, what: &'static str, at: Span) -> Reported {
+        self.report(ResolveErrorKind::Unsupported { what }, at)
+    }
+
+    /// Reports `name`, which names nothing in `namespace`, with the closest of
+    /// `candidates` as its fix.
+    fn report_unknown_name<'c>(
+        &mut self,
+        name: &str,
+        namespace: Namespace,
+        candidates: impl IntoIterator<Item = &'c str>,
+        at: Span,
+    ) -> Reported {
+        let suggestion = suggest(&mut self.suggestions_left, name, candidates);
+        let error = unknown_name(name, namespace, suggestion.clone(), suggestion, at);
+        error.report(&mut self.errors)
     }
 
     /// What `name` is in the kind namespace, for an error that says so ("`Resistor` is a
@@ -711,7 +777,13 @@ mod tests {
                 .iter()
                 .all(|i| i.pins.iter().all(Result::is_ok))
         );
-        assert_eq!(design.contracts, [Some(Contract {})]);
+        let contract = design.contracts[0].as_ref().expect("CeAmp has a contract");
+        assert_eq!(
+            contract.default_setup,
+            Ok(spicy_model::design::SetupId::new(0))
+        );
+        let measures: Vec<&str> = contract.measures.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(measures, ["h"]);
         insta::assert_snapshot!(dump_resolve("ce_amp.spl", src));
     }
 
@@ -739,6 +811,67 @@ mod tests {
             assert!(resolved.errors.is_empty(), "{text}");
             assert_eq!(canonical(&resolved.design), reference, "{text}");
         }
+    }
+
+    /// Statement order inside a contract doesn't change what it means either: a measure
+    /// can use one written after it, and a cycle is reported the same way whatever the
+    /// order (`resolve/contract.rs` pass 3).
+    #[test]
+    fn measure_order_does_not_matter() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/resolve");
+        for case in ["ok/measures.spl", "err/measure_cycle.spl"] {
+            let src = read(&dir.join(case));
+            let open = src.find("contract Amp {\n").unwrap() + "contract Amp {\n".len();
+            let close = open + src[open..].find("\n}").unwrap();
+            let lines: Vec<&str> = src[open..close]
+                .lines()
+                .filter(|l| l.trim_end().ends_with(';'))
+                .collect();
+            let reference = contract_facts(&src);
+            let mut rng = crate::testing::Rng(0x5eed);
+            for _ in 0..20 {
+                let mut shuffled = lines.clone();
+                for i in (1..shuffled.len()).rev() {
+                    shuffled.swap(i, rng.below(i + 1));
+                }
+                let text = format!("{}{}{}", &src[..open], shuffled.join("\n"), &src[close..]);
+                assert_eq!(contract_facts(&text), reference, "{text}");
+            }
+        }
+    }
+
+    /// Red team: a measure as deep as the parser allows resolves without overflowing a
+    /// test thread's 2 MB stack, as a part's value does (ast.md A11). Before the
+    /// recursion was cut down to `binary`, 818 terms overflowed in a debug build.
+    #[test]
+    fn a_deep_measure_does_not_overflow() {
+        let src = format!(
+            "block A {{ input: Analog<In>, output: Analog<Out>, gnd: Ground }}\n\
+             circuit A {{ let r1 = Resistor {{ a: input, b: output, value: 1k }}; \
+             let r2 = Resistor {{ a: output, b: gnd, value: 1k }}; }}\n\
+             setup S for A {{ input: Signal {{ v: 0V }}, output: Load {{}}, temp: 25°C }}\n\
+             contract A {{ setup = S; let m = dc(output.v){}; }}\n",
+            " + 1V".repeat(1000)
+        );
+        let parsed = parse(&src);
+        assert!(parsed.errors.is_empty(), "{:?}", parsed.errors.first());
+        assert!(resolve(&parsed).errors.is_empty());
+    }
+
+    /// Each measure's name and type, and each error with the text it's on, sorted.
+    fn contract_facts(src: &str) -> Vec<String> {
+        let resolved = resolve(&parse(src));
+        let contract = resolved.design.contracts[0].as_ref().unwrap();
+        let mut facts: Vec<String> = contract
+            .measures
+            .iter()
+            .map(|m| format!("{} {:?}", m.name, m.value.as_ref().map(|(_, ty)| ty).ok()))
+            .collect();
+        for e in &resolved.errors {
+            facts.push(format!("{} {}", e.kind.name(), &src[e.span.range()]));
+        }
+        facts.sort();
+        facts
     }
 
     /// A design as a sorted list of facts, independent of declaration order.
@@ -893,15 +1026,45 @@ mod tests {
         let names: Vec<&str> = design.blocks.iter().map(|b| b.name.as_str()).collect();
         assert_eq!(names, ["A", "B"]);
         assert_eq!(resolved.source_map.blocks.len(), 2);
-        assert_eq!(design.contracts, [Some(Contract {}), None]);
+        let contracts: Vec<bool> = design.contracts.iter().map(Option::is_some).collect();
+        assert_eq!(contracts, [true, false]);
         let a = &design.blocks[1].instances[0];
         assert_eq!(a.of, InstanceOf::Block(BlockId::new(0)));
         assert_eq!(a.pins, [Ok(NetId::new(0))]);
         let errors: Vec<_> = resolved.errors.iter().map(|e| e.kind.name()).collect();
+        // The contract names no default setup: `contract A {}` is there for its slot.
         assert_eq!(
             errors,
-            ["Duplicate", "Duplicate", "BadSignalType", "UnknownName"]
+            [
+                "Duplicate",
+                "Duplicate",
+                "BadSignalType",
+                "UnknownName",
+                "NoDefaultSetup"
+            ]
         );
+    }
+
+    /// A contract is broken when its body didn't parse, or when it's the first of two
+    /// for its block (the second-definition rule); a clean one isn't.
+    #[test]
+    fn a_contract_is_tainted_by_a_parse_error_or_a_second_contract() {
+        let block = |name: &str| {
+            format!("block {name} {{ p: Pin }}\n\nsetup S for {name} {{ temp: 25°C }}\n\n")
+        };
+        let src = format!(
+            "{}contract A {{ setup = S; }}\n\ncontract A {{ setup = S; }}\n\n\
+             {}contract B {{ setup = S; let x = ; }}\n\n\
+             {}contract C {{ setup = S; }}\n",
+            block("A"),
+            block("B"),
+            block("C"),
+        );
+        let resolved = resolve(&parse(&src));
+        let tainted: Vec<bool> = (resolved.design.contracts.iter())
+            .map(|c| c.as_ref().unwrap().tainted.is_some())
+            .collect();
+        assert_eq!(tainted, [true, true, false]);
     }
 
     /// A block with no circuit differs from one with an empty `circuit A {}`

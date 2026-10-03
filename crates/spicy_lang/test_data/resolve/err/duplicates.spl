@@ -9,5 +9,7 @@ circuit A {
 
 block A { q: Pin }
 
-contract A {}
-contract A {}
+setup S for A { temp: 25°C }
+
+contract A { setup = S; }
+contract A { setup = S; }

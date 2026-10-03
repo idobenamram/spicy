@@ -1,0 +1,212 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 750
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/measure_types.spl
+---
+block Amp 180..183
+  port vcc: Power<In> 186..189
+  port gnd: Ground 202..205
+  port input: Analog<In> 215..220
+  port output: Analog<Out> 234..240
+  net base 279..283
+  r1 = Resistor 293..295
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 351..353
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let h: response = ac(output.v / input.v)
+  let no_freq = <invalid>
+  let volts_db = <invalid>
+  let volts_low = <invalid>
+  let none = <invalid>
+  let two = <invalid>
+  let zero = <invalid>
+  let kilovolt = <invalid>
+  let up = <invalid>
+  let reference = <invalid>
+  let pair = <invalid>
+  let typo = <invalid>
+  let typo_response = <invalid>
+  let later = <invalid>
+  let mixed = <invalid>
+  let levels = <invalid>
+  let responses = <invalid>
+  let indexed = <invalid>
+  let by_zero = <invalid>
+  let positive = <invalid>
+  let flat = <invalid>
+  let bw: number Hz = h.f_high(-3 dB)
+  let measured_freq = <invalid>
+setup Operating 401..410 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-measure WrongMeasureType 596..599 "mag"
+E-measure WrongMeasureType 635..637 "db"
+E-measure WrongMeasureType 674..679 "f_low"
+E-measure BadArguments 702..708 "h.at()"
+E-measure BadArguments 724..740 "h.at(1kHz, 2kHz)"
+E-measure BadArguments 762..765 "0Hz"
+E-unit UnitMismatch 792..795 "1kV"
+E-measure BadArguments 819..822 "3dB" fix 819..822 "-3dB"
+E-measure BadArguments 845..869 "h.f_high(-3dB, ref: top)"
+E-measure BadArguments 886..907 "dc(output.v, input.v)"
+E-name UnknownName 935..937 "mg" fix 935..937 "mag"
+E-name UnknownName 1035..1037 "mg"
+E-unsupported Unsupported 1059..1062 "min"
+E-unit MixedUnits 1082..1113 "dc(output.v) + h.at(1kHz).mag()"
+E-unit NotArithmetic 1132..1165 "h.at(1kHz).db() + h.at(2kHz).db()"
+E-unit NotArithmetic 1187..1189 "-h"
+E-unsupported Unsupported 1209..1221 "h[Operating]"
+E-value DivisionByZero 1256..1257 "0"
+E-measure BadArguments 1287..1290 "3dB" fix 1287..1290 "-3dB"
+E-measure BadArguments 1316..1319 "0dB"
+E-name WrongNamespace 1380..1382 "bw"
+
+--- rendered ---
+error[E-measure]: `.mag()` doesn't apply to a response over frequency
+   --> measure_types.spl:16:21
+   |
+16 |     let no_freq = h.mag();
+   |                     ^^^ a response over frequency
+   |
+   = note: `.mag()` takes a phasor, from `.at(f)`
+
+error[E-measure]: `.db()` doesn't apply to a number, `V` (a voltage)
+   --> measure_types.spl:17:33
+   |
+17 |     let volts_db = dc(output.v).db();
+   |                                 ^^ a number, `V` (a voltage)
+   |
+   = note: `.db()` takes a phasor or a number with no unit
+
+error[E-measure]: `.f_low()` doesn't apply to a number, `V` (a voltage)
+   --> measure_types.spl:18:34
+   |
+18 |     let volts_low = dc(output.v).f_low(-3dB);
+   |                                  ^^^^^ a number, `V` (a voltage)
+   |
+   = note: `.f_low()` takes a response with no unit, a gain from `ac(out.v / in.v)`
+
+error[E-measure]: `.at()` takes one frequency above 0 Hz, like `.at(1kHz)`
+   --> measure_types.spl:19:16
+   |
+19 |     let none = h.at();
+   |                ^^^^^^ wrong arguments
+
+error[E-measure]: `.at()` takes one frequency above 0 Hz, like `.at(1kHz)`
+   --> measure_types.spl:20:15
+   |
+20 |     let two = h.at(1kHz, 2kHz);
+   |               ^^^^^^^^^^^^^^^^ wrong arguments
+
+error[E-measure]: `.at()` takes one frequency above 0 Hz, like `.at(1kHz)`
+   --> measure_types.spl:21:21
+   |
+21 |     let zero = h.at(0Hz);
+   |                     ^^^ wrong arguments
+
+error[E-unit]: expected `Hz` (a frequency), found `V` (a voltage)
+   --> measure_types.spl:22:25
+   |
+22 |     let kilovolt = h.at(1kV);
+   |                         ^^^ this is `V` (a voltage)
+
+error[E-measure]: `.f_low()` takes a level below 0 dB, like `-3dB`
+   --> measure_types.spl:23:22
+   |
+23 |     let up = h.f_low(3dB);
+   |                      ^^^ wrong arguments
+   |
+   = help: write `-3dB`
+
+error[E-measure]: `.f_high()` takes a level below 0 dB, and `ref: dc` to measure from the DC gain
+   --> measure_types.spl:24:21
+   |
+24 |     let reference = h.f_high(-3dB, ref: top);
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^ wrong arguments
+
+error[E-measure]: `dc` takes one probe, like `dc(out.v)`
+   --> measure_types.spl:25:16
+   |
+25 |     let pair = dc(output.v, input.v);
+   |                ^^^^^^^^^^^^^^^^^^^^^ wrong arguments
+
+error[E-name]: unknown function `mg`
+   --> measure_types.spl:26:27
+   |
+26 |     let typo = h.at(1kHz).mg();
+   |                           ^^ not defined
+   |
+   = help: did you mean `mag`?
+
+error[E-name]: unknown function `mg`
+   --> measure_types.spl:28:27
+   |
+28 |     let typo_response = h.mg();
+   |                           ^^ not defined
+
+error[E-unsupported]: not supported yet: this method
+   --> measure_types.spl:29:19
+   |
+29 |     let later = h.min();
+   |                   ^^^ not supported yet
+
+error[E-unit]: can't add `V` (a voltage) and a plain number
+   --> measure_types.spl:30:17
+   |
+30 |     let mixed = dc(output.v) + h.at(1kHz).mag();
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ different units
+
+error[E-unit]: dB levels can't be used in arithmetic here
+   --> measure_types.spl:31:18
+   |
+31 |     let levels = h.at(1kHz).db() + h.at(2kHz).db();
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not a plain quantity
+
+error[E-unit]: responses can't be used in arithmetic here
+   --> measure_types.spl:32:21
+   |
+32 |     let responses = -h;
+   |                     ^^ not a plain quantity
+
+error[E-unsupported]: not supported yet: `m[s]`
+   --> measure_types.spl:33:19
+   |
+33 |     let indexed = h[Operating];
+   |                   ^^^^^^^^^^^^ not supported yet
+
+error[E-value]: division by zero
+   --> measure_types.spl:34:34
+   |
+34 |     let by_zero = dc(output.v) / 0;
+   |                                  ^ the divisor is zero
+
+error[E-measure]: `.f_high()` takes a level below 0 dB, like `-3dB`
+   --> measure_types.spl:35:29
+   |
+35 |     let positive = h.f_high(3dB);
+   |                             ^^^ wrong arguments
+   |
+   = help: write `-3dB`
+
+error[E-measure]: `.f_low()` takes a level below 0 dB, like `-3dB`
+   --> measure_types.spl:36:24
+   |
+36 |     let flat = h.f_low(0dB);
+   |                        ^^^ wrong arguments
+
+error[E-name]: `bw` is a measure, not a constant
+   --> measure_types.spl:38:30
+   |
+38 |     let measured_freq = h.at(bw);
+   |                              ^^ expected a constant

@@ -1,6 +1,7 @@
 //! Resolve errors (model.md E18 tier 1, E23). Data first, rendered on demand, like the
 //! lexer's and parser's. Each is reported once, at the definition.
 
+use spicy_model::measure::{MeasureType, Method};
 use spicy_model::prelude::{FieldType, Shape, SignalType};
 use spicy_model::units::{Dimension, QKind, Quantity};
 
@@ -25,6 +26,10 @@ pub enum NameKind {
     Circuit,
     Contract,
     Setup,
+    /// A contract's `setup = S;`.
+    DefaultSetup,
+    /// A contract's `let`: a measure.
+    Measure,
     Env,
     Const,
     Value,
@@ -45,6 +50,8 @@ impl NameKind {
             NameKind::Circuit => "a circuit",
             NameKind::Contract => "a contract",
             NameKind::Setup => "a setup",
+            NameKind::DefaultSetup => "a default setup",
+            NameKind::Measure => "a measure",
             NameKind::Env => "an env",
             NameKind::Const => "a const",
             NameKind::Value => "a value",
@@ -68,6 +75,15 @@ pub enum Namespace {
     /// The shapes a setup puts on a port (`Supply`), prelude names like the part kinds,
     /// looked up only where a shape goes (`vcc: Supply { … }`).
     Shape,
+    /// A block's setups, which a contract's `setup = S;` names.
+    Setup,
+    /// The measure table's functions and methods (`dc`, `.mag()`).
+    Function,
+    /// The probes of a net (`.v`, language.md §8.4).
+    Probe,
+    /// What a name can be where a measure goes (`h` in `h.at(1kHz)`): a contract's
+    /// measures and the file's consts, not a net.
+    Measure,
 }
 
 /// Why a setup entry doesn't fit its port's role ([`ResolveErrorKind::WrongRole`]).
@@ -185,6 +201,34 @@ pub enum ResolveErrorKind {
     /// A port given a value where it takes a shape (`vcc: 12V`). `takes` is the shape
     /// its role takes.
     NotAShape { port: String, takes: Shape },
+    /// A contract with no `setup = S;`: its specs have nothing to be checked in.
+    /// `setups` are its block's, in file order.
+    NoDefaultSetup {
+        contract: String,
+        setups: Vec<String>,
+    },
+    /// A contract's `let` that measures nothing: a part (`Resistor { … }`) or a constant
+    /// (`5V`). `is` says which.
+    NotAMeasure { name: String, is: &'static str },
+    /// A probe outside an analysis (`let x = output.v;`, plan §2.9 a): fixed to
+    /// `dc(output.v)` when it's the whole value.
+    NeedsAnalysis,
+    /// A method on a measure it doesn't apply to: `h.mag()` on a response (it needs
+    /// `.at(f)` first), `dc(output.v).db()` (volts aren't a ratio).
+    WrongMeasureType { method: Method, on: MeasureType },
+    /// A function or method given the wrong arguments: `h.at()`, `dc(a.v, b.v)`,
+    /// `h.f_low(3dB)`. `function` is as written, a method with its dot (`.at()`);
+    /// `expected` says what it takes.
+    BadArguments {
+        function: &'static str,
+        expected: &'static str,
+    },
+    /// `ac(…)` of anything but a net's voltage over an input port's: no source would be
+    /// excited.
+    NoExcitation,
+    /// A measure defined in terms of itself, directly or through other measures:
+    /// `cycle` is each measure on the way, from the one met again.
+    MeasureCycle { cycle: Vec<String> },
 }
 
 /// The variant names, for the test that every error kind has a case file. Only tests
@@ -222,6 +266,13 @@ impl ResolveErrorKind {
         "IncompleteSetup",
         "OpenRange",
         "NotAShape",
+        "NoDefaultSetup",
+        "NotAMeasure",
+        "NeedsAnalysis",
+        "WrongMeasureType",
+        "BadArguments",
+        "NoExcitation",
+        "MeasureCycle",
     ];
 }
 
@@ -257,6 +308,13 @@ impl DiagKind for ResolveErrorKind {
             IncompleteSetup { .. } => "IncompleteSetup",
             OpenRange { .. } => "OpenRange",
             NotAShape { .. } => "NotAShape",
+            NoDefaultSetup { .. } => "NoDefaultSetup",
+            NotAMeasure { .. } => "NotAMeasure",
+            NeedsAnalysis => "NeedsAnalysis",
+            WrongMeasureType { .. } => "WrongMeasureType",
+            BadArguments { .. } => "BadArguments",
+            NoExcitation => "NoExcitation",
+            MeasureCycle { .. } => "MeasureCycle",
         }
     }
 
@@ -281,6 +339,13 @@ impl DiagKind for ResolveErrorKind {
             TemperatureSpread { .. } | TemperaturePoint { .. } => "E-unit",
             WrongRole { .. } => "E-role",
             IncompleteSetup { .. } | NotAShape { .. } => "E-setup",
+            NoDefaultSetup { .. } => "E-contract",
+            NotAMeasure { .. }
+            | NeedsAnalysis
+            | WrongMeasureType { .. }
+            | BadArguments { .. }
+            | NoExcitation
+            | MeasureCycle { .. } => "E-measure",
             OpenRange { .. } => "E-value",
         }
     }
@@ -310,6 +375,10 @@ impl DiagKind for ResolveErrorKind {
                     Namespace::Value => "net, port or instance",
                     Namespace::Type => "type",
                     Namespace::Shape => "shape",
+                    Namespace::Setup => "setup",
+                    Namespace::Function => "function",
+                    Namespace::Probe => "probe",
+                    Namespace::Measure => "measure or const",
                 };
                 let notes = suggestion
                     .iter()
@@ -336,6 +405,11 @@ impl DiagKind for ResolveErrorKind {
                 NameKind::Binding => (
                     format!("`{name}` is given twice"),
                     "second time".to_string(),
+                    vec![],
+                ),
+                NameKind::DefaultSetup => (
+                    "the contract names its default setup twice".to_string(),
+                    "second `setup = …;`".to_string(),
                     vec![],
                 ),
                 NameKind::Block | NameKind::Port | NameKind::Setup => (
@@ -580,6 +654,92 @@ impl DiagKind for ResolveErrorKind {
                     )],
                 )
             }
+            NoDefaultSetup { contract, setups } => {
+                let help = match setups.as_slice() {
+                    [] => format!(
+                        "help: `{contract}` has no setup yet: write `setup S for {contract} {{ … }}`, then name it here, `setup = S;`"
+                    ),
+                    [setup] => {
+                        format!("help: name the setup its specs are checked in: `setup = {setup};`")
+                    }
+                    _ => format!(
+                        "help: name the setup its specs are checked in, one of {}",
+                        list_quoted(setups)
+                    ),
+                };
+                (
+                    format!("contract `{contract}` has no default setup"),
+                    "no `setup = …;`".to_string(),
+                    vec![help],
+                )
+            }
+            NotAMeasure { name, is } => (
+                format!("`{name}` isn't a measure"),
+                is.to_string(),
+                vec![
+                    "help: a contract's `let` measures the design, like `dc(out.v)` or `ac(out.v / in.v)`; parts go in the circuit"
+                        .to_string(),
+                ],
+            ),
+            NeedsAnalysis => (
+                "a probe is measured in an analysis".to_string(),
+                "a probe".to_string(),
+                match fix {
+                    Some(_) => write_fix(fix),
+                    None => vec![
+                        "help: `dc(…)` gives its operating point, and `ac(out.v / in.v)` its response to an input"
+                            .to_string(),
+                    ],
+                },
+            ),
+            WrongMeasureType { method, on } => {
+                let takes = match method {
+                    Method::At { .. } => "a response, from `ac(…)`",
+                    Method::Mag => "a phasor, from `.at(f)`",
+                    Method::Db => "a phasor or a number with no unit",
+                    Method::FLow { .. } | Method::FHigh { .. } => {
+                        "a response with no unit, a gain from `ac(out.v / in.v)`"
+                    }
+                };
+                let method = method.name();
+                (
+                    format!("`.{method}()` doesn't apply to {}", describe_measure(*on)),
+                    describe_measure(*on),
+                    vec![format!("note: `.{method}()` takes {takes}")],
+                )
+            }
+            BadArguments { function, expected } => (
+                format!("`{function}` takes {expected}"),
+                "wrong arguments".to_string(),
+                write_fix(fix),
+            ),
+            NoExcitation => (
+                "`ac` measures a net's voltage over an input port's".to_string(),
+                "nothing here is excited".to_string(),
+                vec![
+                    "help: write `ac(out.v / in.v)`, where `in` is an input port: the setup's source there gets the AC stimulus"
+                        .to_string(),
+                ],
+            ),
+            MeasureCycle { cycle } => {
+                let name = &cycle[0];
+                // `a` reads `b`, `b` reads `c`, and `c` reads `a`.
+                let reads: Vec<String> = (cycle.iter().zip(cycle.iter().cycle().skip(1)))
+                    .map(|(reader, read)| format!("`{reader}` reads `{read}`"))
+                    .collect();
+                let notes = match reads.as_slice() {
+                    [_] => vec![],
+                    [first @ .., last] => {
+                        vec![format!("note: {}, and {last}", first.join(", "))]
+                    }
+                    [] => unreachable!("a cycle has a measure"),
+                };
+                (
+                    format!("measure `{name}` is defined in terms of itself"),
+                    format!("this leads back to `{name}`"),
+                    notes,
+                )
+            }
         }
     }
 }
@@ -604,6 +764,16 @@ fn write_fix(fix: Option<&Fix>) -> Vec<String> {
     fix.map(|fix| format!("help: write `{}`", fix.replacement))
         .into_iter()
         .collect()
+}
+
+/// What a measure is, for messages: "a response", "a number in `V`".
+fn describe_measure(ty: MeasureType) -> String {
+    match ty {
+        MeasureType::Probe(_) => "a probe".to_string(),
+        MeasureType::Number { dim, kind } => format!("a number, {}", describe(kind, dim)),
+        MeasureType::Response(_) => "a response over frequency".to_string(),
+        MeasureType::Phasor(_) => "a phasor (a response at one frequency)".to_string(),
+    }
 }
 
 /// What a position expects, for `UnitMismatch`: "a temperature (in `°C`)".

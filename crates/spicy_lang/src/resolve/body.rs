@@ -232,14 +232,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
     /// Every slot's name on `of`, in slot order, for messages.
     fn slot_names(&self, of: InstanceOf) -> Vec<String> {
         match of {
-            InstanceOf::Block(b) => {
-                let mut ports: Vec<_> = self.signatures[b.index()].ports.iter().collect();
-                ports.sort_unstable_by_key(|&(_, port)| port);
-                ports
-                    .into_iter()
-                    .map(|(name, _)| name.to_string())
-                    .collect()
-            }
+            InstanceOf::Block(b) => self.signatures[b.index()].ports.names_in_order(),
             InstanceOf::Part(kind) => {
                 let fields = kind.fields().iter().map(|f| f.name);
                 kind.pins()
@@ -373,8 +366,7 @@ impl<'r, 'p, 'src> BodyResolver<'r, 'p, 'src> {
         spans.kind = path.span;
         if let (Some(first), Some(last)) = (generics.first(), generics.last()) {
             let at = Span::new(first.span.start, last.span.end);
-            let what = "generic arguments";
-            self.r.report(ResolveErrorKind::Unsupported { what }, at);
+            self.r.unsupported("generic arguments", at);
         }
         let slots = match self.kind_named(path) {
             of @ InstanceOf::Part(kind) => Slots {

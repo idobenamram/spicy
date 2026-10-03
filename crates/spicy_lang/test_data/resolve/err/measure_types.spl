@@ -1,0 +1,39 @@
+// Each method of the measure table takes what it takes: `.at(f)` a response, `.mag()`
+// a phasor, `.db()` a ratio, `.f_low` and `.f_high` a gain; with the right arguments.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let h = ac(output.v / input.v);
+    let no_freq = h.mag();
+    let volts_db = dc(output.v).db();
+    let volts_low = dc(output.v).f_low(-3dB);
+    let none = h.at();
+    let two = h.at(1kHz, 2kHz);
+    let zero = h.at(0Hz);
+    let kilovolt = h.at(1kV);
+    let up = h.f_low(3dB);
+    let reference = h.f_high(-3dB, ref: top);
+    let pair = dc(output.v, input.v);
+    let typo = h.at(1kHz).mg();
+    // `.mag()` doesn't apply to a response, so it isn't suggested.
+    let typo_response = h.mg();
+    let later = h.min();
+    let mixed = dc(output.v) + h.at(1kHz).mag();
+    let levels = h.at(1kHz).db() + h.at(2kHz).db();
+    let responses = -h;
+    let indexed = h[Operating];
+    let by_zero = dc(output.v) / 0;
+    let positive = h.f_high(3dB);
+    let flat = h.f_low(0dB);
+    let bw = h.f_high(-3dB);
+    let measured_freq = h.at(bw);
+}

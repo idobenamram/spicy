@@ -352,7 +352,7 @@ model.md §5's table, in id order:
   - `Duplicate`, with `NameKind::DefaultSetup` and `NameKind::Measure`;
   - `UnknownName`:
     - a new `Namespace::Setup` (fix `Operating` for `Operting`);
-    - a new `Namespace::Function` (fix `mag` for `mga`);
+    - a new `Namespace::Function` (fix `mag` for `mg`; a swap like `mga` is two edits, so it gets none);
     - `Namespace::Value` (`outpt.v`);
   - `WrongNamespace`: `dc(r1.v)`, where `r1` is an instance;
   - `MixedUnits`, `NotArithmetic`, and `UnitMismatch` (`h.at(1kV)`);
@@ -367,6 +367,15 @@ model.md §5's table, in id order:
   - ce_amp's contract dump.
 - **Done when:** ce_amp's contract has `setup = Operating` and `let h = ac(output.v / input.v)`.
 - This is the largest step (the measure table and its typing). If it reads too big in review, it splits in two: `dc` first, then `ac` with its methods.
+- **Outcome (2026-10-03, awaiting review):** done when holds. Built as planned, with these changes, each with a test or case file:
+  - `MeasureType::Probe` (not `Signal`, which the port types already use) for `output.v` and `a.v - b.v`, as language.md §8.4 names them; the messages say "probe".
+  - The second-definition rule also covers a contract's lines: the first of two `let`s of a name is `Err`, and so is anything that reads it; the first of two `setup = …;` is `Err`. The first of two contracts is tainted in pass 4, with blocks and setups.
+  - Fixes are offered only where they are the single right answer: a misspelled name where a measure goes gets a note, not a fix (its type may not fit), and suggests only measures and consts; a method is suggested only if it applies to its receiver; `output.v / input.v` gets no `dc(…)` fix, because `ac(…)` takes it too; a positive level gets the fix `-3dB`.
+  - `dc(5V)` is a constant, not a measure; `dc(output.v) / 0` is `DivisionByZero`, as in a value; a measure or a net as a method's argument is `WrongNamespace` ("a constant"); a port whose type is wrong doesn't add `NoExcitation`.
+  - `MeasureCycle` lists the cycle (`` `a` reads `b`, and `b` reads `a` ``).
+  - Stack: the recursion of one measure is cut down to `binary`, so a measure as deep as the parser allows fits a 2 MB stack in a debug build (it overflowed above 818 terms). A chain of lets each reading the next still overflows above about 450 lets (debug) or 1,100 (release): parked, see §3.
+  - `spicy_index::fx::FxHasher::finish` rotates the hash as `rustc-hash` 2 does: names that differed only in their last bytes fell into 32 buckets (400,000 nets took 1.8 s; now 20 ms).
+  - Speed (instructions, against `a86d532`): `resolve_file.typical` +13.1% (about 5.4k instructions per contract with one measure, against about 24k per circuit); every other benchmark within ±0.8%, except `drop_elaborated` +4.4% (the measures' heap blocks). The new pair `measure_chain` (125 and 500 measures) grows 3.6×.
 
 ### Step 4: specs and the `pub` rule
 
@@ -1000,6 +1009,7 @@ Resolve ignores every attribute today, in circuits too. `#[confidence(…)]` is 
 | Attribute arguments `name = value` ([IR] G15) | **Parked.** Only `#[outside(reason = …)]` and `#[check(A = …)]` need them, and neither is in the MVP. Attributes in setups and contracts are "not supported yet" (§2.9 c) |
 | `fn`'s return type needs `->` | **Parked** until `fn` |
 | v5 writes both `impl T for X {}` and `pub block X: T` | **Parked** until traits |
+| A chain of `let`s in a contract, each reading the next, overflows a 2 MB stack: about 450 in a debug build, 1,100 in release (step 3 review) | **Parked (2026-10-03).** No real contract comes near it. Meanwhile the programs that run the front end give it a large stack (rustc runs on 17 MiB, rust-analyzer on 16 MiB). If one ever does: (A) a depth limit with an error, as rustc's `depth_limit` queries (128 by default), counting expression levels too on a 2 MB stack; or (B) type the lets in dependency order with an explicit stack, as flatten's cycle search (a tested prototype is in the step 3 review), so the stack holds one expression |
 | v5 §4.7 cites [IR] "§8" for its questions | **A doc fix:** they're in [IR] §6 |
 | [IR] §4.2's ce_amp setup leaves out `input` and `output` | **Settled by rule 1** (§2.2): that setup would be an `IncompleteSetup`. `circuits/ce_amp.spl` has both. model.md §5 notes it |
 

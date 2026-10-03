@@ -1,0 +1,38 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 704
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/ok/measures.spl
+---
+block Amp 175..178
+  port vcc: Power<In> 181..184
+  port gnd: Ground 197..200
+  port input: Analog<In> 210..215
+  port output: Analog<Out> 229..235
+  net base 274..278
+  r1 = Resistor 288..290
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 346..348
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let gain: number = h.at(1000 Hz).mag()
+  let h: response = ac(output.v / input.v)
+  let level: level dB = h.at(1000 Hz).db()
+  let bass: number Hz = h.f_low(-3 dB)
+  let top: number Hz = h.f_high(-3 dB, ref: dc)
+  let peak: number Hz = h.f_high(-1 dB)
+  let swing: number V = dc(vcc.v - output.v)
+  let headroom: number V = (dc(output.v) - 1 V)
+  let ratio: number = (dc(output.v) / dc(vcc.v))
+  let ratio_db: level dB = ratio.db()
+const OFFSET 149..155 = 1 V
+setup Operating 396..405 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)

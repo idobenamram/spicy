@@ -464,9 +464,11 @@ pub struct Quantity { pub si: f64, pub dim: Dimension, pub kind: QKind }
 pub struct Dimension([i8; 6]);        // s m kg A K rad
 pub enum QKind { Plain, TempPoint, Db }
 
-pub struct Contract {}                // empty until the next phase adds its default setup, measures and specs,
-                                      // and setups, envs and consts to `Design` (contract_v4_review_implementation.md §3.1)
-pub enum MExpr { Probe(Probe), Const(Quantity), Call(MeasureFn, Vec<MExpr>), Binary(Op, Box<MExpr>, Box<MExpr>), … }
+pub struct Contract { pub default_setup: Result<SetupId, Reported>, pub measures: Vec<Measure>, pub tainted: Option<Reported> }
+                                      // specs arrive in contracts_plan.md step 4
+pub struct Measure { pub name: String, pub value: Result<(MExpr, MeasureType), Reported> }
+pub enum MExpr { Const(Quantity), Voltage(NetId), Dc(Box<MExpr>), Ac { out: NetId, input: PortId }, Measure(MeasureId),
+                 Method { method: Method, of: Box<MExpr> }, Neg(Box<MExpr>), Binary { op, lhs, rhs } }   // spicy_model::measure
 
 pub struct FlatDesign {                // ids into the Design, never names copied out of it
     pub root: BlockId,

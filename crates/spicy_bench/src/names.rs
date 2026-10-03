@@ -1,6 +1,7 @@
-//! Inputs for resolve: many names, many values, many mistakes about names, and setups
-//! of a block with many ports. Each is one shape at any size, for a scaling pair (`n`
-//! and `4n`); its doc says the problems resolve finds in it, and a test pins them.
+//! Inputs for resolve: many names, many values, many mistakes about names, setups of a
+//! block with many ports, and a contract with many measures. Each is one shape at any
+//! size, for a scaling pair (`n` and `4n`); its doc says the problems resolve finds in
+//! it, and a test pins them.
 
 use std::fmt::Write;
 
@@ -128,6 +129,25 @@ fn wide_block_setup(ports: usize, unknown: usize) -> String {
     src
 }
 
+/// A contract of `n` measures, each reading the next one (`let m00000 = m00001 * 2;`),
+/// the last `dc(output.v)`: typing `m00000`, the first in name order, types the whole
+/// chain on demand, `n` measures deep. Clean.
+pub fn measure_chain(n: usize) -> String {
+    let mut src = String::from(
+        "block A { input: Analog<In>, output: Analog<Out>, gnd: Ground }\n\n\
+         circuit A {\n    \
+         let r1 = Resistor { a: input, b: output, value: 1k };\n    \
+         let r2 = Resistor { a: output, b: gnd, value: 1k };\n}\n\n\
+         setup S for A { input: Signal { v: 0V }, output: Load {}, temp: 25°C }\n\n\
+         contract A {\n    setup = S;\n",
+    );
+    for i in 0..n - 1 {
+        writeln!(src, "    let m{i:05} = m{:05} * 2;", i + 1).unwrap();
+    }
+    writeln!(src, "    let m{:05} = dc(output.v);\n}}", n - 1).unwrap();
+    src
+}
+
 #[cfg(test)]
 mod tests {
     use spicy_lang::parser::parse;
@@ -145,10 +165,18 @@ mod tests {
     }
 
     #[test]
-    fn named_values_and_wide_setups_are_clean() {
-        for src in [named_values(5), wide_setup(5)] {
+    fn named_values_wide_setups_and_measure_chains_are_clean() {
+        for src in [named_values(5), wide_setup(5), measure_chain(5)] {
             assert_eq!(Problems::of(&src), Problems::default(), "{src}");
         }
+    }
+
+    #[test]
+    fn every_measure_in_a_chain_is_typed() {
+        let resolved = resolve(&parse(&measure_chain(5)));
+        let contract = resolved.design.contracts[0].as_ref().unwrap();
+        let typed: Vec<bool> = contract.measures.iter().map(|m| m.value.is_ok()).collect();
+        assert_eq!(typed, [true; 5]);
     }
 
     #[test]

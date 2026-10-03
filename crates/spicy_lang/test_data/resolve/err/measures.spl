@@ -1,0 +1,46 @@
+// A contract's `let` measures the design in an analysis: not a part, not a constant,
+// not a bare signal; and its name is one the block doesn't have yet, written once.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+const LIMIT: Volt = 1V;
+
+contract Amp {
+    setup = Operating;
+    let part = Resistor { a: vcc, b: gnd, value: 1k };
+    let constant = 2 * 5V;
+    let bare = output.v;
+    let base = dc(output.v);
+    let typo = dc(outpt.v);
+    let call = dcc(output.v);
+    let instance = dc(r1.v);
+    let pin = dc(q1.c);
+    let current = dc(vcc.i);
+    let transient = tran(output.v);
+    let impedance = dc(output.z(1kHz));
+    let gain = dc(output.v);
+    // Which `gain` was meant isn't known: the first is broken too, and so is `twice`,
+    // with no error of its own.
+    let gain = dc(vcc.v);
+    let twice = gain * 2;
+    let of_measure = dc(gain.v);
+    let of_const = dc(LIMIT.v);
+    let port_value = dc(output);
+    let unknown_probe = dc(output.w);
+    // `dc(…)` of a constant is that constant.
+    let constant_dc = dc(5V);
+    // `ac(…)` takes this too, so `dc(…)` isn't the fix.
+    let ratio = output.v / input.v;
+    // A bare name is a measure or a const: neither the net `output` nor `level` itself
+    // is suggested, and `twice` is a note, not a fix (its type may not fit here).
+    let bare_net = dc(outpt);
+    let level = levels.mag();
+    let doubled = twicee * 2;
+}

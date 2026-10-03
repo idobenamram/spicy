@@ -1,0 +1,53 @@
+// A contract names the setup its specs are checked in, once, and it's one of its
+// block's setups.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+block Two { p: Pin }
+
+circuit Two {}
+
+setup Bench for Two { temp: 25°C }
+
+block Three { p: Pin }
+
+circuit Three {}
+
+setup Bench for Three { temp: 25°C }
+
+contract Amp {
+    setup = Operting;
+}
+
+contract Two {
+    let x = 1V;
+}
+
+// Which one was meant isn't known, so the first is broken too.
+contract Three {
+    setup = Bench;
+    setup = Bench;
+}
+
+block Four { p: Pin }
+
+circuit Four {}
+
+contract Four {}
+
+block Five { p: Pin }
+
+circuit Five {}
+
+setup Cold for Five { temp: -40°C }
+
+setup Hot for Five { temp: 85°C }
+
+contract Five {}

@@ -1,0 +1,28 @@
+// A contract's measures (contracts_plan.md step 3): each `let` measures the design in an
+// analysis; a measure can use one written after it.
+const OFFSET: Volt = 1V;
+
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    // Written before `h`, which it reads.
+    let gain = h.at(1kHz).mag();
+    let h = ac(output.v / input.v);
+    let level = h.at(1kHz).db();
+    let bass = h.f_low(-3dB);
+    let top = h.f_high(-3dB, ref: dc);
+    let peak = h.f_high(-1dB);
+    let swing = dc(vcc.v - output.v);
+    let headroom = dc(output.v) - OFFSET;
+    let ratio = dc(output.v) / dc(vcc.v);
+    let ratio_db = ratio.db();
+}

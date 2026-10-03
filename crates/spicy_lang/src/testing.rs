@@ -645,7 +645,11 @@ fn path_text(path: &Path) -> String {
 
 // --- Resolve -----------------------------------------------------------------------
 
-use spicy_model::design::{Design, DesignSourceMap, FieldValue, InstanceOf, PortId, Temp};
+use spicy_model::design::{
+    Block, Design, DesignSourceMap, FieldValue, InstanceOf, Measure, PortId, Temp,
+};
+use spicy_model::measure::{ArithOp, MExpr, MeasureType, Method, Reference};
+use spicy_model::units::QKind;
 
 use spicy_model::flat::{
     Flat, FlatDeviceId, FlatField, FlatInstanceId, FlatNetId, KnobId, KnobSource,
@@ -833,8 +837,25 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
         }
     }
     for (block, contract) in design.blocks.iter().zip(&design.contracts) {
-        if contract.is_some() {
-            let _ = writeln!(out, "contract {}", block.name);
+        let Some(contract) = contract else {
+            continue;
+        };
+        let _ = writeln!(out, "contract {}", block.name);
+        let setup = match contract.default_setup {
+            Ok(id) => design.setups[id.index()].name.as_str(),
+            Err(_) => "<invalid>",
+        };
+        let _ = writeln!(out, "  setup = {setup}");
+        for measure in &contract.measures {
+            match &measure.value {
+                Ok((expr, ty)) => {
+                    let text = measure_text(expr, block, &contract.measures);
+                    let _ = writeln!(out, "  let {}: {} = {text}", measure.name, type_text(*ty));
+                }
+                Err(_) => {
+                    let _ = writeln!(out, "  let {} = <invalid>", measure.name);
+                }
+            }
         }
     }
     let invalid = |_| "<invalid>".to_string();
@@ -887,6 +908,63 @@ fn dump_design(design: &Design, map: &DesignSourceMap) -> String {
     out
 }
 
+/// A measure as written, with the block's and contract's names: `ac(output.v / input.v)`,
+/// `h.at(1000 Hz).mag()`. Arithmetic is parenthesized, so the dump shows how it grouped.
+fn measure_text(expr: &MExpr, block: &Block, measures: &[Measure]) -> String {
+    let text = |e: &MExpr| measure_text(e, block, measures);
+    match expr {
+        MExpr::Const(q) => q.to_string(),
+        MExpr::Voltage(net) => format!("{}.v", block.net(*net).name),
+        // A binary's parentheses are the call's: `dc(vcc.v - output.v)`.
+        MExpr::Dc(x) if matches!(**x, MExpr::Binary { .. }) => format!("dc{}", text(x)),
+        MExpr::Dc(x) => format!("dc({})", text(x)),
+        MExpr::Ac { out, input } => {
+            format!(
+                "ac({}.v / {}.v)",
+                block.net(*out).name,
+                block.port_name(*input)
+            )
+        }
+        MExpr::Measure(id) => measures[id.index()].name.clone(),
+        MExpr::Method { method, of } => {
+            let args = match method {
+                Method::At { hz } => format!("{hz} Hz"),
+                Method::Mag | Method::Db => String::new(),
+                Method::FLow { db } => format!("{db} dB"),
+                Method::FHigh { db, reference } => match reference {
+                    Reference::Peak => format!("{db} dB"),
+                    Reference::Dc => format!("{db} dB, ref: dc"),
+                },
+            };
+            format!("{}.{}({args})", text(of), method.name())
+        }
+        MExpr::Neg(x) => format!("-{}", text(x)),
+        MExpr::Binary { op, lhs, rhs } => {
+            let op = match op {
+                ArithOp::Add => "+",
+                ArithOp::Sub => "-",
+                ArithOp::Mul => "*",
+                ArithOp::Div => "/",
+            };
+            format!("({} {op} {})", text(lhs), text(rhs))
+        }
+    }
+}
+
+/// A measure's type, for the dump: `response`, `number V`, `level dB`.
+fn type_text(ty: MeasureType) -> String {
+    match ty {
+        MeasureType::Probe(_) => "probe".to_string(),
+        MeasureType::Response(_) => "response".to_string(),
+        MeasureType::Phasor(_) => "phasor".to_string(),
+        MeasureType::Number {
+            kind: QKind::Db, ..
+        } => "level dB".to_string(),
+        MeasureType::Number { dim, .. } if dim.is_none() => "number".to_string(),
+        MeasureType::Number { dim, .. } => format!("number {}", dim.symbol()),
+    }
+}
+
 /// Resolving any parsed input never panics, the source map matches the design entry
 /// for entry, every span it records or reports lies inside the input, and every
 /// binding's span lies inside its statement.
@@ -903,6 +981,45 @@ fn check_resolve_invariants(src: &str, parsed: &crate::parser::Parsed) {
         design.contracts.len(),
         "a contract slot per block"
     );
+    assert_eq!(
+        map.contracts.len(),
+        design.contracts.len(),
+        "a span slot per contract"
+    );
+    for (b, (contract, spans)) in design.contracts.iter().zip(&map.contracts).enumerate() {
+        let (Some(contract), Some(spans)) = (contract, spans) else {
+            assert!(
+                contract.is_none() && spans.is_none(),
+                "a contract's spans match it"
+            );
+            continue;
+        };
+        check_span(src, spans.name, "contract name");
+        spans
+            .default_setup
+            .iter()
+            .for_each(|&s| check_span(src, s, "default setup"));
+        if let Ok(id) = contract.default_setup {
+            assert_eq!(
+                design.setups[id.index()].block.index(),
+                b,
+                "the default setup is the block's"
+            );
+        }
+        assert_eq!(
+            contract.measures.len(),
+            spans.measures.len(),
+            "a span per measure"
+        );
+        for (measure, &at) in contract.measures.iter().zip(&spans.measures) {
+            check_span(src, at, "measure name");
+            assert_eq!(
+                &src[at.range()],
+                measure.name,
+                "a measure's span is its name"
+            );
+        }
+    }
     let in_src = |s: Span, what: &str| {
         check_span(src, s, what);
     };

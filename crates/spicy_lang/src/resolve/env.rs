@@ -13,9 +13,7 @@ use spicy_model::prelude::{FieldType, ValueType};
 use spicy_model::units::{Quantity, Value};
 use spicy_span::Span;
 
-use super::{
-    FileValue, NameKind, Namespace, Redefined, ResolveErrorKind, Resolver, suggest, unknown_name,
-};
+use super::{FileValue, NameKind, Namespace, Redefined, ResolveErrorKind, Resolver};
 use crate::parser::ast::{self, ItemKind, ValueDecl};
 
 /// v5's other value types, which are "not supported yet" rather than unknown.
@@ -148,26 +146,16 @@ impl<'p, 'src> Resolver<'p, 'src> {
         };
         let name = self.path_text(path);
         if !args.is_empty() {
-            let what = "type arguments on a value type";
-            return Err(self.report(ResolveErrorKind::Unsupported { what }, ty.span));
+            return Err(self.unsupported("type arguments on a value type", ty.span));
         }
         if let Some(ty) = ValueType::from_name(name) {
             return Ok(ty);
         }
         if LATER_TYPES.contains(&name) {
-            let what = "this type";
-            return Err(self.report(ResolveErrorKind::Unsupported { what }, path.span));
+            return Err(self.unsupported("this type", path.span));
         }
         let names = ValueType::ALL.iter().map(|t| t.name());
-        let suggestion = suggest(&mut self.suggestions_left, name, names);
-        let error = unknown_name(
-            name,
-            Namespace::Type,
-            suggestion.clone(),
-            suggestion,
-            path.span,
-        );
-        Err(error.report(&mut self.errors))
+        Err(self.report_unknown_name(name, Namespace::Type, names, path.span))
     }
 }
 

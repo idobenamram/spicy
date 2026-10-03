@@ -1,0 +1,109 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 750
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/default_setup.spl
+---
+block Amp 107..110
+  port vcc: Power<In> 113..116
+  port gnd: Ground 129..132
+  port input: Analog<In> 142..147
+  port output: Analog<Out> 161..167
+  net base 206..210
+  r1 = Resistor 220..222
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 278..280
+    c → output
+    b → base
+    e → gnd
+block Two 435..438
+  port p: Pin 441..442
+block Three 510..515
+  port p: Pin 518..519
+block Four 787..791
+  port p: Pin 794..795
+block Five 845..849
+  port p: Pin 852..853
+contract Amp
+  setup = <invalid>
+contract Two
+  setup = <invalid>
+  let x = <invalid>
+contract Three
+  setup = <invalid>
+contract Four
+  setup = <invalid>
+contract Five
+  setup = <invalid>
+setup Operating 328..337 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+setup Bench 473..478 for Two
+  temp = 298.15 K (25 °C)
+setup Bench 552..557 for Three
+  temp = 298.15 K (25 °C)
+setup Cold 885..889 for Five
+  temp = 233.14999999999998 K (-40 °C)
+setup Hot 923..926 for Five
+  temp = 358.15 K (85 °C)
+
+--- errors ---
+E-name UnknownName 612..620 "Operting" fix 612..620 "Operating"
+E-contract NoDefaultSetup 634..637 "Two"
+E-measure NotAMeasure 652..654 "1V"
+E-duplicate Duplicate 763..777 "setup = Bench;" related 744..758
+E-contract NoDefaultSetup 830..834 "Four"
+E-contract NoDefaultSetup 962..966 "Five"
+
+--- rendered ---
+error[E-name]: unknown setup `Operting`
+   --> default_setup.spl:26:13
+   |
+26 |     setup = Operting;
+   |             ^^^^^^^^ not defined
+   |
+   = help: did you mean `Operating`?
+
+error[E-contract]: contract `Two` has no default setup
+   --> default_setup.spl:29:10
+   |
+29 | contract Two {
+   |          ^^^ no `setup = …;`
+   |
+   = help: name the setup its specs are checked in: `setup = Bench;`
+
+error[E-measure]: `x` isn't a measure
+   --> default_setup.spl:30:13
+   |
+30 |     let x = 1V;
+   |             ^^ a constant
+   |
+   = help: a contract's `let` measures the design, like `dc(out.v)` or `ac(out.v / in.v)`; parts go in the circuit
+
+error[E-duplicate]: the contract names its default setup twice
+   --> default_setup.spl:36:5
+   |
+35 |     setup = Bench;
+   |     -------------- first defined here
+36 |     setup = Bench;
+   |     ^^^^^^^^^^^^^^ second `setup = …;`
+
+error[E-contract]: contract `Four` has no default setup
+   --> default_setup.spl:43:10
+   |
+43 | contract Four {}
+   |          ^^^^ no `setup = …;`
+   |
+   = help: `Four` has no setup yet: write `setup S for Four { … }`, then name it here, `setup = S;`
+
+error[E-contract]: contract `Five` has no default setup
+   --> default_setup.spl:53:10
+   |
+53 | contract Five {}
+   |          ^^^^ no `setup = …;`
+   |
+   = help: name the setup its specs are checked in, one of `Cold`, `Hot`

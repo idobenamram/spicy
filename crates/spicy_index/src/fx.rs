@@ -1,6 +1,6 @@
 //! The hash maps the compiler stages use for their own tables (`FxHashMap`,
 //! `FxHashSet`): FxHash, the hash rustc (`rustc_data_structures::fx`) and Firefox use,
-//! here as the `rustc-hash` crate's first algorithm.
+//! here as the `rustc-hash` crate's first algorithm with its second's `finish`.
 //!
 //! std's default, SipHash, resists hash flooding from a hostile input and seeds itself
 //! randomly in each process. Neither matters for the names in a source file: SipHash
@@ -72,8 +72,12 @@ impl Hasher for FxHasher {
         self.add(i as u64);
     }
 
+    /// The product's high bits are its best mixed, and a hash table takes its bucket
+    /// from the low bits: the rotation brings 26 high bits down, as `rustc-hash` 2 does.
+    /// Without it, names that differ only in their last bytes (`a0000000`, `a0000001`)
+    /// shared 32 buckets.
     fn finish(&self) -> u64 {
-        self.hash
+        self.hash.rotate_left(26)
     }
 }
 
@@ -94,6 +98,18 @@ mod tests {
         let names: Vec<String> = (0..20).map(|n| "x".repeat(n)).collect();
         let hashes: FxHashSet<u64> = names.iter().map(|n| hash(n)).collect();
         assert_eq!(hashes.len(), names.len());
+    }
+
+    /// Red team: 400 000 nets named `a0000000`, `a0000001`, … took 1 s to resolve, five
+    /// times 200 000's, while their low bits fell in 32 buckets. With the rotation they
+    /// fill 1212 of 4096 (random keys fill about 2590), and 400 000 of them take twice
+    /// as long as 200 000.
+    #[test]
+    fn names_that_differ_at_the_end_spread_over_buckets() {
+        let buckets: FxHashSet<u64> = (0..4096)
+            .map(|i| hash(&format!("a{i:07}")) & 0xfff)
+            .collect();
+        assert!(buckets.len() > 1000, "{} buckets", buckets.len());
     }
 
     #[test]

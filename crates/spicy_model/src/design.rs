@@ -8,6 +8,7 @@
 
 use spicy_index::id;
 
+use crate::measure::{MExpr, MeasureType};
 use crate::prelude::{PartKind, Shape, SignalType};
 use crate::units::{Quantity, Value};
 use spicy_errors::Reported;
@@ -41,6 +42,11 @@ id!(
 id!(
     /// A `setup`, by its position in [`Design::setups`] (source order).
     SetupId
+);
+id!(
+    /// A contract's measure (`let h = …;`), by its position in
+    /// [`Contract::measures`] (source order). Numbered per contract.
+    MeasureId
 );
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -111,10 +117,28 @@ pub enum Temp {
     Value(Value),
 }
 
-/// A block's contract. Its contents (its default setup, measures, specs) are resolved
-/// in the next step (model.md E24, roadmap M1d-5).
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct Contract {}
+/// A block's contract (model.md E24): the setup its specs are checked in, and its
+/// measures. Specs arrive in contracts_plan.md step 4.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Contract {
+    /// `setup = Operating;`: one of the block's setups. `Err` when it's left out or
+    /// names none, reported.
+    pub default_setup: Result<SetupId, Reported>,
+    pub measures: Vec<Measure>,
+    /// As [`Block::tainted`]: whether parsing the contract reported an error, so
+    /// something written may be missing from it, or it's the first of two contracts for
+    /// its block. A broken measure doesn't taint it: only what reads that measure fails.
+    pub tainted: Option<Reported>,
+}
+
+/// `let h = ac(output.v / input.v);` in a contract.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Measure {
+    pub name: String,
+    /// What it computes, and what that is. `Err` when it's wrong, or it's the first of
+    /// two of one name (which was meant isn't known), reported.
+    pub value: Result<(MExpr, MeasureType), Reported>,
+}
 
 impl Design {
     pub fn block(&self, id: BlockId) -> &Block {
@@ -251,6 +275,18 @@ pub struct DesignSourceMap {
     pub envs: Vec<Span>,
     pub consts: Vec<Span>,
     pub setups: Vec<SetupSpans>,
+    /// Each contract's spans, indexed like [`Design::contracts`].
+    pub contracts: Vec<Option<ContractSpans>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ContractSpans {
+    /// The contract's name in `contract Name`.
+    pub name: Span,
+    /// The `setup = S;` statement, if it's written.
+    pub default_setup: Option<Span>,
+    /// Each measure's name in `let name = …`, indexed like [`Contract::measures`].
+    pub measures: Vec<Span>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]

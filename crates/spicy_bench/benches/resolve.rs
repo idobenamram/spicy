@@ -9,7 +9,8 @@ use std::hint::black_box;
 use gungraun::prelude::*;
 
 use spicy_bench::names::{
-    broken_reads, duplicates, named_values, unknown_names, unknown_setup_keys, wide_setup,
+    broken_reads, duplicates, measure_chain, named_values, unknown_names, unknown_setup_keys,
+    wide_setup,
 };
 use spicy_bench::parsed;
 use spicy_bench::typical::{Contracts, board};
@@ -52,6 +53,9 @@ fn resolve_file(parsed: &'static Parsed<'static>) -> Resolved {
 // copies every slot's name), so the sizes are small. At 500, less `wide_setup` at 500:
 // the cost of reporting 500 keys.
 #[benches::unknown_setup_keys(args = [unknown_setup_keys(125), unknown_setup_keys(500)], setup = parsed)]
+// A contract's measures, each typed on demand by the one before it, one call deeper
+// each: the sizes stay far below the ~1,100 that overflow a 2 MiB stack (release).
+#[benches::measure_chain(args = [measure_chain(125), measure_chain(500)], setup = parsed)]
 fn resolve_shape(parsed: &'static Parsed<'static>) -> Resolved {
     resolve(black_box(parsed))
 }

@@ -31,7 +31,7 @@ use super::fields::{Given, UnboundSlots, left_out_required};
 use super::value::unparen;
 use super::{
     BlockBuilder, FileValue, NameKind, Namespace, PerBlock, Redefined, ResolveError,
-    ResolveErrorKind, Resolver, Scope, Signature, suggest, unknown_name,
+    ResolveErrorKind, Resolver, Scope, Signature,
 };
 use crate::parser::ast::{
     Attribute, Body, Expr, ExprKind, Field, Ident, ItemKind, Key, SetupDecl, SetupEntry, StmtKind,
@@ -47,6 +47,15 @@ pub(super) struct ResolvedSetup {
     pub spans: SetupSpans,
     pub broken: Option<Reported>,
     pub item: Span,
+}
+
+/// The file's setups after pass 1: those of a block the file has, in source order, the
+/// second definitions of a name, and each block's setups by name, which a contract's
+/// `setup = S;` names.
+pub(super) struct FileSetups<'src> {
+    pub resolved: Vec<ResolvedSetup>,
+    pub seconds: Vec<Redefined<SetupId>>,
+    pub by_block: Vec<Scope<'src, SetupId>>,
 }
 
 /// The block a setup is for: its id, its ports by name and their types, and its
@@ -167,7 +176,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
         blocks: &[BlockBuilder],
         circuits: &PerBlock<'p, 'src>,
         envs: &[Env],
-    ) -> (Vec<ResolvedSetup>, Vec<Redefined<SetupId>>) {
+    ) -> FileSetups<'src> {
         let mut names: Vec<Scope<SetupId>> = vec![Scope::default(); signatures.len()];
         let (mut setups, mut seconds) = (Vec::new(), Vec::new());
         for item in &self.parsed.file.items {
@@ -203,7 +212,11 @@ impl<'p, 'src> Resolver<'p, 'src> {
                 Err(redefined) => seconds.push(redefined),
             }
         }
-        (setups, seconds)
+        FileSetups {
+            resolved: setups,
+            seconds,
+            by_block: names,
+        }
     }
 
     /// One setup against its block's ports, with where each part of it was written.
@@ -280,8 +293,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
     /// Reports each attribute: none is read on a setup or its entries yet.
     fn no_attributes(&mut self, attrs: &[Attribute]) {
         for attr in attrs {
-            let what = "attributes on a setup";
-            self.report(ResolveErrorKind::Unsupported { what }, attr.span);
+            self.unsupported("attributes on a setup", attr.span);
         }
     }
 
@@ -299,7 +311,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
             _ => None,
         };
         if let Some(what) = unsupported {
-            self.report(ResolveErrorKind::Unsupported { what }, key.span);
+            self.unsupported(what, key.span);
             return None;
         }
         let Some(port) = of.ports.get(first.text) else {
@@ -476,9 +488,8 @@ impl<'p, 'src> Resolver<'p, 'src> {
             return Err(self.report(kind, e.span));
         };
         if let (Some(first), Some(last)) = (lit.generics.first(), lit.generics.last()) {
-            let what = "generic arguments";
             let at = Span::new(first.span.start, last.span.end);
-            self.report(ResolveErrorKind::Unsupported { what }, at);
+            self.unsupported("generic arguments", at);
         }
         let name = self.path_text(&lit.path);
         match Shape::from_name(name) {
@@ -513,9 +524,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
             };
             return Err(self.report(kind, at));
         }
-        let suggestion = suggest(&mut self.suggestions_left, name, [takes.name()]);
-        let error = unknown_name(name, Namespace::Shape, suggestion.clone(), suggestion, at);
-        error.report(&mut self.errors);
+        self.report_unknown_name(name, Namespace::Shape, [takes.name()], at);
         Ok(())
     }
 
@@ -651,10 +660,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
             ExprKind::Range {
                 lo: Some(_),
                 hi: None,
-            } => {
-                let what = "a range with no upper end (`a..`)";
-                Err(self.report(ResolveErrorKind::Unsupported { what }, e.span))
-            }
+            } => Err(self.unsupported("a range with no upper end (`a..`)", e.span)),
             ExprKind::StructLit(lit) if STIMULI.contains(&self.path_text(&lit.path)) => {
                 Err(self.no_stimulus(lit.path.span))
             }
@@ -665,8 +671,7 @@ impl<'p, 'src> Resolver<'p, 'src> {
     /// Reports a step or a sweep, written where a shape or a field's value goes: not
     /// supported yet.
     fn no_stimulus(&mut self, at: Span) -> Reported {
-        let what = "`Step` and `Sweep`";
-        self.report(ResolveErrorKind::Unsupported { what }, at)
+        self.unsupported("`Step` and `Sweep`", at)
     }
 
     // --- Pass 4: `temp` -------------------------------------------------------------

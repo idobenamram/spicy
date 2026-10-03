@@ -1,0 +1,61 @@
+---
+source: crates/spicy_lang/src/resolve/mod.rs
+assertion_line: 750
+expression: "dump_resolve(&file_name(path), &src)"
+input_file: crates/spicy_lang/test_data/resolve/err/measure_cycle.spl
+---
+block Amp 95..98
+  port vcc: Power<In> 101..104
+  port gnd: Ground 117..120
+  port input: Analog<In> 130..135
+  port output: Analog<Out> 149..155
+  net base 194..198
+  r1 = Resistor 208..210
+    a → vcc
+    b → output
+    value = 4700 Ω
+  q1 = Npn 266..268
+    c → output
+    b → base
+    e → gnd
+contract Amp
+  setup = Operating
+  let b = <invalid>
+  let a = <invalid>
+  let selfish = <invalid>
+  let x1 = <invalid>
+  let x2 = <invalid>
+  let x3 = <invalid>
+setup Operating 316..325 for Amp
+  vcc: Supply v = 12 V
+  input: Signal v = 0 V
+  output: Load
+  temp = 298.15 K (25 °C)
+
+--- errors ---
+E-measure MeasureCycle 467..468 "a"
+E-measure MeasureCycle 512..519 "selfish"
+E-measure MeasureCycle 583..585 "x1"
+
+--- rendered ---
+error[E-measure]: measure `a` is defined in terms of itself
+   --> measure_cycle.spl:14:13
+   |
+14 |     let b = a;
+   |             ^ this leads back to `a`
+   |
+   = note: `a` reads `b`, and `b` reads `a`
+
+error[E-measure]: measure `selfish` is defined in terms of itself
+   --> measure_cycle.spl:16:19
+   |
+16 |     let selfish = selfish.mag();
+   |                   ^^^^^^^ this leads back to `selfish`
+
+error[E-measure]: measure `x1` is defined in terms of itself
+   --> measure_cycle.spl:19:14
+   |
+19 |     let x3 = x1;
+   |              ^^ this leads back to `x1`
+   |
+   = note: `x1` reads `x2`, `x2` reads `x3`, and `x3` reads `x1`

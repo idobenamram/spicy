@@ -1,0 +1,30 @@
+// `ac(…)` measures a net's voltage over an input port's, whose source the setup gives
+// the AC stimulus: nothing else can be excited.
+block Amp { vcc: Power<In>, gnd: Ground, input: Analog<In>, output: Analog<Out> }
+
+circuit Amp {
+    net base;
+    let r1 = Resistor { a: vcc, b: output, value: 4.7k };
+    let q1 = Npn { c: output, b: base, e: gnd };
+}
+
+setup Operating for Amp { vcc: Supply { v: 12V }, input: Signal { v: 0V }, output: Load {}, temp: 25°C }
+
+contract Amp {
+    setup = Operating;
+    let alone = ac(output.v);
+    let backwards = ac(input.v / output.v);
+    let product = ac(output.v * input.v);
+}
+
+// A port whose type is wrong may be an input: only its own error is reported.
+block Broken { input: Analgo<In>, output: Analog<Out> }
+
+circuit Broken {}
+
+setup Bench for Broken { output: Load {}, temp: 25°C }
+
+contract Broken {
+    setup = Bench;
+    let h = ac(output.v / input.v);
+}

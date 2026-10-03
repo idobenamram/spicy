@@ -10,6 +10,7 @@ members = [
     "crates/spicy_netlist",
     "crates/spicy_simulate",
     "crates/spicy_span",
+    "crates/spicy_bench",
     "crates/spicy_cli",
     "fuzz",
 ]
